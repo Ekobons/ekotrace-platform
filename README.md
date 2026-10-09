@@ -19,7 +19,9 @@ brands/           Brand packs: name, colours, logo, support e-mail, enabled feat
 docs/             Design notes and change log.
 ```
 
-Not built yet (next steps): login (passwords, SSO, MFA), approvals, dashboards, other categories.
+Built in stages, following the prototype (stationary combustion first; suppliers and product LCA later):
+stage 1 login, roles, organisation, people, methodology, audit log, platform console (done) ·
+stage 2 approvals and data collection · stage 3 home, dashboards, KPIs, reports, assurance · stage 4 net zero and the rest.
 
 ## Run it on a Windows laptop
 
@@ -38,7 +40,13 @@ npm install
 npm run db:migrate
 npm run db:seed        # loads gases, GWP values, DESNZ 2022–2026, IPCC coals (≈10 s)
 
-# 3. Start (builds the screens and starts everything)
+# 3. Your login (platform admin) — prints a temporary password once
+npm run admin:create -- --email you@ekobon.com --name "Your Name"
+
+# 4. Optional: demo company "BEEAH Group (demo)" with one login per role and 21 months of fuel data
+npm run demo
+
+# 5. Start (builds the screens and starts everything)
 npm run app
 ```
 
@@ -61,4 +69,4 @@ npm test               # engine tests + API tests (API tests rebuild the databas
 | `DATABASE_URL` | PostgreSQL connection |
 | `PORT` | API port (4000) |
 | `BRAND` | folder under `brands/` to use (`ekotrace`, `carbontek`) |
-| `DEV_AUTH` | `true` on a laptop only: no login. Must be `false` on any server (then every request is refused until login is built). |
+| `HOST` | `127.0.0.1` (default) = only this computer can connect. On a server behind HTTPS: `0.0.0.0`. |

@@ -13,6 +13,10 @@ import { catalogueRoutes } from './modules/catalogue.routes.js';
 import { referenceRoutes } from './modules/reference.routes.js';
 import { factorRoutes } from './modules/factors.routes.js';
 import { activityRoutes } from './modules/activity.routes.js';
+import { authRoutes } from './modules/auth.routes.js';
+import { orgRoutes } from './modules/org.routes.js';
+import { peopleRoutes } from './modules/people.routes.js';
+import { platformRoutes } from './modules/platform.routes.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const BRANDS = join(HERE, '../../../brands');
@@ -33,8 +37,13 @@ export async function buildApp(opts: { logger?: boolean } = {}): Promise<Fastify
     return JSON.parse(readFileSync(f, 'utf8'));
   });
 
+  // Login / logout (open), then everything else behind a valid session.
+  await app.register(authRoutes);
   await app.register(async (secured) => {
     secured.addHook('onRequest', authenticate);
+    await secured.register(orgRoutes);
+    await secured.register(peopleRoutes);
+    await secured.register(platformRoutes);
     await secured.register(catalogueRoutes);
     await secured.register(referenceRoutes);
     await secured.register(factorRoutes);

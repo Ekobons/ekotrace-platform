@@ -12,7 +12,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { query, tx, tenantTx } from '../db/pool.js';
-import { requirePlatformAdmin, requireTenant } from '../lib/auth.js';
+import { requirePlatformAdmin, requireRole, requireTenant } from '../lib/auth.js';
 import { AppError, notFound } from '../lib/errors.js';
 
 const code = z.string().regex(/^[a-z0-9_:.-]{2,60}$/, 'lower-case letters, digits, _ : . - only');
@@ -182,6 +182,7 @@ export async function catalogueRoutes(app: FastifyInstance) {
   // ------------------------------------------------- per-client visibility --
   app.put('/api/catalogue/visibility', async (req) => {
     const tenant = requireTenant(req);
+    requireRole(req, 'super_admin');
     const b = z.object({ subcategoryId: z.number().int().optional(), itemId: z.number().int().optional(), enabled: z.boolean() })
       .refine((v) => (v.subcategoryId == null) !== (v.itemId == null), 'Give either subcategoryId or itemId').parse(req.body);
     return tenantTx(tenant, async (c) => {

@@ -11,7 +11,9 @@
     "migrate": "tsx src/db/migrate.ts",
     "seed": "tsx src/db/seed.ts",
     "test": "node --import tsx --test test/*.test.ts",
-    "serve": "tsx src/server.ts"
+    "serve": "tsx src/server.ts",
+    "admin:create": "tsx src/cli/create-admin.ts",
+    "demo": "tsx src/cli/demo.ts"
   },
   "dependencies": {
     "@ekotrace/calc": "*",

@@ -10,11 +10,18 @@ export interface Category { id: number; scope: number; code: string; name: strin
 export interface Unit { code: string; name: string; dimension: string; to_base: number; is_base: boolean; aliases: string[]; active: boolean }
 export interface ResultLine { basis: Basis; gas: string; kgGas: number | null; kgCo2e: number; factorId: number | null; method: 'gas' | 'published' }
 export interface CalcResponse { item: { id: number; name: string; category: string }; gwpSet: string; lines: ResultLine[]; totals: Record<Basis, number>; steps: string[]; warnings: string[] }
-export interface Tenant { id: string; name: string; country: string; gwp_set: string }
-export interface Facility { id: string; name: string; country: string; active: boolean }
+export interface Tenant { id: string; name: string; country: string; gwp_set: string; consolidation?: string; base_year?: number; plan?: string; status?: string; access_expiry?: string }
+export type Role = 'platform_admin' | 'super_admin' | 'admin' | 'manager' | 'preparer' | 'verifier';
+export interface Me { user: { id: string; name: string; email: string; role: Role; tenantId: string | null; scopeNodeId: string | null; mustChangePassword: boolean }; company: (Tenant & { scope_name: string | null }) | null }
+export interface OrgNode { id: string; parent_id: string | null; kind: 'group' | 'subgroup' | 'facility'; name: string; facility_type: string | null; location: string | null; country: string; floor_area_m2: number | null; employees: number | null; ownership_pct: number; operational_control: boolean; financial_control: boolean; active: boolean; sort: number; manager_user_id: string | null; manager_name: string | null; entries: number; canEdit: boolean; canSee: boolean; canEnter: boolean }
+export interface Person { id: string; name: string; email: string; role: Role; scope_node_id: string | null; scope_name: string | null; disabled: boolean; last_login_at: string | null; created_at: string; must_change_password: boolean; facilities: { id: string; name: string }[]; manages: { id: string; name: string }[]; canEdit: boolean }
+export interface Company { id: string; name: string; country: string; gwp_set: string; plan: string; status: string; access_start: string; access_expiry: string; created_at: string; users: number; facilities: number; entries: number; last_login: string | null }
+export const ROLE_LABEL: Record<Role, string> = { platform_admin: 'Platform admin', super_admin: 'Super admin', admin: 'Admin', manager: 'Manager', preparer: 'Data preparer', verifier: 'Verifier' };
+export interface Facility { id: string; name: string; country: string; active: boolean; facility_type?: string | null; parent_name?: string | null; canEnter?: boolean; canApprove?: boolean }
 export interface Factor { id: number; item_id: number; item: string; subcategory: string; basis: Basis; unit: string; co2e: number | null; region: string; valid_from: string; valid_to: string; status: string; version: number; supersedes_id: number | null; note: string | null; source: string; gwp_set: string | null; gases: { gas: string; kgPerUnit: number }[] | null }
 export interface Activity { id: string; period_start: string; period_end: string; facility: string; category: string; item: string; quantity: number; unit: string; data_type: string; gwp_set: string; co2e_direct: number; co2e_wtt: number; co2_biogenic: number; co2e_memo: number; status: string; created_at: string }
 
+/** Platform admin only: the company being looked at (sent as x-tenant-id). Others are fixed to their own company. */
 let tenantId = localStorageGet('ekotrace.tenant');
 function localStorageGet(k: string): string | null { try { return localStorage.getItem(k); } catch { return null; } }
 export function setTenant(id: string | null) {
@@ -24,17 +31,23 @@ export function setTenant(id: string | null) {
 export const currentTenant = () => tenantId;
 
 export class ApiError extends Error {
-  constructor(message: string, public status: number, public details?: { field: string; message: string }[]) { super(message); }
+  constructor(message: string, public status: number, public code?: string, public details?: { field: string; message: string }[]) { super(message); }
 }
+/** Called when the session has ended, so the app can show the login page. */
+let onUnauthenticated: () => void = () => {};
+export function whenLoggedOut(fn: () => void) { onUnauthenticated = fn; }
 
 async function call<T>(method: string, path: string, body?: unknown, raw?: Blob): Promise<T> {
+  // eslint-disable-next-line no-param-reassign
   const headers: Record<string, string> = {};
   if (tenantId) headers['x-tenant-id'] = tenantId;
-  if (body !== undefined) headers['content-type'] = 'application/json';
+  if (body !== undefined || (method !== 'GET' && method !== 'DELETE' && !raw)) headers['content-type'] = 'application/json';
+  if (body === undefined && method !== 'GET' && method !== 'DELETE' && !raw) body = {};
   if (raw) headers['content-type'] = 'application/octet-stream';
   const r = await fetch(path, { method, headers, body: raw ?? (body !== undefined ? JSON.stringify(body) : undefined) });
   const data = await r.json().catch(() => ({}));
-  if (!r.ok) throw new ApiError(data.message ?? `Request failed (${r.status})`, r.status, data.details);
+  if (r.status === 401 && !path.startsWith('/api/auth/login')) onUnauthenticated();
+  if (!r.ok) throw new ApiError(data.message ?? `Request failed (${r.status})`, r.status, data.error, data.details);
   return data as T;
 }
 
@@ -51,12 +64,29 @@ export const api = {
   resolveIssue: (id: number, resolved: boolean) => call('PATCH', `/api/admin/import-issues/${id}`, { resolved }),
   importDesnz: (file: Blob, preview: boolean) => call<{ year: number; version: string; gwpSet: string; fuelRows: number; gasRows: number; skipped?: boolean; factors?: number; items?: number; issues?: number }>('POST', `/api/admin/import/desnz${preview ? '?preview=1' : ''}`, undefined, file),
   addFactor: (b: unknown) => call<{ factor: Factor; replaced: number | null }>('POST', '/api/admin/factors', b),
-  tenants: () => call<{ tenants: Tenant[] }>('GET', '/api/tenants'),
-  createTenant: (b: { name: string; country: string; gwpSet: string }) => call<Tenant>('POST', '/api/admin/tenants', b),
+  // auth
+  login: (email: string, password: string) => call<{ ok: true }>('POST', '/api/auth/login', { email, password }),
+  logout: () => call<{ ok: true }>('POST', '/api/auth/logout'),
+  me: () => call<Me>('GET', '/api/auth/me'),
+  changePassword: (current: string, next: string) => call<{ ok: true }>('POST', '/api/auth/password', { current, next }),
+  // company
   tenant: () => call<Tenant>('GET', '/api/tenant'),
-  updateTenant: (b: { gwpSet?: string; country?: string }) => call<Tenant>('PATCH', '/api/tenant', b),
+  updateTenant: (b: { gwpSet?: string; country?: string; consolidation?: string; baseYear?: number }) => call<Tenant>('PATCH', '/api/tenant', b),
+  boundaries: (year: number) => call<{ year: number; current: string; totals: Record<'operational' | 'financial' | 'equity', number>; facilities: { id: string; name: string; parent_name: string; ownership_pct: number; operational_control: boolean; financial_control: boolean; co2e_direct: number }[] }>('GET', `/api/boundaries?year=${year}`),
   facilities: () => call<{ facilities: Facility[] }>('GET', '/api/facilities'),
-  createFacility: (b: { name: string; country?: string }) => call<Facility>('POST', '/api/facilities', b),
+  org: () => call<{ nodes: OrgNode[] }>('GET', '/api/org'),
+  createNode: (b: Record<string, unknown>) => call<OrgNode>('POST', '/api/org/nodes', b),
+  updateNode: (id: string, b: Record<string, unknown>) => call<OrgNode>('PATCH', `/api/org/nodes/${id}`, b),
+  removeNode: (id: string) => call<{ removed: boolean; archived: boolean; message?: string }>('DELETE', `/api/org/nodes/${id}`),
+  users: () => call<{ users: Person[] }>('GET', '/api/users'),
+  createUser: (b: Record<string, unknown>) => call<{ user: Person; temporaryPassword: string }>('POST', '/api/users', b),
+  updateUser: (id: string, b: Record<string, unknown>) => call<Person>('PATCH', `/api/users/${id}`, b),
+  resetPassword: (id: string) => call<{ temporaryPassword: string }>('POST', `/api/users/${id}/reset-password`),
+  audit: (q: Record<string, string | number | undefined> = {}) => call<{ events: { id: number; at: string; user_name: string | null; action: string; entity: string | null; entity_id: string | null; detail: unknown; ip: string | null }[] }>('GET', `/api/audit?${new URLSearchParams(Object.entries(q).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)]))}`),
+  // platform console
+  companies: () => call<{ companies: Company[] }>('GET', '/api/platform/companies'),
+  createCompany: (b: Record<string, unknown>) => call<{ company: Company; superAdmin: { email: string; temporaryPassword: string } }>('POST', '/api/platform/companies', b),
+  updateCompany: (id: string, b: Record<string, unknown>) => call<Company>('PATCH', `/api/platform/companies/${id}`, b),
   calculate: (b: unknown) => call<CalcResponse>('POST', '/api/calculate', b),
   saveActivity: (b: unknown) => call<{ id: string; totals: Record<Basis, number>; warnings: string[] }>('POST', '/api/activities', b),
   activities: (q: Record<string, string | number | undefined> = {}) => call<{ activities: Activity[] }>('GET', `/api/activities?${new URLSearchParams(Object.entries(q).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)]))}`),

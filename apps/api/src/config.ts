@@ -27,6 +27,7 @@ export const config = {
   databaseUrl: required('DATABASE_URL'),
   port: Number(process.env.PORT ?? 4000),
   brand: process.env.BRAND ?? 'ekotrace',
-  devAuth: /^(1|true|yes)$/i.test(process.env.DEV_AUTH ?? ''),
+  /** 127.0.0.1 = only this computer can connect (laptop). Servers set HOST=0.0.0.0 behind HTTPS. */
+  host: process.env.HOST ?? '127.0.0.1',
   dbPoolSize: Number(process.env.DB_POOL_SIZE ?? 20),
 };

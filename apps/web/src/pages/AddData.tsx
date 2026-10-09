@@ -74,7 +74,7 @@ export function AddData() {
     });
   }, [catCode, tenant?.id]);
   useEffect(() => {
-    api.facilities().then((f) => { setFacilities(f.facilities); setFacilityId((id) => (f.facilities.some((x) => x.id === id) ? id : f.facilities[0]?.id ?? '')); });
+    api.facilities().then((f) => { const mine = f.facilities.filter((x) => x.canEnter); setFacilities(mine); setFacilityId((id) => (mine.some((x) => x.id === id) ? id : mine[0]?.id ?? '')); });
   }, [tenant?.id]);
 
   const sub = cat?.subcategories.find((s) => s.id === subId) ?? null;
@@ -158,8 +158,8 @@ export function AddData() {
           <label className="field" style={{ minWidth: 260 }}>
             <span>Facility</span>
             <select className="input" value={facilityId} onChange={(e) => setFacilityId(e.target.value)}>
-              {!facilities.length && <option value="">No facilities yet — add one in Company & facilities</option>}
-              {facilities.map((f) => <option key={f.id} value={f.id}>{f.name} ({f.country})</option>)}
+              {!facilities.length && <option value="">No facilities you can enter data for — ask your administrator</option>}
+              {facilities.map((f) => <option key={f.id} value={f.id}>{f.parent_name ? `${f.parent_name} › ` : ''}{f.name}</option>)}
             </select>
           </label>
           <label className="field">
