@@ -15,49 +15,64 @@ const isoTime = (s: string) => s.replace(/^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{4
 const localTime = (iso: string, tz?: string) => new Date(iso).toLocaleString('en-GB', { timeZone: tz, day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 
 export function Meters() {
-  const { role, tenant } = useApp();
-  const tz = tenant?.timezone ?? 'Asia/Dubai';
-  const [params, setParams] = useSearchParams();
   const [facilities, setFacilities] = useState<Facility[]>([]);
   const [facilityId, setFacilityId] = useState('');
-  const [meters, setMeters] = useState<Meter[]>([]);
-  const [open, setOpen] = useState<string | null>(params.get('id'));
-  const [adding, setAdding] = useState<MeterDraft | null | false>(false);
-  const canManage = ['platform_admin', 'super_admin', 'admin', 'manager'].includes(role);
-  const load = () => api.meters(facilityId || undefined).then((r) => setMeters(r.meters));
   useEffect(() => { api.facilities().then((r) => setFacilities(r.facilities)); }, []);
-  useEffect(() => { load(); }, [facilityId]); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => { if (params.get('new')) { setAdding(takeDraft()); setParams({}, { replace: true }); } }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
   return (
     <div className="page">
       <div className="head">
         <div><div className="eyebrow">Capture</div><h1>Meters</h1>
-          <p className="sub">Meters whose readings arrive from another system (hourly, daily, weekly, monthly) or from bills. Each ended month becomes one entry, with its coverage and any gaps shown.</p></div>
+          <p className="sub">All meters across the company and how their readings are arriving. Each ended month becomes one entry, with its coverage and any gaps shown. A facility's own meters are also under Organisation → the facility → Meters.</p></div>
         <label className="field" style={{ alignSelf: 'flex-end', minWidth: 240 }}><span>Facility</span>
           <select className="input" value={facilityId} onChange={(e) => setFacilityId(e.target.value)}>
             <option value="">All facilities</option>{facilities.map((f) => <option key={f.id} value={f.id}>{f.parent_name ? `${f.parent_name} › ` : ''}{f.name}</option>)}</select></label>
-        {canManage && <button className="btn p" style={{ alignSelf: 'flex-end' }} onClick={() => setAdding(null)}><Icon name="plus" />Add meter</button>}
       </div>
-      {adding !== false && <MeterForm draft={adding} facilities={facilities.filter((f) => f.canEnter)} onDone={(m) => { setAdding(false); load(); if (m) setOpen(m.id); }} />}
-      <div className="card flush">
+      <MeterRegister facilityId={facilityId || undefined} facilities={facilities} />
+    </div>
+  );
+}
+
+/**
+ * The meter list with its add form and the open meter's panel. Used on Capture → Meters
+ * (all facilities) and on the facility page (one facility, `embedded`).
+ */
+export function MeterRegister({ facilityId, facilities, embedded, canEditFacility = true, onCount }: { facilityId?: string; facilities: Facility[]; embedded?: boolean; canEditFacility?: boolean; onCount?: (n: number) => void }) {
+  const { role, tenant } = useApp();
+  const tz = tenant?.timezone ?? 'Asia/Dubai';
+  const [params, setParams] = useSearchParams();
+  const [meters, setMeters] = useState<Meter[]>([]);
+  const [open, setOpen] = useState<string | null>(embedded ? null : params.get('id'));
+  const [adding, setAdding] = useState<MeterDraft | null | false>(false);
+  const canManage = ['platform_admin', 'super_admin', 'admin', 'manager'].includes(role) && canEditFacility;
+  const load = () => api.meters(facilityId).then((r) => { setMeters(r.meters); onCount?.(r.meters.length); });
+  useEffect(() => { load(); }, [facilityId]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (!embedded && params.get('new')) { setAdding(takeDraft()); setParams({}, { replace: true }); } }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const formFacilities = (facilityId ? facilities.filter((f) => f.id === facilityId) : facilities).filter((f) => f.canEnter);
+
+  return (
+    <div style={{ display: 'grid', gap: 12, minWidth: 0 }}>
+      {canManage && adding === false && <div className="row" style={{ justifyContent: embedded ? 'space-between' : 'flex-end' }}>
+        {embedded && <span className="sub">Readings arrive through the API, from bills or pasted in the meter. To follow all meters at once: Capture → Meters.</span>}
+        <button className="btn p sm" onClick={() => setAdding(null)}><Icon name="plus" />Add meter</button></div>}
+      {adding !== false && <MeterForm draft={adding} facilities={formFacilities} onDone={(m) => { setAdding(false); load(); if (m) setOpen(m.id); }} />}
+      <div className={embedded ? 'scrollx' : 'card flush'}>
         {meters.length ? (
           <table className="t">
-            <thead><tr><th>Meter</th><th>Measures</th><th>Readings</th><th>Last reading</th><th className="num">Count</th><th className="num">Entries</th><th /></tr></thead>
+            <thead><tr><th>Meter</th><th>Measures</th><th>Readings</th><th>Last reading</th>{!embedded && <th className="num">Count</th>}<th className="num">Entries</th><th /></tr></thead>
             <tbody>{meters.map((m) => (
               <tr key={m.id} className={`click ${open === m.id ? 'sel' : ''}`} onClick={() => setOpen(open === m.id ? null : m.id)}>
-                <td><b>{m.name}</b>{!m.active && <span className="chip grey" style={{ marginLeft: 6 }}>inactive</span>}<div className="muted small">{m.facility} · <span className="mono">{m.external_id}</span>{m.account_no ? ` · account ${m.account_no}` : ''}</div></td>
+                <td><b>{m.name}</b>{!m.active && <span className="chip grey" style={{ marginLeft: 6 }}>inactive</span>}<div className="muted small">{embedded ? '' : `${m.facility} · `}<span className="mono">{m.external_id}</span>{m.account_no ? ` · account ${m.account_no}` : ''}</div></td>
                 <td>{m.item}<div className="muted small">{m.category_name}</div></td>
                 <td>{FREQ[m.frequency]} · {m.reading_type === 'cumulative' ? 'register' : 'per period'}<div className="muted small">{unitLabel(m.unit)}{Number(m.multiplier) !== 1 ? ` × ${Number(m.multiplier)}` : ''}</div></td>
                 <td>{m.last ? <>{num(Number(m.last.value))}<div className="muted small">{localTime(m.last.ts, tz)}</div></> : <span className="chip warn">none yet</span>}</td>
-                <td className="num">{m.readings.toLocaleString('en')}</td>
+                {!embedded && <td className="num">{m.readings.toLocaleString('en')}</td>}
                 <td className="num">{m.entries}</td>
                 <td>{m.auto_entries ? <span className="chip">automatic</span> : <span className="chip grey">manual</span>}</td>
               </tr>))}</tbody>
           </table>
-        ) : <div className="empty">No meters{facilityId ? ' for this facility' : ''} yet. Add one here, or from Add data (Month by month → “Set up a meter with these inputs”).</div>}
+        ) : <div className="empty">No meters{facilityId ? ' for this facility' : ''} yet.{canManage ? ' Add one here, or from Add data (Month by month → “Set up a meter with these inputs”).' : ''}</div>}
       </div>
-      {open && <MeterPanel key={open} id={open} facilities={facilities} canManage={canManage} onChanged={load} onClose={() => setOpen(null)} />}
+      {open && <div className={embedded ? 'scrollx' : undefined}><MeterPanel key={open} id={open} facilities={facilities} canManage={canManage} onChanged={load} onClose={() => setOpen(null)} /></div>}
     </div>
   );
 }

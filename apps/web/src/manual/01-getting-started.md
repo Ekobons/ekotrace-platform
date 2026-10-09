@@ -41,7 +41,19 @@ Every request is checked on the server against these rules — hiding a button i
 
 ## The organisation
 
-Organisation & groups holds the structure: **main entity → sub-groups → facilities**. Data is always entered for a facility. Each facility has a profile (type, location, manager), its **vehicle fleet**, its **landfill sites** and its **grid region** (the emirate or grid it buys electricity from).
+Organisation & groups holds the structure: **main entity → sub-groups → facilities**. Data is always entered for a facility.
+
+Everything that **describes** a facility — set up once, changed rarely — is on the facility itself, in tabs (Organisation → click the facility):
+
+| Tab | What it holds |
+|---|---|
+| Profile | type, location, manager, floor area, employees, ownership and control, **grid region** (the emirate or grid it buys electricity from) |
+| Meters | the facility's meters: what each measures, how often readings come, the utility account number; open one to see its months and readings |
+| Energy | the energy set-up at a glance: grid region and its factors, utility accounts that bills are matched to, certificates and contracts usable here |
+| Vehicle fleet | the vehicles based here, with in-service and retired dates |
+| Landfill sites | landfills the company operates here, with their history of waste placed |
+
+What **arrives** month after month stays under Capture, where it can be followed across all facilities at once: **Meters** (all meters and how their readings are coming in) and **Bills** (the one place to upload PDF bills). Certificates and supplier factors are kept for the whole company under Setup → Energy certificates & suppliers; the Energy tab shows the ones that apply to the facility.
 
 **Methodology & boundaries** sets how the company reports: the consolidation approach (operational control, financial control or equity share — totals shown live for all three), the GWP set (AR4, AR5 or AR6) and the base year. A joint venture is handled by its ownership % and control flags.
 

@@ -290,3 +290,9 @@ pre.code { background: #F4F7F5; border: 1px solid var(--line); border-radius: 10
   .mchapter { break-before: page; } .mchapter:first-child { break-before: auto; }
   .mf-step, .ml-row, .ms-col, .mdoc table { break-inside: avoid; }
 }
+
+/* Wide tables inside the facility panel scroll sideways instead of stretching it. */
+.scrollx { min-width: 0; overflow-x: auto; }
+.facility-energy dl { display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; margin: 0; }
+.facility-energy dt { color: var(--muted); }
+.facility-energy dd { margin: 0; }

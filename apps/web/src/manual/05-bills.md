@@ -9,7 +9,7 @@ Electricity, cooling, heat and gas bills can be uploaded as PDF in one place (Ca
 ! File checks | must be a real PDF; the same file uploaded twice is recognised and not stored again
 > Text read | supplier, account no., bill no., billing period, bill date, consumption and unit, amount — each with the line of the bill it came from
 ? Text in the PDF? | Yes: fields filled in from the bill | No (a scan): flagged — type the figures from the preview
-> Matched to a meter | by the account number; or chosen; or “New meter for this account”
+> Matched to a meter | by the account number; or chosen; or “New meter for this account” (a facility’s accounts are listed on its Energy tab)
 * A person checks | every field against the PDF shown beside it, corrects what is needed
 ? Correct? | Book it: one reading for the billing period | Reject it, with a reason (duplicate, not ours, water only…)
 > Months follow | the consumption is split over the months the bill covers, by days; the meter's monthly entries are created or updated

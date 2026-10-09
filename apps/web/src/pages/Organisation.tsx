@@ -5,10 +5,12 @@
  */
 import { useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
 import { useApp } from '../App';
-import { api, type GridRegion, type OrgNode, type Person } from '../lib/api';
+import { api, type Facility, type GridRegion, type OrgNode, type Person } from '../lib/api';
 import { Icon } from '../components/Icon';
 import { Fleet } from '../components/Fleet';
 import { WasteSites } from '../components/WasteSites';
+import { FacilityEnergy } from '../components/FacilityEnergy';
+import { MeterRegister } from './Meters';
 
 const TYPES = ['Office', 'Plant', 'Warehouse', 'Fleet depot', 'Data centre', 'Residential', 'Retail', 'Landfill', 'Laboratory', 'Other'];
 
@@ -156,8 +158,11 @@ function NodeForm({ f, setF, kind, managers, disabled }: { f: F; setF: (f: F) =>
 }
 
 function Profile({ node, nodes, managers, onClose, onSaved }: { node: OrgNode; nodes: OrgNode[]; managers: Person[]; onClose: () => void; onSaved: (m: string) => void }) {
-  const [tab, setTab] = useState<'profile' | 'fleet' | 'waste'>('profile');
+  const [tab, setTab] = useState<'profile' | 'meters' | 'energy' | 'fleet' | 'waste'>('profile');
   const [fleetCount, setFleetCount] = useState<number | null>(null);
+  const [meterCount, setMeterCount] = useState<number | null>(null);
+  const [facilities, setFacilities] = useState<Facility[]>([]);
+  useEffect(() => { if (node.kind === 'facility') { api.facilities().then((r) => setFacilities(r.facilities)).catch(() => setFacilities([])); api.meters(node.id).then((r) => setMeterCount(r.meters.length)).catch(() => {}); } }, [node.id, node.kind]);
   const [f, setF] = useState(fieldsFrom(node));
   const [parent, setParent] = useState(node.parent_id ?? '');
   const [err, setErr] = useState<string | null>(null);
@@ -172,10 +177,14 @@ function Profile({ node, nodes, managers, onClose, onSaved }: { node: OrgNode; n
       {node.kind === 'facility' && (
         <div className="tabs">
           <button className={tab === 'profile' ? 'on' : ''} onClick={() => setTab('profile')}>Profile</button>
+          <button className={tab === 'meters' ? 'on' : ''} onClick={() => setTab('meters')}>Meters{meterCount != null ? ` (${meterCount})` : ''}</button>
+          <button className={tab === 'energy' ? 'on' : ''} onClick={() => setTab('energy')}>Energy</button>
           <button className={tab === 'fleet' ? 'on' : ''} onClick={() => setTab('fleet')}>Vehicle fleet{fleetCount != null ? ` (${fleetCount})` : ''}</button>
           <button className={tab === 'waste' ? 'on' : ''} onClick={() => setTab('waste')}>Landfill sites</button>
         </div>
       )}
+      {tab === 'meters' && node.kind === 'facility' && <MeterRegister embedded facilityId={node.id} facilities={facilities} canEditFacility={node.canEnter && node.active} onCount={setMeterCount} />}
+      {tab === 'energy' && node.kind === 'facility' && <FacilityEnergy node={node} onProfile={() => setTab('profile')} />}
       {tab === 'waste' && node.kind === 'facility' && <WasteSites facilityId={node.id} canEdit={node.canEnter && node.active && canManageFleet} />}
       {tab === 'fleet' && node.kind === 'facility' && <Fleet facilityId={node.id} canEdit={node.canEnter && node.active && canManageFleet} onCount={setFleetCount} />}
       {tab === 'profile' && <>

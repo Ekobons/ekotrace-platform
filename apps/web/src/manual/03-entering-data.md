@@ -31,7 +31,7 @@ From the month-by-month view, **“Set up a meter with these inputs”** turns t
 | One entry | every tab | a single bill, invoice or record |
 | Paste or type rows | Vehicles | many vehicles and months at once, in everyday words |
 | Excel upload | Vehicles (template per fleet and month) | fleet data kept in spreadsheets |
-| Meters | Capture → Meters | readings sent by another system (hourly to monthly) |
+| Meters | Capture → Meters, or the facility's Meters tab | readings sent by another system (hourly to monthly) |
 | Bills | Capture → Bills | PDF utility bills |
 
 ## What is saved with an entry

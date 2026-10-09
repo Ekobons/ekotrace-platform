@@ -2,6 +2,13 @@
 
 Newest first.
 
+## 2026-10-10 (7) — Facility page holds the facility's set-up
+
+- Organisation → facility now has tabs **Profile · Meters · Energy · Vehicle fleet · Landfill sites** — everything that describes the facility in one place.
+- **Meters tab**: the facility's meters (add with the facility already filled in; open a meter for its months, readings and settings). Same component as Capture → Meters, which stays as the company-wide view with a facility filter.
+- **Energy tab**: grid region with its latest factors (or a prompt to set one), utility accounts that bills are matched to, and the certificates / contracts usable at the facility (its own and company-wide) with MWh left — with links to where each is managed.
+- Manual updated: Getting started (facility tabs vs. Capture), Entering data, Meters, Bills.
+
 ## 2026-10-10 (6) — User manual in the app; session inactivity timeout
 
 - **User manual** (Help → User manual, every role): getting started, each data category explained, entering data, meters, bills, factors & methodology, a dedicated **security** chapter, integrations & API, glossary. Flow charts, a scopes overview, protection layers and a month-split diagram. Searchable; "Print / save as PDF" prints all chapters.
