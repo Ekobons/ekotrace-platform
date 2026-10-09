@@ -147,3 +147,8 @@ dialog.drawer::backdrop { background: #0B2A2533; }
 .modal .in { padding: 20px; display: grid; gap: 12px; }
 .secret { font-family: var(--f-mono); font-size: 16px; background: var(--warn-bg); color: var(--warn); padding: 10px 12px; border-radius: 10px; user-select: all; }
 .avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--primary-soft); color: var(--ok); display: grid; place-items: center; font-weight: 700; font-size: 12px; flex: none; }
+
+/* Show split by gas */
+.disclose { justify-self: start; gap: 6px; padding-left: 4px; }
+.disclose svg { width: 14px; height: 14px; transform: rotate(-90deg); transition: transform .15s; }
+.disclose[aria-expanded="true"] svg { transform: none; }

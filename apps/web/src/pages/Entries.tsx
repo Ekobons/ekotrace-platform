@@ -6,12 +6,14 @@ import { useEffect, useRef, useState } from 'react';
 import { api, BASIS_LABEL, num, tco2e, type Activity } from '../lib/api';
 import { Result } from '../components/Result';
 import { Icon } from '../components/Icon';
+import { GasToggle, useGasSplit } from '../components/GasToggle';
 
 export function Entries() {
   const [year, setYear] = useState(new Date().getFullYear());
   const [rows, setRows] = useState<Activity[]>([]);
   const [gas, setGas] = useState<Awaited<ReturnType<typeof api.byGas>>['rows']>([]);
   const [open, setOpen] = useState<Awaited<ReturnType<typeof api.activity>> | null>(null);
+  const [showGas, toggleGas] = useGasSplit();
   const dlg = useRef<HTMLDialogElement>(null);
 
   useEffect(() => {
@@ -39,15 +41,18 @@ export function Entries() {
       </div>
 
       <div className="card flush">
-        <div style={{ padding: '14px 16px 6px' }}><h2>By greenhouse gas · {year}</h2><p className="sub">Each gas in kg and in CO₂e. Totals given by a source without a gas split appear as “CO2e”.</p></div>
-        {gas.length ? (
+        <div className="row" style={{ padding: '14px 16px 10px' }}>
+          <div className="grow"><h2>By greenhouse gas · {year}</h2><p className="sub">Each gas in kg and in CO₂e. Totals given by a source without a gas split appear as “CO2e”.</p></div>
+          {gas.length > 0 && <GasToggle open={showGas} onToggle={toggleGas} count={new Set(gas.filter((g) => g.kg_gas != null).map((g) => g.gas)).size} />}
+        </div>
+        {!gas.length ? <div className="empty">No entries for {year}.</div> : showGas && (
           <table className="t">
             <thead><tr><th>Category</th><th>Part</th><th>Gas</th><th className="num">kg of gas</th><th className="num">tCO₂e</th></tr></thead>
             <tbody>{gas.map((g, i) => (
               <tr key={i}><td>{g.category}</td><td>{BASIS_LABEL[g.basis]}</td><td className="mono">{g.gas}</td><td className="num">{num(g.kg_gas)}</td><td className="num">{tco2e(g.kg_co2e)}</td></tr>
             ))}</tbody>
           </table>
-        ) : <div className="empty">No entries for {year}.</div>}
+        )}
       </div>
 
       <div className="card flush">

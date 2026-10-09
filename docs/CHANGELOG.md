@@ -2,6 +2,11 @@
 
 Newest first.
 
+## 2026-10-09 (4) — CO₂e first, split by gas below
+
+- Add data (live result), the entry drawer and Entries & results show the CO₂e totals first. The split by gas sits below behind **Show split by gas**, closed by default; the choice is remembered on that browser.
+- Calculation unchanged: still each gas × the company's GWP set, so per-gas reporting and the GWP setting keep working.
+
 ## 2026-10-09 (3) — Stage 1: login, roles, organisation, people, methodology, audit log, platform console
 
 **Login and security**
