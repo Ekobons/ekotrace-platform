@@ -28,6 +28,8 @@ export const fugitiveSchema = z.discriminatedUnion('method', [
 /** Vehicles: how the entry was measured, and what the money bought (spend). */
 export const vehicleSchema = z.object({
   method: z.enum(['distance', 'fuel', 'electricity', 'spend']),
+  /** several identical vehicles: the quantity (or amount) is per vehicle */
+  count: z.number().int().min(1).max(100000).optional(),
   /** fuel used, when it differs from the vehicle type's usual fuel (or the type's fuel is unknown) */
   fuelItemId: z.number().int().positive().optional(),
   /** electric / plug-in hybrid: charged at the company's own site (already on its meter) or elsewhere */
@@ -197,7 +199,8 @@ async function vehicleCalc(input: CalcInput, item: ItemRow, ctx: CalcContext, un
 
   // Spend: find the price (entered, company list, platform list).
   let spend: Parameters<typeof calcVehicle>[0]['spend'];
-  let qty = input.quantity ?? 0;
+  const count = v.count ?? 1;
+  let qty = (input.quantity ?? 0) * count;
   let unit = input.unit;
   if (v.method === 'spend') {
     if (!v.spend) throw new AppError('Enter the amount spent and its currency');
@@ -211,7 +214,7 @@ async function vehicleCalc(input: CalcInput, item: ItemRow, ctx: CalcContext, un
     // Price per the entry's unit (e.g. a price per US gallon used for litres).
     const pricePerUnit = found.unit === unit ? found.price : found.price * convert(units, 1, unit, found.unit);
     spend = { currency: v.spend.currency, price: pricePerUnit, priceUnit: unit, priceSource: found.source, buys };
-    qty = v.spend.amount;
+    qty = v.spend.amount * count;
   }
   const result = calcVehicle({
     vehicleName: item.name, electric, phev, method: v.method, quantity: qty, unit, date, region,
@@ -220,8 +223,12 @@ async function vehicleCalc(input: CalcInput, item: ItemRow, ctx: CalcContext, un
     evEnergy: (electric || phev) && v.method === 'distance' ? await evEnergy(item.id, date, unit) : null,
     gridFactors, charging: v.charging ?? 'elsewhere', spend, gwp, units,
   });
+  if (count > 1) {
+    const per = v.method === 'spend' ? v.spend!.amount : input.quantity ?? 0;
+    result.steps.unshift(`${count} vehicles × ${per} ${v.method === 'spend' ? v.spend!.currency : unit} each = ${qty} ${v.method === 'spend' ? v.spend!.currency : unit}`);
+  }
   const stored: Stored = v.method === 'spend'
-    ? { quantity: v.spend!.amount / spend!.price, unit, inputs: { vehicle: { ...v, price: spend!.price, priceUnit: unit, priceSource: spend!.priceSource, fuelItemId: fuel?.id } } }
+    ? { quantity: qty / spend!.price, unit, inputs: { vehicle: { ...v, price: spend!.price, priceUnit: unit, priceSource: spend!.priceSource, fuelItemId: fuel?.id } } }
     : { quantity: qty, unit, inputs: { vehicle: { ...v, fuelItemId: fuel?.id ?? v.fuelItemId } } };
   return { result, stored };
 }

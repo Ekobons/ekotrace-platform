@@ -9,7 +9,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { useApp } from '../App';
 import { api, ApiError, download, num, tco2e, type Basis, type CalcResponse, type Category, type Item, type Vehicle, type VehicleMethod } from '../lib/api';
 import { Result } from '../components/Result';
-import { UploadPreview, useFuels } from '../components/Fleet';
+import { UploadPreview, useFuels, useVehicleTypes } from '../components/Fleet';
+import { PasteGrid } from '../components/PasteGrid';
 import { Icon } from '../components/Icon';
 
 const METHOD_LABEL: Record<VehicleMethod, string> = { distance: 'Distance', fuel: 'Fuel used', electricity: 'Electricity charged', spend: 'Spend' };
@@ -20,12 +21,13 @@ const methodsFor = (it?: { attrs?: Item['attrs'] } | null): VehicleMethod[] =>
   it?.attrs?.electric ? (it.attrs.distance === false ? ['electricity', 'spend'] : ['distance', 'electricity', 'spend'])
     : it?.attrs?.distance === false ? ['fuel', 'spend'] : ['distance', 'fuel', 'spend'];
 
-type Mode = 'one' | 'fleet' | 'upload';
+type Mode = 'one' | 'fleet' | 'paste' | 'upload';
 
 export function VehicleEntry({ cat, facilityId, period, onSaved }: {
   cat: Category; facilityId: string; period: { periodStart: string; periodEnd: string }; onSaved: () => void;
 }) {
   const [mode, setMode] = useState<Mode>('one');
+  const types = useVehicleTypes();
   const [fleet, setFleet] = useState<Vehicle[]>([]);
   useEffect(() => {
     if (!facilityId) { setFleet([]); return; }
@@ -37,10 +39,13 @@ export function VehicleEntry({ cat, facilityId, period, onSaved }: {
       <div className="seg" style={{ justifySelf: 'start' }}>
         <button className={mode === 'one' ? 'on' : ''} onClick={() => setMode('one')}>One entry</button>
         <button className={mode === 'fleet' ? 'on' : ''} onClick={() => setMode('fleet')}>Fleet this period ({fleet.length})</button>
-        <button className={mode === 'upload' ? 'on' : ''} onClick={() => setMode('upload')}>Upload Excel</button>
+        <button className={mode === 'paste' ? 'on' : ''} onClick={() => setMode('paste')}>Paste or type rows</button>
+        <button className={mode === 'upload' ? 'on' : ''} onClick={() => setMode('upload')}>Upload Excel file</button>
       </div>
       {mode === 'one' && <OneEntry cat={cat} facilityId={facilityId} period={period} fleet={fleet} onSaved={onSaved} />}
       {mode === 'fleet' && <FleetGrid facilityId={facilityId} period={period} fleet={fleet} onSaved={onSaved} />}
+      {mode === 'paste' && <PasteGrid facilityId={facilityId} types={types} onSaved={onSaved}
+        month={period.periodStart.slice(0, 7) === period.periodEnd.slice(0, 7) ? period.periodStart.slice(0, 7) : undefined} />}
       {mode === 'upload' && <VehicleUpload period={period} facilityId={facilityId} onSaved={onSaved} />}
     </div>
   );
@@ -55,6 +60,7 @@ function OneEntry({ cat, facilityId, period, fleet, onSaved }: { cat: Category; 
   const [itemId, setItemId] = useState<number | null>(null);
   const [method, setMethod] = useState<VehicleMethod>('distance');
   const [quantity, setQuantity] = useState('');
+  const [count, setCount] = useState('1');
   const [unit, setUnit] = useState('km');
   const [fuelId, setFuelId] = useState<number | null>(null);
   const [charging, setCharging] = useState<'site' | 'elsewhere'>('elsewhere');
@@ -82,10 +88,11 @@ function OneEntry({ cat, facilityId, period, fleet, onSaved }: { cat: Category; 
 
   const payload = useMemo(() => {
     if (!item || quantity === '' || !facilityId) return null;
-    const v = { method, vehicleId: veh?.id, fuelItemId: fuelId ?? undefined, charging: plug ? charging : undefined,
+    const n = veh ? 1 : Math.max(1, Math.floor(Number(count) || 1));
+    const v = { method, count: n > 1 ? n : undefined, vehicleId: veh?.id, fuelItemId: fuelId ?? undefined, charging: plug ? charging : undefined,
       spend: method === 'spend' ? { amount: Number(quantity), currency, price: price ? Number(price) : undefined } : undefined };
     return { itemId: item.id, unit, quantity: method === 'spend' ? undefined : Number(quantity), facilityId, ...period, vehicle: v };
-  }, [item, quantity, unit, method, veh, fuelId, plug, charging, currency, price, facilityId, period]);
+  }, [item, quantity, count, unit, method, veh, fuelId, plug, charging, currency, price, facilityId, period]);
 
   useEffect(() => {
     setError(null);
@@ -99,7 +106,7 @@ function OneEntry({ cat, facilityId, period, fleet, onSaved }: { cat: Category; 
     try {
       const r = await api.saveActivity({ ...payload, dataType, note: note || undefined });
       toast(`Saved: ${veh?.name ?? item?.name} · ${tco2e(r.totals.direct)} tCO₂e${r.totals.scope2 ? ` + ${tco2e(r.totals.scope2)} tCO₂e Scope 2` : ''}`);
-      setQuantity(''); setNote(''); setPrice(''); onSaved();
+      setQuantity(''); setNote(''); setPrice(''); setCount('1'); onSaved();
     } catch (e) { setError((e as Error).message); }
   };
 
@@ -154,8 +161,14 @@ function OneEntry({ cat, facilityId, period, fleet, onSaved }: { cat: Category; 
         )}
 
         <div className="row" style={{ alignItems: 'flex-end' }}>
+          {!veh && (
+            <label className="field" style={{ width: 110 }}>
+              <span>No. of vehicles</span>
+              <input className="input num" inputMode="numeric" value={count} onChange={(e) => setCount(e.target.value.replace(/\D/g, ''))} />
+            </label>
+          )}
           <label className="field" style={{ width: 170 }}>
-            <span>{method === 'spend' ? 'Amount spent' : method === 'distance' ? 'Distance' : 'Quantity'}</span>
+            <span>{method === 'spend' ? 'Amount spent' : method === 'distance' ? 'Distance' : 'Quantity'}{!veh && Number(count) > 1 ? ' per vehicle' : ''}</span>
             <input className="input num" inputMode="decimal" value={quantity} placeholder="0" onChange={(e) => setQuantity(e.target.value.replace(/[^0-9.]/g, ''))} />
           </label>
           {method === 'spend' ? (

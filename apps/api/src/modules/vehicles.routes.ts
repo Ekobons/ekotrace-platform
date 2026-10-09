@@ -19,6 +19,7 @@ import { assertCan, scopeOf } from '../lib/access.js';
 import { AppError, notFound } from '../lib/errors.js';
 import { readSheet, sendWorkbook, styleHeader, toIsoDate } from '../lib/xlsx.js';
 import { runBatch, tenantSettings, type SaveInput } from './activity.routes.js';
+import { matchVehicleType, splitQuantity } from '../lib/vehicleMatch.js';
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Use the format yyyy-mm-dd');
 const METHODS = ['distance', 'fuel', 'electricity', 'spend'] as const;
@@ -278,9 +279,144 @@ export async function vehicleRoutes(app: FastifyInstance) {
 }
 
 // ------------------------------------------------------- vehicle data upload --
-const ENTRY_COLS = ['Facility *', 'Month * (yyyy-mm)', 'Vehicle (fleet name or registration)', 'Vehicle type (if not in the fleet)', 'Method * (distance/fuel/electricity/spend)',
-  'Quantity or amount *', 'Unit (km, mile, litre, kg, m3, kWh)', 'Currency (spend)', 'Price per unit (spend, optional)', 'Fuel (optional)', 'Charging (site/elsewhere)', 'Data type (actual/estimated/proxy)', 'Note'];
+const ENTRY_COLS = ['Facility *', 'Month * (yyyy-mm)', 'Vehicle (fleet name or registration)', 'Vehicle type (if not in the fleet)', 'Number of vehicles (default 1)',
+  'Quantity per vehicle *', 'Unit (km, mile, litre, kg, m3, kWh, AED…)', 'Method (distance/fuel/electricity/spend — optional, read from the unit)', 'Price per unit (spend, optional)',
+  'Fuel (optional)', 'Charging (site/elsewhere)', 'Data type (actual/estimated/proxy)', 'Note'];
 const key = (s: string) => s.replace(/\s*\*/g, '').trim();
+
+/**
+ * One row of vehicle data, from a paste or an Excel file. Everything is text as
+ * the person typed it; processRows() reads it, says how it was understood, and
+ * calculates (or saves) it.
+ */
+export const rowSchema = z.object({
+  facilityId: z.string().uuid().optional(),
+  facility: z.string().max(200).optional(),
+  month: z.string().max(40).optional(),
+  /** fleet name / registration, or a vehicle description ("car petrol") */
+  what: z.string().max(200).default(''),
+  /** vehicle type chosen by the person, overriding the reading of `what` */
+  typeId: z.number().int().positive().optional(),
+  count: z.union([z.string(), z.number()]).optional(),
+  quantity: z.union([z.string(), z.number()]).default(''),
+  unit: z.string().max(40).optional(),
+  method: z.string().max(40).optional(),
+  price: z.union([z.string(), z.number()]).optional(),
+  fuel: z.string().max(200).optional(),
+  charging: z.string().max(20).optional(),
+  dataType: z.string().max(20).optional(),
+  note: z.string().max(1000).optional(),
+});
+export type VehicleRow = z.infer<typeof rowSchema>;
+
+export interface RowResult {
+  index: number; errors: string[]; warnings: string[]; totals: Record<string, number> | null;
+  /** how the row was understood */
+  read: { vehicle: string | null; vehicleKind: 'fleet' | 'type' | null; typeId: number | null; assumed: string[]; month: string | null; count: number;
+    method: string | null; quantity: number | null; unit: string | null; total: number | null } ;
+}
+
+async function lookups() {
+  const types = await vehicleTypes();
+  const unitRows = await query<{ code: string; name: string; aliases: string[]; dimension: string }>('SELECT code, name, aliases, dimension FROM unit');
+  const unitBy = new Map<string, { code: string; dimension: string }>();
+  for (const u of unitRows) for (const n of [u.code, u.name, ...(u.aliases ?? [])]) unitBy.set(n.toLowerCase(), { code: u.code, dimension: u.dimension });
+  // In vehicle data "kWh" is electricity charged; litres spelled every way.
+  for (const [k, v] of [['kwh', 'kWh_e'], ['mwh', 'MWh_e'], ['litre', 'L'], ['litres', 'L'], ['liter', 'L'], ['liters', 'L'], ['ltr', 'L'], ['ltrs', 'L'], ['lt', 'L'], ['l', 'L'],
+    ['kms', 'km'], ['kilometers', 'km'], ['kilometres', 'km'], ['miles', 'mi'], ['mile', 'mi'], ['m³', 'm3'], ['cubic metre', 'm3'], ['gallon', 'gal_us'], ['gallons', 'gal_us']] as const) {
+    const u = unitRows.find((x) => x.code === v); if (u) unitBy.set(k, { code: u.code, dimension: u.dimension });
+  }
+  const fuels = new Map((await query<{ id: number; name: string }>(`SELECT i.id, i.name FROM item i JOIN subcategory s ON s.id = i.subcategory_id JOIN category c ON c.id = s.category_id WHERE c.code = 'stationary_combustion'`)).map((f) => [f.name.toLowerCase(), f.id]));
+  return { types, unitBy, fuels };
+}
+
+/** Read, check and calculate rows; with commit, save the good ones. Rows with problems are never saved. */
+export async function processRows(c: Tx, req: FastifyRequest, t: { id: string; gwp_set: string }, rows: VehicleRow[], opts: { facilityId?: string; month?: string; commit: boolean }) {
+  const { types, unitBy, fuels } = await lookups();
+  const typeRefs = types.map((x) => ({ id: x.id, code: x.code, name: x.name }));
+  const facs = (await c.query(`SELECT id, name FROM org_node WHERE kind = 'facility' AND active`)).rows as { id: string; name: string }[];
+  const fleet = (await c.query('SELECT id, facility_id, name, registration, item_id FROM vehicle')).rows as { id: string; facility_id: string; name: string; registration: string | null; item_id: number }[];
+  const out: RowResult[] = [];
+  const entries: { i: number; e: SaveInput }[] = [];
+
+  rows.forEach((r, index) => {
+    const errors: string[] = [];
+    const read: RowResult['read'] = { vehicle: null, vehicleKind: null, typeId: null, assumed: [], month: null, count: 1, method: null, quantity: null, unit: null, total: null };
+    // Facility: id, name, or the one chosen on screen.
+    const fac = r.facilityId ? facs.find((f) => f.id === r.facilityId)
+      : r.facility ? facs.find((f) => f.name.toLowerCase() === r.facility!.trim().toLowerCase()) : facs.find((f) => f.id === opts.facilityId);
+    if (!fac) errors.push(r.facility ? `Unknown facility "${r.facility}"` : 'Facility missing');
+    // Month: the row's, else the one chosen on screen.
+    const monthIso = toIsoDate(String(r.month ?? '').trim()) ?? (r.month ? null : opts.month ? `${opts.month}-01` : null);
+    const month = monthIso ? /^(\d{4})-(\d{2})/.exec(monthIso) : null;
+    if (!month) errors.push(r.month ? `"${r.month}" is not a month (use yyyy-mm)` : 'Month missing');
+    else read.month = `${month[1]}-${month[2]}`;
+    // Vehicle: fleet vehicle (name or registration) at that facility, else a type.
+    const what = (r.what ?? '').trim();
+    const veh = what ? fleet.find((v) => v.facility_id === fac?.id && (v.registration?.toLowerCase().replace(/\s+/g, '') === what.toLowerCase().replace(/\s+/g, '') || v.name.toLowerCase() === what.toLowerCase())) : undefined;
+    let itemId: number | null = null;
+    if (veh) { itemId = veh.item_id; read.vehicle = `${veh.name}${veh.registration ? ` (${veh.registration})` : ''}`; read.vehicleKind = 'fleet'; }
+    else if (r.typeId) {
+      const ty = types.find((x) => x.id === r.typeId);
+      if (ty) { itemId = ty.id; read.vehicle = ty.name; read.vehicleKind = 'type'; } else errors.push('Unknown vehicle type');
+    } else if (what) {
+      const m = matchVehicleType(what, typeRefs);
+      if (m) { itemId = m.type.id; read.vehicle = m.type.name; read.vehicleKind = 'type'; read.assumed = m.assumed; }
+      else errors.push(`Could not read "${what}" as a vehicle — choose the type`);
+    } else errors.push('Vehicle missing');
+    read.typeId = itemId;
+    const ty = types.find((x) => x.id === itemId);
+    // Count.
+    const countText = String(r.count ?? '').trim();
+    const count = countText ? Number(countText.replace(/,/g, '')) : 1;
+    if (!Number.isInteger(count) || count < 1 || count > 100000) errors.push('Number of vehicles must be a whole number from 1');
+    else read.count = count;
+    if (veh && count > 1) errors.push('A fleet vehicle is one vehicle: leave the number empty or 1');
+    // Quantity and unit ("34km" in one cell works too).
+    const q = typeof r.quantity === 'number' ? { qty: r.quantity, unit: '' } : splitQuantity(String(r.quantity ?? ''));
+    if (q.qty == null || q.qty < 0) errors.push(String(r.quantity ?? '').trim() ? `"${r.quantity}" is not a quantity` : 'Quantity missing');
+    else read.quantity = q.qty;
+    const unitText = (r.unit || q.unit || '').trim();
+    const currencyGiven = /^[A-Za-z]{3}$/.test(unitText) && !unitBy.has(unitText.toLowerCase());
+    const u = unitText && !currencyGiven ? unitBy.get(unitText.toLowerCase()) : undefined;
+    if (unitText && !u && !currencyGiven) errors.push(`Unknown unit "${unitText}"`);
+    // Method: given, else from the unit (km → distance, litres → fuel, kWh → electricity, AED → spend).
+    let method = (r.method ?? '').trim().toLowerCase();
+    if (method && !(METHODS as readonly string[]).includes(method)) { errors.push(`Method "${r.method}" — use distance, fuel, electricity or spend`); method = ''; }
+    if (!method) method = currencyGiven ? 'spend' : !u ? (ty?.attrs.distance === false ? 'fuel' : 'distance') : u.dimension === 'distance' ? 'distance' : u.dimension === 'electricity' ? 'electricity' : 'fuel';
+    read.method = method;
+    let unit = u?.code ?? (method === 'distance' ? 'km' : method === 'electricity' ? 'kWh_e' : 'L');
+    if (method === 'spend' && ty?.attrs.electric) unit = 'kWh_e';
+    if (method === 'spend' && !currencyGiven && !u) errors.push('Spend needs the currency in the unit column (e.g. AED)');
+    read.unit = method === 'spend' ? (currencyGiven ? unitText.toUpperCase() : unitText) : unit;
+    if (read.quantity != null) read.total = read.quantity * read.count;
+    const fuelName = (r.fuel ?? '').trim();
+    const fuelItemId = fuelName ? fuels.get(fuelName.toLowerCase()) : undefined;
+    if (fuelName && !fuelItemId) errors.push(`Unknown fuel "${fuelName}"`);
+    const charging = (r.charging ?? '').trim().toLowerCase();
+    if (charging && !['site', 'elsewhere'].includes(charging)) errors.push('Charging must be site or elsewhere');
+    const dataType = ((r.dataType ?? '').trim().toLowerCase() || 'actual') as SaveInput['dataType'];
+    if (!['actual', 'estimated', 'proxy'].includes(dataType)) errors.push('Data type must be actual, estimated or proxy');
+    const price = String(r.price ?? '').trim() ? Number(String(r.price).replace(/,/g, '')) : undefined;
+    if (price !== undefined && !(price > 0)) errors.push('Price must be a positive number');
+
+    out.push({ index, errors, warnings: [], totals: null, read });
+    if (errors.length) return;
+    const y = Number(month![1]), m = Number(month![2]);
+    entries.push({ i: index, e: {
+      facilityId: fac!.id, itemId: itemId!, unit, quantity: method === 'spend' ? undefined : q.qty!,
+      periodStart: `${month![1]}-${month![2]}-01`, periodEnd: new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10), dataType, note: r.note || undefined,
+      vehicle: { method: method as 'distance', count: count > 1 ? count : undefined, vehicleId: veh?.id, fuelItemId, charging: (charging || undefined) as 'site' | undefined,
+        spend: method === 'spend' ? { amount: q.qty!, currency: currencyGiven ? unitText.toUpperCase() : 'AED', price } : undefined },
+    } as SaveInput });
+  });
+  const batch = entries.length ? await runBatch(c, req, t, entries.map((x) => x.e), !opts.commit) : { results: [], saved: 0, failed: 0 };
+  batch.results.forEach((b, k) => {
+    const o = out[entries[k]!.i]!;
+    if (b.ok) { o.totals = b.totals ?? null; o.warnings = b.warnings ?? []; } else o.errors.push(b.error!);
+  });
+  return { rows: out, valid: out.filter((r) => !r.errors.length).length, saved: opts.commit ? batch.saved : 0 };
+}
 
 export async function vehicleUploadRoutes(app: FastifyInstance) {
   /**
@@ -294,7 +430,6 @@ export async function vehicleUploadRoutes(app: FastifyInstance) {
     for (let d = new Date(`${q.from}-01T00:00:00Z`); d <= new Date(`${q.to}-01T00:00:00Z`) && months.length < 24; d.setUTCMonth(d.getUTCMonth() + 1)) months.push(d.toISOString().slice(0, 7));
     if (!months.length) throw new AppError('The period is empty');
     const types = await vehicleTypes();
-    const unitsRows = await query<{ code: string; name: string }>(`SELECT code, name FROM unit WHERE dimension IN ('distance','volume','mass','electricity') AND active ORDER BY dimension, sort`);
     const { facilities, fleet } = await tenantTx(tenant, async (c) => {
       const scope = await scopeOf(c, req.user);
       const facs = (await c.query(`SELECT id, name FROM org_node WHERE kind = 'facility' AND active ORDER BY name`)).rows.filter((f) => scope.enter.has(f.id) && (!q.facilityId || f.id === q.facilityId));
@@ -305,100 +440,60 @@ export async function vehicleUploadRoutes(app: FastifyInstance) {
     const wb = new ExcelJS.Workbook();
     const ws = wb.addWorksheet('Vehicle data');
     ws.addRow(ENTRY_COLS);
-    const unitFor = (m: string, v: { attrs: { electric?: boolean } }) => (m === 'distance' ? 'km' : m === 'electricity' || (m === 'spend' && v.attrs.electric) ? 'kWh' : 'litre');
+    const unitFor = (m: string, v: { attrs: { electric?: boolean } }) => (m === 'distance' ? 'km' : m === 'electricity' ? 'kWh' : m === 'spend' ? 'AED' : 'litre');
     for (const m of months) {
       for (const f of facilities) {
         for (const v of fleet.filter((x) => x.facility_id === f.id && x.in_service_from.slice(0, 7) <= m && (!x.retired_on || x.retired_on.slice(0, 7) >= m))) {
-          ws.addRow([f.name, m, v.registration || v.name, '', v.default_method, null, unitFor(v.default_method, v), v.default_method === 'spend' ? 'AED' : '', null, '', v.charging ?? '', 'actual', '']);
+          ws.addRow([f.name, m, v.registration || v.name, '', null, null, unitFor(v.default_method, v), v.default_method, null, '', v.charging ?? '', 'actual', '']);
         }
       }
     }
-    if (ws.rowCount === 1) ws.addRow([facilities[0]!.name, months[0], '', types.find((t) => /Average car · Diesel/.test(t.name))?.name ?? '', 'distance', null, 'km', '', null, '', '', 'actual', 'Example: no fleet yet']);
-    styleHeader(ws, [26, 14, 24, 44, 22, 16, 16, 12, 16, 30, 16, 14, 30]);
-    const lists = wb.addWorksheet('Lists');
-    lists.addRow(['Facility', 'Vehicle type', 'Unit', 'Fleet vehicle']);
+    if (ws.rowCount === 1) ws.addRow([facilities[0]!.name, months[0], '', 'Car petrol', 2, 1500, 'km', '', null, '', '', 'actual', 'Example: 2 petrol cars, 1,500 km each']);
+    styleHeader(ws, [26, 14, 24, 40, 14, 16, 18, 26, 16, 30, 16, 14, 30]);
+    const lists = wb.addWorksheet('Vehicle types');
+    lists.addRow(['Facility', 'Vehicle type (or write it your way: "car petrol", "pickup diesel", "tipper 18t")', 'Fleet vehicle']);
     const fleetNames = fleet.filter((v) => !v.retired_on).map((v) => v.registration || v.name);
-    const n = Math.max(facilities.length, types.length, unitsRows.length, fleetNames.length);
-    for (let i = 0; i < n; i++) lists.addRow([facilities[i]?.name ?? '', types[i]?.name ?? '', unitsRows[i]?.name ?? '', fleetNames[i] ?? '']);
-    styleHeader(lists, [30, 60, 22, 26]);
+    const n = Math.max(facilities.length, types.length, fleetNames.length);
+    for (let i = 0; i < n; i++) lists.addRow([facilities[i]?.name ?? '', types[i]?.name ?? '', fleetNames[i] ?? '']);
+    styleHeader(lists, [30, 70, 26]);
     const lastRow = Math.max(ws.rowCount + 200, 500); // fixed before the loop: touching a cell adds rows
     for (let r = 2; r <= lastRow; r++) {
-      ws.getCell(`A${r}`).dataValidation = { type: 'list', allowBlank: true, formulae: [`Lists!$A$2:$A$${facilities.length + 1}`] };
-      if (fleetNames.length) ws.getCell(`C${r}`).dataValidation = { type: 'list', allowBlank: true, formulae: [`Lists!$D$2:$D$${fleetNames.length + 1}`] };
-      ws.getCell(`D${r}`).dataValidation = { type: 'list', allowBlank: true, formulae: [`Lists!$B$2:$B$${types.length + 1}`] };
-      ws.getCell(`E${r}`).dataValidation = { type: 'list', allowBlank: true, formulae: ['"distance,fuel,electricity,spend"'] };
+      ws.getCell(`A${r}`).dataValidation = { type: 'list', allowBlank: true, formulae: [`'Vehicle types'!$A$2:$A$${facilities.length + 1}`] };
+      ws.getCell(`H${r}`).dataValidation = { type: 'list', allowBlank: true, formulae: ['"distance,fuel,electricity,spend"'] };
       ws.getCell(`K${r}`).dataValidation = { type: 'list', allowBlank: true, formulae: ['"site,elsewhere"'] };
       ws.getCell(`L${r}`).dataValidation = { type: 'list', allowBlank: true, formulae: ['"actual,estimated,proxy"'] };
     }
     return sendWorkbook(reply, wb, `vehicle-data-${q.from}_${q.to}.xlsx`);
   });
 
-  /** Upload vehicle data: preview (each row calculated, problems listed), then ?commit=1 saves the valid rows. */
+  /** Excel file of vehicle data: preview (each row read, calculated, problems listed), then ?commit=1 saves the good rows. */
   app.post('/api/vehicles/entries/upload', async (req) => {
     const tenant = requireTenant(req);
     const commit = z.object({ commit: z.coerce.boolean().optional() }).parse(req.query).commit ?? false;
     const { rows } = await readSheet(req.body, 'Vehicle data');
     const t = await tenantSettings(tenant);
-    const types = new Map((await vehicleTypes()).map((x) => [x.name.toLowerCase(), x]));
-    const unitRows = await query<{ code: string; name: string; aliases: string[] }>('SELECT code, name, aliases FROM unit');
-    const unitBy = new Map<string, string>();
-    for (const u of unitRows) for (const n of [u.code, u.name, ...(u.aliases ?? [])]) unitBy.set(n.toLowerCase(), u.code);
-    unitBy.set('kwh', 'kWh_e'); unitBy.set('mwh', 'MWh_e'); unitBy.set('litre', 'L'); unitBy.set('litres', 'L');
-    const fuels = new Map((await query<{ id: number; name: string }>(`SELECT i.id, i.name FROM item i JOIN subcategory s ON s.id = i.subcategory_id JOIN category c ON c.id = s.category_id WHERE c.code = 'stationary_combustion'`)).map((f) => [f.name.toLowerCase(), f.id]));
+    const g = (row: Record<string, string>, k: string) => (row[key(k)] ?? '').trim();
+    const mapped: VehicleRow[] = rows.map(({ row }) => ({
+      facility: g(row, ENTRY_COLS[0]!), month: g(row, ENTRY_COLS[1]!), what: g(row, ENTRY_COLS[2]!) || g(row, ENTRY_COLS[3]!), count: g(row, ENTRY_COLS[4]!),
+      quantity: g(row, ENTRY_COLS[5]!), unit: g(row, ENTRY_COLS[6]!), method: g(row, ENTRY_COLS[7]!), price: g(row, ENTRY_COLS[8]!), fuel: g(row, ENTRY_COLS[9]!),
+      charging: g(row, ENTRY_COLS[10]!), dataType: g(row, ENTRY_COLS[11]!), note: g(row, ENTRY_COLS[12]!),
+    }));
     return tenantTx(tenant, async (c) => {
-      const facs = (await c.query(`SELECT id, name FROM org_node WHERE kind = 'facility' AND active`)).rows as { id: string; name: string }[];
-      const fleet = (await c.query('SELECT id, facility_id, name, registration, item_id FROM vehicle')).rows as { id: string; facility_id: string; name: string; registration: string | null; item_id: number }[];
-      const entries: (SaveInput | null)[] = [];
-      const problems: string[][] = [];
-      for (const { row } of rows) {
-        const g = (k: string) => (row[key(k)] ?? '').trim();
-        const errs: string[] = [];
-        const fac = facs.find((f) => f.name.toLowerCase() === g('Facility *').toLowerCase());
-        if (!fac) errs.push(g('Facility *') ? `Unknown facility "${g('Facility *')}"` : 'Facility missing');
-        const month = /^(\d{4})-(\d{2})/.exec(toIsoDate(g('Month * (yyyy-mm)')) ?? '');
-        if (!month) errs.push('Month missing or not yyyy-mm');
-        const vName = g('Vehicle (fleet name or registration)').toLowerCase();
-        const veh = vName ? fleet.find((v) => v.facility_id === fac?.id && (v.registration?.toLowerCase() === vName || v.name.toLowerCase() === vName)) : undefined;
-        if (vName && !veh) errs.push(`"${g('Vehicle (fleet name or registration)')}" is not in the fleet of ${fac?.name ?? 'this facility'}`);
-        const typ = veh ? undefined : types.get(g('Vehicle type (if not in the fleet)').toLowerCase());
-        if (!veh && !typ) errs.push(g('Vehicle type (if not in the fleet)') ? `Unknown vehicle type "${g('Vehicle type (if not in the fleet)')}"` : 'Give a fleet vehicle or a vehicle type');
-        const method = g('Method * (distance/fuel/electricity/spend)').toLowerCase() as SaveInput['vehicle'] extends infer V ? V extends { method: infer M } ? M : never : never;
-        if (!(METHODS as readonly string[]).includes(method)) errs.push('Method must be distance, fuel, electricity or spend');
-        const qty = Number(g('Quantity or amount *').replace(/,/g, ''));
-        if (!g('Quantity or amount *') || !Number.isFinite(qty) || qty < 0) errs.push('Quantity missing or not a number');
-        let unit = unitBy.get(g('Unit (km, mile, litre, kg, m3, kWh)').toLowerCase()) ?? '';
-        if (!unit) unit = method === 'distance' ? 'km' : method === 'electricity' ? 'kWh_e' : 'L';
-        const currency = g('Currency (spend)').toUpperCase();
-        const price = g('Price per unit (spend, optional)') ? Number(g('Price per unit (spend, optional)')) : undefined;
-        if (method === 'spend' && !/^[A-Z]{3}$/.test(currency)) errs.push('Currency missing (e.g. AED)');
-        const fuelName = g('Fuel (optional)');
-        const fuelItemId = fuelName ? fuels.get(fuelName.toLowerCase()) : undefined;
-        if (fuelName && !fuelItemId) errs.push(`Unknown fuel "${fuelName}"`);
-        const charging = g('Charging (site/elsewhere)').toLowerCase() || undefined;
-        const dataType = (g('Data type (actual/estimated/proxy)').toLowerCase() || 'actual') as SaveInput['dataType'];
-        problems.push(errs);
-        if (errs.length) { entries.push(null); continue; }
-        const y = Number(month![1]), m = Number(month![2]);
-        const end = new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10);
-        entries.push({
-          facilityId: fac!.id, itemId: veh?.item_id ?? typ!.id, unit, quantity: method === 'spend' ? undefined : qty,
-          periodStart: `${month![1]}-${month![2]}-01`, periodEnd: end, dataType, note: g('Note') || undefined,
-          vehicle: { method, vehicleId: veh?.id, fuelItemId, charging: charging as 'site' | undefined, spend: method === 'spend' ? { amount: qty, currency, price } : undefined },
-        } as SaveInput);
-      }
-      const valid = entries.map((e, i) => ({ e, i })).filter((x) => x.e);
-      const batch = valid.length ? await runBatch(c, req, t, valid.map((x) => x.e), !commit) : { results: [], saved: 0, failed: 0 };
-      const out = rows.map(({ n, row }, i) => {
-        const k = valid.findIndex((x) => x.i === i);
-        const r = k >= 0 ? batch.results[k] : undefined;
-        return {
-          row: n, facility: row[key('Facility *')] ?? '', month: row[key('Month * (yyyy-mm)')] ?? '', vehicle: row[key('Vehicle (fleet name or registration)')] || row[key('Vehicle type (if not in the fleet)')] || '',
-          method: row[key('Method * (distance/fuel/electricity/spend)')] ?? '', quantity: row[key('Quantity or amount *')] ?? '',
-          errors: [...problems[i]!, ...(r && !r.ok ? [r.error!] : [])], warnings: r?.warnings ?? [], totals: r?.ok ? r.totals : null,
-        };
-      });
-      if (commit) await audit(c, req, 'vehicle.data.upload', 'activity', null, { rows: rows.length, saved: batch.saved });
-      return { rows: out, valid: out.filter((r) => !r.errors.length).length, saved: commit ? batch.saved : 0 };
+      const r = await processRows(c, req, t, mapped, { commit });
+      if (commit) await audit(c, req, 'vehicle.data.upload', 'activity', null, { rows: rows.length, saved: r.saved });
+      return { ...r, rows: r.rows.map((x, i) => ({ ...x, row: rows[i]!.n })) };
+    });
+  });
+
+  /** Rows pasted or typed on screen: the same reading and checks as the Excel upload. */
+  app.post('/api/vehicles/entries/rows', async (req) => {
+    const tenant = requireTenant(req);
+    const b = z.object({ facilityId: z.string().uuid().optional(), month: z.string().regex(/^\d{4}-\d{2}$/).optional(), rows: z.array(rowSchema).min(1).max(2000), commit: z.boolean().default(false) }).parse(req.body);
+    const t = await tenantSettings(tenant);
+    return tenantTx(tenant, async (c) => {
+      const r = await processRows(c, req, t, b.rows, { facilityId: b.facilityId, month: b.month, commit: b.commit });
+      if (b.commit) await audit(c, req, 'vehicle.data.rows', 'activity', null, { rows: b.rows.length, saved: r.saved });
+      return r;
     });
   });
 }

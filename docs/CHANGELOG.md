@@ -2,6 +2,14 @@
 
 Newest first.
 
+## 2026-10-10 — Vehicle count; paste rows from Excel
+
+- **Number of vehicles**: one entry or a row can cover several identical vehicles — "car petrol, 2, 34 km" = 2 × 34 km = 68 km. Saved with the count (shown as the first calculation step, kept on recalculation).
+- **Paste or type rows** (Add data → Vehicles): copy rows from Excel or any table and paste into the grid (Ctrl+V fills from the clicked cell; a pasted header row is matched by column names). Vehicles can be written in everyday words — "car petrol", "pickup diesel", "Land Cruiser diesel", "tipper 18t", "refrigerated truck 7t", "forklift LPG", "Tesla" — or as a fleet registration. Each row shows how it was read (type, what was assumed, total, method from the unit: km → distance, litres/kg → fuel, kWh → electricity, AED → spend), its result or its problem; the type can be changed per row. Only good rows are saved; rows with problems stay to be fixed.
+- Excel upload uses the same reading (new column "Number of vehicles"; method optional, read from the unit).
+- Refrigerated HGV types now have their own names ("Refrigerated Rigid (>17 tonnes) · Average laden"); importer version 3.
+- Tests: 20 engine + 26 API (incl. matcher).
+
 ## 2026-10-09 (7) — Vehicles (mobile combustion), EV charging in Scope 2, fleet register, price list
 
 **Vehicle types and factors** (DESNZ 2022–2026, per km and per mile, with gas split and well-to-tank)

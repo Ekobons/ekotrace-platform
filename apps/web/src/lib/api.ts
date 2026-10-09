@@ -50,6 +50,13 @@ export interface VehicleType { id: number; name: string; code: string; sub: stri
 export interface Price { id: string; platform: boolean; region: string; item_id: number; item: string; currency: string; price: number; unit: string; valid_from: string; valid_to: string; source: string }
 export interface UploadRow { row: number; errors: string[]; warnings?: string[]; totals?: Record<Basis, number> | null; [k: string]: unknown }
 
+/** A row typed or pasted on screen (text as entered). */
+export interface PastedRow { month?: string; what: string; typeId?: number; count?: string; quantity: string; unit?: string; method?: string; note?: string }
+export interface RowResult {
+  index: number; errors: string[]; warnings: string[]; totals: Record<Basis, number> | null;
+  read: { vehicle: string | null; vehicleKind: 'fleet' | 'type' | null; typeId: number | null; assumed: string[]; month: string | null; count: number; method: string | null; quantity: number | null; unit: string | null; total: number | null };
+}
+
 export class ApiError extends Error {
   constructor(message: string, public status: number, public code?: string, public details?: { field: string; message: string }[]) { super(message); }
 }
@@ -124,6 +131,7 @@ export const api = {
   deleteVehicle: (id: string) => call('DELETE', `/api/vehicles/${id}`),
   uploadFleet: (facilityId: string, file: Blob, commit: boolean) => call<{ rows: UploadRow[]; valid: number; added: number }>('POST', `/api/facilities/${facilityId}/vehicles/upload${commit ? '?commit=1' : ''}`, undefined, file),
   uploadVehicleData: (file: Blob, commit: boolean) => call<{ rows: UploadRow[]; valid: number; saved: number }>('POST', `/api/vehicles/entries/upload${commit ? '?commit=1' : ''}`, undefined, file),
+  vehicleRows: (b: { facilityId?: string; month?: string; rows: PastedRow[]; commit: boolean }) => call<{ rows: RowResult[]; valid: number; saved: number }>('POST', '/api/vehicles/entries/rows', b),
   batch: (entries: unknown[], dryRun: boolean) => call<{ results: { index: number; ok: boolean; id?: string; totals?: Record<Basis, number>; warnings?: string[]; error?: string }[]; saved: number; failed: number }>('POST', '/api/activities/batch', { entries, dryRun }),
   recalculate: (b: { ids?: string[]; year?: number; onlyWithWarnings?: boolean }) => call<{ checked: number; changed: number; problems: string[] }>('POST', '/api/activities/recalculate', b),
   // price list

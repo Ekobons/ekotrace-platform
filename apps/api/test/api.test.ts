@@ -455,18 +455,18 @@ test('vehicles: data template per fleet and month; upload preview then save; bat
   await wb.xlsx.load(t.rawPayload as unknown as ArrayBuffer);
   const ws = wb.getWorksheet('Vehicle data')!;
   const prefilled: string[] = [];
-  ws.eachRow((r, n) => { if (n > 1) prefilled.push(`${r.getCell(2).value}|${r.getCell(3).value}|${r.getCell(5).value}`); });
+  ws.eachRow((r, n) => { if (n > 1) prefilled.push(`${r.getCell(2).value}|${r.getCell(3).value}|${r.getCell(8).value}`); });
   assert.ok(prefilled.includes('2026-04|SHJ 77|distance'), prefilled.join(','));
   assert.ok(prefilled.includes('2026-05|Forklift 2|fuel'));
   ws.eachRow((r, n) => { if (n > 1) r.getCell(6).value = 100; });
-  ws.addRow(['Sharjah plant', '2026-05', 'Not a vehicle', '', 'distance', 5, 'km', '', '', '', '', 'actual', '']);
+  ws.addRow(['Sharjah plant', '2026-05', 'Spaceship', '', '', 5, 'km', '', '', '', '', 'actual', '']);
   const buf = Buffer.from(await wb.xlsx.writeBuffer());
   const up = (commit: boolean) => app.inject({ method: 'POST', url: `/api/vehicles/entries/upload${commit ? '?commit=1' : ''}`, payload: buf,
     headers: { cookie: adminCookie, 'x-tenant-id': tenantA, 'content-type': 'application/octet-stream' } });
   const pre = (await up(false)).json();
   assert.equal(pre.rows.length, prefilled.length + 1, JSON.stringify(pre).slice(0, 500));
   assert.equal(pre.valid, prefilled.length, JSON.stringify(pre.rows.filter((r: { errors: string[] }) => r.errors.length)));
-  assert.match(pre.rows.at(-1).errors[0], /not in the fleet/);
+  assert.match(pre.rows.at(-1).errors[0], /Could not read "Spaceship"/);
   const before = (await api('GET', '/api/activities?limit=1000', undefined, tenantA)).body.activities.length;
   assert.equal(pre.saved, 0);
   const done = (await up(true)).json();
@@ -500,4 +500,44 @@ test('recalculate: an EV entry saved before the grid factor existed gets its Sco
   assert.equal(after.warnings.length, 0);
   // Recalculating again changes nothing.
   assert.equal((await api('POST', '/api/activities/recalculate', { ids: [saved.body.id], onlyWithWarnings: false }, tenantB)).body.changed, 0);
+});
+
+test('vehicles: pasted rows — "car petrol | 2 | 34 km" = 2 cars × 34 km; method read from the unit; bad rows never saved', async () => {
+  const rows = [
+    { what: 'car petrol', count: '2', quantity: '34', unit: 'km' },
+    { what: 'pickup diesel', quantity: '120 L' },                         // litres → fuel used
+    { what: 'SHJ 77', quantity: '3000', unit: 'km', month: '2026-07' },     // fleet truck by registration (any spacing)
+    { what: 'car petrol', count: '3', quantity: '500', unit: 'AED' },      // spend, needs a price
+    { what: 'Spaceship', quantity: '5', unit: 'km' },
+    { what: 'car petrol', count: '1.5', quantity: '10', unit: 'km' },
+  ];
+  const pre = await api('POST', '/api/vehicles/entries/rows', { facilityId: facA, month: '2026-08', rows }, tenantA);
+  assert.equal(pre.status, 200, JSON.stringify(pre.body));
+  const [car, pickup, truck, spend, bad, half] = pre.body.rows;
+  assert.equal(car.read.vehicle, 'Average car · Petrol');
+  assert.equal(car.read.total, 68);
+  assert.deepEqual(car.errors, []);
+  const one = await api('POST', '/api/calculate', { facilityId: facA, itemId: car.read.typeId, unit: 'km', quantity: 68, periodStart: '2026-08-01', periodEnd: '2026-08-31', vehicle: { method: 'distance' } }, tenantA);
+  assert.ok(Math.abs(car.totals.direct - one.body.totals.direct) < 1e-9, '2 × 34 km = 68 km');
+  assert.equal(pickup.read.method, 'fuel');
+  assert.equal(pickup.read.unit, 'L');
+  assert.equal(truck.read.vehicleKind, 'fleet');
+  assert.equal(truck.read.month, '2026-07');
+  assert.match(spend.errors.join(), /No AED price/);
+  assert.match(bad.errors.join(), /Could not read/);
+  assert.match(half.errors.join(), /whole number/);
+  assert.equal(pre.body.saved, 0);
+  // Choose the type for the unreadable row, then save: only good rows are saved.
+  rows[4] = { ...rows[4]!, typeId: car.read.typeId } as typeof rows[number];
+  const done = await api('POST', '/api/vehicles/entries/rows', { facilityId: facA, month: '2026-08', rows, commit: true }, tenantA);
+  assert.equal(done.body.saved, 4, JSON.stringify(done.body.rows.map((r: { errors: string[] }) => r.errors)));
+  const list = (await api('GET', `/api/activities?facilityId=${facA}&year=2026&category=mobile_combustion&limit=1000`, undefined, tenantA)).body.activities;
+  const saved = list.find((a: { quantity: number; unit: string; period_start: string }) => Number(a.quantity) === 68 && a.unit === 'km' && a.period_start.startsWith('2026-08'));
+  assert.ok(saved, 'saved as 68 km');
+  const detail = (await api('GET', `/api/activities/${saved.id}`, undefined, tenantA)).body;
+  assert.equal(detail.inputs.vehicle.count, 2);
+  assert.match(detail.steps[0], /^2 vehicles × 34 km each = 68 km/);
+  // Recalculating keeps the count.
+  await api('POST', '/api/activities/recalculate', { ids: [saved.id], onlyWithWarnings: false }, tenantA);
+  assert.match((await api('GET', `/api/activities/${saved.id}`, undefined, tenantA)).body.steps[0], /^2 vehicles/);
 });

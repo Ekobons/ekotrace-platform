@@ -171,3 +171,6 @@ dialog.drawer.wide { width: min(880px, 100vw); }
 table.t tfoot td { border-top: 2px solid var(--line); background: #F7FAF8; }
 .modal.wide table.t td { white-space: nowrap; }
 .modal.wide table.t td:last-child { white-space: normal; min-width: 200px; }
+table.t.paste td { padding: 4px 6px; vertical-align: top; }
+table.t.paste tr.row-bad td { background: #FDF3F1; }
+table.t.paste th { padding: 8px 6px; }

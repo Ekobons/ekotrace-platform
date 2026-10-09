@@ -14,7 +14,7 @@ import type { Tx } from '../db/pool.js';
 import { DESNZ_UNIT, slug, type DesnzParsed } from './desnz.js';
 
 /** Raise when the importer learns to read more of the file: editions already loaded are read again once. */
-export const IMPORTER_VERSION = 2;
+export const IMPORTER_VERSION = 3;
 
 export interface ImportSummary {
   source: string;
@@ -261,7 +261,7 @@ export function vehicleItem(group: string, vehicleName: string, variant: string)
   const vehicle = m ? `All ${m[1]}` : vehicleName;
   const code = `veh:${group}:${slug(vehicle)}:${slug(variant || 'any')}`;
   if (group === 'hgv' || group === 'hgv_refrigerated') {
-    return { code, sub: group, name: `${vehicle} · ${variant.replace(/ laden$/i, ' laden')}`,
+    return { code, sub: group, name: `${group === 'hgv_refrigerated' ? 'Refrigerated ' : ''}${vehicle} · ${variant}`,
       attrs: { vehicle, load: variant, powertrain: 'Diesel', fuel: 'desnz:diesel-100-mineral-diesel', distance: true, refrigerated: group === 'hgv_refrigerated' } };
   }
   if (group === 'motorbikes') {

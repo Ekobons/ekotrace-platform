@@ -106,10 +106,11 @@ function recalcInput(a: Record<string, any>, periodStart: string, periodEnd: str
     const v = inputs.vehicle ?? { method: 'distance' };
     if (v.method === 'spend' && v.spend && v.price) {
       // Same amount at the price used when it was saved.
-      return { ...base, cv, vehicle: { method: 'spend', fuelItemId: v.fuelItemId ?? undefined, charging: v.charging ?? undefined,
+      return { ...base, cv, vehicle: { method: 'spend', count: v.count ?? undefined, fuelItemId: v.fuelItemId ?? undefined, charging: v.charging ?? undefined,
         spend: { amount: Number(v.spend.amount), currency: String(v.spend.currency), price: Number(v.price) } } };
     }
-    return { ...base, quantity: Number(a.quantity), cv, vehicle: { method: v.method, fuelItemId: v.fuelItemId ?? undefined, charging: v.charging ?? undefined } };
+    const count = Number(v.count ?? 1);
+    return { ...base, quantity: Number(a.quantity) / count, cv, vehicle: { method: v.method, count: count > 1 ? count : undefined, fuelItemId: v.fuelItemId ?? undefined, charging: v.charging ?? undefined } };
   }
   return { ...base, quantity: Number(a.quantity), cv };
 }
