@@ -10,7 +10,7 @@
  * Every step is written out in plain language and stored with the entry,
  * so an auditor can follow the number back to the factor and its source.
  */
-import { CalcError, type Basis, type CalcResult, type Factor, type GwpTable, type ResultLine } from './types.js';
+import { CalcError, type Basis, type CalcResult, type Factor, type FactorUsed, type GwpTable, type ResultLine } from './types.js';
 import { chooseFactors } from './factors.js';
 import { type UnitRegistry, convert, getUnit } from './units.js';
 import { tryGwp } from './gwp.js';
@@ -48,6 +48,7 @@ export function calcCombustion(input: CombustionInput): CalcResult {
   const lines: ResultLine[] = [];
   const steps: string[] = [];
   const warnings: string[] = [];
+  const factors: FactorUsed[] = [];
   const totals: Record<Basis, number> = { direct: 0, wtt: 0, outside_scopes: 0, memo: 0 };
 
   for (const [basis, { factor, fallback }] of choices) {
@@ -57,8 +58,23 @@ export function calcCombustion(input: CombustionInput): CalcResult {
     if (fallback) warnings.push(`${label}: no ${factor.source} factor covers ${input.date}; used the latest available (${factor.validFrom} – ${factor.validTo}). Recalculate when the new set is loaded.`);
     if (unit !== factor.unit) steps.push(`${label}: ${fmt(quantity)} ${entered.name} = ${fmt(q)} ${fu.name}`);
 
+    const perEntered = convert(units, 1, unit, factor.unit); // factor units in one entered unit
+    const used = (co2ePerUnit: number, method: 'gas' | 'published') => {
+      const f: FactorUsed = {
+        basis, factorId: factor.id, source: factor.source, validFrom: factor.validFrom,
+        co2ePerUnit, unit: fu.code, unitName: fu.name, perEnteredUnit: co2ePerUnit * perEntered,
+        enteredUnit: entered.code, enteredUnitName: entered.name, quantity, method,
+      };
+      if (method === 'gas' && factor.co2ePerUnit != null && factor.sourceGwpSet && factor.sourceGwpSet !== gwp.set) {
+        f.published = { co2ePerUnit: factor.co2ePerUnit, gwpSet: factor.sourceGwpSet };
+      }
+      factors.push(f);
+      steps.push(`${label} CO2e factor: ${fmt(co2ePerUnit)} kg ${basis === 'outside_scopes' ? 'CO2' : 'CO2e'}/${fu.code}${unit !== factor.unit ? ` = ${fmt(f.perEnteredUnit)} per ${entered.code}` : ''} (${method === 'gas' ? `gas split × GWP ${gwp.set}` : factor.source})`);
+    };
+
     const gasesUsable = factor.gases.length > 0 && factor.gases.every((g) => tryGwp(gwp, g.gas) !== undefined);
     if (basis !== 'wtt' && gasesUsable) {
+      used(factor.gases.reduce((s, g) => s + g.kgPerUnit * tryGwp(gwp, g.gas)!, 0), 'gas');
       let sum = 0;
       for (const g of factor.gases) {
         const kgGas = q * g.kgPerUnit;
@@ -77,6 +93,7 @@ export function calcCombustion(input: CombustionInput): CalcResult {
         }
       }
     } else if (factor.co2ePerUnit != null) {
+      used(factor.co2ePerUnit, 'published');
       const co2e = q * factor.co2ePerUnit;
       totals[basis] += co2e;
       lines.push({ basis, gas: 'CO2e', kgGas: null, kgCo2e: co2e, factorId: factor.id, method: 'published' });
@@ -86,7 +103,7 @@ export function calcCombustion(input: CombustionInput): CalcResult {
       }
     }
   }
-  return { lines, totals, steps, warnings };
+  return { lines, factors, totals, steps, warnings };
 }
 
 export function basisLabel(b: Basis): string {

@@ -111,3 +111,29 @@ test('blend without composition uses the published blend factor and says so', ()
   assert.ok(Math.abs(r.totals.direct - 19240) < 1e-6);
   assert.ok(r.warnings.length === 1);
 });
+
+test('CO2e factor used: quantity × factor = total; AR6 shows the published AR5 value alongside', () => {
+  const r5 = calcCombustion({ itemName: 'Diesel', quantity: 3, unit: 'kL', date: '2024-03-01', region: 'AE', factors: diesel(10, 2024), gwp: AR5, units });
+  const d5 = r5.factors.find((f) => f.basis === 'direct')!;
+  assert.ok(Math.abs(d5.co2ePerUnit - 2.66155) < 1e-9);
+  assert.equal(d5.unit, 'L');
+  assert.ok(Math.abs(d5.perEnteredUnit - 2661.55) < 1e-6); // per kilolitre
+  assert.ok(Math.abs(d5.quantity * d5.perEnteredUnit - r5.totals.direct) < 1e-6);
+  assert.equal(d5.published, undefined);
+  const w5 = r5.factors.find((f) => f.basis === 'wtt')!;
+  assert.equal(w5.method, 'published');
+  assert.ok(Math.abs(w5.quantity * w5.perEnteredUnit - r5.totals.wtt) < 1e-6);
+
+  const r6 = calcCombustion({ itemName: 'Diesel', quantity: 1000, unit: 'L', date: '2024-03-01', region: 'AE', factors: diesel(10, 2024), gwp: AR6, units });
+  const d6 = r6.factors.find((f) => f.basis === 'direct')!;
+  assert.ok(Math.abs(1000 * d6.co2ePerUnit - r6.totals.direct) < 1e-6);
+  assert.deepEqual(d6.published, { co2ePerUnit: 2.66155, gwpSet: 'AR5' });
+});
+
+test('CO2e factor of a refrigerant blend is its blend GWP', () => {
+  const r = calcFugitive({ itemName: 'R-410A', unit: 'kg', data: { method: 'quantity', released: 10 },
+    composition: [{ gas: 'HFC-32', fraction: 0.5 }, { gas: 'HFC-125', fraction: 0.5 }], gwp: AR5, units, kyoto: () => true });
+  const f = r.factors.find((x) => x.basis === 'direct')!;
+  assert.ok(Math.abs(f.co2ePerUnit - 1923.5) < 1e-9);
+  assert.ok(Math.abs(10 * f.perEnteredUnit - r.totals.direct) < 1e-6);
+});

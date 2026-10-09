@@ -152,3 +152,8 @@ dialog.drawer::backdrop { background: #0B2A2533; }
 .disclose { justify-self: start; gap: 6px; padding-left: 4px; }
 .disclose svg { width: 14px; height: 14px; transform: rotate(-90deg); transition: transform .15s; }
 .disclose[aria-expanded="true"] svg { transform: none; }
+
+/* Emission factors used (quantity × factor = result) */
+.eftable .muted { color: var(--muted); font-weight: 400; }
+.eftable .small { font-size: 11.5px; margin-top: 2px; }
+.eftable td b { font-family: 'JetBrains Mono', monospace; font-weight: 600; }

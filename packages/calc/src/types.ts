@@ -72,8 +72,36 @@ export interface ResultLine {
   method: 'gas' | 'published';
 }
 
+/**
+ * The CO2e emission factor behind one part of the result, so a user can
+ * cross-check: quantity × perEnteredUnit = total. For gas-split factors it is
+ * the sum of kg gas × GWP of the company's set; otherwise the published total.
+ */
+export interface FactorUsed {
+  basis: Basis;
+  factorId: number | null;
+  /** e.g. "DESNZ 2026" or "GWP AR5" (fugitive gas with known composition) */
+  source: string;
+  validFrom: string | null;
+  /** kg CO2e (kg CO2 for outside_scopes) per unit of the factor */
+  co2ePerUnit: number;
+  unit: string;
+  unitName: string;
+  /** the same factor per unit the user entered */
+  perEnteredUnit: number;
+  enteredUnit: string;
+  enteredUnitName: string;
+  /** quantity in the entered unit that the factor applies to */
+  quantity: number;
+  method: 'gas' | 'published';
+  /** the source's own CO2e per unit and its GWP set, when they differ from the value used */
+  published?: { co2ePerUnit: number; gwpSet: string };
+}
+
 export interface CalcResult {
   lines: ResultLine[];
+  /** CO2e factor per part of the result (one per basis) */
+  factors: FactorUsed[];
   /** kg CO2e per basis (memo and outside_scopes are never part of the inventory total) */
   totals: Record<Basis, number>;
   /** plain-language calculation steps, stored with every entry for audit */

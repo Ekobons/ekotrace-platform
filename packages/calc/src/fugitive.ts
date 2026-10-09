@@ -20,7 +20,7 @@
  * Kyoto basket (HCFC-22, CFCs, halons) are kept as "memo" lines: reported
  * separately, never added to the scope totals (GHG Protocol).
  */
-import { CalcError, type Basis, type CalcResult, type Factor, type GwpTable, type ResultLine } from './types.js';
+import { CalcError, type Basis, type CalcResult, type Factor, type FactorUsed, type GwpTable, type ResultLine } from './types.js';
 import { type UnitRegistry, convert, getUnit } from './units.js';
 import { tryGwp } from './gwp.js';
 import { fmt } from './combustion.js';
@@ -111,6 +111,19 @@ export function calcFugitive(input: FugitiveInput): CalcResult {
   const lines: ResultLine[] = [];
   const warnings: string[] = [];
   const totals: Record<Basis, number> = { direct: 0, wtt: 0, outside_scopes: 0, memo: 0 };
+  const factors: FactorUsed[] = [];
+  const kgUnit = getUnit(input.units, 'kg');
+  const entered = getUnit(input.units, input.unit);
+  const kgPerEntered = convert(input.units, 1, input.unit, 'kg');
+  const used = (basis: Basis, perKg: number, source: string, f: Factor | null) => {
+    const u: FactorUsed = {
+      basis, factorId: f?.id ?? null, source, validFrom: f?.validFrom ?? null, co2ePerUnit: perKg, unit: 'kg', unitName: kgUnit.name,
+      perEnteredUnit: perKg * kgPerEntered, enteredUnit: entered.code, enteredUnitName: entered.name, quantity: kg / kgPerEntered,
+      method: f ? 'published' : 'gas',
+    };
+    factors.push(u);
+    steps.push(`${basis === 'memo' ? 'Memo (non-Kyoto) ' : ''}CO2e factor of ${input.itemName}: ${fmt(perKg)} kg CO2e/kg (${f ? source : `composition × GWP ${input.gwp.set}`})`);
+  };
 
   if (input.composition.length) {
     const sum = input.composition.reduce((s, c) => s + c.fraction, 0);
@@ -125,6 +138,10 @@ export function calcFugitive(input: FugitiveInput): CalcResult {
       lines.push({ basis, gas: c.gas, kgGas, kgCo2e: co2e, factorId: null, method: 'gas' });
       steps.push(`${c.gas}: ${fmt(kg)} kg × ${fmt(c.fraction * 100)} % = ${fmt(kgGas)} kg × GWP ${gw} (${input.gwp.set}) = ${fmt(co2e)} kg CO2e${basis === 'memo' ? ' — non-Kyoto, reported separately' : ''}`);
     }
+    for (const basis of ['direct', 'memo'] as const) {
+      const parts = input.composition.filter((c) => (input.kyoto(c.gas) ? 'direct' : 'memo') === basis);
+      if (parts.length) used(basis, parts.reduce((s, c) => s + c.fraction * tryGwp(input.gwp, c.gas)!, 0), `GWP ${input.gwp.set}`, null);
+    }
   } else if (input.blendFactors?.some((f) => f.co2ePerUnit != null)) {
     let gwpNote = '';
     for (const f of input.blendFactors) {
@@ -133,6 +150,7 @@ export function calcFugitive(input: FugitiveInput): CalcResult {
       const perKg = convert(input.units, f.co2ePerUnit, 'kg', f.unit);
       const co2e = kg * perKg;
       totals[f.basis] += co2e;
+      used(f.basis, perKg, f.source, f);
       lines.push({ basis: f.basis, gas: 'CO2e', kgGas: null, kgCo2e: co2e, factorId: f.id, method: 'published' });
       steps.push(`${input.itemName}${f.basis === 'memo' ? ' (non-Kyoto part, reported separately)' : ''}: ${fmt(kg)} kg × ${fmt(perKg)} kg CO2e/kg (${f.source}) = ${fmt(co2e)} kg CO2e`);
       if (f.sourceGwpSet && f.sourceGwpSet !== input.gwp.set) gwpNote = ` and the ${f.sourceGwpSet} value is used although the company reports in ${input.gwp.set}`;
@@ -141,5 +159,5 @@ export function calcFugitive(input: FugitiveInput): CalcResult {
   } else {
     throw new CalcError(`${input.itemName} has neither a gas composition nor a factor`, 'NO_FACTOR');
   }
-  return { lines, totals, steps, warnings };
+  return { lines, factors, totals, steps, warnings };
 }

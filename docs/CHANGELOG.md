@@ -2,6 +2,14 @@
 
 Newest first.
 
+## 2026-10-09 (5) — CO₂e emission factor shown with every result
+
+- Below the totals, an **Emission factor** table: for Scope 1, well-to-tank, biogenic CO₂ and memo it shows the CO₂e factor per entered unit, the source (e.g. DESNZ 2026), how it was obtained (gas split × company GWP, or published total) and the check `quantity × factor = result`.
+- When the entered unit differs from the factor's unit (e.g. GJ vs kWh), both are shown. When the company's GWP set differs from the source's, DESNZ's own published CO₂e factor is shown alongside.
+- Refrigerants show the blend's CO₂e per kg (composition × GWP).
+- Saved entries keep their factors (new column `activity.factors`, migration 004). Entries saved earlier show the factor derived as total ÷ quantity.
+- Tests: 14 engine + 18 API.
+
 ## 2026-10-09 (4) — CO₂e first, split by gas below
 
 - Add data (live result), the entry drawer and Entries & results show the CO₂e totals first. The split by gas sits below behind **Show split by gas**, closed by default; the choice is remembered on that browser.

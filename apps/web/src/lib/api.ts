@@ -9,7 +9,13 @@ export interface Subcategory { id: number; category_id: number; code: string; na
 export interface Category { id: number; scope: number; code: string; name: string; calc_method: 'combustion' | 'fugitive'; description: string | null; active: boolean; subcategories: Subcategory[] }
 export interface Unit { code: string; name: string; dimension: string; to_base: number; is_base: boolean; aliases: string[]; active: boolean }
 export interface ResultLine { basis: Basis; gas: string; kgGas: number | null; kgCo2e: number; factorId: number | null; method: 'gas' | 'published' }
-export interface CalcResponse { item: { id: number; name: string; category: string }; gwpSet: string; lines: ResultLine[]; totals: Record<Basis, number>; steps: string[]; warnings: string[] }
+/** CO2e emission factor behind one part of a result: quantity × perEnteredUnit = total. */
+export interface FactorUsed {
+  basis: Basis; factorId: number | null; source: string; validFrom: string | null; co2ePerUnit: number; unit: string; unitName: string;
+  perEnteredUnit: number; enteredUnit: string; enteredUnitName: string; quantity: number; method: 'gas' | 'published';
+  published?: { co2ePerUnit: number; gwpSet: string };
+}
+export interface CalcResponse { item: { id: number; name: string; category: string }; gwpSet: string; lines: ResultLine[]; factors: FactorUsed[]; totals: Record<Basis, number>; steps: string[]; warnings: string[] }
 export interface Tenant { id: string; name: string; country: string; gwp_set: string; consolidation?: string; base_year?: number; plan?: string; status?: string; access_expiry?: string }
 export type Role = 'platform_admin' | 'super_admin' | 'admin' | 'manager' | 'preparer' | 'verifier';
 export interface Me { user: { id: string; name: string; email: string; role: Role; tenantId: string | null; scopeNodeId: string | null; mustChangePassword: boolean }; company: (Tenant & { scope_name: string | null }) | null }
@@ -90,7 +96,7 @@ export const api = {
   calculate: (b: unknown) => call<CalcResponse>('POST', '/api/calculate', b),
   saveActivity: (b: unknown) => call<{ id: string; totals: Record<Basis, number>; warnings: string[] }>('POST', '/api/activities', b),
   activities: (q: Record<string, string | number | undefined> = {}) => call<{ activities: Activity[] }>('GET', `/api/activities?${new URLSearchParams(Object.entries(q).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)]))}`),
-  activity: (id: string) => call<Activity & { steps: string[]; warnings: string[]; inputs: Record<string, unknown>; lines: { basis: Basis; gas: string; kg_gas: number | null; kg_co2e: number; method: string; source: string | null }[] }>('GET', `/api/activities/${id}`),
+  activity: (id: string) => call<Activity & { steps: string[]; warnings: string[]; factors: FactorUsed[]; inputs: Record<string, unknown>; lines: { basis: Basis; gas: string; kg_gas: number | null; kg_co2e: number; method: string; source: string | null }[] }>('GET', `/api/activities/${id}`),
   byGas: (year: number) => call<{ rows: { scope: number; category: string; basis: Basis; gas: string; kg_gas: number | null; kg_co2e: number }[] }>('GET', `/api/reports/by-gas?year=${year}`),
   // catalogue admin
   addSubcategory: (b: unknown) => call('POST', '/api/admin/subcategories', b),

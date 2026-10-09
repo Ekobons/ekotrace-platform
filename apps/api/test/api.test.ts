@@ -129,6 +129,13 @@ test('AR6 company gets a different (recomputed) total from the same entry', asyn
   const b = await api('POST', '/api/calculate', { itemId: id, quantity: 1000, unit: 'L', periodStart: '2025-03-01', periodEnd: '2025-03-31' }, tenantB);
   assert.equal(b.body.gwpSet, 'AR6');
   assert.ok(b.body.totals.direct > a.body.totals.direct);
+  // CO2e factor shown to the user: AR5 equals DESNZ's published value; AR6 differs and shows the published one alongside.
+  const fa = a.body.factors.find((f: { basis: string }) => f.basis === 'direct');
+  const fb = b.body.factors.find((f: { basis: string }) => f.basis === 'direct');
+  assert.ok(Math.abs(1000 * fa.perEnteredUnit - a.body.totals.direct) < 1e-6);
+  assert.equal(fa.published, undefined);
+  assert.equal(fb.published.gwpSet, 'AR5');
+  assert.ok(Math.abs(1000 * fb.perEnteredUnit - b.body.totals.direct) < 1e-6);
 });
 
 test('save an entry; other companies cannot see it (row-level security)', async () => {
@@ -143,6 +150,8 @@ test('save an entry; other companies cannot see it (row-level security)', async 
   const detail = await api('GET', `/api/activities/${s.body.id}`, undefined, tenantA);
   assert.ok(detail.body.steps.length >= 4);
   assert.ok(detail.body.lines.some((l: { source: string }) => l.source === 'DESNZ-2025'));
+  const f = detail.body.factors.find((x: { basis: string }) => x.basis === 'direct');
+  assert.ok(Math.abs(500 * f.perEnteredUnit - Number(detail.body.co2e_direct)) < 1e-6, 'saved entry keeps its CO2e factor');
 });
 
 test('fugitive: R-410A per gas (Kyoto), R-401A HCFC part as memo, blend without composition uses DESNZ total', async () => {
