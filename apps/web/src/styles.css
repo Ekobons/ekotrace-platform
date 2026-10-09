@@ -174,3 +174,8 @@ table.t tfoot td { border-top: 2px solid var(--line); background: #F7FAF8; }
 table.t.paste td { padding: 4px 6px; vertical-align: top; }
 table.t.paste tr.row-bad td { background: #FDF3F1; }
 table.t.paste th { padding: 8px 6px; }
+.stat.s2m { border-left: 4px dashed var(--s2); }
+
+/* Grouped options in a form (market-based inputs etc.) */
+fieldset.box { border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px 14px; display: grid; gap: 10px; margin: 0; min-width: 0; }
+fieldset.box legend { font-size: 11.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); padding: 0 6px; }

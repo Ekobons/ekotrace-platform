@@ -49,6 +49,19 @@ export interface DesnzVehicleRow {
 }
 /** Electricity used per km / mile by electric and plug-in hybrid vehicles. */
 export interface DesnzEvEnergyRow { group: VehicleGroup; vehicle: string; variant: string; unit: 'km' | 'mi'; kwh: number }
+export type UkEnergyKey = 'elecTd' | 'elecWttGen' | 'elecWttTd' | 'heat' | 'heatTd' | 'heatWtt' | 'heatWttTd';
+/** Which flat-file row is which UK energy factor (names checked 2022–2026). */
+function ukEnergyKey(scope: string, l1: string, l2: string, l3: string): UkEnergyKey | null {
+  if (scope === 'Scope 3' && l2 === 'T&D- UK electricity') return 'elecTd';
+  if (scope === 'Scope 3' && l2 === 'WTT- UK electricity (generation)') return 'elecWttGen';
+  if (scope === 'Scope 3' && l2 === 'WTT- UK electricity (T&D)') return 'elecWttTd';
+  if (scope === 'Scope 2' && l1 === 'Heat and steam' && l3 === 'District heat and steam') return 'heat';
+  if (scope === 'Scope 3' && l2 === 'Distribution - district heat & steam') return 'heatTd';
+  if (scope === 'Scope 3' && l2 === 'WTT- heat and steam' && l3 === 'District heat and steam') return 'heatWtt';
+  if (scope === 'Scope 3' && l2 === 'WTT- district heat & steam distribution') return 'heatWttTd';
+  return null;
+}
+
 export type VehicleGroup = 'cars_by_size' | 'cars_by_segment' | 'vans' | 'hgv' | 'hgv_refrigerated' | 'motorbikes';
 
 export interface DesnzParsed {
@@ -56,6 +69,11 @@ export interface DesnzParsed {
   evEnergy: DesnzEvEnergyRow[];
   /** UK grid electricity (Scope 2, location-based), kg CO2e per kWh and its gas split */
   ukGrid: { co2e: number | null; gasCo2e: { CO2?: number; CH4?: number; N2O?: number } } | null;
+  /**
+   * Other UK energy rows, per kWh consumed: electricity T&D losses and well-to-tank,
+   * district heat & steam (Scope 2), its distribution losses and well-to-tank.
+   */
+  ukEnergy: Partial<Record<UkEnergyKey, { co2e: number | null; gasCo2e: { CO2?: number; CH4?: number; N2O?: number } }>>;
   year: number;
   version: string;
   gwpSet: 'AR4' | 'AR5' | 'AR6';
@@ -135,6 +153,7 @@ export async function parseDesnz(path: string): Promise<DesnzParsed> {
   const vehicles = new Map<string, DesnzVehicleRow>();
   const evEnergy: DesnzEvEnergyRow[] = [];
   let ukGrid: DesnzParsed['ukGrid'] = null;
+  const ukEnergy: DesnzParsed['ukEnergy'] = {};
   ws.eachRow((row, n) => {
     if (n <= headerRow) return;
     const g = (k: string) => row.getCell(col[k]!).value;
@@ -160,6 +179,15 @@ export async function parseDesnz(path: string): Promise<DesnzParsed> {
     }
     if (vgroup && vunit && /^SECR kWh UK electricity for EVs$/.test(l1) && v != null) {
       evEnergy.push({ group: vgroup, vehicle: l3, variant: colText, unit: vunit, kwh: v });
+      return;
+    }
+    const ek = uom === 'kWh' ? ukEnergyKey(scope, l1, l2, l3) : null;
+    if (ek) {
+      const e = (ukEnergy[ek] ??= { co2e: null, gasCo2e: {} });
+      if (/of co2/.test(ghg)) e.gasCo2e.CO2 = v ?? undefined;
+      else if (/of ch4/.test(ghg)) e.gasCo2e.CH4 = v ?? undefined;
+      else if (/of n2o/.test(ghg)) e.gasCo2e.N2O = v ?? undefined;
+      else if (ghg.startsWith('kg co2e')) e.co2e = v;
       return;
     }
     if (scope === 'Scope 2' && l1 === 'UK electricity' && uom === 'kWh') {
@@ -208,7 +236,7 @@ export async function parseDesnz(path: string): Promise<DesnzParsed> {
     fuels: [...fuels.values()].filter((r) => r.co2e != null || Object.keys(r.gasCo2e).length),
     gases: [...gases.values()],
     vehicles: [...vehicles.values()].filter((r) => r.co2e != null),
-    evEnergy, ukGrid,
+    evEnergy, ukGrid, ukEnergy,
     sha256: createHash('sha256').update(buf).digest('hex'),
   };
 }

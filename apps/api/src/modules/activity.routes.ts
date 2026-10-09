@@ -33,8 +33,22 @@ async function applyFleetVehicle(c: Tx, input: CalcInput & { facilityId?: string
   return v as { id: string; name: string };
 }
 
-function contextFor(c: Tx, gwpSet: string, region: string): CalcContext {
-  return { gwpSet, region, lookupPrice: (itemId, r, date, currency) => findPrice(c, itemId, r, date, currency) };
+/** Everything a calculation may need to look up inside the company's transaction. */
+export function contextFor(c: Tx, gwpSet: string, region: string, fac?: { id: string; grid_region?: string | null }, activityId?: string): CalcContext {
+  return {
+    gwpSet, region, gridRegion: fac?.grid_region ?? null, facilityId: fac?.id, activityId,
+    lookupPrice: (itemId, r, date, currency) => findPrice(c, itemId, r, date, currency),
+    lookupSupplier: async (id) => {
+      const s = (await c.query('SELECT supplier, energy, co2e, unit, source, valid_from::text, valid_to::text FROM supplier_factor WHERE id = $1', [id])).rows[0];
+      return s ? { name: s.supplier, energy: s.energy, co2ePerUnit: Number(s.co2e), unit: s.unit, source: s.source, validFrom: s.valid_from, validTo: s.valid_to } : null;
+    },
+    // Locked while the entry is saved, so two people cannot claim the same MWh at once.
+    lookupCertificates: async (ids, exclude) => (await c.query(
+      `SELECT e.id, concat_ws(' ', initcap(e.technology), coalesce(e.standard, e.instrument), e.reference) AS label, e.co2e_per_kwh, e.mwh, e.market,
+              e.vintage_from::text, e.vintage_to::text, e.facility_id,
+              COALESCE((SELECT sum(k.kwh) FROM certificate_claim k WHERE k.certificate_id = e.id AND ($2::uuid IS NULL OR k.activity_id <> $2)), 0) AS claimed_other_kwh
+         FROM energy_certificate e WHERE e.id = ANY($1) FOR UPDATE OF e`, [ids, exclude ?? null])).rows,
+  };
 }
 
 export const saveSchema = calcInputSchema.extend({
@@ -50,21 +64,25 @@ export type SaveInput = z.infer<typeof saveSchema>;
  */
 export async function saveEntry(c: Tx, req: FastifyRequest, t: { id: string; gwp_set: string }, b: SaveInput, opts: { dryRun?: boolean } = {}) {
   const tenant = t.id;
-  const fac = (await c.query(`SELECT id, name, country FROM org_node WHERE id = $1 AND kind = 'facility' AND active`, [b.facilityId])).rows[0];
+  const fac = (await c.query(`SELECT id, name, country, grid_region FROM org_node WHERE id = $1 AND kind = 'facility' AND active`, [b.facilityId])).rows[0];
   if (!fac) throw notFound('Facility');
   assertCan((await scopeOf(c, req.user)).enter, fac.id, 'enter data for this facility');
   const veh = await applyFleetVehicle(c, b);
-  const { result, item, gwpSet, stored } = await calculate(b, contextFor(c, t.gwp_set, fac.country));
+  const { result, item, gwpSet, stored } = await calculate(b, contextFor(c, t.gwp_set, fac.country, fac));
   if (opts.dryRun) return { id: null, createdAt: null, item: item.name, gwpSet, totals: result.totals, warnings: result.warnings, stored };
   const quantity = stored.quantity;
   const a = (await c.query(
     `INSERT INTO activity (tenant_id, facility_id, category_id, item_id, period_start, period_end, quantity, unit, inputs, data_type, gwp_set,
-                           co2e_direct, co2e_wtt, co2_biogenic, co2e_memo, steps, warnings, note, created_by, factors, co2e_scope2, vehicle_id)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22) RETURNING id, created_at`,
+                           co2e_direct, co2e_wtt, co2_biogenic, co2e_memo, steps, warnings, note, created_by, factors, co2e_scope2, vehicle_id, co2e_scope2_market, co2e_td)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24) RETURNING id, created_at`,
     [tenant, fac.id, item.category_id, item.id, b.periodStart, b.periodEnd, quantity, stored.unit, JSON.stringify(stored.inputs), b.dataType, gwpSet,
      result.totals.direct, result.totals.wtt, result.totals.outside_scopes, result.totals.memo,
      JSON.stringify(result.steps), JSON.stringify(result.warnings), b.note ?? null, req.user.id, JSON.stringify(result.factors),
-     result.totals.scope2, veh?.id ?? null])).rows[0];
+     result.totals.scope2, veh?.id ?? null, result.totals.scope2_market, result.totals.td_loss])).rows[0];
+  // Certificates claimed by this entry (checked and locked during the calculation).
+  for (const k of (stored.inputs.claims as { certificateId: string; kwh: number }[] | undefined) ?? []) {
+    await c.query('INSERT INTO certificate_claim (tenant_id, certificate_id, activity_id, kwh) VALUES ($1,$2,$3,$4)', [tenant, k.certificateId, a.id, k.kwh]);
+  }
   if (result.lines.length) {
     await c.query(
       `INSERT INTO activity_result (activity_id, tenant_id, basis, gas, kg_gas, kg_co2e, factor_id, method)
@@ -101,6 +119,10 @@ function recalcInput(a: Record<string, any>, periodStart: string, periodEnd: str
   const inputs = (a.inputs ?? {}) as Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
   const base = { itemId: a.item_id as number, unit: a.unit as string, periodStart, periodEnd };
   if (a.calc_method === 'fugitive') return { ...base, fugitive: inputs as CalcInput['fugitive'] };
+  if (a.calc_method === 'electricity') {
+    const e = { ...(inputs.energy ?? {}) }; delete e.regions; delete e.certificates;
+    return { ...base, quantity: Number(a.quantity), energy: e };
+  }
   const cv = inputs.cv ? { value: Number(inputs.cv.value), energyUnit: String(inputs.cv.energyUnit), perUnit: String(inputs.cv.perUnit) } : undefined;
   if (a.calc_method === 'vehicle') {
     const v = inputs.vehicle ?? { method: 'distance' };
@@ -181,7 +203,7 @@ export async function activityRoutes(app: FastifyInstance) {
     return tenantTx(tenant, async (c) => {
       const scope = await scopeOf(c, req.user);
       const rows = (await c.query(
-        `SELECT f.id, f.name, f.country, f.active, f.facility_type, p.name AS parent_name
+        `SELECT f.id, f.name, f.country, f.grid_region, f.active, f.facility_type, p.name AS parent_name
            FROM org_node f LEFT JOIN org_node p ON p.id = f.parent_id
           WHERE f.kind = 'facility' AND f.active ORDER BY p.name NULLS FIRST, f.name`)).rows;
       return { facilities: rows.filter((f) => scope.see.has(f.id)).map((f) => ({ ...f, canEnter: scope.enter.has(f.id), canApprove: scope.approve.has(f.id) })) };
@@ -199,13 +221,14 @@ export async function activityRoutes(app: FastifyInstance) {
     const t = await tenantSettings(req.user.tenantId);
     return tenantTx(t.id, async (c) => {
       let region = t.country;
+      let fac: { id: string; grid_region: string | null } | undefined;
       if (input.facilityId) {
-        const f = (await c.query(`SELECT country FROM org_node WHERE id = $1 AND kind = 'facility'`, [input.facilityId])).rows[0];
+        const f = (await c.query(`SELECT id, country, grid_region FROM org_node WHERE id = $1 AND kind = 'facility'`, [input.facilityId])).rows[0];
         if (!f) throw notFound('Facility');
-        region = f.country;
+        region = f.country; fac = f;
       }
       await applyFleetVehicle(c, input);
-      const { result, item, gwpSet, stored } = await calculate(input, contextFor(c, t.gwp_set, region));
+      const { result, item, gwpSet, stored } = await calculate(input, contextFor(c, t.gwp_set, region, fac));
       return { item: { id: item.id, name: item.name, category: item.category }, gwpSet, stored, ...result };
     });
   });
@@ -254,17 +277,23 @@ export async function activityRoutes(app: FastifyInstance) {
         const input = recalcInput(a, iso(a.period_start), iso(a.period_end));
         await c.query('SAVEPOINT recalc');
         try {
-          const fac = (await c.query('SELECT country FROM org_node WHERE id = $1', [a.facility_id])).rows[0];
+          const fac = (await c.query('SELECT id, country, grid_region FROM org_node WHERE id = $1', [a.facility_id])).rows[0];
+          if (a.calc_method === 'electricity') {
+            const cl = (await c.query('SELECT certificate_id, kwh FROM certificate_claim WHERE activity_id = $1', [a.id])).rows;
+            if (cl.length) input.energy = { ...(input.energy ?? {}), certificates: cl.map((k) => ({ certificateId: k.certificate_id, kwh: Number(k.kwh) })) };
+          }
           if (a.vehicle_id && input.vehicle) input.vehicle.vehicleId = a.vehicle_id;
           await applyFleetVehicle(c, { ...input, facilityId: a.facility_id }).catch(() => null); // retired since: keep the saved type
-          const { result, gwpSet } = await calculate(input, contextFor(c, t.gwp_set, fac.country));
-          const same = ['direct', 'wtt', 'outside_scopes', 'memo', 'scope2'].every((k) => Math.abs(Number(a[k === 'direct' ? 'co2e_direct' : k === 'wtt' ? 'co2e_wtt' : k === 'outside_scopes' ? 'co2_biogenic' : k === 'memo' ? 'co2e_memo' : 'co2e_scope2']) - result.totals[k as 'direct']) < 1e-6)
+          const { result, gwpSet } = await calculate(input, contextFor(c, t.gwp_set, fac.country, fac, a.id));
+          const col: Record<string, string> = { direct: 'co2e_direct', wtt: 'co2e_wtt', outside_scopes: 'co2_biogenic', memo: 'co2e_memo', scope2: 'co2e_scope2', scope2_market: 'co2e_scope2_market', td_loss: 'co2e_td' };
+          const same = Object.entries(col).every(([k, cname]) => Math.abs(Number(a[cname]) - result.totals[k as 'direct']) < 1e-6)
             && JSON.stringify(a.warnings) === JSON.stringify(result.warnings) && a.gwp_set === gwpSet;
           if (!same) {
             await c.query(
-              `UPDATE activity SET co2e_direct=$2, co2e_wtt=$3, co2_biogenic=$4, co2e_memo=$5, co2e_scope2=$6, steps=$7, warnings=$8, factors=$9, gwp_set=$10, updated_at=now() WHERE id=$1`,
+              `UPDATE activity SET co2e_direct=$2, co2e_wtt=$3, co2_biogenic=$4, co2e_memo=$5, co2e_scope2=$6, steps=$7, warnings=$8, factors=$9, gwp_set=$10,
+                                  co2e_scope2_market=$11, co2e_td=$12, updated_at=now() WHERE id=$1`,
               [a.id, result.totals.direct, result.totals.wtt, result.totals.outside_scopes, result.totals.memo, result.totals.scope2,
-               JSON.stringify(result.steps), JSON.stringify(result.warnings), JSON.stringify(result.factors), gwpSet]);
+               JSON.stringify(result.steps), JSON.stringify(result.warnings), JSON.stringify(result.factors), gwpSet, result.totals.scope2_market, result.totals.td_loss]);
             await c.query('DELETE FROM activity_result WHERE activity_id = $1', [a.id]);
             if (result.lines.length) {
               await c.query(
@@ -274,8 +303,8 @@ export async function activityRoutes(app: FastifyInstance) {
                  result.lines.map((l) => l.kgCo2e), result.lines.map((l) => l.factorId), result.lines.map((l) => l.method)]);
             }
             await audit(c, req, 'activity.recalculate', 'activity', a.id, {
-              before: { direct: Number(a.co2e_direct), scope2: Number(a.co2e_scope2), wtt: Number(a.co2e_wtt) },
-              after: { direct: result.totals.direct, scope2: result.totals.scope2, wtt: result.totals.wtt } });
+              before: { direct: Number(a.co2e_direct), scope2: Number(a.co2e_scope2), scope2Market: Number(a.co2e_scope2_market), td: Number(a.co2e_td), wtt: Number(a.co2e_wtt) },
+              after: { direct: result.totals.direct, scope2: result.totals.scope2, scope2Market: result.totals.scope2_market, td: result.totals.td_loss, wtt: result.totals.wtt } });
             changed++;
           }
           await c.query('RELEASE SAVEPOINT recalc');
@@ -296,7 +325,7 @@ export async function activityRoutes(app: FastifyInstance) {
       return {
         activities: (await c.query(
           `SELECT a.id, a.facility_id, a.period_start, a.period_end, f.name AS facility, cat.name AS category, i.name AS item, a.quantity, a.unit, a.data_type, a.gwp_set,
-                  a.co2e_direct, a.co2e_wtt, a.co2_biogenic, a.co2e_memo, a.co2e_scope2, a.status, a.created_at, a.vehicle_id, v.name AS vehicle
+                  a.co2e_direct, a.co2e_wtt, a.co2_biogenic, a.co2e_memo, a.co2e_scope2, a.co2e_scope2_market, a.co2e_td, a.status, a.created_at, a.vehicle_id, v.name AS vehicle
              FROM activity a JOIN org_node f ON f.id = a.facility_id JOIN item i ON i.id = a.item_id JOIN category cat ON cat.id = a.category_id
              LEFT JOIN vehicle v ON v.id = a.vehicle_id
             WHERE a.facility_id = ANY($5) AND ($1::uuid IS NULL OR a.facility_id = $1) AND ($2::int IS NULL OR extract(year FROM a.period_start) = $2) AND ($3::text IS NULL OR cat.code = $3)

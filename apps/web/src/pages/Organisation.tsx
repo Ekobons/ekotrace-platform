@@ -5,7 +5,7 @@
  */
 import { useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
 import { useApp } from '../App';
-import { api, type OrgNode, type Person } from '../lib/api';
+import { api, type GridRegion, type OrgNode, type Person } from '../lib/api';
 import { Icon } from '../components/Icon';
 import { Fleet } from '../components/Fleet';
 
@@ -108,7 +108,7 @@ function fieldsFrom(n: Partial<OrgNode>) {
     name: n.name ?? '', facilityType: n.facility_type ?? '', location: n.location ?? '', country: n.country ?? 'AE',
     floorAreaM2: n.floor_area_m2 != null ? String(n.floor_area_m2) : '', employees: n.employees != null ? String(n.employees) : '',
     ownershipPct: String(n.ownership_pct ?? 100), operationalControl: n.operational_control ?? true, financialControl: n.financial_control ?? true,
-    managerUserId: n.manager_user_id ?? '',
+    managerUserId: n.manager_user_id ?? '', gridRegion: n.grid_region ?? '',
   };
 }
 type F = ReturnType<typeof fieldsFrom>;
@@ -117,7 +117,7 @@ const toBody = (f: F, kind: string) => ({
   ...(kind === 'facility' ? {
     facilityType: f.facilityType || null, location: f.location || null, floorAreaM2: f.floorAreaM2 === '' ? null : Number(f.floorAreaM2),
     employees: f.employees === '' ? null : Number(f.employees), ownershipPct: Number(f.ownershipPct), operationalControl: f.operationalControl,
-    financialControl: f.financialControl, managerUserId: f.managerUserId || null,
+    financialControl: f.financialControl, managerUserId: f.managerUserId || null, gridRegion: f.gridRegion || null,
   } : {}),
 });
 
@@ -137,6 +137,7 @@ function NodeForm({ f, setF, kind, managers, disabled }: { f: F; setF: (f: F) =>
             <label className="field grow"><span>Floor area m²</span><input className="input num" value={f.floorAreaM2} onChange={set('floorAreaM2')} /></label>
             <label className="field grow"><span>Employees</span><input className="input num" value={f.employees} onChange={set('employees')} /></label>
           </div>
+          <GridRegionField country={f.country.toUpperCase()} value={f.gridRegion} onChange={(v) => setF({ ...f, gridRegion: v })} />
           <label className="field"><span>Manager (approves this facility's data)</span>
             <select className="input" value={f.managerUserId} onChange={set('managerUserId')}><option value="">— none —</option>{managers.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}</select></label>
           <div className="card" style={{ background: '#F8FAF9', padding: 12, display: 'grid', gap: 8 }}>
@@ -215,5 +216,19 @@ function AddNode({ parent, kind, managers, onClose, onSaved }: { parent: OrgNode
         </div>
       </div>
     </dialog>
+  );
+}
+
+/** Grid region of a facility (location-based Scope 2): national average or a sub-region with its own factor. */
+function GridRegionField({ country, value, onChange }: { country: string; value: string; onChange: (v: string) => void }) {
+  const [regions, setRegions] = useState<GridRegion[]>([]);
+  useEffect(() => { api.gridRegions().then((r) => setRegions(r.regions)).catch(() => setRegions([])); }, []);
+  const here = regions.filter((r) => r.country === country && r.kind !== 'country');
+  return (
+    <label className="field"><span>Grid region (electricity)</span>
+      <select className="input" value={value} onChange={(e) => onChange(e.target.value)}>
+        <option value="">{country} national average</option>
+        {here.map((r) => <option key={r.code} value={r.code}>{r.name} ({r.code}){r.factors?.some((x) => x.basis === 'scope2') ? '' : ' — no factor yet, national used'}</option>)}
+      </select></label>
   );
 }

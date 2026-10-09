@@ -26,6 +26,7 @@ const P: Record<string, string> = {
   scale: 'M12 4v16M5 8h14M5 8l-3 6h6zM19 8l-3 6h6zM8 20h8',
   users: 'M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM2 21v-1a6 6 0 0 1 12 0v1M17 11a3 3 0 1 0 0-6M22 21v-1a5 5 0 0 0-4-4.9',
   plug: 'M9 2v6M15 2v6M6 8h12v4a6 6 0 0 1-12 0zM12 18v4',
+  bolt: 'M13 2 4 14h7l-1 8 9-12h-7z',
   spark: 'M12 3l2 6 6 2-6 2-2 6-2-6-6-2 6-2z',
   lock: 'M5 11h14v10H5zM8 11V7a4 4 0 0 1 8 0v4',
   chat: 'M4 5h16v11H8l-4 4z',

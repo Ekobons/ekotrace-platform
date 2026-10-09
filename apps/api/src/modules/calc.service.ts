@@ -4,7 +4,7 @@
  * calculation for the item's category, and returns the result with its steps.
  */
 import { z } from 'zod';
-import { calcCombustion, calcFugitive, calcVehicle, chooseFactors, convert, impliedCalorificValue, type CalcResult, type Factor } from '@ekotrace/calc';
+import { calcCombustion, calcEnergy, calcFugitive, calcVehicle, chooseFactors, convert, impliedCalorificValue, type CalcResult, type CertificateClaim, type Factor, type SupplierFactor } from '@ekotrace/calc';
 import { query } from '../db/pool.js';
 import { AppError, notFound } from '../lib/errors.js';
 import { refdata } from './refdata.js';
@@ -44,6 +44,20 @@ export const vehicleSchema = z.object({
   vehicleId: z.string().uuid().optional(),
 });
 
+/** Purchased energy: grid region, supplier factor, certificates claimed, cooling plant efficiency. */
+export const energySchema = z.object({
+  /** grid region of this entry (else the facility's) */
+  gridRegion: z.string().regex(/^[A-Z]{2}(-[A-Z0-9]{1,10})?$/).optional(),
+  /** a factor from the supplier list … */
+  supplierFactorId: z.string().uuid().optional(),
+  /** … or one typed on the entry */
+  supplier: z.object({ name: z.string().trim().min(1).max(120), co2e: z.number().finite().min(0), unit: z.string().min(1), source: z.string().trim().min(2).max(200) }).optional(),
+  /** certificates / contracts claimed for this electricity, kWh each */
+  certificates: z.array(z.object({ certificateId: z.string().uuid(), kwh: z.number().finite().positive() })).max(50).optional(),
+  /** district cooling */
+  cooling: z.object({ method: z.enum(['supplier', 'efficiency']), kwhPerTrh: z.number().finite().positive().optional(), cop: z.number().finite().positive().optional() }).optional(),
+});
+
 export const calcInputSchema = z.object({
   itemId: z.number().int().positive(),
   unit: z.string().min(1),
@@ -56,6 +70,7 @@ export const calcInputSchema = z.object({
   region: z.string().length(2).or(z.literal('GLOBAL')).optional(),
   gwpSet: z.enum(['AR4', 'AR5', 'AR6']).optional(),
   vehicle: vehicleSchema.optional(),
+  energy: energySchema.optional(),
 });
 export type CalcInput = z.infer<typeof calcInputSchema>;
 
@@ -93,9 +108,17 @@ export async function loadFactors(itemId: number): Promise<Factor[]> {
 }
 
 export interface PriceFound { price: number; unit: string; currency: string; source: string }
+export interface CertificateRow { id: string; label: string; co2e_per_kwh: number; mwh: number; claimed_other_kwh: number; market: string; vintage_from: string; vintage_to: string; facility_id: string | null }
 export interface CalcContext {
   gwpSet: string;
   region: string;
+  /** grid region of the facility (state / emirate / grid), if set */
+  gridRegion?: string | null;
+  facilityId?: string;
+  /** the entry being recalculated: its own certificate claims do not count as used elsewhere */
+  activityId?: string;
+  lookupSupplier?: (id: string) => Promise<(SupplierFactor & { validFrom: string; validTo: string; energy: string }) | null>;
+  lookupCertificates?: (ids: string[], excludeActivityId?: string) => Promise<CertificateRow[]>;
   /** price list lookup (company price first, then the platform list) */
   lookupPrice?: (itemId: number, region: string, date: string, currency: string) => Promise<PriceFound | null>;
 }
@@ -119,7 +142,11 @@ export async function calculate(input: CalcInput, ctx: CalcContext): Promise<{ r
 
   let result: CalcResult;
   let stored: Stored = { quantity: input.quantity ?? 0, unit: input.unit, inputs: input.cv ? { cv: input.cv } : {} };
-  if (item.calc_method === 'vehicle') {
+  if (item.calc_method === 'electricity') {
+    if (input.quantity === undefined) throw new AppError('Enter the quantity of energy');
+    const e = await energyCalc(input, item, ctx, ref.units, gwp, date);
+    result = e.result; stored = e.stored;
+  } else if (item.calc_method === 'vehicle') {
     if (input.quantity === undefined && !input.vehicle?.spend) throw new AppError('Enter the distance, fuel, electricity or spend');
     const v = await vehicleCalc(input, item, ctx, ref.units, gwp, region, date);
     result = v.result; stored = v.stored;
@@ -241,4 +268,66 @@ export async function findPrice(c: { query: (q: string, p: unknown[]) => Promise
       WHERE item_id = $1 AND region = $2 AND currency = $4 AND valid_from <= $3::date AND valid_to >= $3::date
       ORDER BY (tenant_id IS NOT NULL) DESC, valid_from DESC LIMIT 1`, [itemId, region, date, currency])).rows[0];
   return r ? { price: Number(r.price), unit: String(r.unit), currency: String(r.currency), source: `price list: ${r.source}` } : null;
+}
+
+// --------------------------------------------------------- purchased energy --
+const ENERGY_OF: Record<string, 'electricity' | 'heat' | 'cooling'> = { 'grid:electricity': 'electricity', 'heat:district': 'heat', 'cooling:district': 'cooling' };
+
+async function energyCalc(input: CalcInput, item: ItemRow, ctx: CalcContext, units: Awaited<ReturnType<typeof refdata>>['units'],
+  gwp: Parameters<typeof calcEnergy>[0]['gwp'], date: string): Promise<{ result: CalcResult; stored: Stored }> {
+  const energy = ENERGY_OF[item.code];
+  if (!energy) throw new AppError(`${item.name} is not set up for purchased energy`);
+  const e = input.energy ?? {};
+  const country = ctx.region.slice(0, 2);
+  const first = e.gridRegion ?? ctx.gridRegion ?? country;
+  const regions = [...new Set([first, first.slice(0, 2)])];
+  const warnings: string[] = [];
+
+  // Supplier factor: from the list (checked against the energy and the period) or typed in.
+  let supplier: SupplierFactor | null = null;
+  if (e.supplierFactorId) {
+    const s = ctx.lookupSupplier ? await ctx.lookupSupplier(e.supplierFactorId) : null;
+    if (!s) throw new AppError('Supplier factor not found');
+    if (s.energy !== energy) throw new AppError(`That supplier factor is for ${s.energy}, not ${energy}`);
+    if (date < s.validFrom || date > s.validTo) warnings.push(`The supplier factor of ${s.name} is for ${s.validFrom.slice(0, 7)} – ${s.validTo.slice(0, 7)}, not this period.`);
+    supplier = s;
+  } else if (e.supplier) {
+    supplier = { name: e.supplier.name, co2ePerUnit: e.supplier.co2e, unit: e.supplier.unit, source: e.supplier.source };
+  }
+  if (supplier) {
+    const u = units.get(supplier.unit);
+    const want = { electricity: 'electricity', heat: 'heat', cooling: 'cooling' }[energy];
+    if (!u || u.dimension !== want) throw new AppError(`The supplier factor must be per unit of ${want} (e.g. per kWh${energy === 'cooling' ? ' or per TRh' : ''})`);
+  }
+
+  // Certificates: same company, this facility (or any), enough left, right market and vintage.
+  const claims: CertificateClaim[] = [];
+  if (e.certificates?.length) {
+    if (energy !== 'electricity') throw new AppError('Certificates apply to electricity only');
+    const rows = ctx.lookupCertificates ? await ctx.lookupCertificates(e.certificates.map((x) => x.certificateId), ctx.activityId) : [];
+    for (const want of e.certificates) {
+      const c = rows.find((r) => r.id === want.certificateId);
+      if (!c) throw new AppError('Certificate not found');
+      if (c.facility_id && ctx.facilityId && c.facility_id !== ctx.facilityId) throw new AppError(`${c.label} is assigned to another facility`);
+      const left = Number(c.mwh) * 1000 - Number(c.claimed_other_kwh);
+      const kwhClaim = convert(units, want.kwh, 'kWh_e', 'kWh_e');
+      if (kwhClaim > left + 1e-6) throw new AppError(`${c.label}: only ${Math.max(0, Math.round(left)).toLocaleString('en')} kWh left to claim`);
+      if (c.market !== country) warnings.push(`${c.label} is from the ${c.market} market, not ${country}: the GHG Protocol requires certificates from the same market as the consumption.`);
+      const vf = String(c.vintage_from).slice(0, 10), vt = String(c.vintage_to).slice(0, 10);
+      if (input.periodEnd < vf || input.periodStart > vt) warnings.push(`${c.label}: vintage ${vf.slice(0, 7)} – ${vt.slice(0, 7)} does not cover this period. Check it meets your reporting rules.`);
+      claims.push({ id: c.id, label: c.label, kwh: kwhClaim, co2ePerKwh: Number(c.co2e_per_kwh) });
+    }
+  }
+
+  const gridItem = energy === 'cooling' ? (await query<{ id: number }>(`SELECT id FROM item WHERE code = 'grid:electricity'`))[0] : null;
+  if (energy === 'cooling' && !e.cooling && !supplier) throw new AppError("District cooling needs the supplier's factor, or the plant's efficiency (kWh per TRh, or COP)");
+  const result = calcEnergy({
+    energy, itemName: item.name, quantity: input.quantity!, unit: input.unit, date, regions,
+    factors: energy === 'cooling' ? [] : await loadFactors(item.id),
+    cooling: energy === 'cooling' ? { method: e.cooling?.method ?? 'supplier', kwhPerTrh: e.cooling?.kwhPerTrh, cop: e.cooling?.cop, gridFactors: gridItem ? await loadFactors(gridItem.id) : [] } : undefined,
+    supplier, certificates: claims, gwp, units,
+  });
+  result.warnings.unshift(...warnings);
+  const stored: Stored = { quantity: input.quantity!, unit: input.unit, inputs: { energy: { ...e, regions }, claims: claims.map((c) => ({ certificateId: c.id, kwh: c.kwh })) } };
+  return { result, stored };
 }

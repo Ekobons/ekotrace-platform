@@ -12,6 +12,7 @@ import { Library } from './pages/Library';
 import { Organisation } from './pages/Organisation';
 import { People } from './pages/People';
 import { Methodology } from './pages/Methodology';
+import { EnergyRegister } from './pages/EnergyRegister';
 import { AuditLog } from './pages/AuditLog';
 import { Console } from './pages/Console';
 
@@ -43,6 +44,7 @@ const NAV: { group?: string; items: NavItem[] }[] = [
   { group: 'Setup', items: [
     { to: '/organisation', label: 'Organisation & groups', icon: 'tree' },
     { to: '/methodology', label: 'Methodology & boundaries', icon: 'scale', roles: ['super_admin', 'admin', 'verifier'] },
+    { to: '/energy', label: 'Energy certificates & suppliers', icon: 'bolt', roles: ['super_admin', 'admin', 'manager', 'verifier'] },
     { to: '/people', label: 'People & access', icon: 'users', roles: ['super_admin', 'admin', 'manager'] },
     { to: '/library', label: 'Factors & dictionary', icon: 'book', roles: [] },
     { label: 'Metric registry', icon: 'list', stage: 4 }, { label: 'Integrations & API', icon: 'plug', stage: 4 }, { label: 'AI models', icon: 'spark', stage: 4 },
@@ -142,6 +144,7 @@ function Shell() {
           <Route path="/organisation" element={<NeedCo><Organisation /></NeedCo>} />
           <Route path="/people" element={<NeedCo><People /></NeedCo>} />
           <Route path="/methodology" element={<NeedCo><Methodology /></NeedCo>} />
+          <Route path="/energy" element={<NeedCo><EnergyRegister /></NeedCo>} />
           <Route path="/audit" element={<NeedCo><AuditLog /></NeedCo>} />
           <Route path="*" element={<div className="page"><div className="card empty">Page not found.</div></div>} />
         </Routes>

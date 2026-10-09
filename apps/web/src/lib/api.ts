@@ -2,7 +2,7 @@
  * Talking to the API. One function per call, typed results.
  * The chosen company travels in the x-tenant-id header (temporary, until login exists).
  */
-export type Basis = 'direct' | 'wtt' | 'outside_scopes' | 'memo' | 'scope2';
+export type Basis = 'direct' | 'wtt' | 'outside_scopes' | 'memo' | 'scope2' | 'scope2_market' | 'td_loss';
 
 export interface Item { id: number; subcategory_id: number; code: string; name: string; aliases: string[]; default_unit: string | null; gas_code: string | null; note: string | null; sort: number; active: boolean; composition: { gas: string; fraction: number }[] | null; hiddenForClient?: boolean; attrs?: VehicleAttrs }
 /** Vehicle types: class, powertrain, the fuel it burns, electric / plug-in, distance factors or not. */
@@ -13,7 +13,7 @@ export interface Unit { code: string; name: string; dimension: string; to_base: 
 export interface ResultLine { basis: Basis; gas: string; kgGas: number | null; kgCo2e: number; factorId: number | null; method: 'gas' | 'published' }
 /** CO2e emission factor behind one part of a result: quantity × perEnteredUnit = total. */
 export interface FactorUsed {
-  basis: Basis; factorId: number | null; source: string; validFrom: string | null; co2ePerUnit: number; unit: string; unitName: string;
+  basis: Basis; label?: string; factorId: number | null; source: string; validFrom: string | null; co2ePerUnit: number; unit: string; unitName: string;
   perEnteredUnit: number; enteredUnit: string; enteredUnitName: string; quantity: number; method: 'gas' | 'published';
   published?: { co2ePerUnit: number; gwpSet: string };
 }
@@ -23,13 +23,13 @@ export interface CalcResponse { cv?: CvUsed; stored?: { quantity: number; unit: 
 export interface Tenant { id: string; name: string; country: string; gwp_set: string; consolidation?: string; base_year?: number; plan?: string; status?: string; access_expiry?: string }
 export type Role = 'platform_admin' | 'super_admin' | 'admin' | 'manager' | 'preparer' | 'verifier';
 export interface Me { user: { id: string; name: string; email: string; role: Role; tenantId: string | null; scopeNodeId: string | null; mustChangePassword: boolean }; company: (Tenant & { scope_name: string | null }) | null }
-export interface OrgNode { id: string; parent_id: string | null; kind: 'group' | 'subgroup' | 'facility'; name: string; facility_type: string | null; location: string | null; country: string; floor_area_m2: number | null; employees: number | null; ownership_pct: number; operational_control: boolean; financial_control: boolean; active: boolean; sort: number; manager_user_id: string | null; manager_name: string | null; entries: number; canEdit: boolean; canSee: boolean; canEnter: boolean }
+export interface OrgNode { id: string; parent_id: string | null; kind: 'group' | 'subgroup' | 'facility'; name: string; facility_type: string | null; location: string | null; country: string; floor_area_m2: number | null; employees: number | null; ownership_pct: number; operational_control: boolean; financial_control: boolean; active: boolean; sort: number; manager_user_id: string | null; manager_name: string | null; grid_region?: string | null; entries: number; canEdit: boolean; canSee: boolean; canEnter: boolean }
 export interface Person { id: string; name: string; email: string; role: Role; scope_node_id: string | null; scope_name: string | null; disabled: boolean; last_login_at: string | null; created_at: string; must_change_password: boolean; facilities: { id: string; name: string }[]; manages: { id: string; name: string }[]; canEdit: boolean }
 export interface Company { id: string; name: string; country: string; gwp_set: string; plan: string; status: string; access_start: string; access_expiry: string; created_at: string; users: number; facilities: number; entries: number; last_login: string | null }
 export const ROLE_LABEL: Record<Role, string> = { platform_admin: 'Platform admin', super_admin: 'Super admin', admin: 'Admin', manager: 'Manager', preparer: 'Data preparer', verifier: 'Verifier' };
-export interface Facility { id: string; name: string; country: string; active: boolean; facility_type?: string | null; parent_name?: string | null; canEnter?: boolean; canApprove?: boolean }
+export interface Facility { id: string; name: string; country: string; grid_region?: string | null; active: boolean; facility_type?: string | null; parent_name?: string | null; canEnter?: boolean; canApprove?: boolean }
 export interface Factor { id: number; item_id: number; item: string; subcategory: string; basis: Basis; unit: string; co2e: number | null; region: string; valid_from: string; valid_to: string; status: string; version: number; supersedes_id: number | null; note: string | null; source: string; gwp_set: string | null; gases: { gas: string; kgPerUnit: number }[] | null }
-export interface Activity { id: string; period_start: string; period_end: string; facility: string; category: string; item: string; quantity: number; unit: string; data_type: string; gwp_set: string; co2e_direct: number; co2e_wtt: number; co2_biogenic: number; co2e_memo: number; co2e_scope2?: number; status: string; created_at: string; vehicle?: string | null; vehicle_id?: string | null }
+export interface Activity { id: string; period_start: string; period_end: string; facility: string; category: string; item: string; quantity: number; unit: string; data_type: string; gwp_set: string; co2e_direct: number; co2e_wtt: number; co2_biogenic: number; co2e_memo: number; co2e_scope2?: number; co2e_scope2_market?: number; co2e_td?: number; status: string; created_at: string; vehicle?: string | null; vehicle_id?: string | null }
 
 /** Platform admin only: the company being looked at (sent as x-tenant-id). Others are fixed to their own company. */
 let tenantId = localStorageGet('ekotrace.tenant');
@@ -55,6 +55,15 @@ export interface PastedRow { month?: string; what: string; typeId?: number; coun
 export interface RowResult {
   index: number; errors: string[]; warnings: string[]; totals: Record<Basis, number> | null;
   read: { vehicle: string | null; vehicleKind: 'fleet' | 'type' | null; typeId: number | null; assumed: string[]; month: string | null; count: number; method: string | null; quantity: number | null; unit: string | null; total: number | null };
+}
+
+export interface GridRegion { code: string; country: string; name: string; kind: 'country' | 'subnational' | 'grid'; note: string | null; active: boolean;
+  factors: { id: number; basis: Basis; year: number; co2e: number; unit: string; source: string; title: string; note: string | null }[] | null }
+export interface SupplierFactor { id: string; shared: boolean; supplier: string; energy: 'electricity' | 'heat' | 'cooling'; region: string | null; co2e: number; unit: string; renewable_pct: number | null; valid_from: string; valid_to: string; source: string }
+export interface Certificate {
+  id: string; facility_id: string | null; facility: string | null; instrument: 'certificate' | 'ppa' | 'green_tariff' | 'other'; standard: string | null;
+  technology: 'solar' | 'wind' | 'hydro' | 'biomass' | 'biogas' | 'geothermal' | 'nuclear' | 'other'; mwh: number; co2e_per_kwh: number; market: string;
+  vintage_from: string; vintage_to: string; reference: string | null; supplier: string | null; retired_on: string | null; note: string | null; claimed_mwh: number; claims: number;
 }
 
 export class ApiError extends Error {
@@ -134,6 +143,18 @@ export const api = {
   vehicleRows: (b: { facilityId?: string; month?: string; rows: PastedRow[]; commit: boolean }) => call<{ rows: RowResult[]; valid: number; saved: number }>('POST', '/api/vehicles/entries/rows', b),
   batch: (entries: unknown[], dryRun: boolean) => call<{ results: { index: number; ok: boolean; id?: string; totals?: Record<Basis, number>; warnings?: string[]; error?: string }[]; saved: number; failed: number }>('POST', '/api/activities/batch', { entries, dryRun }),
   recalculate: (b: { ids?: string[]; year?: number; onlyWithWarnings?: boolean }) => call<{ checked: number; changed: number; problems: string[] }>('POST', '/api/activities/recalculate', b),
+  // Scope 2
+  gridRegions: () => call<{ regions: GridRegion[] }>('GET', '/api/grid-regions'),
+  addGridRegion: (b: unknown) => call<GridRegion>('POST', '/api/grid-regions', b),
+  addRegionFactor: (code: string, b: unknown) => call<{ id: number; co2e: number }>('POST', `/api/grid-regions/${code}/factors`, b),
+  supplierFactors: (energy?: string) => call<{ suppliers: SupplierFactor[] }>('GET', `/api/supplier-factors${energy ? `?energy=${energy}` : ''}`),
+  addSupplierFactor: (b: unknown) => call('POST', '/api/supplier-factors', b),
+  deleteSupplierFactor: (id: string) => call('DELETE', `/api/supplier-factors/${id}`),
+  certificates: (q: { facilityId?: string; usable?: boolean } = {}) => call<{ certificates: Certificate[] }>('GET', `/api/certificates?${new URLSearchParams(Object.entries(q).filter(([, v]) => v !== undefined).map(([k, v]) => [k, String(v)]))}`),
+  addCertificate: (b: unknown) => call<Certificate>('POST', '/api/certificates', b),
+  updateCertificate: (id: string, b: unknown) => call<Certificate>('PATCH', `/api/certificates/${id}`, b),
+  deleteCertificate: (id: string) => call('DELETE', `/api/certificates/${id}`),
+  certificateClaims: (id: string) => call<{ claims: { kwh: number; activity_id: string; period_start: string; facility: string }[] }>('GET', `/api/certificates/${id}/claims`),
   // price list
   priceItems: () => call<{ items: { id: number; name: string; default_unit: string | null; sub: string }[] }>('GET', '/api/price-items'),
   prices: (q: { region?: string; itemId?: number } = {}) => call<{ prices: Price[] }>('GET', `/api/prices?${new URLSearchParams(Object.entries(q).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)]))}`),
@@ -166,8 +187,8 @@ export function num(v: number | null | undefined, sig = 6): string {
   if (a >= 1e-4 && a < 1e9) return Number(v.toPrecision(sig)).toLocaleString('en', { maximumFractionDigits: 10 });
   return v.toExponential(3);
 }
-export const BASIS_SHORT: Record<Basis, string> = { direct: 'Scope 1', wtt: 'WTT · S3.3', outside_scopes: 'Biogenic', memo: 'Memo', scope2: 'Scope 2' };
-export const BASIS_LABEL: Record<Basis, string> = { direct: 'Scope 1', wtt: 'Well-to-tank (Scope 3.3)', outside_scopes: 'Biogenic CO₂ (outside scopes)', memo: 'Memo: non-Kyoto gases', scope2: 'Scope 2 (EV charging)' };
+export const BASIS_SHORT: Record<Basis, string> = { direct: 'Scope 1', wtt: 'Upstream · S3.3', outside_scopes: 'Biogenic', memo: 'Memo', scope2: 'Scope 2 loc.', scope2_market: 'Scope 2 mkt.', td_loss: 'T&D · S3.3' };
+export const BASIS_LABEL: Record<Basis, string> = { direct: 'Scope 1', wtt: 'Upstream / well-to-tank (Scope 3.3)', outside_scopes: 'Biogenic CO₂ (outside scopes)', memo: 'Memo: non-Kyoto gases', scope2: 'Scope 2 · location-based', scope2_market: 'Scope 2 · market-based', td_loss: 'T&D losses (Scope 3.3)' };
 
 /** Download a file from the API (keeps the company header), e.g. an Excel template. */
 export async function download(path: string, filename: string) {
@@ -179,4 +200,9 @@ export async function download(path: string, filename: string) {
   const a = document.createElement('a');
   a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 5000);
+}
+
+/** Unit code → short label for tables ("kWh_e" → "kWh", "TRh" → "TRh", "kWh_gcv" → "kWh gross"). */
+export function unitLabel(code: string): string {
+  return code.replace(/_e$/, '').replace(/_th$/, ' heat').replace(/_c$/, ' cooling').replace(/_gcv$/, ' gross');
 }

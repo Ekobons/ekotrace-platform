@@ -14,7 +14,7 @@ import type { Tx } from '../db/pool.js';
 import { DESNZ_UNIT, slug, type DesnzParsed } from './desnz.js';
 
 /** Raise when the importer learns to read more of the file: editions already loaded are read again once. */
-export const IMPORTER_VERSION = 3;
+export const IMPORTER_VERSION = 4;
 
 export interface ImportSummary {
   source: string;
@@ -201,11 +201,19 @@ export async function importDesnz(c: Tx, p: DesnzParsed, opts: { createdBy?: str
   if (evRows) issues.push({ severity: 'info', message: `${evRows} electricity-use values (kWh per km/mile) for electric and plug-in hybrid vehicles loaded` });
   const gridItem = (await c.query(`SELECT id FROM item WHERE code = 'grid:electricity'`)).rows[0]?.id as number | undefined;
   const ukGridRows: typeof factors = [];
-  if (gridItem && p.ukGrid?.co2e != null) {
-    const g = p.ukGrid.gasCo2e;
-    const split: [string, number][] = g.CO2 != null ? [['CO2', g.CO2], ...(g.CH4 != null ? [['CH4_fossil', g.CH4 / gwp.get('CH4_fossil')!] as [string, number]] : []), ...(g.N2O != null ? [['N2O', g.N2O / gwp.get('N2O')!] as [string, number]] : [])] : [];
-    ukGridRows.push({ item: gridItem, basis: 'scope2', unit: 'kWh_e', co2e: p.ukGrid.co2e, gases: split });
-  }
+  const splitOf = (g: { CO2?: number; CH4?: number; N2O?: number }): [string, number][] => (g.CO2 != null
+    ? [['CO2', g.CO2], ...(g.CH4 != null ? [['CH4_fossil', g.CH4 / gwp.get('CH4_fossil')!] as [string, number]] : []), ...(g.N2O != null ? [['N2O', g.N2O / gwp.get('N2O')!] as [string, number]] : [])]
+    : []);
+  if (gridItem && p.ukGrid?.co2e != null) ukGridRows.push({ item: gridItem, basis: 'scope2', unit: 'kWh_e', co2e: p.ukGrid.co2e, gases: splitOf(p.ukGrid.gasCo2e) });
+  // UK electricity: T&D losses and upstream (WTT of generation + WTT of T&D) per kWh consumed.
+  const E = p.ukEnergy;
+  if (gridItem && E.elecTd?.co2e != null) ukGridRows.push({ item: gridItem, basis: 'td_loss', unit: 'kWh_e', co2e: E.elecTd.co2e, gases: splitOf(E.elecTd.gasCo2e) });
+  if (gridItem && E.elecWttGen?.co2e != null) ukGridRows.push({ item: gridItem, basis: 'wtt', unit: 'kWh_e', co2e: E.elecWttGen.co2e + (E.elecWttTd?.co2e ?? 0), gases: [] });
+  // District heat & steam (UK): Scope 2, distribution losses, upstream.
+  const heatItem = (await c.query(`SELECT id FROM item WHERE code = 'heat:district'`)).rows[0]?.id as number | undefined;
+  if (heatItem && E.heat?.co2e != null) ukGridRows.push({ item: heatItem, basis: 'scope2', unit: 'kWh_th', co2e: E.heat.co2e, gases: splitOf(E.heat.gasCo2e) });
+  if (heatItem && E.heatTd?.co2e != null) ukGridRows.push({ item: heatItem, basis: 'td_loss', unit: 'kWh_th', co2e: E.heatTd.co2e, gases: splitOf(E.heatTd.gasCo2e) });
+  if (heatItem && E.heatWtt?.co2e != null) ukGridRows.push({ item: heatItem, basis: 'wtt', unit: 'kWh_th', co2e: E.heatWtt.co2e + (E.heatWttTd?.co2e ?? 0), gases: [] });
 
   // ---- bulk insert factors + gas split ------------------------------------------
   const vf = `${p.year}-01-01`, vt = `${p.year}-12-31`;

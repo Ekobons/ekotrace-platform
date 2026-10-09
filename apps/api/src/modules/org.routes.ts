@@ -23,6 +23,8 @@ const nodeFields = z.object({
   operationalControl: z.boolean().optional(),
   financialControl: z.boolean().optional(),
   managerUserId: z.string().uuid().nullable().optional(),
+  /** grid region for electricity (null = the country's national average) */
+  gridRegion: z.string().regex(/^[A-Z]{2}(-[A-Z0-9]{1,10})?$/).nullable().optional(),
 });
 
 /** Which nodes this person may change. */
@@ -40,7 +42,7 @@ export async function orgRoutes(app: FastifyInstance) {
     return tenantTx(tenant, async (c) => {
       const nodes = (await c.query(
         `SELECT n.id, n.parent_id, n.kind, n.name, n.facility_type, n.location, n.country, n.floor_area_m2, n.employees, n.ownership_pct,
-                n.operational_control, n.financial_control, n.active, n.sort, n.manager_user_id, u.name AS manager_name,
+                n.operational_control, n.financial_control, n.active, n.sort, n.manager_user_id, u.name AS manager_name, n.grid_region,
                 (SELECT count(*)::int FROM activity a WHERE a.facility_id = n.id) AS entries
            FROM org_node n LEFT JOIN app_user u ON u.id = n.manager_user_id
           ORDER BY n.kind = 'group' DESC, n.sort, n.name`)).rows;
@@ -60,10 +62,10 @@ export async function orgRoutes(app: FastifyInstance) {
       if (!canEdit(await editable(c, req), parent.id)) throw forbidden('You can only add inside your own part of the organisation');
       const r = (await c.query(
         `INSERT INTO org_node (tenant_id, parent_id, kind, name, facility_type, location, country, floor_area_m2, employees, ownership_pct,
-                               operational_control, financial_control, manager_user_id)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,COALESCE($10,100),COALESCE($11,true),COALESCE($12,true),$13) RETURNING *`,
+                               operational_control, financial_control, manager_user_id, grid_region)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,COALESCE($10,100),COALESCE($11,true),COALESCE($12,true),$13,$14) RETURNING *`,
         [tenant, b.parentId, b.kind, b.name, b.facilityType ?? null, b.location ?? null, (b.country ?? parent.country).toUpperCase(),
-         b.floorAreaM2 ?? null, b.employees ?? null, b.ownershipPct ?? null, b.operationalControl ?? null, b.financialControl ?? null, b.managerUserId ?? null])).rows[0];
+         b.floorAreaM2 ?? null, b.employees ?? null, b.ownershipPct ?? null, b.operationalControl ?? null, b.financialControl ?? null, b.managerUserId ?? null, b.gridRegion ?? null])).rows[0];
       await audit(c, req, 'node.create', b.kind, r.id, { name: b.name });
       return r;
     });
@@ -91,12 +93,13 @@ export async function orgRoutes(app: FastifyInstance) {
                 floor_area_m2 = CASE WHEN $8 THEN $9 ELSE floor_area_m2 END, employees = CASE WHEN $10 THEN $11 ELSE employees END,
                 ownership_pct = COALESCE($12, ownership_pct), operational_control = COALESCE($13, operational_control),
                 financial_control = COALESCE($14, financial_control), manager_user_id = CASE WHEN $15 THEN $16 ELSE manager_user_id END,
-                parent_id = COALESCE($17, parent_id), active = COALESCE($18, active), sort = COALESCE($19, sort)
+                parent_id = COALESCE($17, parent_id), active = COALESCE($18, active), sort = COALESCE($19, sort),
+                grid_region = CASE WHEN $20 THEN $21 ELSE grid_region END
           WHERE id = $1 RETURNING *`,
         [id, b.name ?? null, b.facilityType !== undefined, b.facilityType ?? null, b.location !== undefined, b.location ?? null, b.country?.toUpperCase() ?? null,
          b.floorAreaM2 !== undefined, b.floorAreaM2 ?? null, b.employees !== undefined, b.employees ?? null, b.ownershipPct ?? null,
          b.operationalControl ?? null, b.financialControl ?? null, b.managerUserId !== undefined, b.managerUserId ?? null,
-         b.parentId ?? null, b.active ?? null, b.sort ?? null])).rows[0];
+         b.parentId ?? null, b.active ?? null, b.sort ?? null, b.gridRegion !== undefined, b.gridRegion ?? null])).rows[0];
       const changed = Object.fromEntries(Object.keys(b).map((k) => [k, (b as Record<string, unknown>)[k]]));
       await audit(c, req, 'node.update', before.kind, id, { name: before.name, changed });
       return r;

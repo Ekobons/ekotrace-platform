@@ -9,9 +9,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useApp } from '../App';
-import { api, ApiError, BASIS_LABEL, num, tco2e, type Activity, type CalcResponse, type Category, type Facility } from '../lib/api';
+import { unitLabel, api, ApiError, BASIS_LABEL, num, tco2e, type Activity, type CalcResponse, type Category, type Facility } from '../lib/api';
 import { Result } from '../components/Result';
 import { VehicleEntry } from './VehicleEntry';
+import { EnergyEntry } from './EnergyEntry';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const lastDay = (y: number, m: number) => new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
@@ -218,7 +219,10 @@ export function AddData() {
         </div>
       </div>
 
-      {cat.calc_method === 'vehicle' ? <VehicleEntry cat={cat} facilityId={facilityId} period={period} onSaved={loadRecent} /> : (
+      {cat.calc_method === 'electricity' ? (
+        <EnergyEntry cat={cat} facilityId={facilityId} period={period} onSaved={loadRecent}
+          facilityRegion={facilities.find((f) => f.id === facilityId)?.grid_region ?? null} country={facilities.find((f) => f.id === facilityId)?.country ?? 'AE'} />
+      ) : cat.calc_method === 'vehicle' ? <VehicleEntry cat={cat} facilityId={facilityId} period={period} onSaved={loadRecent} /> : (
       <div className="grid2">
         <div className="card" style={{ padding: 12 }}>
           <div className="eyebrow" style={{ padding: '4px 8px 8px' }}>{fugitive ? 'Gas groups' : 'Fuel classes'}</div>
@@ -352,12 +356,12 @@ export function AddData() {
         <div style={{ padding: '14px 16px 6px' }}><h2>Recent entries · {facilities.find((f) => f.id === facilityId)?.name ?? '—'}</h2></div>
         {recent.length ? (
           <table className="t">
-            <thead><tr><th>Period</th><th>Item</th><th className="num">Quantity</th><th className="num">{BASIS_LABEL.direct} tCO₂e</th>{cat.calc_method === 'vehicle' && <th className="num">Scope 2 tCO₂e</th>}<th className="num">WTT tCO₂e</th><th className="num">Biogenic tCO₂</th><th>Type</th></tr></thead>
+            <thead><tr><th>Period</th><th>Item</th><th className="num">Quantity</th><th className="num">{BASIS_LABEL.direct} tCO₂e</th>{(cat.calc_method === 'vehicle' || cat.calc_method === 'electricity') && <th className="num">Scope 2 loc. tCO₂e</th>}{cat.calc_method === 'electricity' && <th className="num">Scope 2 mkt. tCO₂e</th>}<th className="num">WTT tCO₂e</th><th className="num">Biogenic tCO₂</th><th>Type</th></tr></thead>
             <tbody>{recent.map((a) => (
               <tr key={a.id}>
                 <td>{a.period_start.slice(0, 7)}{a.period_end.slice(0, 7) !== a.period_start.slice(0, 7) ? ` – ${a.period_end.slice(0, 7)}` : ''}</td>
-                <td>{a.vehicle ? <><b>{a.vehicle}</b> · </> : null}{a.item}</td><td className="num">{num(a.quantity)} {a.unit}</td>
-                <td className="num">{tco2e(a.co2e_direct)}</td>{cat.calc_method === 'vehicle' && <td className="num">{tco2e(Number(a.co2e_scope2 ?? 0))}</td>}<td className="num">{tco2e(a.co2e_wtt)}</td><td className="num">{tco2e(a.co2_biogenic)}</td>
+                <td>{a.vehicle ? <><b>{a.vehicle}</b> · </> : null}{a.item}</td><td className="num">{num(a.quantity)} {unitLabel(a.unit)}</td>
+                <td className="num">{tco2e(a.co2e_direct)}</td>{(cat.calc_method === 'vehicle' || cat.calc_method === 'electricity') && <td className="num">{tco2e(Number(a.co2e_scope2 ?? 0))}</td>}{cat.calc_method === 'electricity' && <td className="num">{tco2e(Number(a.co2e_scope2_market ?? 0))}</td>}<td className="num">{tco2e(a.co2e_wtt)}</td><td className="num">{tco2e(a.co2_biogenic)}</td>
                 <td><span className="chip grey">{a.data_type}</span></td>
               </tr>))}
             </tbody>

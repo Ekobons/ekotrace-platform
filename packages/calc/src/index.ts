@@ -6,3 +6,4 @@ export * from './factors.js';
 export * from './combustion.js';
 export * from './fugitive.js';
 export * from './vehicle.js';
+export * from './energy.js';

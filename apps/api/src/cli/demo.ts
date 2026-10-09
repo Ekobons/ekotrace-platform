@@ -11,6 +11,7 @@
 import { platformTx, pool, type Tx } from '../db/pool.js';
 import { hashPassword, temporaryPassword } from '../lib/password.js';
 import { calculate } from '../modules/calc.service.js';
+import { contextFor } from '../modules/activity.routes.js';
 
 const NAME = 'BEEAH Group (demo)';
 const TREE: [string, [string, string, string][]][] = [
@@ -61,6 +62,7 @@ async function main() {
     if (old) {
       // Demo company only (matched by its exact name): remove everything it holds.
       for (const sql of [
+        'DELETE FROM certificate_claim WHERE tenant_id = $1', 'DELETE FROM energy_certificate WHERE tenant_id = $1', 'DELETE FROM supplier_factor WHERE tenant_id = $1',
         'DELETE FROM activity_result WHERE tenant_id = $1', 'DELETE FROM activity WHERE tenant_id = $1', 'DELETE FROM vehicle WHERE tenant_id = $1',
         'DELETE FROM price WHERE tenant_id = $1', 'DELETE FROM user_facility WHERE tenant_id = $1',
         'DELETE FROM session WHERE user_id IN (SELECT id FROM app_user WHERE tenant_id = $1)', 'DELETE FROM audit_log WHERE tenant_id = $1',
@@ -157,6 +159,56 @@ async function main() {
       }
     }
     console.log(`Fleet: ${veh.length} vehicles (one retired), ${nv} monthly vehicle entries.`);
+
+    // Scope 2. Grid regions: Sharjah sites on SEWA, the data centre on DEWA. Demo supplier factors and
+    // a demo certificate are clearly marked: they are NOT real values. No grid factors are added (they are
+    // shared by every company): location-based shows a warning until the platform admin adds them.
+    await c.query(`UPDATE org_node SET grid_region = 'AE-SH' WHERE tenant_id = $1 AND kind = 'facility' AND name <> 'Data Centre Dubai'`, [t]);
+    await c.query(`UPDATE org_node SET grid_region = 'AE-DU' WHERE tenant_id = $1 AND name = 'Data Centre Dubai'`, [t]);
+    await c.query(`SELECT set_config('app.tenant_id', $1, true)`, [t]);
+    const DEMO = 'DEMO value — not a real factor; replace with the supplier\'s published figure';
+    await c.query(`INSERT INTO supplier_factor (tenant_id, supplier, energy, co2e, unit, valid_from, valid_to, source) VALUES
+      ($1, 'Demo utility (replace)', 'electricity', 0.45, 'kWh_e', '2025-01-01', '2026-12-31', $2),
+      ($1, 'Demo district cooling (replace)', 'cooling', 0.6, 'TRh', '2025-01-01', '2026-12-31', $2)`, [t, DEMO]);
+    const cert = (await c.query(`INSERT INTO energy_certificate (tenant_id, instrument, standard, technology, mwh, market, vintage_from, vintage_to, reference, supplier, note)
+      VALUES ($1,'certificate','I-REC','solar',500,'AE','2025-01-01','2026-12-31','DEMO-IREC-0001','Demo solar park','DEMO certificate — not real') RETURNING id`, [t])).rows[0].id;
+    const items = Object.fromEntries((await c.query(`SELECT code, id FROM item WHERE code IN ('grid:electricity','cooling:district')`)).rows.map((r) => [r.code, r.id]));
+    const SCOPE2: [string, string, string, number, Record<string, unknown>][] = [
+      ['Data Centre Dubai', 'grid:electricity', 'kWh_e', 380000, { supplier: { name: 'Demo utility (replace)', co2e: 0.45, unit: 'kWh_e', source: DEMO }, certificates: [{ certificateId: cert, kwh: 20000 }] }],
+      ['BEEAH Headquarters', 'grid:electricity', 'kWh_e', 95000, {}],
+      ['Sharjah Waste-to-Energy', 'grid:electricity', 'kWh_e', 140000, {}],
+      ['BEEAH Headquarters', 'cooling:district', 'TRh', 180000, { supplier: { name: 'Demo district cooling (replace)', co2e: 0.6, unit: 'TRh', source: DEMO }, cooling: { method: 'supplier' } }],
+    ];
+    let ne = 0;
+    for (let y = 2025; y <= 2026; y++) {
+      for (let m = 0; m < (y === 2026 ? 9 : 12); m++) {
+        const start = `${y}-${String(m + 1).padStart(2, '0')}-01`;
+        const end = new Date(Date.UTC(y, m + 1, 0)).toISOString().slice(0, 10);
+        for (const [fac, code, unit, base, energy] of SCOPE2) {
+          const q = Math.round(base * (0.8 + 0.4 * Math.abs(Math.sin(m * 0.9 + y + base))));
+          const f = (await c.query('SELECT id, country, grid_region FROM org_node WHERE id = $1', [ids.get(fac)])).rows[0];
+          const { result, item: it, gwpSet, stored } = await calculate({ itemId: items[code], unit, quantity: q, periodStart: start, periodEnd: end, energy } as never, contextFor(c, 'AR5', 'AE', f));
+          const a = (await c.query(
+            `INSERT INTO activity (tenant_id, facility_id, category_id, item_id, period_start, period_end, quantity, unit, inputs, data_type, gwp_set,
+                                   co2e_direct, co2e_wtt, co2_biogenic, co2e_memo, co2e_scope2, co2e_scope2_market, co2e_td, steps, warnings, status, created_by, factors)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'actual',$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,'approved',$20,$21) RETURNING id`,
+            [t, f.id, it.category_id, items[code], start, end, stored.quantity, stored.unit, JSON.stringify(stored.inputs), gwpSet,
+             result.totals.direct, result.totals.wtt, result.totals.outside_scopes, result.totals.memo, result.totals.scope2, result.totals.scope2_market, result.totals.td_loss,
+             JSON.stringify(result.steps), JSON.stringify(result.warnings), users.get('preparer'), JSON.stringify(result.factors)])).rows[0].id;
+          for (const k of (stored.inputs.claims as { certificateId: string; kwh: number }[] | undefined) ?? []) {
+            await c.query('INSERT INTO certificate_claim (tenant_id, certificate_id, activity_id, kwh) VALUES ($1,$2,$3,$4)', [t, k.certificateId, a, k.kwh]);
+          }
+          if (result.lines.length) {
+            await c.query(`INSERT INTO activity_result (activity_id, tenant_id, basis, gas, kg_gas, kg_co2e, factor_id, method)
+                           SELECT $1, $2, * FROM unnest($3::text[], $4::text[], $5::numeric[], $6::numeric[], $7::bigint[], $8::text[])`,
+              [a, t, result.lines.map((l) => l.basis), result.lines.map((l) => l.gas), result.lines.map((l) => l.kgGas), result.lines.map((l) => l.kgCo2e),
+               result.lines.map((l) => l.factorId), result.lines.map((l) => l.method)]);
+          }
+          ne++;
+        }
+      }
+    }
+    console.log(`Scope 2: ${ne} monthly electricity / cooling entries (demo supplier factors and a demo I-REC; location-based waits for the UAE grid factors).`);
     console.log(`\nDemo company "${NAME}" created: ${TREE.length} sub-groups, ${[...ids.keys()].length - TREE.length} facilities, ${n} fuel entries (Jan 2025 – Sep 2026).`);
   });
   console.log('\nDemo logins (all with the same password, shown once):');

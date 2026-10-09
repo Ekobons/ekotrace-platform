@@ -2,6 +2,25 @@
 
 Newest first.
 
+## 2026-10-10 (2) — Scope 2: electricity, heat & steam, cooling; location- and market-based; Scope 3.3 T&D and upstream
+
+**Electricity**
+- **Location-based**: kWh × grid factor of the facility's **grid region** — country average (AE) or sub-region (emirate / state / grid sub-region: AE-DU, AE-SH, AE-AZ…, US eGRID, Indian states…). A sub-region without its own factor falls back to the country, shown in the steps. Grid region set per facility (profile) and changeable per entry.
+- **Market-based**, GHG Protocol hierarchy: (1) certificates and contracts claimed — I-REC / REC / GO / REGO, PPAs, green tariffs, with source (solar, wind, hydro, biomass, biogas, geothermal, nuclear, other) and their factor (0 for zero-carbon sources); (2) the rest at the supplier's factor (list or typed in); (3) else the region's residual mix; (4) else the grid average, with a disclosure note.
+- Both figures always shown and stored side by side (dual reporting); never added together.
+- **Scope 3.3**: T&D losses and upstream (WTT of generation + WTT of T&D) per kWh. UK: DESNZ 2022–2026. Other regions: entered by the platform admin — T&D as kg/kWh or as a loss % of the grid factor.
+
+**Heat & steam**: UK DESNZ district heat & steam (Scope 2), distribution losses and upstream (Scope 3.3); elsewhere the supplier's factor (used for both views).
+**Cooling** (district cooling): TRh / kWh / MWh of cooling; supplier's factor per TRh (both views), or plant efficiency (kWh of electricity per TRh, or COP) × the grid factor of the region.
+
+**Certificate register** (Setup → Energy certificates & suppliers): MWh held, standard, source, market, vintage, references, facility; claims per entry recorded and locked — the tool refuses claims beyond the MWh held (also under simultaneous saves); a claimed certificate cannot be deleted or have its source / factor changed; claims listed per certificate. Warnings when the market differs from the facility's country or the vintage does not cover the period.
+**Supplier factors**: company's own and a shared list (platform), per energy, unit and period, with source and renewable %.
+**Factor library → Grid electricity & prices**: regions per country with each year's grid / residual / T&D / upstream factors; add regions and factors.
+
+**Also**: Entries & results show Scope 2 location / market and Scope 3.3 (upstream + T&D); EV charging now also reports market-based (= location; no contract applies); recalculation covers energy entries and keeps certificate claims; importer version 4 (UK electricity T&D / WTT, district heat); migration 007.
+**Demo**: grid regions (Sharjah sites SEWA, data centre DEWA), demo supplier factors and a demo I-REC — clearly marked as not real; location-based waits for the UAE grid factors.
+**Tests**: 24 engine + 28 API, incl. UK results against DESNZ 2026, Dubai sub-region and fallback, certificate over-claim, supplier vs residual, cooling both methods.
+
 ## 2026-10-10 — Vehicle count; paste rows from Excel
 
 - **Number of vehicles**: one entry or a row can cover several identical vehicles — "car petrol, 2, 34 km" = 2 × 34 km = 68 km. Saved with the count (shown as the first calculation step, kept on recalculation).

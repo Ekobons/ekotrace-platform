@@ -541,3 +541,75 @@ test('vehicles: pasted rows — "car petrol | 2 | 34 km" = 2 cars × 34 km; meth
   await api('POST', '/api/activities/recalculate', { ids: [saved.id], onlyWithWarnings: false }, tenantA);
   assert.match((await api('GET', `/api/activities/${saved.id}`, undefined, tenantA)).body.steps[0], /^2 vehicles/);
 });
+
+// ------------------------------------------------------------------ Scope 2 --
+test('Scope 2 electricity: UK location vs market; Dubai sub-region; certificates claimed once; supplier factor; T&D as loss %', async () => {
+  const grid = await itemId('grid:electricity');
+  const period = { periodStart: '2026-03-01', periodEnd: '2026-03-31' };
+  // UK facility: DESNZ 2026
+  const groupA = (await api('GET', '/api/org', undefined, tenantA)).body.nodes.find((n: { kind: string }) => n.kind === 'group').id;
+  const london = (await api('POST', '/api/org/nodes', { parentId: groupA, kind: 'facility', name: 'London office', country: 'GB' }, tenantA)).body.id;
+  const uk = await api('POST', '/api/calculate', { facilityId: london, itemId: grid, unit: 'MWh_e', quantity: 10, ...period }, tenantA);
+  assert.equal(uk.status, 200, JSON.stringify(uk.body));
+  const desnz = async (basis: string) => Number((await pool.query(`SELECT co2e FROM factor f JOIN factor_source s ON s.id = f.source_id WHERE f.item_id = $1 AND f.region = 'GB' AND f.basis = $2 AND s.code = 'DESNZ-2026' AND f.status = 'active'`, [grid, basis])).rows[0].co2e);
+  assert.ok(Math.abs(uk.body.totals.scope2 - 10000 * (await desnz('scope2'))) / uk.body.totals.scope2 < 0.001);
+  // DESNZ's T&D gas split adds to 0.01300 against a published 0.01299 (rounding): within 0.1 %
+  assert.ok(Math.abs(uk.body.totals.td_loss - 10000 * (await desnz('td_loss'))) / uk.body.totals.td_loss < 0.001);
+  assert.ok(Math.abs(uk.body.totals.wtt - 10000 * (await desnz('wtt'))) < 1e-6);
+  assert.ok(Math.abs(uk.body.totals.scope2_market - uk.body.totals.scope2) < 1e-6, 'no residual mix: grid average');
+
+  // Dubai facility (test factors, platform admin): AE-DU location and residual, AE T&D as % loss
+  assert.equal((await api('PATCH', `/api/org/nodes/${facA}`, { gridRegion: 'AE-DU' }, tenantA)).status, 200);
+  for (const [kind, co2e, region] of [['location', 0.4, 'AE'], ['location', 0.35, 'AE-DU'], ['residual', 0.45, 'AE-DU']] as const) {
+    const r = await api('POST', `/api/grid-regions/${region}/factors`, { kind, year: 2026, co2e, source: 'TEST-S2' });
+    assert.equal(r.status, 200, JSON.stringify(r.body));
+  }
+  const td = await api('POST', '/api/grid-regions/AE/factors', { kind: 'td_loss', year: 2026, lossPct: 5, source: 'TEST-S2' });
+  assert.ok(Math.abs(td.body.co2e - 0.02) < 1e-12, '5% × 0.4');
+  const e1 = await api('POST', '/api/calculate', { facilityId: facA, itemId: grid, unit: 'kWh_e', quantity: 100000, ...period }, tenantA);
+  assert.ok(Math.abs(e1.body.totals.scope2 - 35000) < 1e-6, JSON.stringify(e1.body.totals));
+  assert.ok(Math.abs(e1.body.totals.scope2_market - 45000) < 1e-6);
+  assert.ok(Math.abs(e1.body.totals.td_loss - 2000) < 1e-6);
+
+  // Certificate: 60 MWh solar I-REC; claim 40 MWh on one entry, then only 20 MWh are left
+  const cert = await api('POST', '/api/certificates', { instrument: 'certificate', standard: 'I-REC', technology: 'solar', mwh: 60, market: 'AE', vintageFrom: '2026-01-01', vintageTo: '2026-12-31', reference: 'IREC-TEST-1' }, tenantA);
+  assert.equal(cert.status, 200, JSON.stringify(cert.body));
+  const s1 = await api('POST', '/api/activities', { facilityId: facA, itemId: grid, unit: 'kWh_e', quantity: 100000, ...period, energy: { certificates: [{ certificateId: cert.body.id, kwh: 40000 }] } }, tenantA);
+  assert.equal(s1.status, 200, JSON.stringify(s1.body));
+  assert.ok(Math.abs(s1.body.totals.scope2_market - 60000 * 0.45) < 1e-6, '40 MWh solar at 0 + 60 MWh residual');
+  const over = await api('POST', '/api/activities', { facilityId: facA, itemId: grid, unit: 'kWh_e', quantity: 50000, periodStart: '2026-04-01', periodEnd: '2026-04-30', energy: { certificates: [{ certificateId: cert.body.id, kwh: 30000 }] } }, tenantA);
+  assert.equal(over.status, 400);
+  assert.match(over.body.message, /only 20,000 kWh left/);
+  const list = (await api('GET', '/api/certificates', undefined, tenantA)).body.certificates.find((x: { id: string }) => x.id === cert.body.id);
+  assert.equal(Number(list.claimed_mwh), 40);
+  assert.equal((await api('DELETE', `/api/certificates/${cert.body.id}`, undefined, tenantA)).status, 400, 'claimed: cannot delete');
+  assert.equal((await api('GET', '/api/certificates', undefined, tenantB)).body.certificates.length, 0, 'other company sees none');
+
+  // Supplier factor (company's own) wins over the residual mix for the uncovered part
+  const sup = await api('POST', '/api/supplier-factors', { supplier: 'Test utility', energy: 'electricity', co2e: 0.3, unit: 'kWh_e', validFrom: '2026-01-01', validTo: '2026-12-31', source: 'test bill' }, tenantA);
+  assert.equal(sup.status, 200, JSON.stringify(sup.body));
+  const e2 = await api('POST', '/api/calculate', { facilityId: facA, itemId: grid, unit: 'kWh_e', quantity: 10000, ...period, energy: { supplierFactorId: sup.body.id } }, tenantA);
+  assert.ok(Math.abs(e2.body.totals.scope2_market - 3000) < 1e-6);
+  assert.ok(Math.abs(e2.body.totals.scope2 - 3500) < 1e-6, 'location unchanged');
+
+  // Recalculation keeps the claim and does not count it twice
+  const rc = await api('POST', '/api/activities/recalculate', { ids: [s1.body.id], onlyWithWarnings: false }, tenantA);
+  assert.equal(rc.status, 200, JSON.stringify(rc.body));
+  assert.equal(rc.body.problems.length, 0, JSON.stringify(rc.body));
+});
+
+test('Scope 2 cooling and heat: supplier per TRh; plant efficiency × Dubai grid', async () => {
+  const cool = await itemId('cooling:district');
+  const period = { periodStart: '2026-03-01', periodEnd: '2026-03-31' };
+  const sup = await api('POST', '/api/supplier-factors', { supplier: 'Test cooling', energy: 'cooling', co2e: 0.5, unit: 'TRh', validFrom: '2026-01-01', validTo: '2026-12-31', source: 'test' }, tenantA);
+  const a = await api('POST', '/api/calculate', { facilityId: facA, itemId: cool, unit: 'TRh', quantity: 1000, ...period, energy: { supplierFactorId: sup.body.id, cooling: { method: 'supplier' } } }, tenantA);
+  assert.equal(a.status, 200, JSON.stringify(a.body));
+  assert.ok(Math.abs(a.body.totals.scope2 - 500) < 1e-9 && Math.abs(a.body.totals.scope2_market - 500) < 1e-9);
+  const b = await api('POST', '/api/calculate', { facilityId: facA, itemId: cool, unit: 'TRh', quantity: 1000, ...period, energy: { cooling: { method: 'efficiency', kwhPerTrh: 0.8 } } }, tenantA);
+  assert.ok(Math.abs(b.body.totals.scope2 - 800 * 0.35) < 1e-9, JSON.stringify(b.body.totals));
+  const none = await api('POST', '/api/calculate', { facilityId: facA, itemId: cool, unit: 'TRh', quantity: 1000, ...period }, tenantA);
+  assert.equal(none.status, 400);
+  const heat = await itemId('heat:district');
+  const wrong = await api('POST', '/api/calculate', { facilityId: facA, itemId: heat, unit: 'kWh_th', quantity: 1000, ...period, energy: { supplierFactorId: sup.body.id } }, tenantA);
+  assert.equal(wrong.status, 400, 'cooling factor used for heat is refused');
+});

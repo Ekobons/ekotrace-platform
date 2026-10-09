@@ -133,6 +133,10 @@ function electricityPart(input: VehicleInput, kwh: number, enteredQty: number, e
   }
   const g = calcCombustion({ itemName: 'Grid electricity', quantity: kwh, unit: 'kWh_e', date: input.date, region: input.region,
     factors: grid, gwp: input.gwp, units: input.units });
+  // Market-based: no certificate or supplier contract applies to charging on the road, so it equals the location-based figure.
+  g.totals.scope2_market = g.totals.scope2;
+  g.lines.push({ basis: 'scope2_market', gas: 'CO2e', kgGas: null, kgCo2e: g.totals.scope2, factorId: null, method: 'published' });
+  g.factors.push(...g.factors.filter((f) => f.basis === 'scope2').map((f) => ({ ...f, basis: 'scope2_market' as const, label: 'Grid average (no contract applies)' })));
   // Show the factor per entered unit (km, mile or kWh).
   const perEntered = enteredQty > 0 ? kwh / enteredQty : 0;
   for (const f of g.factors) {

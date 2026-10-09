@@ -73,7 +73,7 @@ export function calcCombustion(input: CombustionInput): CalcResult {
   const calcU = getUnit(units, calcUnit);
 
   const choices = chooseFactors(input.factors, { date: input.date, region: input.region, unit: calcUnit, units });
-  if (!choices.has('direct') && !choices.has('scope2')) {
+  if (!choices.has('direct') && !choices.has('scope2') && !choices.has('scope2_market')) {
     const dims = [...new Set(input.factors.map((f) => units.get(f.unit)?.name).filter(Boolean))].join(', ');
     throw new CalcError(
       `No factor for ${input.itemName} in ${calcU.name}. Factors exist in: ${dims || 'none'}.`,
@@ -141,7 +141,7 @@ export function calcCombustion(input: CombustionInput): CalcResult {
 }
 
 export function basisLabel(b: Basis): string {
-  return { direct: 'Direct', wtt: 'Well-to-tank', outside_scopes: 'Biogenic CO2 (outside scopes)', memo: 'Memo (non-Kyoto)', scope2: 'Scope 2 electricity' }[b];
+  return { direct: 'Direct', wtt: 'Well-to-tank', outside_scopes: 'Biogenic CO2 (outside scopes)', memo: 'Memo (non-Kyoto)', scope2: 'Scope 2 (location-based)', scope2_market: 'Scope 2 (market-based)', td_loss: 'T&D losses' }[b];
 }
 
 /** Up to 6 significant digits, no exponent for normal magnitudes. */

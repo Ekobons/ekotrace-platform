@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { calcCombustion, calcFugitive, calcVehicle, impliedCalorificValue, unitRegistry, convert, chooseFactors, type Factor, type GwpTable } from '../src/index.js';
+import { calcCombustion, calcEnergy, calcFugitive, calcVehicle, impliedCalorificValue, unitRegistry, convert, chooseFactors, type Factor, type GwpTable } from '../src/index.js';
 
 const units = unitRegistry([
   { code: 'kg', name: 'kilogram', dimension: 'mass', toBase: 1 },
@@ -227,4 +227,69 @@ test('vehicle by fuel and by spend; electric car cannot be entered by fuel', () 
   assert.throws(() => calcVehicle({ ...baseV, electric: true, method: 'fuel', quantity: 1, unit: 'L', vehicleFactors: bevCar, fuel }), /is electric/);
   const kwh = calcVehicle({ ...baseV, electric: true, method: 'electricity', quantity: 500, unit: 'kWh_e', vehicleFactors: bevCar });
   assert.ok(Math.abs(kwh.totals.scope2 - 500 * 0.13096) < 1e-6);
+});
+
+// ------------------------------------------------------------------ Scope 2 --
+const unitsE = unitRegistry([...unitsV.values(),
+  { code: 'MWh_e', name: 'MWh (electricity)', dimension: 'electricity', toBase: 1000 },
+  { code: 'kWh_th', name: 'kWh (heat)', dimension: 'heat', toBase: 1 },
+  { code: 'kWh_c', name: 'kWh (cooling)', dimension: 'cooling', toBase: 1 }, { code: 'TRh', name: 'TRh', dimension: 'cooling', toBase: 3.516852842 }]);
+const ef = (id: number, basis: 'scope2' | 'scope2_market' | 'td_loss' | 'wtt', region: string, co2e: number, gases: { gas: string; kgPerUnit: number }[] = [], unit = 'kWh_e', year = 2026): Factor =>
+  ({ id, itemId: 8, basis, unit, co2ePerUnit: co2e, sourceGwpSet: 'AR5', source: region === 'GB' ? `DESNZ ${year}` : 'TEST', region, validFrom: `${year}-01-01`, validTo: `${year}-12-31`, gases });
+// DESNZ 2026 UK electricity: 0.13096 (CO2 0.12943, CH4 0.00067, N2O 0.00086); T&D 0.01299; WTT 0.03682 + 0.00359
+const gb = [ef(1, 'scope2', 'GB', 0.13096, [{ gas: 'CO2', kgPerUnit: 0.12943 }, { gas: 'CH4_fossil', kgPerUnit: 0.00067 / 28 }, { gas: 'N2O', kgPerUnit: 0.00086 / 265 }]),
+  ef(2, 'td_loss', 'GB', 0.01299), ef(3, 'wtt', 'GB', 0.04041)];
+// Test values only (not real UAE factors): national 0.4, Dubai 0.35, residual mix in Dubai 0.45
+const ae = [ef(10, 'scope2', 'AE', 0.4), ef(11, 'scope2', 'AE-DU', 0.35), ef(12, 'scope2_market', 'AE-DU', 0.45), ef(13, 'td_loss', 'AE', 0.02)];
+const baseE = { energy: 'electricity' as const, itemName: 'Grid electricity', date: '2026-04-01', gwp: AR5, units: unitsE };
+
+test('electricity UK: location = DESNZ (per gas), market = grid average when nothing else, T&D and WTT in Scope 3.3', () => {
+  const r = calcEnergy({ ...baseE, quantity: 100, unit: 'MWh_e', regions: ['GB'], factors: gb });
+  assert.ok(Math.abs(r.totals.scope2 - 100000 * (0.12943 + 0.00067 + 0.00086)) < 1e-6, String(r.totals.scope2));
+  assert.ok(Math.abs(r.totals.scope2_market - r.totals.scope2) < 1e-6);
+  assert.ok(Math.abs(r.totals.td_loss - 1299) < 1e-6);
+  assert.ok(Math.abs(r.totals.wtt - 4041) < 1e-6);
+  assert.equal(r.totals.direct, 0);
+  assert.ok(r.steps.some((s) => /grid average is used/.test(s)));
+});
+
+test('electricity sub-region: Dubai factor and residual mix; certificates cover part; supplier factor wins over residual', () => {
+  const certs = [{ id: 'c1', label: 'Solar I-REC', kwh: 40000, co2ePerKwh: 0 }];
+  const r = calcEnergy({ ...baseE, quantity: 100000, unit: 'kWh_e', regions: ['AE-DU', 'AE'], factors: ae, certificates: certs });
+  assert.ok(Math.abs(r.totals.scope2 - 35000) < 1e-6, 'location: 100 MWh × 0.35 (Dubai)');
+  assert.ok(Math.abs(r.totals.scope2_market - 60000 * 0.45) < 1e-6, 'market: 40 MWh solar at 0 + 60 MWh residual mix');
+  assert.ok(Math.abs(r.totals.td_loss - 2000) < 1e-6, 'T&D from the country factor');
+  assert.ok(r.steps.some((s) => /AE-DU has no T&D losses factor of its own/.test(s)));
+  const s = calcEnergy({ ...baseE, quantity: 100000, unit: 'kWh_e', regions: ['AE-DU', 'AE'], factors: ae, certificates: certs,
+    supplier: { name: 'Utility', co2ePerUnit: 0.3, unit: 'kWh_e', source: 'test' } });
+  assert.ok(Math.abs(s.totals.scope2_market - 60000 * 0.3) < 1e-6);
+  const sh = calcEnergy({ ...baseE, quantity: 1000, unit: 'kWh_e', regions: ['AE-SH', 'AE'], factors: ae });
+  assert.ok(Math.abs(sh.totals.scope2 - 400) < 1e-6, 'Sharjah has no factor: national average');
+  assert.throws(() => calcEnergy({ ...baseE, quantity: 1000, unit: 'kWh_e', regions: ['AE'], factors: ae, certificates: [{ id: 'x', label: 'x', kwh: 2000, co2ePerKwh: 0 }] }), /exceed/);
+  const none = calcEnergy({ ...baseE, quantity: 1000, unit: 'kWh_e', regions: ['QA'], factors: ae });
+  assert.equal(none.totals.scope2, 0);
+  assert.ok(none.warnings.some((w) => /No grid electricity factor for QA/.test(w)));
+});
+
+test('cooling: supplier factor per TRh for both views; or plant efficiency × grid', () => {
+  const sup = calcEnergy({ ...baseE, energy: 'cooling', quantity: 10000, unit: 'TRh', regions: ['AE-DU', 'AE'], factors: [],
+    supplier: { name: 'District cooling Co', co2ePerUnit: 0.5, unit: 'TRh', source: 'test' }, cooling: { method: 'supplier', gridFactors: ae } });
+  assert.ok(Math.abs(sup.totals.scope2 - 5000) < 1e-6);
+  assert.ok(Math.abs(sup.totals.scope2_market - 5000) < 1e-6);
+  const eff = calcEnergy({ ...baseE, energy: 'cooling', quantity: 10000, unit: 'TRh', regions: ['AE-DU', 'AE'], factors: [],
+    cooling: { method: 'efficiency', kwhPerTrh: 0.9, gridFactors: ae } });
+  assert.ok(Math.abs(eff.totals.scope2 - 10000 * 0.9 * 0.35) < 1e-6, '9,000 kWh × Dubai 0.35');
+  const d = eff.factors.find((f) => f.basis === 'scope2')!;
+  assert.ok(Math.abs(d.perEnteredUnit * 10000 - eff.totals.scope2) < 1e-6, 'factor shown per TRh');
+  const cop = calcEnergy({ ...baseE, energy: 'cooling', quantity: 3516.852842, unit: 'kWh_c', regions: ['AE'], factors: [], cooling: { method: 'efficiency', cop: 4, gridFactors: ae } });
+  assert.ok(Math.abs(cop.totals.scope2 - (3516.852842 / 4) * 0.4) < 1e-6);
+});
+
+test('heat: UK DESNZ district heat; elsewhere the supplier factor for both views', () => {
+  const heatGb = [ef(20, 'scope2', 'GB', 0.17529, [], 'kWh_th'), ef(21, 'td_loss', 'GB', 0.00945, [], 'kWh_th')];
+  const h = calcEnergy({ ...baseE, energy: 'heat', quantity: 1000, unit: 'kWh_th', regions: ['GB'], factors: heatGb });
+  assert.ok(Math.abs(h.totals.scope2 - 175.29) < 1e-9);
+  assert.ok(Math.abs(h.totals.td_loss - 9.45) < 1e-9);
+  const x = calcEnergy({ ...baseE, energy: 'heat', quantity: 1000, unit: 'kWh_th', regions: ['AE'], factors: [], supplier: { name: 'Steam Co', co2ePerUnit: 0.25, unit: 'kWh_th', source: 'test' } });
+  assert.ok(Math.abs(x.totals.scope2 - 250) < 1e-9 && Math.abs(x.totals.scope2_market - 250) < 1e-9);
 });
