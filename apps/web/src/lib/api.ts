@@ -2,13 +2,13 @@
  * Talking to the API. One function per call, typed results.
  * The chosen company travels in the x-tenant-id header (temporary, until login exists).
  */
-export type Basis = 'direct' | 'wtt' | 'outside_scopes' | 'memo' | 'scope2' | 'scope2_market' | 'td_loss';
+export type Basis = 'direct' | 'wtt' | 'outside_scopes' | 'memo' | 'scope2' | 'scope2_market' | 'td_loss' | 'scope3';
 
 export interface Item { id: number; subcategory_id: number; code: string; name: string; aliases: string[]; default_unit: string | null; gas_code: string | null; note: string | null; sort: number; active: boolean; composition: { gas: string; fraction: number }[] | null; hiddenForClient?: boolean; attrs?: VehicleAttrs }
 /** Vehicle types: class, powertrain, the fuel it burns, electric / plug-in, distance factors or not. */
 export interface VehicleAttrs { vehicle?: string; powertrain?: string; load?: string; fuel?: string | null; electric?: boolean; phev?: boolean; distance?: boolean }
 export interface Subcategory { id: number; category_id: number; code: string; name: string; grp?: string | null; units: string[]; default_unit: string | null; is_bioenergy: boolean; sort: number; active: boolean; hiddenForClient?: boolean; items: Item[] }
-export interface Category { id: number; scope: number; code: string; name: string; calc_method: 'combustion' | 'fugitive' | 'vehicle' | 'electricity'; description: string | null; active: boolean; subcategories: Subcategory[] }
+export interface Category { id: number; scope: number; code: string; name: string; calc_method: 'combustion' | 'fugitive' | 'vehicle' | 'electricity' | 'waste' | 'waste_disposal'; ghg_category?: number | null; description: string | null; active: boolean; subcategories: Subcategory[] }
 export interface Unit { code: string; name: string; dimension: string; to_base: number; is_base: boolean; aliases: string[]; active: boolean }
 export interface ResultLine { basis: Basis; gas: string; kgGas: number | null; kgCo2e: number; factorId: number | null; method: 'gas' | 'published' }
 /** CO2e emission factor behind one part of a result: quantity × perEnteredUnit = total. */
@@ -29,7 +29,7 @@ export interface Company { id: string; name: string; country: string; gwp_set: s
 export const ROLE_LABEL: Record<Role, string> = { platform_admin: 'Platform admin', super_admin: 'Super admin', admin: 'Admin', manager: 'Manager', preparer: 'Data preparer', verifier: 'Verifier' };
 export interface Facility { id: string; name: string; country: string; grid_region?: string | null; active: boolean; facility_type?: string | null; parent_name?: string | null; canEnter?: boolean; canApprove?: boolean }
 export interface Factor { id: number; item_id: number; item: string; subcategory: string; basis: Basis; unit: string; co2e: number | null; region: string; valid_from: string; valid_to: string; status: string; version: number; supersedes_id: number | null; note: string | null; source: string; gwp_set: string | null; gases: { gas: string; kgPerUnit: number }[] | null }
-export interface Activity { id: string; period_start: string; period_end: string; facility: string; category: string; item: string; quantity: number; unit: string; data_type: string; gwp_set: string; co2e_direct: number; co2e_wtt: number; co2_biogenic: number; co2e_memo: number; co2e_scope2?: number; co2e_scope2_market?: number; co2e_td?: number; status: string; created_at: string; vehicle?: string | null; vehicle_id?: string | null }
+export interface Activity { id: string; period_start: string; period_end: string; facility: string; category: string; item: string; quantity: number; unit: string; data_type: string; gwp_set: string; co2e_direct: number; co2e_wtt: number; co2_biogenic: number; co2e_memo: number; co2e_scope2?: number; co2e_scope2_market?: number; co2e_td?: number; co2e_scope3?: number; scope?: number; ghg_category?: number | null; waste_site?: string | null; status: string; created_at: string; vehicle?: string | null; vehicle_id?: string | null }
 
 /** Platform admin only: the company being looked at (sent as x-tenant-id). Others are fixed to their own company. */
 let tenantId = localStorageGet('ekotrace.tenant');
@@ -143,6 +143,15 @@ export const api = {
   vehicleRows: (b: { facilityId?: string; month?: string; rows: PastedRow[]; commit: boolean }) => call<{ rows: RowResult[]; valid: number; saved: number }>('POST', '/api/vehicles/entries/rows', b),
   batch: (entries: unknown[], dryRun: boolean) => call<{ results: { index: number; ok: boolean; id?: string; totals?: Record<Basis, number>; warnings?: string[]; error?: string }[]; saved: number; failed: number }>('POST', '/api/activities/batch', { entries, dryRun }),
   recalculate: (b: { ids?: string[]; year?: number; onlyWithWarnings?: boolean }) => call<{ checked: number; changed: number; problems: string[] }>('POST', '/api/activities/recalculate', b),
+  // Waste
+  wasteDefaults: () => call<WasteDefaults>('GET', '/api/waste/defaults'),
+  wasteSites: (facilityId?: string) => call<{ sites: WasteSite[] }>('GET', `/api/waste/sites${facilityId ? `?facilityId=${facilityId}` : ''}`),
+  wasteSite: (id: string) => call<WasteSite & { deposits: WasteDeposit[]; entryList: { id: string; period_start: string; period_end: string; co2e_direct: number }[] }>('GET', `/api/waste/sites/${id}`),
+  addWasteSite: (b: unknown) => call<WasteSite>('POST', '/api/waste/sites', b),
+  updateWasteSite: (id: string, b: unknown) => call<WasteSite>('PATCH', `/api/waste/sites/${id}`, b),
+  deleteWasteSite: (id: string) => call<{ ok: true }>('DELETE', `/api/waste/sites/${id}`),
+  saveDeposits: (id: string, b: { rows: { year: number; type: string; tonnes: number; source?: string | null; estimated?: boolean }[]; replaceAll?: boolean }) =>
+    call<{ saved: number; removed: number; entries: string[] }>('PUT', `/api/waste/sites/${id}/deposits`, b),
   // Scope 2
   gridRegions: () => call<{ regions: GridRegion[] }>('GET', '/api/grid-regions'),
   addGridRegion: (b: unknown) => call<GridRegion>('POST', '/api/grid-regions', b),
@@ -187,8 +196,8 @@ export function num(v: number | null | undefined, sig = 6): string {
   if (a >= 1e-4 && a < 1e9) return Number(v.toPrecision(sig)).toLocaleString('en', { maximumFractionDigits: 10 });
   return v.toExponential(3);
 }
-export const BASIS_SHORT: Record<Basis, string> = { direct: 'Scope 1', wtt: 'Upstream · S3.3', outside_scopes: 'Biogenic', memo: 'Memo', scope2: 'Scope 2 loc.', scope2_market: 'Scope 2 mkt.', td_loss: 'T&D · S3.3' };
-export const BASIS_LABEL: Record<Basis, string> = { direct: 'Scope 1', wtt: 'Upstream / well-to-tank (Scope 3.3)', outside_scopes: 'Biogenic CO₂ (outside scopes)', memo: 'Memo: non-Kyoto gases', scope2: 'Scope 2 · location-based', scope2_market: 'Scope 2 · market-based', td_loss: 'T&D losses (Scope 3.3)' };
+export const BASIS_SHORT: Record<Basis, string> = { direct: 'Scope 1', wtt: 'Upstream · S3.3', outside_scopes: 'Biogenic', memo: 'Memo', scope2: 'Scope 2 loc.', scope2_market: 'Scope 2 mkt.', td_loss: 'T&D · S3.3', scope3: 'Scope 3' };
+export const BASIS_LABEL: Record<Basis, string> = { direct: 'Scope 1', wtt: 'Upstream / well-to-tank (Scope 3.3)', outside_scopes: 'Biogenic CO₂ (outside scopes)', memo: 'Memo: non-Kyoto gases', scope2: 'Scope 2 · location-based', scope2_market: 'Scope 2 · market-based', td_loss: 'T&D losses (Scope 3.3)', scope3: 'Scope 3' };
 
 /** Download a file from the API (keeps the company header), e.g. an Excel template. */
 export async function download(path: string, filename: string) {
@@ -206,3 +215,17 @@ export async function download(path: string, filename: string) {
 export function unitLabel(code: string): string {
   return code.replace(/_e$/, '').replace(/_th$/, ' heat').replace(/_c$/, ' cooling').replace(/_gcv$/, ' gross');
 }
+
+// ------------------------------------------------------------------ waste --
+export interface WasteType { code: string; name: string; group: 'msw' | 'industrial' | 'sludge' | 'other'; dm: number; doc: number; cf: number | null; fcf: number; docf: number; decay: string; n2o: string; source: string; note?: string }
+export interface WasteDefaults {
+  types: WasteType[]; climates: Record<string, string>; k: Record<string, Record<string, number>>;
+  landfillMcf: Record<string, { name: string; mcf: number }>; devices: Record<string, { name: string; de: number; source: string }>;
+  incinerators: Record<string, { name: string; ch4: number; batch: boolean; n2oMsw: number }>;
+  bio: Record<'composting' | 'ad', Record<'wet' | 'dry', { ch4: number; n2o: number }>>; adLeak: number;
+  wastewater: Record<string, { name: string; domestic: number; industrial: number }>; bo: { BOD: number; COD: number };
+  mcfDischarge: number; n2oPlant: number; n2oEffluent: number; msw: { composition: Record<string, number>; source: string };
+}
+export interface WasteSiteParams { climate?: string; siteType?: string; mcf?: number; ox?: number; f?: number; delayMonths?: number; composition?: Record<string, number>; overrides?: Record<string, { doc?: number; docf?: number; k?: number }>; source?: string }
+export interface WasteSite { id: string; facility_id: string; facility: string; kind: 'landfill'; name: string; opened_year: number | null; closed_year: number | null; params: WasteSiteParams; note: string | null; active: boolean; entries: number; history: { first: number | null; last: number | null; tonnes: number; rows: number } | null; canEdit?: boolean }
+export interface WasteDeposit { id: number; year: number; type: string; tonnes: number; source: string | null; estimated: boolean }

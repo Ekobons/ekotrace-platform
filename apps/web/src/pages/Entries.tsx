@@ -51,6 +51,7 @@ export function Entries() {
         <div className="stat s2"><small>Scope 2 · location-based</small><b>{tco2e(sum('co2e_scope2'))}</b><small>tCO₂e</small></div>
         <div className="stat s2m"><small>Scope 2 · market-based</small><b>{tco2e(sum('co2e_scope2_market'))}</b><small>tCO₂e</small></div>
         <div className="stat s3"><small>Scope 3.3 · upstream + T&D losses</small><b>{tco2e(sum('co2e_wtt') + sum('co2e_td'))}</b><small>tCO₂e</small></div>
+        <div className="stat s3"><small>Scope 3.5 · waste sent to others</small><b>{tco2e(sum('co2e_scope3'))}</b><small>tCO₂e</small></div>
         <div className="stat bio"><small>Biogenic CO₂ (outside scopes)</small><b>{tco2e(sum('co2_biogenic'))}</b><small>tCO₂</small></div>
         <div className="stat memo"><small>Memo: non-Kyoto gases</small><b>{tco2e(sum('co2e_memo'))}</b><small>tCO₂e</small></div>
       </div>
@@ -75,11 +76,11 @@ export function Entries() {
         {rows.length ? (
           <div className="scroll">
             <table className="t">
-              <thead><tr><th>Period</th><th>Facility</th><th>Category</th><th>Item</th><th className="num">Quantity</th><th className="num">Scope 1 tCO₂e</th><th className="num">Scope 2 loc.</th><th className="num">Scope 2 mkt.</th><th className="num">Scope 3.3</th><th>GWP</th><th>Type</th></tr></thead>
+              <thead><tr><th>Period</th><th>Facility</th><th>Category</th><th>Item</th><th className="num">Quantity</th><th className="num">Scope 1 tCO₂e</th><th className="num">Scope 2 loc.</th><th className="num">Scope 2 mkt.</th><th className="num">Scope 3.3</th><th className="num">Scope 3 other</th><th>GWP</th><th>Type</th></tr></thead>
               <tbody>{rows.map((a) => (
                 <tr key={a.id} className="click" onClick={() => show(a.id)}>
-                  <td>{a.period_start.slice(0, 7)}</td><td>{a.facility}</td><td>{a.category}</td><td>{a.vehicle ? <><b>{a.vehicle}</b> · </> : null}{a.item}</td>
-                  <td className="num">{num(a.quantity)} {unitLabel(a.unit)}</td><td className="num">{tco2e(a.co2e_direct)}</td><td className="num">{tco2e(Number(a.co2e_scope2 ?? 0))}</td><td className="num">{tco2e(Number(a.co2e_scope2_market ?? 0))}</td><td className="num">{tco2e(Number(a.co2e_wtt) + Number(a.co2e_td ?? 0))}</td>
+                  <td>{a.period_start.slice(0, 7)}</td><td>{a.facility}</td><td>{a.category}</td><td>{a.vehicle ? <><b>{a.vehicle}</b> · </> : null}{a.waste_site ? <><b>{a.waste_site}</b> · </> : null}{a.item}</td>
+                  <td className="num">{num(a.quantity)} {unitLabel(a.unit)}</td><td className="num">{tco2e(a.co2e_direct)}</td><td className="num">{tco2e(Number(a.co2e_scope2 ?? 0))}</td><td className="num">{tco2e(Number(a.co2e_scope2_market ?? 0))}</td><td className="num">{tco2e(Number(a.co2e_wtt) + Number(a.co2e_td ?? 0))}</td><td className="num">{a.ghg_category ? <>{tco2e(Number(a.co2e_scope3 ?? 0))} <span className="chip grey">3.{a.ghg_category}</span></> : tco2e(Number(a.co2e_scope3 ?? 0))}</td>
                   <td>{a.gwp_set}</td><td><span className="chip grey">{a.data_type}</span></td>
                 </tr>))}
               </tbody>
@@ -91,11 +92,11 @@ export function Entries() {
       <dialog ref={dlg} className="drawer" onClose={() => setOpen(null)}>
         {open && (
           <div className="in">
-            <div className="row"><div className="grow"><div className="eyebrow">Entry · {open.period_start} to {open.period_end}</div><h2>{open.vehicle ? `${open.vehicle} · ` : ''}{open.item}</h2></div>
+            <div className="row"><div className="grow"><div className="eyebrow">Entry · {open.period_start} to {open.period_end}</div><h2>{open.vehicle ? `${open.vehicle} · ` : ''}{open.waste_site ? `${open.waste_site} · ` : ''}{open.item}</h2></div>
               <button className="btn ghost" onClick={() => dlg.current?.close()} aria-label="Close"><Icon name="x" /></button></div>
-            <div className="row"><div className="sub grow">{num(open.quantity)} {open.unit} · {open.data_type} · saved {new Date(open.created_at).toLocaleString()}</div>
+            <div className="row"><div className="sub grow">{num(open.quantity)} {unitLabel(open.unit)}{open.unit === 't' && open.item === 'Landfill methane' ? ' CH₄ generated' : ''} · {open.data_type} · saved {new Date(open.created_at).toLocaleString()}</div>
               {canRecalc && <button className="btn ghost sm" onClick={() => recalc({ ids: [open.id], onlyWithWarnings: false })}>Recalculate</button>}</div>
-            <Result r={{ gwpSet: open.gwp_set, totals: { direct: Number(open.co2e_direct), scope2: Number(open.co2e_scope2 ?? 0), scope2_market: Number(open.co2e_scope2_market ?? 0), td_loss: Number(open.co2e_td ?? 0), wtt: Number(open.co2e_wtt), outside_scopes: Number(open.co2_biogenic), memo: Number(open.co2e_memo) },
+            <Result r={{ gwpSet: open.gwp_set, totals: { direct: Number(open.co2e_direct), scope2: Number(open.co2e_scope2 ?? 0), scope2_market: Number(open.co2e_scope2_market ?? 0), td_loss: Number(open.co2e_td ?? 0), scope3: Number(open.co2e_scope3 ?? 0), wtt: Number(open.co2e_wtt), outside_scopes: Number(open.co2_biogenic), memo: Number(open.co2e_memo) },
               lines: open.lines.map((l) => ({ basis: l.basis, gas: l.gas, kgGas: l.kg_gas, kgCo2e: l.kg_co2e, method: l.method, source: l.source })), steps: open.steps, warnings: open.warnings, factors: open.factors, cv: open.inputs?.cv }} quantity={Number(open.quantity)} unitName={open.unit} energy={ENERGY_UNITS.has(open.unit)} />
           </div>
         )}

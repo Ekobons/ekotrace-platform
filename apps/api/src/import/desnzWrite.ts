@@ -11,10 +11,10 @@
  *  - Anything unexpected is written to import_issue for the admin to review.
  */
 import type { Tx } from '../db/pool.js';
-import { DESNZ_UNIT, slug, type DesnzParsed } from './desnz.js';
+import { DESNZ_UNIT, slug, type DesnzParsed, type WasteRoute } from './desnz.js';
 
 /** Raise when the importer learns to read more of the file: editions already loaded are read again once. */
-export const IMPORTER_VERSION = 4;
+export const IMPORTER_VERSION = 5;
 
 export interface ImportSummary {
   source: string;
@@ -215,6 +215,21 @@ export async function importDesnz(c: Tx, p: DesnzParsed, opts: { createdBy?: str
   if (heatItem && E.heatTd?.co2e != null) ukGridRows.push({ item: heatItem, basis: 'td_loss', unit: 'kWh_th', co2e: E.heatTd.co2e, gases: splitOf(E.heatTd.gasCo2e) });
   if (heatItem && E.heatWtt?.co2e != null) ukGridRows.push({ item: heatItem, basis: 'wtt', unit: 'kWh_th', co2e: E.heatWtt.co2e + (E.heatWttTd?.co2e ?? 0), gases: [] });
 
+  // ---- waste disposal (Scope 3.5): one item per material and route, per tonne ---------
+  const WASTE_SUB: Record<string, string> = { Refuse: 'waste3_refuse', Construction: 'waste3_construction', Paper: 'waste3_paper', Plastic: 'waste3_plastic',
+    Metal: 'waste3_metal', 'Electrical items': 'waste3_electrical', Other: 'waste3_other' };
+  for (const w of p.waste) {
+    const sub = WASTE_SUB[w.group];
+    if (!sub) { issues.push({ severity: 'info', message: `Waste group "${w.group}" not set up; not imported`, detail: w }); continue; }
+    const itemCode = `waste3:${slug(w.group)}:${slug(w.material)}:${w.route}`;
+    let item = itemIds.get(itemCode);
+    if (!item) {
+      item = await upsertItem(itemCode, sub, `${w.material} · ${WASTE_ROUTE_NAME[w.route]}`, { defaultUnit: 't', sort: WASTE_ROUTE_SORT[w.route] });
+      await c.query('UPDATE item SET attrs = $2 WHERE id = $1', [item, JSON.stringify({ material: w.material, route: w.route })]);
+    }
+    factors.push({ item, basis: 'scope3', unit: 't', co2e: w.co2e, gases: [] });
+  }
+
   // ---- bulk insert factors + gas split ------------------------------------------
   const vf = `${p.year}-01-01`, vt = `${p.year}-12-31`;
   let inserted = 0;
@@ -249,6 +264,12 @@ export async function importDesnz(c: Tx, p: DesnzParsed, opts: { createdBy?: str
   await c.query("SELECT pg_notify('refdata_changed', $1)", [code]);
   return { source: code, skipped: false, items: itemIds.size, factors: inserted, issues: issues.length };
 }
+
+export const WASTE_ROUTE_NAME: Record<WasteRoute, string> = {
+  reuse: 'Re-use', open_loop: 'Open-loop recycling', closed_loop: 'Closed-loop recycling', combustion: 'Combustion (energy recovery)',
+  composting: 'Composting', landfill: 'Landfill', ad: 'Anaerobic digestion',
+};
+const WASTE_ROUTE_SORT: Record<WasteRoute, number> = { landfill: 1, combustion: 2, open_loop: 3, closed_loop: 4, composting: 5, ad: 6, reuse: 7 };
 
 // ---------------------------------------------------------------- vehicles --
 const POWERTRAIN: Record<string, { label: string; key: string; fuel: string | null; electric?: boolean; phev?: boolean }> = {

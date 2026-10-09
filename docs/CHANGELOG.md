@@ -2,6 +2,28 @@
 
 Newest first.
 
+## 2026-10-10 (3) — Waste: own sites (Scope 1) and waste sent to others (Scope 3.5)
+
+The scope follows who runs the treatment site: one **Waste** tab with "Treated at our own site · Scope 1" and "Sent to another company · Scope 3.5". IPCC 2006 Guidelines Vol. 5 with the 2019 Refinement, every default shown next to its field and replaceable per site or entry; to be aligned with the client's approved methodology when it is received.
+
+**Landfill (Scope 1)**
+- **Site register** per facility (Add data → Waste → Manage landfill sites, or Organisation → facility → Landfill sites): climate, site type (MCF, 2019 Table 3.1 incl. semi-aerobic / active aeration), soil cover (oxidation 10% / 0, Table 3.2), optional methane share F, delay, composition of mixed waste (default Table 2.3 Western Asia & Middle East), DOC / DOCf / k per waste type.
+- **Tonnage history** per year and waste type: paste from Excel (one column per type, or one row per year and type), or fill a range of years with an average (marked estimated). After a change, the site's entries can be recalculated in one click.
+- **First order decay** (IPCC eq. 3.4–3.6): DOC Table 2.4, DOCf 2019 Table 3.0, k Table 3.3 by climate (UAE: tropical dry), delay 6 months; year-by-year table in the steps. A month's entry uses the share of days.
+- Or **from gas collected** ÷ collection efficiency (AP-42: 60–85%, 75% average).
+- **Gas recovered**: engines, boilers, open / enclosed flares, or sent to another company; kg CH₄ or m³ × CH₄ % (0.7168 kg/Nm³). Destruction: open flare 50%, enclosed 90% (CDM Tool 06), engines / boilers manufacturer's value, at most 99% (US EPA subpart HH); slip counted as emitted; CO₂ from burning it reported as biogenic. Emitted = (generated − recovered) × (1 − OX) + slip.
+
+**Incineration / waste-to-energy**: waste types (municipal by composition, Table 2.4; industrial Table 2.5; sludges; clinical); fossil CO₂ = waste × dry matter × carbon × fossil share × oxidation × 44/12; biogenic CO₂ outside scopes; CH₄ by technology (Table 5.3) and N₂O by waste class (Table 5.6); or measured stack CO₂ with its biogenic share. Plant values for dry matter / carbon / fossil share; energy exported shown, never subtracted.
+**Composting and anaerobic digestion**: Table 4.1 per tonne wet or dry; digesters also from measured biogas, leaks (5% default), burned / sent out, the rest counted as vented.
+**Wastewater**: domestic or industrial; treatment system → MCF (2019 Tables 6.3 / 6.8); BOD or COD as kg or flow × mg/L; sludge removed; Bo 0.6 / 0.25; gas recovered; N₂O in the plant (0.016 kg N₂O-N/kg N, 2019) and in effluent (0.005); CH₄ from effluent discharged (MCF 0.11).
+
+**Scope 3.5 — waste sent to others**: DESNZ waste disposal factors 2022–2026 (all materials × routes: landfill, combustion, open / closed-loop recycling, composting, anaerobic digestion, re-use), rows of material, route and tonnes, previewed and saved together. Note shown that DESNZ landfill factors are UK averages.
+
+**Also**: new basis "Scope 3" (other categories; the category records which, here 3.5) shown on Entries & results; entries link to their landfill; importer version 5; migration 008.
+**Demo**: Al Saja'a Landfill facility with a DEMO tonnage history (2000–2025, estimated, not real), landfill gas to engines and a flare, monthly waste-to-energy, composting, wastewater and office waste sent out.
+**Tests**: 30 engine (incl. landfill FOD worked by hand, incineration of plastics and mixed waste, composting, digester leaks, wastewater) + 30 API.
+**To check**: N₂O factor for effluent (0.005) is the 2006 value carried into the 2019 Refinement — to confirm against Table 6.8A.
+
 ## 2026-10-10 (2) — Scope 2: electricity, heat & steam, cooling; location- and market-based; Scope 3.3 T&D and upstream
 
 **Electricity**

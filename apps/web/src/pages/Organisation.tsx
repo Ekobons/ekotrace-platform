@@ -8,6 +8,7 @@ import { useApp } from '../App';
 import { api, type GridRegion, type OrgNode, type Person } from '../lib/api';
 import { Icon } from '../components/Icon';
 import { Fleet } from '../components/Fleet';
+import { WasteSites } from '../components/WasteSites';
 
 const TYPES = ['Office', 'Plant', 'Warehouse', 'Fleet depot', 'Data centre', 'Residential', 'Retail', 'Landfill', 'Laboratory', 'Other'];
 
@@ -155,7 +156,7 @@ function NodeForm({ f, setF, kind, managers, disabled }: { f: F; setF: (f: F) =>
 }
 
 function Profile({ node, nodes, managers, onClose, onSaved }: { node: OrgNode; nodes: OrgNode[]; managers: Person[]; onClose: () => void; onSaved: (m: string) => void }) {
-  const [tab, setTab] = useState<'profile' | 'fleet'>('profile');
+  const [tab, setTab] = useState<'profile' | 'fleet' | 'waste'>('profile');
   const [fleetCount, setFleetCount] = useState<number | null>(null);
   const [f, setF] = useState(fieldsFrom(node));
   const [parent, setParent] = useState(node.parent_id ?? '');
@@ -172,8 +173,10 @@ function Profile({ node, nodes, managers, onClose, onSaved }: { node: OrgNode; n
         <div className="tabs">
           <button className={tab === 'profile' ? 'on' : ''} onClick={() => setTab('profile')}>Profile</button>
           <button className={tab === 'fleet' ? 'on' : ''} onClick={() => setTab('fleet')}>Vehicle fleet{fleetCount != null ? ` (${fleetCount})` : ''}</button>
+          <button className={tab === 'waste' ? 'on' : ''} onClick={() => setTab('waste')}>Landfill sites</button>
         </div>
       )}
+      {tab === 'waste' && node.kind === 'facility' && <WasteSites facilityId={node.id} canEdit={node.canEnter && node.active && canManageFleet} />}
       {tab === 'fleet' && node.kind === 'facility' && <Fleet facilityId={node.id} canEdit={node.canEnter && node.active && canManageFleet} onCount={setFleetCount} />}
       {tab === 'profile' && <>
       {!node.canEdit && <div className="note info">Read-only: this is outside the part of the organisation you manage.</div>}

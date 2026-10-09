@@ -4,7 +4,7 @@
  * calculation for the item's category, and returns the result with its steps.
  */
 import { z } from 'zod';
-import { calcCombustion, calcEnergy, calcFugitive, calcVehicle, chooseFactors, convert, impliedCalorificValue, type CalcResult, type CertificateClaim, type Factor, type SupplierFactor } from '@ekotrace/calc';
+import { calcBiological, calcCombustion, calcEnergy, calcFugitive, calcIncineration, calcLandfill, calcVehicle, calcWastewater, ch4FromGas, chooseFactors, convert, impliedCalorificValue, DEVICES, INCINERATORS, LANDFILL_MCF, WW_SYSTEMS, type CalcResult, type CertificateClaim, type Climate, type Factor, type Recovery, type SupplierFactor } from '@ekotrace/calc';
 import { query } from '../db/pool.js';
 import { AppError, notFound } from '../lib/errors.js';
 import { refdata } from './refdata.js';
@@ -58,6 +58,38 @@ export const energySchema = z.object({
   cooling: z.object({ method: z.enum(['supplier', 'efficiency']), kwhPerTrh: z.number().finite().positive().optional(), cop: z.number().finite().positive().optional() }).optional(),
 });
 
+// -------------------------------------------------------------------- waste --
+const frac = z.number().finite().min(0).max(1);
+const device = z.enum(Object.keys(DEVICES) as [keyof typeof DEVICES, ...(keyof typeof DEVICES)[]]);
+/** Methane recovered and burned (or sent out): kg CH4, or gas volume (normal m³) × methane %. */
+export const recoverySchema = z.object({
+  device, ch4Kg: amount.optional(), gasM3: amount.optional(), ch4Pct: z.number().min(0).max(100).optional(), de: frac.optional(),
+}).refine((r) => r.ch4Kg !== undefined || (r.gasM3 !== undefined && r.ch4Pct !== undefined), 'Enter kg of methane, or the gas volume (m³) and its methane %');
+const overridesSchema = z.record(z.string(), z.object({ dm: frac.optional(), doc: frac.optional(), cf: frac.optional(), fcf: frac.optional(), docf: frac.optional(), k: z.number().min(0).max(2).optional() }));
+export const compositionSchema = z.record(z.string(), frac);
+const streamSchema = z.object({ type: z.string().min(1).max(40), tonnes: amount });
+
+export const wasteSchema = z.discriminatedUnion('process', [
+  z.object({ process: z.literal('landfill'), siteId: z.string().uuid(), method: z.enum(['fod', 'collection']).default('fod'), collectionEfficiency: frac.optional(), recovery: z.array(recoverySchema).max(20).default([]) }),
+  z.object({
+    process: z.literal('incineration'), streams: z.array(streamSchema).min(1).max(30), composition: compositionSchema.optional(), overrides: overridesSchema.optional(),
+    technology: z.string().refine((t) => t in INCINERATORS, 'Choose the incinerator technology'), of: frac.optional(), ch4PerT: amount.optional(), n2oPerT: amount.optional(),
+    measured: z.object({ co2Tonnes: amount, biogenicPct: z.number().min(0).max(100), source: z.string().trim().min(2).max(200) }).optional(), exportedMWh: amount.optional(),
+  }),
+  z.object({
+    process: z.enum(['composting', 'ad']), tonnes: amount, basis: z.enum(['wet', 'dry']).default('wet'), ch4PerT: amount.optional(), n2oPerT: amount.optional(),
+    measured: z.object({ ch4ProducedKg: amount.optional(), gasM3: amount.optional(), ch4Pct: z.number().min(0).max(100).optional(), leakPct: z.number().min(0).max(100).optional(), recovery: z.array(recoverySchema).max(20).default([]) })
+      .refine((m) => m.ch4ProducedKg !== undefined || (m.gasM3 !== undefined && m.ch4Pct !== undefined), 'Enter the methane produced (kg), or the biogas volume and its methane %').optional(),
+  }),
+  z.object({
+    process: z.literal('wastewater'), kind: z.enum(['domestic', 'industrial']), system: z.string().refine((t) => t in WW_SYSTEMS, 'Choose the treatment system'), mcf: frac.optional(),
+    measure: z.enum(['BOD', 'COD']), organicsKg: amount.optional(), flowM3: amount.optional(), mgPerL: amount.optional(), sludgeKg: amount.optional(), bo: amount.optional(),
+    recovery: z.array(recoverySchema).max(20).default([]), nInfluentKg: amount.optional(), efPlant: frac.optional(), nEffluentKg: amount.optional(), efEffluent: frac.optional(),
+    effluentOrganicsKg: amount.optional(), mcfDischarge: frac.optional(),
+  }).refine((w) => w.organicsKg !== undefined || (w.flowM3 !== undefined && w.mgPerL !== undefined), 'Enter the organics treated (kg), or the flow (m³) and its concentration (mg/L)'),
+]);
+export type WasteInput = z.infer<typeof wasteSchema>;
+
 export const calcInputSchema = z.object({
   itemId: z.number().int().positive(),
   unit: z.string().min(1),
@@ -71,11 +103,12 @@ export const calcInputSchema = z.object({
   gwpSet: z.enum(['AR4', 'AR5', 'AR6']).optional(),
   vehicle: vehicleSchema.optional(),
   energy: energySchema.optional(),
+  waste: wasteSchema.optional(),
 });
 export type CalcInput = z.infer<typeof calcInputSchema>;
 
 interface ItemRow {
-  id: number; name: string; active: boolean; category_id: number; category: string; calc_method: 'combustion' | 'fugitive' | 'vehicle' | 'electricity';
+  id: number; name: string; active: boolean; category_id: number; category: string; calc_method: 'combustion' | 'fugitive' | 'vehicle' | 'electricity' | 'waste' | 'waste_disposal';
   sub_units: string[]; gas_code: string | null; sub_active: boolean; code: string;
   attrs: { vehicle?: string; powertrain?: string; fuel?: string | null; electric?: boolean; phev?: boolean; distance?: boolean };
 }
@@ -121,7 +154,14 @@ export interface CalcContext {
   lookupCertificates?: (ids: string[], excludeActivityId?: string) => Promise<CertificateRow[]>;
   /** price list lookup (company price first, then the platform list) */
   lookupPrice?: (itemId: number, region: string, date: string, currency: string) => Promise<PriceFound | null>;
+  /** a landfill of the company with its tonnage history */
+  lookupWasteSite?: (id: string) => Promise<WasteSiteRow | null>;
 }
+export interface WasteSiteParams {
+  climate?: Climate; siteType?: string; mcf?: number; ox?: number; f?: number; delayMonths?: number;
+  composition?: Record<string, number>; overrides?: Record<string, Record<string, number>>;
+}
+export interface WasteSiteRow { id: string; name: string; facility_id: string; params: WasteSiteParams; deposits: { year: number; type: string; tonnes: number }[] }
 
 /** What is stored as the entry's quantity: for spend, the fuel / kWh bought. */
 export interface Stored { quantity: number; unit: string; inputs: Record<string, unknown> }
@@ -131,7 +171,7 @@ export async function calculate(input: CalcInput, ctx: CalcContext): Promise<{ r
   const ref = await refdata();
   const item = await loadItem(input.itemId);
   if (!item.active || !item.sub_active) throw new AppError(`${item.name} is switched off in the catalogue`);
-  if (item.calc_method !== 'vehicle' && item.sub_units.length && !item.sub_units.includes(input.unit)) {
+  if (item.calc_method !== 'vehicle' && item.calc_method !== 'waste' && item.sub_units.length && !item.sub_units.includes(input.unit)) {
     throw new AppError(`${input.unit} is not offered for this fuel class. Use one of: ${item.sub_units.join(', ')}`);
   }
   const gwpSet = input.gwpSet ?? ctx.gwpSet;
@@ -142,7 +182,14 @@ export async function calculate(input: CalcInput, ctx: CalcContext): Promise<{ r
 
   let result: CalcResult;
   let stored: Stored = { quantity: input.quantity ?? 0, unit: input.unit, inputs: input.cv ? { cv: input.cv } : {} };
-  if (item.calc_method === 'electricity') {
+  if (item.calc_method === 'waste') {
+    const w = await wasteCalc(input, item, ctx, gwp);
+    result = w.result; stored = w.stored;
+  } else if (item.calc_method === 'waste_disposal') {
+    if (input.quantity === undefined) throw new AppError('Enter the tonnes of waste');
+    result = calcCombustion({ itemName: item.name, quantity: input.quantity, unit: input.unit, date, region, factors: await loadFactors(item.id), gwp, units: ref.units });
+    stored = { quantity: input.quantity, unit: input.unit, inputs: {} };
+  } else if (item.calc_method === 'electricity') {
     if (input.quantity === undefined) throw new AppError('Enter the quantity of energy');
     const e = await energyCalc(input, item, ctx, ref.units, gwp, date);
     result = e.result; stored = e.stored;
@@ -166,7 +213,7 @@ export async function calculate(input: CalcInput, ctx: CalcContext): Promise<{ r
     }
     result = calcFugitive({ itemName: item.name, unit: input.unit, data: input.fugitive, composition, blendFactors, gwp, units: ref.units, kyoto: (g) => ref.kyoto.has(g) });
   }
-  if (input.periodStart.slice(0, 4) !== input.periodEnd.slice(0, 4)) {
+  if (input.periodStart.slice(0, 4) !== input.periodEnd.slice(0, 4) && item.calc_method !== 'waste') {
     result.warnings.push(`The period spans two calendar years; factors for ${input.periodStart.slice(0, 4)} were used.`);
   }
   if (item.calc_method === 'fugitive') stored = { quantity: result.lines.reduce((s, l) => s + (l.kgGas ?? 0), 0), unit: input.unit, inputs: input.fugitive ?? {} };
@@ -329,5 +376,69 @@ async function energyCalc(input: CalcInput, item: ItemRow, ctx: CalcContext, uni
   });
   result.warnings.unshift(...warnings);
   const stored: Stored = { quantity: input.quantity!, unit: input.unit, inputs: { energy: { ...e, regions }, claims: claims.map((c) => ({ certificateId: c.id, kwh: c.kwh })) } };
+  return { result, stored };
+}
+
+// -------------------------------------------------------------------- waste --
+const PROCESS_ITEM: Record<WasteInput['process'], string> = {
+  landfill: 'waste:landfill', incineration: 'waste:incineration', composting: 'waste:composting', ad: 'waste:ad', wastewater: 'waste:wastewater',
+};
+const kgCh4 = (r: z.infer<typeof recoverySchema>): Recovery => ({ device: r.device, ch4Kg: r.ch4Kg ?? ch4FromGas(r.gasM3!, r.ch4Pct!), ...(r.de !== undefined ? { de: r.de } : {}) });
+const days = (a: string, b: string) => Math.round((Date.parse(b) - Date.parse(a)) / 86400000) + 1;
+
+async function wasteCalc(input: CalcInput, item: ItemRow, ctx: CalcContext, gwp: Parameters<typeof calcLandfill>[0]['gwp']): Promise<{ result: CalcResult; stored: Stored }> {
+  const w = input.waste;
+  if (!w) throw new AppError('Enter the waste treatment details');
+  if (PROCESS_ITEM[w.process] !== item.code) throw new AppError(`${item.name} does not match the process entered (${w.process})`);
+  const steps: string[] = [];
+  const gasNote = (rs: z.infer<typeof recoverySchema>[]) => {
+    for (const r of rs) if (r.ch4Kg === undefined) steps.push(`${DEVICES[r.device].name}: ${r.gasM3} m³ × ${r.ch4Pct}% methane × 0.7168 kg/m³ (0 °C, 1 atm) = ${Number(ch4FromGas(r.gasM3!, r.ch4Pct!).toPrecision(6))} kg CH4`);
+  };
+  let result: CalcResult;
+  let stored: Stored;
+  if (w.process === 'landfill') {
+    const site = ctx.lookupWasteSite ? await ctx.lookupWasteSite(w.siteId) : null;
+    if (!site) throw new AppError('Landfill not found in the site register');
+    if (ctx.facilityId && site.facility_id !== ctx.facilityId) throw new AppError(`${site.name} belongs to another facility`);
+    const year = Number(input.periodStart.slice(0, 4));
+    if (input.periodEnd.slice(0, 4) !== String(year)) throw new AppError('A landfill entry covers one calendar year or part of it');
+    const p = site.params;
+    const mcf = p.mcf ?? (p.siteType ? LANDFILL_MCF[p.siteType]?.mcf : undefined);
+    if (mcf === undefined) throw new AppError(`Set the site type (MCF) of ${site.name} in the site register`);
+    gasNote(w.recovery);
+    const r = calcLandfill({
+      siteName: site.name, year, periodFraction: Math.min(1, days(input.periodStart, input.periodEnd) / days(`${year}-01-01`, `${year}-12-31`)),
+      method: w.method, climate: p.climate ?? 'tropical_dry', mcf, ox: p.ox ?? 0, f: p.f, delayMonths: p.delayMonths,
+      deposits: site.deposits, composition: p.composition, overrides: p.overrides, collectionEfficiency: w.collectionEfficiency,
+      recovery: w.recovery.map(kgCh4), gwp,
+    });
+    if (!p.climate) r.warnings.push(`Climate of ${site.name} not set: tropical dry (UAE) assumed.`);
+    result = r;
+    stored = { quantity: r.generatedT, unit: 't', inputs: { waste: w, siteId: site.id } };
+  } else if (w.process === 'incineration') {
+    result = calcIncineration({ plantName: item.name, streams: w.streams, composition: w.composition, overrides: w.overrides, technology: w.technology, of: w.of,
+      ch4PerT: w.ch4PerT, n2oPerT: w.n2oPerT, measured: w.measured, exportedMWh: w.exportedMWh, gwp });
+    stored = { quantity: w.streams.reduce((a, x) => a + x.tonnes, 0), unit: 't', inputs: { waste: w } };
+  } else if (w.process === 'composting' || w.process === 'ad') {
+    if (w.measured && w.process !== 'ad') throw new AppError('Measured biogas applies to anaerobic digestion only');
+    const m = w.measured;
+    if (m) {
+      gasNote(m.recovery);
+      if (m.ch4ProducedKg === undefined) steps.push(`Biogas produced: ${m.gasM3} m³ × ${m.ch4Pct}% methane × 0.7168 kg/m³ = ${Number(ch4FromGas(m.gasM3!, m.ch4Pct!).toPrecision(6))} kg CH4`);
+    }
+    result = calcBiological({ process: w.process, tonnes: w.tonnes, basis: w.basis, ch4PerT: w.ch4PerT, n2oPerT: w.n2oPerT, gwp,
+      measured: m ? { ch4ProducedKg: m.ch4ProducedKg ?? ch4FromGas(m.gasM3!, m.ch4Pct!), leakPct: m.leakPct, recovery: m.recovery.map(kgCh4) } : undefined });
+    stored = { quantity: w.tonnes, unit: 't', inputs: { waste: w } };
+  } else if (w.process === 'wastewater') {
+    const organicsKg = w.organicsKg ?? (w.flowM3! * w.mgPerL!) / 1000; // m³ × mg/L = g → kg
+    if (w.organicsKg === undefined) steps.push(`Organics treated: ${w.flowM3} m³ × ${w.mgPerL} mg/L ${w.measure} ÷ 1000 = ${Number(organicsKg.toPrecision(6))} kg ${w.measure}`);
+    gasNote(w.recovery);
+    result = calcWastewater({ kind: w.kind, system: w.system, mcf: w.mcf, measure: w.measure, organicsKg, sludgeKg: w.sludgeKg, bo: w.bo, recovery: w.recovery.map(kgCh4),
+      nInfluentKg: w.nInfluentKg, efPlant: w.efPlant, nEffluentKg: w.nEffluentKg, efEffluent: w.efEffluent, effluentOrganicsKg: w.effluentOrganicsKg, mcfDischarge: w.mcfDischarge, gwp });
+    stored = { quantity: organicsKg, unit: 'kg', inputs: { waste: w } };
+  } else {
+    throw new AppError('Unknown waste process');
+  }
+  result.steps.splice(1, 0, ...steps);
   return { result, stored };
 }

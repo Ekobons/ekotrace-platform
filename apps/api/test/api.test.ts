@@ -613,3 +613,58 @@ test('Scope 2 cooling and heat: supplier per TRh; plant efficiency × Dubai grid
   const wrong = await api('POST', '/api/calculate', { facilityId: facA, itemId: heat, unit: 'kWh_th', quantity: 1000, ...period, energy: { supplierFactorId: sup.body.id } }, tenantA);
   assert.equal(wrong.status, 400, 'cooling factor used for heat is refused');
 });
+
+test('waste Scope 1: landfill site register, FOD entry by hand, recalculation after the history changes; other company cannot see the site', async () => {
+  const lf = await itemId('waste:landfill');
+  const site = await api('POST', '/api/waste/sites', { facilityId: facA, name: 'Test cell', openedYear: 2018, params: { climate: 'tropical_dry', siteType: 'managed_anaerobic', ox: 0.1 } }, tenantA);
+  assert.equal(site.status, 200, JSON.stringify(site.body));
+  const h = await api('PUT', `/api/waste/sites/${site.body.id}/deposits`, { rows: [{ year: 2024, type: 'food', tonnes: 1000 }] }, tenantA);
+  assert.equal(h.status, 200, JSON.stringify(h.body));
+  const period = { periodStart: '2025-01-01', periodEnd: '2025-12-31' };
+  const s = await api('POST', '/api/activities', { facilityId: facA, itemId: lf, unit: 't', ...period,
+    waste: { process: 'landfill', siteId: site.body.id, recovery: [{ device: 'flare_enclosed', gasM3: 10, ch4Pct: 50 }] } }, tenantA);
+  assert.equal(s.status, 200, JSON.stringify(s.body));
+  const gen = 1000 * 0.15 * 0.7 * (1 - Math.exp(-0.085)) * 0.5 * 16 / 12 * 1000; // kg CH4
+  const rec = 10 * 0.5 * 0.7168;
+  const ch4 = (gen - rec) * 0.9 + rec * 0.1;
+  assert.ok(Math.abs(s.body.totals.direct - ch4 * 28) < 1e-6, `${s.body.totals.direct} vs ${ch4 * 28}`);
+  const saved = (await api('GET', `/api/activities/${s.body.id}`, undefined, tenantA)).body;
+  assert.equal(saved.waste_site, 'Test cell');
+  assert.ok(Math.abs(Number(saved.quantity) - gen / 1000) < 1e-6, 'quantity = t CH4 generated');
+
+  // More history → recalculate the site's entries
+  const h2 = await api('PUT', `/api/waste/sites/${site.body.id}/deposits`, { rows: [{ year: 2023, type: 'msw', tonnes: 5000 }] }, tenantA);
+  assert.deepEqual(h2.body.entries, [s.body.id]);
+  const rc = await api('POST', '/api/activities/recalculate', { ids: h2.body.entries, onlyWithWarnings: false }, tenantA);
+  assert.equal(rc.body.changed, 1, JSON.stringify(rc.body));
+  assert.ok(Number((await api('GET', `/api/activities/${s.body.id}`, undefined, tenantA)).body.co2e_direct) > s.body.totals.direct);
+
+  assert.equal((await api('DELETE', `/api/waste/sites/${site.body.id}`, undefined, tenantA)).status, 400, 'has entries');
+  assert.equal((await api('GET', '/api/waste/sites', undefined, tenantB)).body.sites.length, 0);
+  const steal = await api('POST', '/api/calculate', { facilityId: facA, itemId: lf, unit: 't', ...period, waste: { process: 'landfill', siteId: site.body.id, recovery: [] } }, tenantB);
+  assert.notEqual(steal.status, 200);
+});
+
+test('waste Scope 1: incineration (fossil CO2 + biogenic outside scopes), composting; Scope 3.5 DESNZ factor per tonne', async () => {
+  const period = { periodStart: '2026-02-01', periodEnd: '2026-02-28' };
+  const inc = await api('POST', '/api/calculate', { facilityId: facA, itemId: await itemId('waste:incineration'), unit: 't', ...period,
+    waste: { process: 'incineration', streams: [{ type: 'plastics', tonnes: 100 }], technology: 'continuous_stoker' } }, tenantA);
+  assert.equal(inc.status, 200, JSON.stringify(inc.body));
+  assert.ok(Math.abs(inc.body.totals.direct - (275000 + 100 * 0.0002 * 28 + 100 * 0.05 * 265)) < 1e-6);
+  const comp = await api('POST', '/api/calculate', { facilityId: facA, itemId: await itemId('waste:composting'), unit: 't', ...period,
+    waste: { process: 'composting', tonnes: 100, basis: 'wet' } }, tenantA);
+  assert.ok(Math.abs(comp.body.totals.direct - (400 * 28 + 24 * 265)) < 1e-6);
+  const wrong = await api('POST', '/api/calculate', { facilityId: facA, itemId: await itemId('waste:composting'), unit: 't', ...period,
+    waste: { process: 'ad', tonnes: 100, basis: 'wet' } }, tenantA);
+  assert.equal(wrong.status, 400, 'process must match the item');
+
+  const food = await itemId('waste3:refuse:organic-food-and-drink-waste:landfill');
+  const f = (await pool.query(`SELECT co2e FROM factor WHERE item_id = $1 AND basis = 'scope3' AND valid_from = '2026-01-01' AND status = 'active'`, [food])).rows[0];
+  const s3 = await api('POST', '/api/activities', { facilityId: facA, itemId: food, unit: 't', quantity: 12, ...period }, tenantA);
+  assert.equal(s3.status, 200, JSON.stringify(s3.body));
+  assert.ok(Math.abs(s3.body.totals.scope3 - 12 * Number(f.co2e)) < 1e-6);
+  assert.equal(s3.body.totals.direct, 0);
+  const row = (await api('GET', `/api/activities?category=waste_generated`, undefined, tenantA)).body.activities[0];
+  assert.equal(row.ghg_category, 5);
+  assert.ok(Math.abs(Number(row.co2e_scope3) - 12 * Number(f.co2e)) < 1e-6);
+});

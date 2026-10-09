@@ -200,5 +200,5 @@ export function calcEnergy(input: EnergyInput): CalcResult {
 }
 
 function basisName(b: Basis): string {
-  return { direct: 'Scope 1', wtt: 'Upstream (Scope 3.3)', outside_scopes: 'Biogenic CO2', memo: 'Memo', scope2: 'Location-based', scope2_market: 'Market-based', td_loss: 'T&D losses' }[b];
+  return { direct: 'Scope 1', wtt: 'Upstream (Scope 3.3)', outside_scopes: 'Biogenic CO2', memo: 'Memo', scope2: 'Location-based', scope2_market: 'Market-based', td_loss: 'T&D losses', scope3: 'Scope 3' }[b];
 }

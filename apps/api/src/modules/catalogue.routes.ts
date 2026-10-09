@@ -31,7 +31,7 @@ export async function catalogueRoutes(app: FastifyInstance) {
     const hiddenSub = new Set(hidden.map((h) => h.subcategory_id).filter(Boolean));
     const hiddenItem = new Set(hidden.map((h) => h.item_id).filter(Boolean));
 
-    const cats = await query(`SELECT id, scope, code, name, calc_method, description, sort, active FROM category
+    const cats = await query(`SELECT id, scope, code, name, calc_method, description, sort, active, ghg_category FROM category
                                WHERE ($1 OR active) AND ($2::text IS NULL OR code = $2) ORDER BY scope, sort, id`, [showAll, q.category ?? null]);
     const subs = await query(`SELECT id, category_id, code, name, grp, units, default_unit, is_bioenergy, sort, active FROM subcategory
                                WHERE ($1 OR active) ORDER BY sort, id`, [showAll]);

@@ -16,14 +16,14 @@ import { contextFor } from '../modules/activity.routes.js';
 const NAME = 'BEEAH Group (demo)';
 const TREE: [string, [string, string, string][]][] = [
   ['Real Estate', [['BEEAH Headquarters', 'Office', 'Sharjah'], ['Al Zahia Community', 'Residential', 'Sharjah']]],
-  ['Waste Management', [['Sharjah Waste-to-Energy', 'Plant', 'Sharjah'], ["Al Saja'a Recycling Complex", 'Plant', 'Sharjah'], ['Fleet Depot Sharjah', 'Fleet depot', 'Sharjah']]],
+  ['Waste Management', [['Sharjah Waste-to-Energy', 'Plant', 'Sharjah'], ["Al Saja'a Recycling Complex", 'Plant', 'Sharjah'], ["Al Saja'a Landfill", 'Landfill', 'Sharjah'], ['Fleet Depot Sharjah', 'Fleet depot', 'Sharjah']]],
   ['Technology', [['Data Centre Dubai', 'Data centre', 'Dubai']]],
 ];
 const PEOPLE: [string, string, string, string | null, string[]][] = [
   // name, email, role, admin of sub-group, facilities (manager/preparer)
   ['Nikhil (Super admin)', 'superadmin@beeah.demo', 'super_admin', null, []],
   ['Layla (Admin)', 'admin@beeah.demo', 'admin', 'Waste Management', []],
-  ['Hessa (Manager)', 'manager@beeah.demo', 'manager', null, ['Sharjah Waste-to-Energy', "Al Saja'a Recycling Complex"]],
+  ['Hessa (Manager)', 'manager@beeah.demo', 'manager', null, ['Sharjah Waste-to-Energy', "Al Saja'a Recycling Complex", "Al Saja'a Landfill"]],
   ['Aisha (Data preparer)', 'preparer@beeah.demo', 'preparer', null, ['Sharjah Waste-to-Energy']],
   ['Verifier (read-only)', 'verifier@beeah.demo', 'verifier', null, []],
 ];
@@ -64,6 +64,7 @@ async function main() {
       for (const sql of [
         'DELETE FROM certificate_claim WHERE tenant_id = $1', 'DELETE FROM energy_certificate WHERE tenant_id = $1', 'DELETE FROM supplier_factor WHERE tenant_id = $1',
         'DELETE FROM activity_result WHERE tenant_id = $1', 'DELETE FROM activity WHERE tenant_id = $1', 'DELETE FROM vehicle WHERE tenant_id = $1',
+        'DELETE FROM waste_deposit WHERE tenant_id = $1', 'DELETE FROM waste_site WHERE tenant_id = $1',
         'DELETE FROM price WHERE tenant_id = $1', 'DELETE FROM user_facility WHERE tenant_id = $1',
         'DELETE FROM session WHERE user_id IN (SELECT id FROM app_user WHERE tenant_id = $1)', 'DELETE FROM audit_log WHERE tenant_id = $1',
         'UPDATE org_node SET manager_user_id = NULL WHERE tenant_id = $1', 'DELETE FROM app_user WHERE tenant_id = $1', 'DELETE FROM tenant_catalogue WHERE tenant_id = $1',
@@ -209,6 +210,58 @@ async function main() {
       }
     }
     console.log(`Scope 2: ${ne} monthly electricity / cooling entries (demo supplier factors and a demo I-REC; location-based waits for the UAE grid factors).`);
+
+    // Waste. Scope 1: a landfill with a DEMO tonnage history (estimated, not real), waste-to-energy,
+    // composting, a wastewater plant. Scope 3.5: office waste sent to others.
+    const DEMO_W = 'DEMO — not real data';
+    const site = (await c.query(`INSERT INTO waste_site (tenant_id, facility_id, name, opened_year, params, note) VALUES ($1,$2,$3,2000,$4,$5) RETURNING id`,
+      [t, ids.get("Al Saja'a Landfill"), "Al Saja'a landfill (demo history)", JSON.stringify({ climate: 'tropical_dry', siteType: 'managed_anaerobic', ox: 0.1, source: DEMO_W }), DEMO_W])).rows[0].id;
+    for (let y = 2000; y <= 2025; y++) {
+      await c.query(`INSERT INTO waste_deposit (tenant_id, site_id, year, waste_type, tonnes, source, estimated) VALUES ($1,$2,$3,'msw',$4,$5,true)`,
+        [t, site, y, y <= 2020 ? 800000 : 800000 - (y - 2020) * 90000, DEMO_W]);
+    }
+    const wItems = Object.fromEntries((await c.query(`SELECT code, id FROM item WHERE code LIKE 'waste:%' OR code IN ('waste3:refuse:commercial-and-industrial-waste:landfill','waste3:paper:paper-and-board-mixed:closed_loop')`)).rows.map((r) => [r.code, r.id]));
+    const put = async (fac: string, input: Record<string, unknown>) => {
+      const f = (await c.query('SELECT id, country, grid_region FROM org_node WHERE id = $1', [ids.get(fac)])).rows[0];
+      const { result, item: it, gwpSet, stored } = await calculate(input as never, contextFor(c, 'AR5', 'AE', f));
+      const a = (await c.query(
+        `INSERT INTO activity (tenant_id, facility_id, category_id, item_id, period_start, period_end, quantity, unit, inputs, data_type, gwp_set,
+                               co2e_direct, co2e_wtt, co2_biogenic, co2e_memo, co2e_scope3, steps, warnings, status, created_by, factors, waste_site_id)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'actual',$10,$11,$12,$13,$14,$15,$16,$17,'approved',$18,$19,$20) RETURNING id`,
+        [t, f.id, it.category_id, it.id, input.periodStart, input.periodEnd, stored.quantity, stored.unit, JSON.stringify(stored.inputs), gwpSet,
+         result.totals.direct, result.totals.wtt, result.totals.outside_scopes, result.totals.memo, result.totals.scope3,
+         JSON.stringify(result.steps), JSON.stringify(result.warnings), users.get('preparer'), JSON.stringify(result.factors), (stored.inputs.siteId as string) ?? null])).rows[0].id;
+      if (result.lines.length) {
+        await c.query(`INSERT INTO activity_result (activity_id, tenant_id, basis, gas, kg_gas, kg_co2e, factor_id, method)
+                       SELECT $1, $2, * FROM unnest($3::text[], $4::text[], $5::numeric[], $6::numeric[], $7::bigint[], $8::text[])`,
+          [a, t, result.lines.map((l) => l.basis), result.lines.map((l) => l.gas), result.lines.map((l) => l.kgGas), result.lines.map((l) => l.kgCo2e),
+           result.lines.map((l) => l.factorId), result.lines.map((l) => l.method)]);
+      }
+    };
+    let nw = 0;
+    // Landfill: yearly (2025) and Jan–Sep 2026, gas to engines and a flare.
+    for (const [ps, pe, m3] of [['2025-01-01', '2025-12-31', 20e6], ['2026-01-01', '2026-09-30', 15e6]] as const) {
+      await put("Al Saja'a Landfill", { itemId: wItems['waste:landfill'], unit: 't', periodStart: ps, periodEnd: pe,
+        waste: { process: 'landfill', siteId: site, method: 'fod', recovery: [{ device: 'engine', gasM3: m3 * 0.8, ch4Pct: 50 }, { device: 'flare_enclosed', gasM3: m3 * 0.2, ch4Pct: 50 }] } });
+      nw++;
+    }
+    for (let y = 2025; y <= 2026; y++) {
+      for (let m = 0; m < (y === 2026 ? 9 : 12); m++) {
+        const ps = `${y}-${String(m + 1).padStart(2, '0')}-01`;
+        const pe = new Date(Date.UTC(y, m + 1, 0)).toISOString().slice(0, 10);
+        const k = 0.85 + 0.3 * Math.abs(Math.sin(m + y));
+        await put('Sharjah Waste-to-Energy', { itemId: wItems['waste:incineration'], unit: 't', periodStart: ps, periodEnd: pe,
+          waste: { process: 'incineration', streams: [{ type: 'msw', tonnes: Math.round(25000 * k) }], technology: 'continuous_stoker', exportedMWh: Math.round(14000 * k) } });
+        await put("Al Saja'a Recycling Complex", { itemId: wItems['waste:composting'], unit: 't', periodStart: ps, periodEnd: pe,
+          waste: { process: 'composting', tonnes: Math.round(3000 * k), basis: 'wet' } });
+        await put('Al Zahia Community', { itemId: wItems['waste:wastewater'], unit: 'kg', periodStart: ps, periodEnd: pe,
+          waste: { process: 'wastewater', kind: 'domestic', system: 'centralised_aerobic', measure: 'BOD', flowM3: Math.round(60000 * k), mgPerL: 250, nInfluentKg: Math.round(2400 * k), nEffluentKg: Math.round(600 * k), recovery: [] } });
+        await put('BEEAH Headquarters', { itemId: wItems['waste3:refuse:commercial-and-industrial-waste:landfill'], unit: 't', quantity: Math.round(8 * k * 10) / 10, periodStart: ps, periodEnd: pe });
+        if (wItems['waste3:paper:paper-and-board-mixed:closed_loop']) await put('BEEAH Headquarters', { itemId: wItems['waste3:paper:paper-and-board-mixed:closed_loop'], unit: 't', quantity: Math.round(1.5 * k * 10) / 10, periodStart: ps, periodEnd: pe });
+        nw += 5;
+      }
+    }
+    console.log(`Waste: a landfill with a DEMO tonnage history 2000–2025, ${nw} waste entries (landfill, waste-to-energy, composting, wastewater, office waste sent out).`);
     console.log(`\nDemo company "${NAME}" created: ${TREE.length} sub-groups, ${[...ids.keys()].length - TREE.length} facilities, ${n} fuel entries (Jan 2025 – Sep 2026).`);
   });
   console.log('\nDemo logins (all with the same password, shown once):');

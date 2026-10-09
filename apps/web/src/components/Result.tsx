@@ -22,12 +22,13 @@ export function Result({ r, quantity, unitName, energy }: {
   const [showSteps, setShowSteps] = useState(false);
   const [showGas, toggleGas] = useGasSplit();
   const gasCount = new Set(r.lines.filter((l) => l.kgGas != null).map((l) => l.gas)).size;
-  const order: Basis[] = ['direct', 'scope2', 'scope2_market', 'td_loss', 'wtt', 'outside_scopes', 'memo'];
-  const cls: Record<Basis, string> = { direct: 's1', scope2: 's2', scope2_market: 's2m', td_loss: 's3', wtt: 's3', outside_scopes: 'bio', memo: 'memo' };
+  const order: Basis[] = ['direct', 'scope2', 'scope2_market', 'scope3', 'td_loss', 'wtt', 'outside_scopes', 'memo'];
+  const cls: Record<Basis, string> = { direct: 's1', scope2: 's2', scope2_market: 's2m', td_loss: 's3', wtt: 's3', scope3: 's3', outside_scopes: 'bio', memo: 'memo' };
+  const s3only = !!r.totals.scope3 && !r.totals.direct;
   return (
     <div style={{ display: 'grid', gap: 12 }}>
       <div className="total">
-        {order.filter((b) => (energy ? b === 'scope2' || b === 'scope2_market' : b === 'direct') || r.totals[b]).map((b) => (
+        {order.filter((b) => (energy ? b === 'scope2' || b === 'scope2_market' : b === 'direct' && !s3only) || r.totals[b]).map((b) => (
           <div key={b} className={`stat ${cls[b]}`}>
             <small>{BASIS_LABEL[b]}</small>
             <b>{tco2e(r.totals[b])}</b>
@@ -100,7 +101,7 @@ function FactorTable({ r, order, quantity, unitName }: {
               {f.published && <div className="muted small">{f.source} published ({f.published.gwpSet}): {ef(f.published.co2ePerUnit)} kg/{f.unitName}</div>}
             </td>
             <td>{f.source}<div className="muted small">{
-              f.method === 'gas' ? (f.factorId ? `gas split × GWP ${r.gwpSet}` : 'gas composition × GWP')
+              f.method === 'gas' ? (f.factorId ? `gas split × GWP ${r.gwpSet}` : f.source.startsWith('IPCC') || f.source.startsWith('measured') ? `IPCC method, gases × GWP ${r.gwpSet}` : f.source.startsWith('GWP') ? 'methane × GWP' : 'gas composition × GWP')
               : f.factorId ? 'published total' : f.source === 'Total ÷ quantity' ? 'older entry: derived' : f.label?.startsWith('Supplier') ? 'supplier factor' : f.label ? 'contractual instrument' : ''}</div></td>
             <td className="num mono">{num(f.quantity)} × {ef(f.perEnteredUnit)}<div className="muted small">= {tco2e(f.quantity * f.perEnteredUnit)} t{gas}</div></td>
           </tr>

@@ -62,6 +62,22 @@ function ukEnergyKey(scope: string, l1: string, l2: string, l3: string): UkEnerg
   return null;
 }
 
+/** Waste disposal (Scope 3 category 5): kg CO2e per tonne by material and treatment route. */
+export interface DesnzWasteRow { group: string; material: string; route: WasteRoute; co2e: number }
+export type WasteRoute = 'reuse' | 'open_loop' | 'closed_loop' | 'combustion' | 'composting' | 'landfill' | 'ad';
+/** DESNZ route names (2025 called combustion "Incineration with Energy Recovery"). */
+export function wasteRoute(t: string): WasteRoute | null {
+  const x = t.toLowerCase();
+  if (x === 're-use') return 'reuse';
+  if (x === 'open-loop') return 'open_loop';
+  if (x === 'closed-loop') return 'closed_loop';
+  if (x === 'combustion' || /incineration/.test(x)) return 'combustion';
+  if (x === 'composting') return 'composting';
+  if (x === 'landfill') return 'landfill';
+  if (x === 'anaerobic digestion') return 'ad';
+  return null;
+}
+
 export type VehicleGroup = 'cars_by_size' | 'cars_by_segment' | 'vans' | 'hgv' | 'hgv_refrigerated' | 'motorbikes';
 
 export interface DesnzParsed {
@@ -79,6 +95,7 @@ export interface DesnzParsed {
   gwpSet: 'AR4' | 'AR5' | 'AR6';
   fuels: DesnzFuelRow[];
   gases: DesnzGasRow[];
+  waste: DesnzWasteRow[];
   sha256: string;
 }
 
@@ -152,6 +169,7 @@ export async function parseDesnz(path: string): Promise<DesnzParsed> {
   const gases = new Map<string, DesnzGasRow>();
   const vehicles = new Map<string, DesnzVehicleRow>();
   const evEnergy: DesnzEvEnergyRow[] = [];
+  const waste: DesnzWasteRow[] = [];
   let ukGrid: DesnzParsed['ukGrid'] = null;
   const ukEnergy: DesnzParsed['ukEnergy'] = {};
   ws.eachRow((row, n) => {
@@ -162,6 +180,11 @@ export async function parseDesnz(path: string): Promise<DesnzParsed> {
     const v = num(row.getCell(col[valueCol]!).value);
     if (!l3) return;
 
+    if (scope === 'Scope 3' && l1 === 'Waste disposal' && uom === 'tonnes') {
+      const route = wasteRoute(colText);
+      if (route && v != null && ghg.startsWith('kg co2e')) waste.push({ group: l2, material: l3, route, co2e: v });
+      return;
+    }
     // Road vehicles: Scope 1 per km/mile, and their well-to-tank (Scope 3).
     const vunit = VEH_UNIT[uom];
     const vgroup = vunit ? vehicleGroup(l2) : null;
@@ -236,7 +259,7 @@ export async function parseDesnz(path: string): Promise<DesnzParsed> {
     fuels: [...fuels.values()].filter((r) => r.co2e != null || Object.keys(r.gasCo2e).length),
     gases: [...gases.values()],
     vehicles: [...vehicles.values()].filter((r) => r.co2e != null),
-    evEnergy, ukGrid, ukEnergy,
+    evEnergy, ukGrid, ukEnergy, waste,
     sha256: createHash('sha256').update(buf).digest('hex'),
   };
 }
