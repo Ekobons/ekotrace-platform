@@ -31,6 +31,7 @@ const P: Record<string, string> = {
   lock: 'M5 11h14v10H5zM8 11V7a4 4 0 0 1 8 0v4',
   chat: 'M4 5h16v11H8l-4 4z',
   edit: 'M4 20h4L19 9l-4-4L4 16zM14 6l4 4',
+  building: 'M4 21V4h10v17M14 9h6v12M3 21h18M7 8h4M7 12h4M7 16h4',
   chevron: 'M9 6l6 6-6 6',
   down: 'M6 9l6 6 6-6',
 };

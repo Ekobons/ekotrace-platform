@@ -3,7 +3,7 @@
  * and readings. Readings come from another system through the API, or are pasted here.
  */
 import { useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useApp } from '../App';
 import { api, num, tco2e, unitLabel, type Facility, type Meter, type MeterDetail } from '../lib/api';
 import { MeterForm, takeDraft, type MeterDraft } from '../components/MeterForm';
@@ -61,7 +61,7 @@ export function MeterRegister({ facilityId, facilities, embedded, canEditFacilit
             <thead><tr><th>Meter</th><th>Measures</th><th>Readings</th><th>Last reading</th>{!embedded && <th className="num">Count</th>}<th className="num">Entries</th><th /></tr></thead>
             <tbody>{meters.map((m) => (
               <tr key={m.id} className={`click ${open === m.id ? 'sel' : ''}`} onClick={() => setOpen(open === m.id ? null : m.id)}>
-                <td><b>{m.name}</b>{!m.active && <span className="chip grey" style={{ marginLeft: 6 }}>inactive</span>}<div className="muted small">{embedded ? '' : `${m.facility} · `}<span className="mono">{m.external_id}</span>{m.account_no ? ` · account ${m.account_no}` : ''}</div></td>
+                <td><b>{m.name}</b>{!m.active && <span className="chip grey" style={{ marginLeft: 6 }}>inactive</span>}<div className="muted small">{!embedded && <><Link to={`/organisation?open=${m.facility_id}&tab=meters`} onClick={(e) => e.stopPropagation()}>{m.facility}</Link> · </>}<span className="mono">{m.external_id}</span>{m.account_no ? ` · account ${m.account_no}` : ''}</div></td>
                 <td>{m.item}<div className="muted small">{m.category_name}</div></td>
                 <td>{FREQ[m.frequency]} · {m.reading_type === 'cumulative' ? 'register' : 'per period'}<div className="muted small">{unitLabel(m.unit)}{Number(m.multiplier) !== 1 ? ` × ${Number(m.multiplier)}` : ''}</div></td>
                 <td>{m.last ? <>{num(Number(m.last.value))}<div className="muted small">{localTime(m.last.ts, tz)}</div></> : <span className="chip warn">none yet</span>}</td>

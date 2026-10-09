@@ -2,6 +2,14 @@
 
 Newest first.
 
+## 2026-10-10 (8) — Organisation: colour-coded hierarchy, org chart, clearer clicks
+
+- Hierarchy list restyled as in the prototype: main entity teal, sub-groups olive, facilities blue (row tint, left bar, type badges, legend); icons; counts of sub-groups and facilities.
+- **Org chart** view (List | Org chart, remembered per browser): cards with coloured headers, connectors, fold / unfold per branch, zoom.
+- **Clicking:** a facility row (whole row, keyboard too) or card opens the facility, with "Open ›" on hover; a group row folds / unfolds, "Details" opens its profile.
+- `/organisation?open=<id>&tab=meters|energy|fleet|waste` opens a facility on a tab; Capture → Meters links each meter's facility there.
+- Manual (Getting started) updated.
+
 ## 2026-10-10 (7) — Facility page holds the facility's set-up
 
 - Organisation → facility now has tabs **Profile · Meters · Energy · Vehicle fleet · Landfill sites** — everything that describes the facility in one place.
