@@ -1,0 +1,14 @@
+{
+  "name": "@ekotrace/calc",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Pure GHG calculation engine: units, gases and GWP, fuel combustion, fugitive emissions. No database, no I/O.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": { ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" } },
+  "scripts": {
+    "build": "tsc -p .",
+    "test": "node --import tsx --test test/*.test.ts"
+  }
+}

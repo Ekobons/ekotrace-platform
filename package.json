@@ -1,0 +1,20 @@
+{
+  "name": "ekotrace-platform",
+  "private": true,
+  "description": "Ekotrace GHG accounting platform (white-label ready). One codebase, many deployments.",
+  "workspaces": ["packages/*", "apps/*"],
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "build": "npm run build -w @ekotrace/calc && npm run build -w @ekotrace/api",
+    "test": "npm test -w @ekotrace/calc && npm test -w @ekotrace/api",
+    "typecheck": "tsc -p packages/calc && tsc -p apps/api --noEmit",
+    "db:migrate": "npm run migrate -w @ekotrace/api",
+    "db:seed": "npm run seed -w @ekotrace/api",
+    "dev": "npm run dev -w @ekotrace/api"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.5",
+    "tsx": "4.23.15",
+    "typescript": "5.9.3"
+  }
+}
