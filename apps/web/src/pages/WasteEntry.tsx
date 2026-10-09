@@ -15,6 +15,7 @@ import { api, ApiError, num, tco2e, type CalcResponse, type Category, type Waste
 import { Result } from '../components/Result';
 import { WasteSites } from '../components/WasteSites';
 import { Icon } from '../components/Icon';
+import { MonthGrid } from '../components/MonthGrid';
 
 type Process = 'landfill' | 'incineration' | 'composting' | 'ad' | 'wastewater';
 const PROCESSES: [Process, string][] = [['landfill', 'Landfill'], ['incineration', 'Incineration / WtE'], ['composting', 'Composting'], ['ad', 'Anaerobic digestion'], ['wastewater', 'Wastewater']];
@@ -63,8 +64,10 @@ function Recovery({ d, rows, set, title }: { d: WasteDefaults; rows: RecRow[]; s
   );
 }
 
-export function WasteEntry({ cat, cats, facilityId, period, onSaved }: {
+export function WasteEntry({ cat, cats, facilityId, period, onSaved, monthly }: {
   cat: Category; cats: Category[]; facilityId: string; period: { periodStart: string; periodEnd: string }; onSaved: () => void;
+  /** month by month for this year */
+  monthly?: number;
 }) {
   const navigate = useNavigate();
   const own = cat.calc_method === 'waste';
@@ -80,13 +83,13 @@ export function WasteEntry({ cat, cats, facilityId, period, onSaved }: {
           ? 'Landfills, incinerators, composting and digestion plants, and wastewater plants the company operates: their emissions are Scope 1.'
           : 'Waste handed to another company for treatment: Scope 3 category 5. (That company reports the same tonnes in its own Scope 1.)'}</span>
       </div>
-      {own ? <OwnSite cat={cat} facilityId={facilityId} period={period} onSaved={onSaved} /> : <SentOut cat={cat} facilityId={facilityId} period={period} onSaved={onSaved} />}
+      {own ? <OwnSite cat={cat} facilityId={facilityId} period={period} onSaved={onSaved} monthly={monthly} /> : <SentOut cat={cat} facilityId={facilityId} period={period} onSaved={onSaved} monthly={monthly} />}
     </div>
   );
 }
 
 // ------------------------------------------------------------- own sites (Scope 1) --
-function OwnSite({ cat, facilityId, period, onSaved }: { cat: Category; facilityId: string; period: { periodStart: string; periodEnd: string }; onSaved: () => void }) {
+function OwnSite({ cat, facilityId, period, onSaved, monthly }: { cat: Category; facilityId: string; period: { periodStart: string; periodEnd: string }; onSaved: () => void; monthly?: number }) {
   const { toast, role } = useApp();
   const [d, setD] = useState<WasteDefaults | null>(null);
   const [proc, setProc] = useState<Process>('landfill');
@@ -132,8 +135,10 @@ function OwnSite({ cat, facilityId, period, onSaved }: { cat: Category; facility
   const site = sites.find((s) => s.id === siteId);
   const yearOnly = period.periodStart.slice(5) === '01-01' && period.periodEnd.slice(5) === '12-31';
 
-  const waste = useMemo(() => {
+  /** The entry's waste details; `reading` replaces the monthly reading (tonnes, flow or organics) for month by month. */
+  const wasteFor = useMemo(() => (reading?: number): Record<string, unknown> | null => {
     if (!d) return null;
+    const r = (field: string) => (reading !== undefined ? String(reading) : field);
     if (proc === 'landfill') {
       if (!siteId) return null;
       const recovery = recPayload(rec);
@@ -141,29 +146,41 @@ function OwnSite({ cat, facilityId, period, onSaved }: { cat: Category; facility
       return { process: 'landfill', siteId, method: lfMethod, ...(lfMethod === 'collection' ? { collectionEfficiency: Number(ce) / 100 } : {}), recovery };
     }
     if (proc === 'incineration') {
-      const st = streams.filter((s) => s.tonnes !== '').map((s) => ({ type: s.type, tonnes: Number(s.tonnes) }));
+      if (reading !== undefined && streams.length !== 1) return null;
+      const st = streams.map((s, i) => ({ type: s.type, tonnes: i === 0 ? r(s.tonnes) : s.tonnes })).filter((s) => s.tonnes !== '').map((s) => ({ type: s.type, tonnes: Number(s.tonnes) }));
       if (!st.length) return null;
+      if (reading !== undefined && measured) return null;
       if (measured && (meas.co2Tonnes === '' || meas.biogenicPct === '' || meas.source.trim().length < 2)) return null;
       const overrides = Object.fromEntries(Object.entries(plant).map(([k, v]) => [k, Object.fromEntries(Object.entries(v).filter(([, x]) => x !== '' && x !== undefined).map(([f, x]) => [f, Number(x) / 100]))]).filter(([, v]) => Object.keys(v as object).length));
       return { process: 'incineration', streams: st, technology: tech, ...(measured ? { measured: { co2Tonnes: Number(meas.co2Tonnes), biogenicPct: Number(meas.biogenicPct), source: meas.source.trim() } } : {}),
         ...(inc.of !== '' ? { of: Number(inc.of) / 100 } : {}), ...(inc.ch4PerT !== '' ? { ch4PerT: Number(inc.ch4PerT) } : {}), ...(inc.n2oPerT !== '' ? { n2oPerT: Number(inc.n2oPerT) } : {}),
-        ...(inc.exportedMWh !== '' ? { exportedMWh: Number(inc.exportedMWh) } : {}), ...(Object.keys(overrides).length ? { overrides } : {}) };
+        ...(inc.exportedMWh !== '' && reading === undefined ? { exportedMWh: Number(inc.exportedMWh) } : {}), ...(Object.keys(overrides).length ? { overrides } : {}) };
     }
     if (proc === 'composting' || proc === 'ad') {
-      if (bio.tonnes === '') return null;
-      const m = proc === 'ad' && adMeasured
+      if (r(bio.tonnes) === '') return null;
+      const m = proc === 'ad' && adMeasured && reading === undefined
         ? (ad.mode === 'kg' ? (ad.ch4Kg === '' ? null : { ch4ProducedKg: Number(ad.ch4Kg) }) : (ad.gasM3 === '' || ad.ch4Pct === '' ? null : { gasM3: Number(ad.gasM3), ch4Pct: Number(ad.ch4Pct) }))
         : undefined;
       if (m === null) return null;
-      return { process: proc, tonnes: Number(bio.tonnes), basis: bio.basis, ...(bio.ch4PerT !== '' && !m ? { ch4PerT: Number(bio.ch4PerT) } : {}), ...(bio.n2oPerT !== '' ? { n2oPerT: Number(bio.n2oPerT) } : {}),
+      return { process: proc, tonnes: Number(r(bio.tonnes)), basis: bio.basis, ...(bio.ch4PerT !== '' && !m ? { ch4PerT: Number(bio.ch4PerT) } : {}), ...(bio.n2oPerT !== '' ? { n2oPerT: Number(bio.n2oPerT) } : {}),
         ...(m ? { measured: { ...m, ...(ad.leakPct !== '' ? { leakPct: Number(ad.leakPct) } : {}), recovery: recPayload(adRec) } } : {}) };
     }
-    const org = ww.mode === 'kg' ? (ww.organicsKg === '' ? null : { organicsKg: Number(ww.organicsKg) }) : (ww.flowM3 === '' || ww.mgPerL === '' ? null : { flowM3: Number(ww.flowM3), mgPerL: Number(ww.mgPerL) });
+    const flow = ww.mode === 'flow';
+    const org = !flow ? (r(ww.organicsKg) === '' ? null : { organicsKg: Number(r(ww.organicsKg)) }) : (r(ww.flowM3) === '' || ww.mgPerL === '' ? null : { flowM3: Number(r(ww.flowM3)), mgPerL: Number(ww.mgPerL) });
     if (!org) return null;
-    const opt = (k: keyof typeof ww, scale = 1) => (ww[k] !== '' ? { [k]: Number(ww[k]) / scale } : {});
-    return { process: 'wastewater', kind: ww.kind, system: ww.system, measure: ww.measure, ...org, ...opt('sludgeKg'), ...opt('nInfluentKg'), ...opt('nEffluentKg'), ...opt('effluentOrganicsKg'),
-      ...opt('mcf'), ...opt('bo'), ...opt('efPlant'), ...opt('efEffluent'), recovery: recPayload(wwRec) };
+    const opt = (k: keyof typeof ww, as: string = k) => (ww[k] !== '' ? { [as]: Number(ww[k]) } : {});
+    // With flow, nitrogen and effluent are concentrations (mg/L); with kg, totals for the period (not repeated month by month).
+    const n = flow ? { ...opt('nInfluentKg', 'nInfluentMgPerL'), ...opt('nEffluentKg', 'nEffluentMgPerL'), ...opt('effluentOrganicsKg', 'effluentMgPerL') }
+      : reading === undefined ? { ...opt('nInfluentKg'), ...opt('nEffluentKg'), ...opt('effluentOrganicsKg') } : {};
+    return { process: 'wastewater', kind: ww.kind, system: ww.system, measure: ww.measure, ...org, ...(reading === undefined ? opt('sludgeKg') : {}), ...n,
+      ...opt('mcf'), ...opt('bo'), ...opt('efPlant'), ...opt('efEffluent'), recovery: reading === undefined ? recPayload(wwRec) : [] };
   }, [d, proc, siteId, lfMethod, ce, rec, streams, tech, measured, meas, inc, plant, bio, adMeasured, ad, adRec, ww, wwRec]);
+  const waste = useMemo(() => wasteFor(), [wasteFor]);
+  const buildMonth = useMemo(() => (q: number, p: { periodStart: string; periodEnd: string }) => {
+    const w = itemId ? wasteFor(q) : null;
+    return w ? { itemId, unit: proc === 'wastewater' ? 'kg' : 't', ...p, waste: w } : null;
+  }, [wasteFor, itemId, proc]);
+  const monthOk = !!monthly && proc !== 'landfill' && !(proc === 'incineration' && (streams.length !== 1 || measured)) && !(proc === 'ad' && adMeasured);
 
   const payload = useMemo(() => (itemId && waste ? { itemId, unit: proc === 'wastewater' ? 'kg' : 't', facilityId: facilityId || undefined, ...period, waste } : null), [itemId, waste, proc, facilityId, period]);
 
@@ -212,6 +229,7 @@ function OwnSite({ cat, facilityId, period, onSaved }: { cat: Category; facility
             ? <>Methane generated this year from the waste placed in all earlier years (first order decay, IPCC 2006 Vol. 5 ch. 3), less the gas recovered, less {Math.round((site?.params.ox ?? 0) * 100)}% oxidised in the cover. {!yearOnly && 'The model gives a yearly figure: for a month, the share of days is used.'}</>
             : <>Methane generated = gas collected ÷ collection efficiency. Use when the gas is metered but the tonnage history is not known.</>}
         </div>
+        {monthly && <div className="note info">Landfill methane is modelled per year, so this entry covers the whole of {monthly} (month by month does not apply).</div>}
         {lfMethod === 'collection' && <label className="field" style={{ width: 220 }}><span>Collection efficiency %</span><input className="input num" value={ce} onChange={(e) => setCe(clean(e.target.value))} />
           <small className="muted">US EPA AP-42 §2.4: typically 60–85% (75% average) with an active gas system</small></label>}
         <Recovery d={d} rows={rec} set={setRec} title="Landfill gas recovered in the period (leave empty if none)" />
@@ -225,7 +243,7 @@ function OwnSite({ cat, facilityId, period, onSaved }: { cat: Category; facility
                 {['msw', 'industrial', 'sludge', 'other'].map((g) => <optgroup key={g} label={{ msw: 'Municipal & commercial', industrial: 'Industrial (IPCC Table 2.5)', sludge: 'Sludge', other: 'Other' }[g]}>
                   {incTypes.filter((t) => (t.code === 'msw' ? g === 'msw' : d.types.find((x) => x.code === t.code)?.group === g)).map((t) => <option key={t.code} value={t.code}>{t.name}</option>)}</optgroup>)}
               </select></label>
-              <label className="field" style={{ width: 160 }}><span>Tonnes</span><input className="input num" value={s.tonnes} onChange={(e) => setStreams(streams.map((x, k) => (k === i ? { ...x, tonnes: clean(e.target.value) } : x)))} /></label>
+              {!monthOk && <label className="field" style={{ width: 160 }}><span>Tonnes</span><input className="input num" value={s.tonnes} onChange={(e) => setStreams(streams.map((x, k) => (k === i ? { ...x, tonnes: clean(e.target.value) } : x)))} /></label>}
               {streams.length > 1 && <button className="btn ghost sm" onClick={() => setStreams(streams.filter((_, k) => k !== i))} aria-label="Remove"><Icon name="x" /></button>}
             </div>))}
           <div className="row" style={{ justifyContent: 'flex-end' }}><button className="btn sm" onClick={() => setStreams([...streams, { type: 'ind_other', tonnes: '' }])}><Icon name="plus" />Add waste type</button></div>
@@ -261,7 +279,7 @@ function OwnSite({ cat, facilityId, period, onSaved }: { cat: Category; facility
 
       {(proc === 'composting' || proc === 'ad') && <>
         <div className="row" style={{ gap: 8, alignItems: 'flex-end' }}>
-          <label className="field" style={{ width: 170 }}><span>Waste treated, tonnes</span><input className="input num" value={bio.tonnes} onChange={(e) => setBio({ ...bio, tonnes: clean(e.target.value) })} /></label>
+          {!monthOk && <label className="field" style={{ width: 170 }}><span>Waste treated, tonnes</span><input className="input num" value={bio.tonnes} onChange={(e) => setBio({ ...bio, tonnes: clean(e.target.value) })} /></label>}
           <div className="seg" style={{ marginBottom: 4 }}>
             <button className={bio.basis === 'wet' ? 'on' : ''} onClick={() => setBio({ ...bio, basis: 'wet' })}>Wet weight</button>
             <button className={bio.basis === 'dry' ? 'on' : ''} onClick={() => setBio({ ...bio, basis: 'dry' })}>Dry weight</button>
@@ -306,16 +324,17 @@ function OwnSite({ cat, facilityId, period, onSaved }: { cat: Category; facility
             <button className={ww.mode === 'kg' ? 'on' : ''} onClick={() => setWw({ ...ww, mode: 'kg' })}>kg {ww.measure}</button>
           </div>
           {ww.mode === 'flow' ? <>
-            <label className="field" style={{ width: 160 }}><span>Inflow (m³)</span><input className="input num" value={ww.flowM3} onChange={(e) => setWw({ ...ww, flowM3: clean(e.target.value) })} /></label>
+            {!monthOk && <label className="field" style={{ width: 160 }}><span>Inflow (m³)</span><input className="input num" value={ww.flowM3} onChange={(e) => setWw({ ...ww, flowM3: clean(e.target.value) })} /></label>}
             <label className="field" style={{ width: 160 }}><span>Influent {ww.measure} (mg/L)</span><input className="input num" value={ww.mgPerL} onChange={(e) => setWw({ ...ww, mgPerL: clean(e.target.value) })} /></label>
-          </> : <label className="field" style={{ width: 160 }}><span>{ww.measure} treated (kg)</span><input className="input num" value={ww.organicsKg} onChange={(e) => setWw({ ...ww, organicsKg: clean(e.target.value) })} /></label>}
-          <label className="field" style={{ width: 190 }}><span>Removed as sludge (kg {ww.measure})</span><input className="input num" placeholder="0" value={ww.sludgeKg} onChange={(e) => setWw({ ...ww, sludgeKg: clean(e.target.value) })} /></label>
+          </> : !monthOk && <label className="field" style={{ width: 160 }}><span>{ww.measure} treated (kg)</span><input className="input num" value={ww.organicsKg} onChange={(e) => setWw({ ...ww, organicsKg: clean(e.target.value) })} /></label>}
+          {!monthOk && <label className="field" style={{ width: 190 }}><span>Removed as sludge (kg {ww.measure})</span><input className="input num" placeholder="0" value={ww.sludgeKg} onChange={(e) => setWw({ ...ww, sludgeKg: clean(e.target.value) })} /></label>}
         </div>
+        {ww.mode === 'kg' && monthOk ? <div className="sub">Month by month with kg {ww.measure}: nitrogen and sludge are not repeated each month. Use “Flow × concentration” to include nitrogen as mg/L, or enter them month by month.</div> : (
         <div className="row" style={{ gap: 8 }}>
-          <label className="field" style={{ width: 200 }}><span>Nitrogen in influent (kg N)</span><input className="input num" value={ww.nInfluentKg} onChange={(e) => setWw({ ...ww, nInfluentKg: clean(e.target.value) })} /></label>
-          <label className="field" style={{ width: 200 }}><span>Nitrogen in effluent (kg N)</span><input className="input num" value={ww.nEffluentKg} onChange={(e) => setWw({ ...ww, nEffluentKg: clean(e.target.value) })} /></label>
-          <label className="field" style={{ width: 220 }}><span>{ww.measure} left in effluent (kg)</span><input className="input num" value={ww.effluentOrganicsKg} onChange={(e) => setWw({ ...ww, effluentOrganicsKg: clean(e.target.value) })} /></label>
-        </div>
+          <label className="field" style={{ width: 230 }}><span>Nitrogen in influent ({ww.mode === 'flow' ? 'mg/L N' : 'kg N'})</span><input className="input num" value={ww.nInfluentKg} onChange={(e) => setWw({ ...ww, nInfluentKg: clean(e.target.value) })} /></label>
+          <label className="field" style={{ width: 230 }}><span>Nitrogen in effluent ({ww.mode === 'flow' ? 'mg/L N' : 'kg N'})</span><input className="input num" value={ww.nEffluentKg} onChange={(e) => setWw({ ...ww, nEffluentKg: clean(e.target.value) })} /></label>
+          <label className="field" style={{ width: 220 }}><span>{ww.measure} left in effluent ({ww.mode === 'flow' ? 'mg/L' : 'kg'})</span><input className="input num" value={ww.effluentOrganicsKg} onChange={(e) => setWw({ ...ww, effluentOrganicsKg: clean(e.target.value) })} /></label>
+        </div>)}
         <label className="row" style={{ gap: 6, fontSize: 13 }}><input type="checkbox" checked={wwAdv} onChange={(e) => setWwAdv(e.target.checked)} />Plant values (replace IPCC defaults) and gas recovered</label>
         {wwAdv && <>
           <div className="row" style={{ gap: 8 }}>
@@ -329,6 +348,12 @@ function OwnSite({ cat, facilityId, period, onSaved }: { cat: Category; facility
         <div className="sub">CH₄ = ({ww.measure} treated − removed as sludge) × Bo {d.bo[ww.measure]} × MCF; N₂O = nitrogen × emission factor × 44/28 (IPCC 2006 Vol. 5 ch. 6, 2019 Refinement factors).</div>
       </>}
 
+      {monthly && proc !== 'landfill' && !monthOk && <div className="note info">Month by month needs one reading per month: {proc === 'incineration' ? 'one waste type and no measured stack CO₂' : 'no measured biogas'}. Otherwise choose a month or the whole year.</div>}
+      {monthOk ? <MonthGrid year={monthly!} facilityId={facilityId} build={buildMonth} onSaved={onSaved}
+        label={proc === 'wastewater' ? (ww.mode === 'flow' ? 'Inflow' : `${ww.measure} treated`) : proc === 'incineration' ? 'Waste incinerated' : 'Waste treated'}
+        unitName={proc === 'wastewater' ? (ww.mode === 'flow' ? 'm³' : `kg ${ww.measure}`) : 'tonnes'}
+        hint={`Paste 12 values from Excel (a row or a column) into January to fill all months.${proc === 'incineration' && inc.exportedMWh ? ' Energy exported is not repeated month by month.' : ''}${proc === 'wastewater' && wwRec.length ? ' Gas recovered is not repeated month by month.' : ''}`}
+        dup={{ category: 'waste_treatment', same: (a) => a.item === cat.subcategories.flatMap((x) => x.items).find((i) => i.code === ITEM[proc])?.name }} /> : <>
       <div className="row">
         <label className="field" style={{ width: 160 }}><span>Data type</span>
           <select className="input" value={dataType} onChange={(e) => setDataType(e.target.value)}><option value="actual">Actual</option><option value="estimated">Estimated</option><option value="proxy">Proxy</option></select></label>
@@ -337,6 +362,7 @@ function OwnSite({ cat, facilityId, period, onSaved }: { cat: Category; facility
       {error && <div className="note bad">{error}</div>}
       {result ? <Result r={result} /> : !error && <div className="note info">Enter the {proc === 'landfill' ? 'landfill and any gas recovered' : proc === 'wastewater' ? 'organics load' : 'tonnes'} to see the emissions and how they were calculated.</div>}
       <div className="row" style={{ justifyContent: 'flex-end' }}><button className="btn p" disabled={!result || !facilityId || saving} onClick={save}>{saving ? 'Saving…' : 'Save entry'}</button></div>
+      </>}
     </div>
   );
 }
@@ -346,7 +372,7 @@ interface Row3 { material: string; route: string; tonnes: string; note: string }
 const emptyRow = (): Row3 => ({ material: '', route: 'landfill', tonnes: '', note: '' });
 const ROUTE: Record<string, string> = { landfill: 'Landfill', combustion: 'Combustion (energy recovery)', open_loop: 'Open-loop recycling', closed_loop: 'Closed-loop recycling', composting: 'Composting', ad: 'Anaerobic digestion', reuse: 'Re-use' };
 
-function SentOut({ cat, facilityId, period, onSaved }: { cat: Category; facilityId: string; period: { periodStart: string; periodEnd: string }; onSaved: () => void }) {
+function SentOut({ cat, facilityId, period, onSaved, monthly }: { cat: Category; facilityId: string; period: { periodStart: string; periodEnd: string }; onSaved: () => void; monthly?: number }) {
   const { toast } = useApp();
   const [rows, setRows] = useState<Row3[]>([emptyRow(), emptyRow(), emptyRow()]);
   const [unit, setUnit] = useState<'t' | 'kg'>('t');
@@ -390,6 +416,11 @@ function SentOut({ cat, facilityId, period, onSaved }: { cat: Category; facility
     return nr;
   }));
   const total = Object.values(res).reduce((s, x) => s + (x.co2e ?? 0), 0);
+  // Month by month: one material and route, a reading per month.
+  const [mm, setMm] = useState({ material: '', route: 'landfill' });
+  const mmRoutes = materials.get(mm.material)?.routes;
+  const mmItem = mmRoutes?.get(mm.route);
+  const buildMonth = useMemo(() => (q: number, p: { periodStart: string; periodEnd: string }) => (mmItem ? { itemId: mmItem, unit, quantity: q, ...p } : null), [mmItem, unit]);
   const okCount = entries.filter((e) => res[e.i]?.co2e !== undefined).length;
 
   const save = async () => {
@@ -403,6 +434,27 @@ function SentOut({ cat, facilityId, period, onSaved }: { cat: Category; facility
     } finally { setBusy(false); }
   };
 
+  if (monthly) return (
+    <div className="card" style={{ display: 'grid', gap: 12, minWidth: 0 }}>
+      <div className="row"><div className="grow" style={{ minWidth: 0 }}><h2>Waste sent for treatment · month by month</h2>
+        <p className="sub">Choose the material and route once, then the {unit === 't' ? 'tonnes' : 'kg'} for each month. For several materials, save one, then choose the next.</p></div>
+        <div className="seg"><button className={unit === 't' ? 'on' : ''} onClick={() => setUnit('t')}>tonnes</button><button className={unit === 'kg' ? 'on' : ''} onClick={() => setUnit('kg')}>kg</button></div></div>
+      <div className="row" style={{ gap: 8, alignItems: 'flex-end' }}>
+        <label className="field grow"><span>Material</span><select className="input" value={mm.material} onChange={(e) => {
+          const r = materials.get(e.target.value)?.routes;
+          setMm({ material: e.target.value, route: r && !r.has(mm.route) ? (r.has('landfill') ? 'landfill' : [...r.keys()][0]!) : mm.route });
+        }}>
+          <option value="">Choose…</option>
+          {groups.map((g) => <optgroup key={g} label={g}>{[...materials.entries()].filter(([, m]) => m.group === g).map(([k, m]) => <option key={k} value={k}>{m.name}</option>)}</optgroup>)}
+        </select></label>
+        <label className="field" style={{ width: 260 }}><span>Route</span><select className="input" value={mm.route} disabled={!mmRoutes} onChange={(e) => setMm({ ...mm, route: e.target.value })}>
+          {Object.entries(ROUTE).filter(([k]) => !mmRoutes || mmRoutes.has(k)).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></label>
+      </div>
+      <MonthGrid year={monthly} facilityId={facilityId} build={buildMonth} onSaved={onSaved} bases={['scope3']}
+        label={mm.material ? `${materials.get(mm.material)?.name} · ${ROUTE[mm.route]}` : 'Waste sent'} unitName={unit === 't' ? 'tonnes' : 'kg'}
+        dup={{ category: 'waste_generated', same: (a) => a.item === `${materials.get(mm.material)?.name} · ${ROUTE[mm.route]}` }} />
+    </div>
+  );
   return (
     <div className="card" style={{ display: 'grid', gap: 12, minWidth: 0 }}>
       <div className="row"><div className="grow" style={{ minWidth: 0 }}><h2>Waste sent for treatment</h2>

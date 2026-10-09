@@ -14,6 +14,7 @@ import { Result } from '../components/Result';
 import { VehicleEntry } from './VehicleEntry';
 import { EnergyEntry } from './EnergyEntry';
 import { WasteEntry } from './WasteEntry';
+import { MonthGrid } from '../components/MonthGrid';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const lastDay = (y: number, m: number) => new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
@@ -54,7 +55,8 @@ export function AddData() {
   const [facilities, setFacilities] = useState<Facility[]>([]);
   const [facilityId, setFacilityId] = useState('');
   const [year, setYear] = useState(new Date().getFullYear());
-  const [month, setMonth] = useState<number | 'year'>(new Date().getMonth());
+  const [month, setMonth] = useState<number | 'year' | 'each'>(new Date().getMonth());
+  const monthly = month === 'each';
   const [subId, setSubId] = useState<number | null>(null);
   const [itemId, setItemId] = useState<number | null>(null);
   const [units, setUnits] = useState<{ code: string; name: string; dimension: string }[]>([]);
@@ -122,7 +124,7 @@ export function AddData() {
   }, [itemId, useCv, cvEnergy, cvPer, year]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const period = useMemo(() => {
-    if (month === 'year') return { periodStart: iso(year, 0, 1), periodEnd: iso(year, 11, 31) };
+    if (month === 'year' || month === 'each') return { periodStart: iso(year, 0, 1), periodEnd: iso(year, 11, 31) };
     return { periodStart: iso(year, month, 1), periodEnd: iso(year, month, lastDay(year, month)) };
   }, [year, month]);
 
@@ -143,6 +145,15 @@ export function AddData() {
     const cv = cvPossible && useCv && Number(cvValue) > 0 && cvPer ? { value: Number(cvValue), energyUnit: cvEnergy, perUnit: cvPer } : undefined;
     return { ...base, quantity: Number(quantity), ...(cv ? { cv } : {}) };
   }, [itemId, unit, facilityId, period, cat, method, fug, quantity, cvPossible, useCv, cvValue, cvEnergy, cvPer]);
+
+  /** Month by month: the same entry with each month's quantity. */
+  const buildMonth = useMemo(() => (v: number, p: { periodStart: string; periodEnd: string }) => {
+    if (!itemId || !unit) return null;
+    const base = { itemId, unit, ...p };
+    if (cat?.calc_method === 'fugitive') return method === 'quantity' ? { ...base, fugitive: { method: 'quantity', released: v } } : null;
+    const cv = cvPossible && useCv && Number(cvValue) > 0 && cvPer ? { value: Number(cvValue), energyUnit: cvEnergy, perUnit: cvPer } : undefined;
+    return { ...base, quantity: v, ...(cv ? { cv } : {}) };
+  }, [itemId, unit, cat, method, cvPossible, useCv, cvValue, cvEnergy, cvPer]);
 
   // Live preview (debounced).
   useEffect(() => {
@@ -219,15 +230,16 @@ export function AddData() {
             <button key={m} className={`btn sm ${month === i ? 'p' : ''}`} style={{ minWidth: 56 }} onClick={() => setMonth(i)}>{m}</button>
           ))}
           <button className={`btn sm ${month === 'year' ? 'p' : ''}`} onClick={() => setMonth('year')}>Whole year</button>
+          <button className={`btn sm ${month === 'each' ? 'p' : ''}`} title="One entry per month: set the inputs once, then type or paste the 12 readings" onClick={() => setMonth('each')}>Month by month</button>
         </div>
       </div>
 
       {cat.calc_method === 'waste' || cat.calc_method === 'waste_disposal' ? (
-        <WasteEntry cat={cat} cats={cats} facilityId={facilityId} period={period} onSaved={loadRecent} />
+        <WasteEntry cat={cat} cats={cats} facilityId={facilityId} period={period} onSaved={loadRecent} monthly={monthly ? year : undefined} />
       ) : cat.calc_method === 'electricity' ? (
-        <EnergyEntry cat={cat} facilityId={facilityId} period={period} onSaved={loadRecent}
+        <EnergyEntry cat={cat} facilityId={facilityId} period={period} onSaved={loadRecent} monthly={monthly ? year : undefined}
           facilityRegion={facilities.find((f) => f.id === facilityId)?.grid_region ?? null} country={facilities.find((f) => f.id === facilityId)?.country ?? 'AE'} />
-      ) : cat.calc_method === 'vehicle' ? <VehicleEntry cat={cat} facilityId={facilityId} period={period} onSaved={loadRecent} /> : (
+      ) : cat.calc_method === 'vehicle' ? <VehicleEntry cat={cat} facilityId={facilityId} period={period} onSaved={loadRecent} monthly={monthly ? year : undefined} /> : (
       <div className="grid2">
         <div className="card" style={{ padding: 12 }}>
           <div className="eyebrow" style={{ padding: '4px 8px 8px' }}>{fugitive ? 'Gas groups' : 'Fuel classes'}</div>
@@ -250,7 +262,7 @@ export function AddData() {
                 {sub?.items.map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}
               </select>
             </label>
-            {!fugitive && (
+            {!fugitive && !monthly && (
               <label className="field" style={{ width: 170 }}>
                 <span>Quantity</span>
                 <input className="input num" inputMode="decimal" value={quantity} placeholder="0" onChange={(e) => setQuantity(e.target.value.replace(/[^0-9.]/g, ''))} />
@@ -322,7 +334,7 @@ export function AddData() {
                 ))}
               </div>
               <div className="sub">{METHOD_HELP[method]}</div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 10 }}>
+              {!(monthly && method === 'quantity') && <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 10 }}>
                 {FUGITIVE_FIELDS[method].map((f) => (
                   <label key={f.key} className="field">
                     <span>{f.label}{f.optional ? ' (optional)' : ''} · {f.pct ? '%' : unit}</span>
@@ -330,10 +342,15 @@ export function AddData() {
                       onChange={(e) => setFug({ ...fug, [f.key]: e.target.value.replace(/[^0-9.]/g, '') })} />
                   </label>
                 ))}
-              </div>
+              </div>}
             </div>
           )}
 
+          {monthly ? (fugitive && method !== 'quantity'
+            ? <div className="note info">Month by month works with “Quantity refilled”. Screening and mass balance are usually yearly: choose a month or the whole year.</div>
+            : <MonthGrid year={year} facilityId={facilityId} label={fugitive ? `${item?.name ?? 'Gas'} refilled` : `${item?.name ?? 'Fuel'} used`}
+                unitName={units.find((u) => u.code === unit)?.name ?? unit} build={buildMonth} onSaved={loadRecent}
+                dup={{ category: catCode, same: (a) => a.item === item?.name }} />) : <>
           <div className="row">
             <label className="field" style={{ width: 160 }}>
               <span>Data type</span>
@@ -353,6 +370,7 @@ export function AddData() {
           <div className="row" style={{ justifyContent: 'flex-end' }}>
             <button className="btn p" disabled={!result || !facilityId || saving} onClick={save}>{saving ? 'Saving…' : 'Save entry'}</button>
           </div>
+          </>}
         </div>
       </div>
       )}

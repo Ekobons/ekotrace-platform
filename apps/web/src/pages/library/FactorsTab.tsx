@@ -12,6 +12,8 @@ export function FactorsTab() {
   const [cats, setCats] = useState<Category[]>([]);
   const [units, setUnits] = useState<Unit[]>([]);
   const [search, setSearch] = useState('');
+  const [catId, setCatId] = useState<number | null>(null);
+  const [subId, setSubId] = useState<number | null>(null);
   const [itemId, setItemId] = useState<number | null>(null);
   const [year, setYear] = useState<number | ''>('');
   const [factors, setFactors] = useState<Factor[]>([]);
@@ -20,7 +22,11 @@ export function FactorsTab() {
   const [adding, setAdding] = useState(false);
 
   useEffect(() => {
-    api.catalogue(true).then((c) => { setCats(c.categories); setItemId((id) => id ?? c.categories[0]?.subcategories[0]?.items[0]?.id ?? null); });
+    api.catalogue(true).then((c) => {
+      setCats(c.categories);
+      setCatId((id) => id ?? c.categories[0]?.id ?? null);
+      setItemId((id) => id ?? c.categories[0]?.subcategories[0]?.items[0]?.id ?? null);
+    });
     api.units().then((u) => setUnits(u.units));
   }, []);
   const load = () => { if (itemId) api.factors({ itemId, year: year || undefined, status: showAll ? 'all' : 'active', limit: 2000 }).then((r) => setFactors(r.factors)); };
@@ -29,6 +35,20 @@ export function FactorsTab() {
   const item = cats.flatMap((c) => c.subcategories.flatMap((s) => s.items)).find((i) => i.id === itemId);
   const unitName = (c: string) => units.find((u) => u.code === c)?.name ?? c;
   const q = search.trim().toLowerCase();
+  const cat = cats.find((c) => c.id === catId) ?? null;
+  const match = (i: { name: string; aliases: string[] }) => !q || i.name.toLowerCase().includes(q) || i.aliases.some((a) => a.toLowerCase().includes(q));
+  /** Groups shown on the left: with a search, matches in every category; otherwise the chosen category (and subcategory). */
+  const groups = useMemo(() => {
+    const src = q ? cats.flatMap((c) => c.subcategories.map((s) => ({ c, s }))) : (cat?.subcategories ?? []).filter((s) => !subId || s.id === subId).map((s) => ({ c: cat!, s }));
+    return src.map(({ c, s }) => ({ key: s.id, title: q ? `${c.name} › ${s.name}` : s.name, items: s.items.filter(match) })).filter((g) => g.items.length);
+  }, [cats, cat, subId, q]); // eslint-disable-line react-hooks/exhaustive-deps
+  const count = (c: Category) => c.subcategories.reduce((n, s) => n + s.items.length, 0);
+  const pickCat = (id: number) => {
+    setCatId(id); setSubId(null); setSearch('');
+    const c = cats.find((x) => x.id === id);
+    const first = c?.subcategories.flatMap((s) => s.items)[0];
+    if (first && !c!.subcategories.some((s) => s.items.some((i) => i.id === itemId))) setItemId(first.id);
+  };
 
   // Group rows by year for readability.
   const byYear = useMemo(() => {
@@ -41,28 +61,42 @@ export function FactorsTab() {
   }, [factors]);
 
   return (
+    <div style={{ display: 'grid', gap: 12 }}>
+      <div className="catchips">
+        {[1, 2, 3].map((sc) => cats.some((c) => c.scope === sc) && (
+          <div key={sc} className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
+            <span className="eyebrow" style={{ width: 62 }}>Scope {sc}</span>
+            {cats.filter((c) => c.scope === sc).map((c) => (
+              <button key={c.id} className={`chipbtn ${c.id === catId && !q ? 'on' : ''}`} onClick={() => pickCat(c.id)}>
+                {c.name}<span className="meta">{count(c)}</span></button>))}
+          </div>))}
+      </div>
     <div className="grid2">
-      <div className="card" style={{ padding: 12, display: 'grid', gap: 8, maxHeight: 'calc(100vh - 220px)', overflow: 'auto' }}>
-        <input className="input" placeholder="Search fuels, gases…" value={search} onChange={(e) => setSearch(e.target.value)} />
-        {cats.map((c) => (
-          <div key={c.id}>
-            <div className="eyebrow" style={{ padding: '8px 8px 4px' }}>{c.name}</div>
-            {c.subcategories.map((s) => {
-              const items = s.items.filter((i) => !q || i.name.toLowerCase().includes(q) || i.aliases.some((a) => a.toLowerCase().includes(q)));
-              if (!items.length) return null;
-              return (
-                <div key={s.id} className="list">
-                  <div className="sub" style={{ padding: '6px 10px 2px', fontWeight: 600 }}>{s.name}</div>
-                  {items.map((i) => (
-                    <button key={i.id} className={`${i.id === itemId ? 'on' : ''} ${i.active ? '' : 'off'}`} onClick={() => setItemId(i.id)}>
-                      <span>{i.name}</span>{!i.active && <span className="meta">off</span>}
-                    </button>
-                  ))}
-                </div>
-              );
-            })}
+      <div className="card" style={{ padding: 12, display: 'grid', gap: 8, alignContent: 'start', maxHeight: 'calc(100vh - 260px)', overflow: 'auto', position: 'sticky', top: 12 }}>
+        <input className="input" placeholder="Search every category…" value={search} onChange={(e) => setSearch(e.target.value)} />
+        {!q && cat && cat.subcategories.length > 1 && (
+          <select className="input" value={subId ?? ''} onChange={(e) => {
+            const id = e.target.value ? Number(e.target.value) : null;
+            setSubId(id);
+            const sub = cat.subcategories.find((x) => x.id === id);
+            if (sub && !sub.items.some((i) => i.id === itemId) && sub.items[0]) setItemId(sub.items[0].id);
+          }}>
+            <option value="">All {cat.name.toLowerCase()} ({count(cat)})</option>
+            {cat.subcategories.map((s) => <option key={s.id} value={s.id}>{s.name} ({s.items.length})</option>)}
+          </select>
+        )}
+        {q && <div className="sub" style={{ padding: '0 4px' }}>{groups.reduce((n, g) => n + g.items.length, 0)} found in all categories</div>}
+        {groups.map((g) => (
+          <div key={g.key} className="list">
+            <div className="sub" style={{ padding: '6px 10px 2px', fontWeight: 600 }}>{g.title}</div>
+            {g.items.map((i) => (
+              <button key={i.id} className={`${i.id === itemId ? 'on' : ''} ${i.active ? '' : 'off'}`} onClick={() => setItemId(i.id)}>
+                <span>{i.name}</span>{!i.active && <span className="meta">off</span>}
+              </button>
+            ))}
           </div>
         ))}
+        {!groups.length && <div className="empty">Nothing found.</div>}
       </div>
 
       <div className="card" style={{ display: 'grid', gap: 12 }}>
@@ -85,7 +119,7 @@ export function FactorsTab() {
               <button className="btn p" onClick={() => setAdding(true)}>Add or correct a factor</button>
             </div>
             {adding && <AddFactor itemId={item.id} units={units} onDone={(msg) => { setAdding(false); if (msg) { toast(msg); load(); } }} />}
-            {factors.length === 0 ? <div className="empty">{item.gas_code || item.composition?.length ? 'Calculated from the gas table (see Gases & GWP).' : 'No factors for this item yet.'}</div> : (
+            {factors.length === 0 ? <div className="empty">{item.gas_code || item.composition?.length ? 'Calculated from the gas table (see Gases & GWP).' : item.code.startsWith('waste:') ? 'Calculated with the IPCC 2006 / 2019 Refinement method: its default values and their table numbers are shown on the waste entry screen, where they can be replaced per site.' : 'No factors for this item yet.'}</div> : (
               <div className="scroll">
                 <table className="t">
                   <thead><tr><th>Year</th><th>Part</th><th>Per</th><th className="num">kg CO₂e</th><th className="num">CO₂ kg</th><th className="num">CH₄ kg</th><th className="num">N₂O kg</th><th>Source</th><th>Ver.</th></tr></thead>
@@ -119,6 +153,7 @@ export function FactorsTab() {
           </>
         )}
       </div>
+    </div>
     </div>
   );
 }

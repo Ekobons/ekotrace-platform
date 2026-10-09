@@ -86,6 +86,8 @@ export const wasteSchema = z.discriminatedUnion('process', [
     measure: z.enum(['BOD', 'COD']), organicsKg: amount.optional(), flowM3: amount.optional(), mgPerL: amount.optional(), sludgeKg: amount.optional(), bo: amount.optional(),
     recovery: z.array(recoverySchema).max(20).default([]), nInfluentKg: amount.optional(), efPlant: frac.optional(), nEffluentKg: amount.optional(), efEffluent: frac.optional(),
     effluentOrganicsKg: amount.optional(), mcfDischarge: frac.optional(),
+    /** with flow: concentrations instead of kg (mg/L) */
+    nInfluentMgPerL: amount.optional(), nEffluentMgPerL: amount.optional(), effluentMgPerL: amount.optional(),
   }).refine((w) => w.organicsKg !== undefined || (w.flowM3 !== undefined && w.mgPerL !== undefined), 'Enter the organics treated (kg), or the flow (m³) and its concentration (mg/L)'),
 ]);
 export type WasteInput = z.infer<typeof wasteSchema>;
@@ -433,8 +435,19 @@ async function wasteCalc(input: CalcInput, item: ItemRow, ctx: CalcContext, gwp:
     const organicsKg = w.organicsKg ?? (w.flowM3! * w.mgPerL!) / 1000; // m³ × mg/L = g → kg
     if (w.organicsKg === undefined) steps.push(`Organics treated: ${w.flowM3} m³ × ${w.mgPerL} mg/L ${w.measure} ÷ 1000 = ${Number(organicsKg.toPrecision(6))} kg ${w.measure}`);
     gasNote(w.recovery);
+    // Concentrations × flow → kg (m³ × mg/L = g).
+    const fromConc = (mg: number | undefined, what: string) => {
+      if (mg === undefined) return undefined;
+      if (w.flowM3 === undefined) throw new AppError(`${what} in mg/L needs the flow (m³)`);
+      const kg = (w.flowM3 * mg) / 1000;
+      steps.push(`${what}: ${w.flowM3} m³ × ${mg} mg/L ÷ 1000 = ${Number(kg.toPrecision(6))} kg`);
+      return kg;
+    };
+    const nIn = w.nInfluentKg ?? fromConc(w.nInfluentMgPerL, 'Nitrogen in influent');
+    const nOut = w.nEffluentKg ?? fromConc(w.nEffluentMgPerL, 'Nitrogen in effluent');
+    const orgOut = w.effluentOrganicsKg ?? fromConc(w.effluentMgPerL, `${w.measure} left in effluent`);
     result = calcWastewater({ kind: w.kind, system: w.system, mcf: w.mcf, measure: w.measure, organicsKg, sludgeKg: w.sludgeKg, bo: w.bo, recovery: w.recovery.map(kgCh4),
-      nInfluentKg: w.nInfluentKg, efPlant: w.efPlant, nEffluentKg: w.nEffluentKg, efEffluent: w.efEffluent, effluentOrganicsKg: w.effluentOrganicsKg, mcfDischarge: w.mcfDischarge, gwp });
+      nInfluentKg: nIn, efPlant: w.efPlant, nEffluentKg: nOut, efEffluent: w.efEffluent, effluentOrganicsKg: orgOut, mcfDischarge: w.mcfDischarge, gwp });
     stored = { quantity: organicsKg, unit: 'kg', inputs: { waste: w } };
   } else {
     throw new AppError('Unknown waste process');

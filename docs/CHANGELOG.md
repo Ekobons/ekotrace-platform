@@ -2,6 +2,18 @@
 
 Newest first.
 
+## 2026-10-10 (4) — Month by month entry; factor library filters
+
+**Month by month** (Add data → period row → "Month by month"): set the inputs once, then type or paste the 12 readings; one entry per month is saved.
+- Paste a row or a column from Excel into January (or any month) to fill from there; each month is calculated as you type; months that already have the same entry are flagged; a month with a problem stays on screen while the others are saved.
+- Available for: stationary fuels (incl. own calorific value); fugitive "quantity refilled"; vehicles — one vehicle or type, and **fleet × 12 months** (vehicles down, months across, paste a block, months outside a vehicle's service closed); electricity, heat and cooling (same supplier / region / plant; certificates are claimed per month); waste — incineration (one waste type), composting, anaerobic digestion, wastewater (inflow per month), Scope 3.5 (one material and route).
+- Not offered where it does not apply: landfill methane (yearly model), screening / mass balance for gases, measured stack CO₂ or biogas.
+- Wastewater with flow × concentration: nitrogen and effluent BOD/COD now entered as mg/L (converted with the flow, shown in the steps), so they work month by month.
+
+**Factor library → Factors**: category chips by scope with item counts; a subcategory filter; the list shows only the chosen category; search looks across all categories (results labelled category › subcategory). Waste items explain that their values are IPCC defaults shown on the entry screen.
+
+**Tests**: 30 engine + 31 API.
+
 ## 2026-10-10 (3) — Waste: own sites (Scope 1) and waste sent to others (Scope 3.5)
 
 The scope follows who runs the treatment site: one **Waste** tab with "Treated at our own site · Scope 1" and "Sent to another company · Scope 3.5". IPCC 2006 Guidelines Vol. 5 with the 2019 Refinement, every default shown next to its field and replaceable per site or entry; to be aligned with the client's approved methodology when it is received.

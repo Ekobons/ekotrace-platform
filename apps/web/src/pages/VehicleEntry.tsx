@@ -12,6 +12,7 @@ import { Result } from '../components/Result';
 import { UploadPreview, useFuels, useVehicleTypes } from '../components/Fleet';
 import { PasteGrid } from '../components/PasteGrid';
 import { Icon } from '../components/Icon';
+import { MonthGrid, monthPeriod } from '../components/MonthGrid';
 
 const METHOD_LABEL: Record<VehicleMethod, string> = { distance: 'Distance', fuel: 'Fuel used', electricity: 'Electricity charged', spend: 'Spend' };
 const FUEL_UNITS = [['L', 'litre'], ['kL', 'kilolitre'], ['gal_us', 'US gallon'], ['gal_uk', 'imperial gallon'], ['kg', 'kg'], ['t', 'tonne'], ['m3', 'm³']] as const;
@@ -23,8 +24,10 @@ const methodsFor = (it?: { attrs?: Item['attrs'] } | null): VehicleMethod[] =>
 
 type Mode = 'one' | 'fleet' | 'paste' | 'upload';
 
-export function VehicleEntry({ cat, facilityId, period, onSaved }: {
+export function VehicleEntry({ cat, facilityId, period, onSaved, monthly }: {
   cat: Category; facilityId: string; period: { periodStart: string; periodEnd: string }; onSaved: () => void;
+  /** month by month for this year */
+  monthly?: number;
 }) {
   const [mode, setMode] = useState<Mode>('one');
   const types = useVehicleTypes();
@@ -38,12 +41,12 @@ export function VehicleEntry({ cat, facilityId, period, onSaved }: {
     <div style={{ display: 'grid', gap: 12 }}>
       <div className="seg" style={{ justifySelf: 'start' }}>
         <button className={mode === 'one' ? 'on' : ''} onClick={() => setMode('one')}>One entry</button>
-        <button className={mode === 'fleet' ? 'on' : ''} onClick={() => setMode('fleet')}>Fleet this period ({fleet.length})</button>
+        <button className={mode === 'fleet' ? 'on' : ''} onClick={() => setMode('fleet')}>{monthly ? `Fleet × 12 months (${fleet.length})` : `Fleet this period (${fleet.length})`}</button>
         <button className={mode === 'paste' ? 'on' : ''} onClick={() => setMode('paste')}>Paste or type rows</button>
         <button className={mode === 'upload' ? 'on' : ''} onClick={() => setMode('upload')}>Upload Excel file</button>
       </div>
-      {mode === 'one' && <OneEntry cat={cat} facilityId={facilityId} period={period} fleet={fleet} onSaved={onSaved} />}
-      {mode === 'fleet' && <FleetGrid facilityId={facilityId} period={period} fleet={fleet} onSaved={onSaved} />}
+      {mode === 'one' && <OneEntry cat={cat} facilityId={facilityId} period={period} fleet={fleet} onSaved={onSaved} monthly={monthly} />}
+      {mode === 'fleet' && (monthly ? <FleetYearGrid facilityId={facilityId} year={monthly} fleet={fleet} onSaved={onSaved} /> : <FleetGrid facilityId={facilityId} period={period} fleet={fleet} onSaved={onSaved} />)}
       {mode === 'paste' && <PasteGrid facilityId={facilityId} types={types} onSaved={onSaved}
         month={period.periodStart.slice(0, 7) === period.periodEnd.slice(0, 7) ? period.periodStart.slice(0, 7) : undefined} />}
       {mode === 'upload' && <VehicleUpload period={period} facilityId={facilityId} onSaved={onSaved} />}
@@ -52,7 +55,7 @@ export function VehicleEntry({ cat, facilityId, period, onSaved }: {
 }
 
 // ------------------------------------------------------------------ one entry --
-function OneEntry({ cat, facilityId, period, fleet, onSaved }: { cat: Category; facilityId: string; period: { periodStart: string; periodEnd: string }; fleet: Vehicle[]; onSaved: () => void }) {
+function OneEntry({ cat, facilityId, period, fleet, onSaved, monthly }: { cat: Category; facilityId: string; period: { periodStart: string; periodEnd: string }; fleet: Vehicle[]; onSaved: () => void; monthly?: number }) {
   const { toast } = useApp();
   const fuels = useFuels();
   const [vehicleId, setVehicleId] = useState('');
@@ -93,6 +96,15 @@ function OneEntry({ cat, facilityId, period, fleet, onSaved }: { cat: Category; 
       spend: method === 'spend' ? { amount: Number(quantity), currency, price: price ? Number(price) : undefined } : undefined };
     return { itemId: item.id, unit, quantity: method === 'spend' ? undefined : Number(quantity), facilityId, ...period, vehicle: v };
   }, [item, quantity, count, unit, method, veh, fuelId, plug, charging, currency, price, facilityId, period]);
+
+  /** Month by month: same vehicle and method, each month's reading. */
+  const buildMonth = useMemo(() => (q: number, p: { periodStart: string; periodEnd: string }) => {
+    if (!item || !facilityId) return null;
+    const n = veh ? 1 : Math.max(1, Math.floor(Number(count) || 1));
+    const v = { method, count: n > 1 ? n : undefined, vehicleId: veh?.id, fuelItemId: fuelId ?? undefined, charging: plug ? charging : undefined,
+      spend: method === 'spend' ? { amount: q, currency, price: price ? Number(price) : undefined } : undefined };
+    return { itemId: item.id, unit, quantity: method === 'spend' ? undefined : q, ...p, vehicle: v };
+  }, [item, count, unit, method, veh, fuelId, plug, charging, currency, price, facilityId]);
 
   useEffect(() => {
     setError(null);
@@ -167,10 +179,10 @@ function OneEntry({ cat, facilityId, period, fleet, onSaved }: { cat: Category; 
               <input className="input num" inputMode="numeric" value={count} onChange={(e) => setCount(e.target.value.replace(/\D/g, ''))} />
             </label>
           )}
-          <label className="field" style={{ width: 170 }}>
+          {!monthly && <label className="field" style={{ width: 170 }}>
             <span>{method === 'spend' ? 'Amount spent' : method === 'distance' ? 'Distance' : 'Quantity'}{!veh && Number(count) > 1 ? ' per vehicle' : ''}</span>
             <input className="input num" inputMode="decimal" value={quantity} placeholder="0" onChange={(e) => setQuantity(e.target.value.replace(/[^0-9.]/g, ''))} />
-          </label>
+          </label>}
           {method === 'spend' ? (
             <>
               <label className="field" style={{ width: 90 }}><span>Currency</span><input className="input mono" maxLength={3} value={currency} onChange={(e) => setCurrency(e.target.value.toUpperCase())} /></label>
@@ -190,6 +202,10 @@ function OneEntry({ cat, facilityId, period, fleet, onSaved }: { cat: Category; 
           )}
         </div>
 
+        {monthly ? <MonthGrid year={monthly} facilityId={facilityId} build={buildMonth} onSaved={onSaved} bases={['direct', 'scope2']}
+          label={`${veh?.name ?? item?.name ?? 'Vehicle'} · ${METHOD_LABEL[method].toLowerCase()}${!veh && Number(count) > 1 ? ` per vehicle (${count} vehicles)` : ''}`}
+          unitName={method === 'spend' ? currency : unitsFor(method).find(([c]) => c === unit)?.[1] ?? unit}
+          dup={{ category: 'mobile_combustion', same: (a) => (veh ? a.vehicle_id === veh.id : !a.vehicle_id && a.item === item?.name) }} /> : <>
         <div className="row">
           <label className="field" style={{ width: 160 }}><span>Data type</span>
             <select className="input" value={dataType} onChange={(e) => setDataType(e.target.value)}><option value="actual">Actual</option><option value="estimated">Estimated</option><option value="proxy">Proxy</option></select></label>
@@ -199,7 +215,7 @@ function OneEntry({ cat, facilityId, period, fleet, onSaved }: { cat: Category; 
         {result ? <Result r={result} /> : !error && <div className="note info">Enter the {method === 'spend' ? 'amount' : method === 'distance' ? 'distance' : 'quantity'} to see the emissions and how they were calculated.</div>}
         <div className="row" style={{ justifyContent: 'flex-end' }}>
           <button className="btn p" disabled={!result || !facilityId} onClick={save}>Save entry</button>
-        </div>
+        </div></>}
       </div>
     </div>
   );
@@ -342,6 +358,133 @@ function VehicleUpload({ period, facilityId, onSaved }: { period: { periodStart:
             return { rows: r.rows.map((x) => ({ ...x, s1: x.totals ? tco2e(x.totals.direct) : '', s2: x.totals?.scope2 ? tco2e(x.totals.scope2) : '', quantity: num(Number(x.quantity)) })), valid: r.valid, done: r.saved };
           }} />
       )}
+    </div>
+  );
+}
+
+// --------------------------------------------------- fleet × 12 months --
+const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/**
+ * Every vehicle of the facility × the 12 months of a year: method and unit set once per
+ * vehicle, one reading per month. Paste a block from Excel (vehicles down, months across)
+ * into any cell. Months outside a vehicle's service are closed.
+ */
+function FleetYearGrid({ facilityId, year, fleet, onSaved }: { facilityId: string; year: number; fleet: Vehicle[]; onSaved: () => void }) {
+  const { toast } = useApp();
+  const [lines, setLines] = useState<Record<string, Line>>({});
+  const [vals, setVals] = useState<Record<string, string[]>>({});
+  const [res, setRes] = useState<Record<string, { totals?: Record<Basis, number>; error?: string }>>({});
+  const [taken, setTaken] = useState<Set<string>>(new Set());
+  const [busy, setBusy] = useState(false);
+
+  const open = (v: Vehicle, m: number) => {
+    const p = monthPeriod(year, m);
+    return v.in_service_from <= p.periodEnd && (!v.retired_on || v.retired_on >= p.periodStart);
+  };
+  useEffect(() => {
+    const init: Record<string, Line> = {};
+    for (const v of fleet) { const m = v.default_method; init[v.id] = { method: m, quantity: '', unit: m === 'spend' ? (v.attrs.electric ? 'kWh_e' : 'L') : unitsFor(m)[0]![0], currency: 'AED', charging: v.charging ?? 'elsewhere' }; }
+    setLines(init); setVals({}); setRes({});
+    if (facilityId) api.activities({ facilityId, year, category: 'mobile_combustion', limit: 1000 }).then((r) => {
+      setTaken(new Set(r.activities.filter((a) => a.vehicle_id && a.period_start.slice(0, 7) === a.period_end.slice(0, 7)).map((a) => `${a.vehicle_id}|${Number(a.period_start.slice(5, 7)) - 1}`)));
+    }).catch(() => setTaken(new Set()));
+  }, [fleet, facilityId, year]);
+
+  const cells = fleet.flatMap((v) => (vals[v.id] ?? []).map((q, m) => ({ v, m, q })).filter((x) => x.q !== '' && open(x.v, x.m)));
+  const entries = cells.map(({ v, m, q }) => {
+    const l = lines[v.id]!;
+    return { k: `${v.id}|${m}`, body: { facilityId, itemId: v.item_id, unit: l.unit, quantity: l.method === 'spend' ? undefined : Number(q), ...monthPeriod(year, m),
+      vehicle: { method: l.method, vehicleId: v.id, charging: v.attrs.electric || v.attrs.phev ? l.charging : undefined, spend: l.method === 'spend' ? { amount: Number(q), currency: l.currency } : undefined } } };
+  });
+  const key = JSON.stringify(entries.map((e) => e.body));
+  useEffect(() => {
+    if (!entries.length) { setRes({}); return; }
+    const t = window.setTimeout(() => {
+      api.batch(entries.map((e) => e.body), true).then((r) => {
+        const out: typeof res = {};
+        r.results.forEach((x, i) => { out[entries[i]!.k] = x.ok ? { totals: x.totals } : { error: x.error }; });
+        setRes(out);
+      }).catch(() => {});
+    }, 450);
+    return () => window.clearTimeout(t);
+  }, [key]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const setCell = (id: string, m: number, x: string) => setVals((o) => { const row = [...(o[id] ?? Array(12).fill(''))]; row[m] = x; return { ...o, [id]: row }; });
+  /** Paste a block (rows = vehicles from this one down, columns = months from this one on). */
+  const paste = (vi: number, m: number, text: string) => {
+    const rows = text.replace(/\r/g, '').split('\n').filter((r) => r.trim() !== '').map((r) => r.split('\t'));
+    if (rows.length < 2 && (rows[0]?.length ?? 0) < 2) return false;
+    setVals((o) => {
+      const n = { ...o };
+      rows.forEach((r, i) => {
+        const v = fleet[vi + i]; if (!v) return;
+        const row = [...(n[v.id] ?? Array(12).fill(''))];
+        r.forEach((c, j) => { const x = c.replace(/[\s,]/g, ''); if (m + j < 12) row[m + j] = x === '' || !Number.isFinite(Number(x)) ? '' : x; });
+        n[v.id] = row;
+      });
+      return n;
+    });
+    return true;
+  };
+  const rowSum = (id: string, b: Basis) => entries.filter((e) => e.k.startsWith(`${id}|`)).reduce((s, e) => s + (res[e.k]?.totals?.[b] ?? 0), 0);
+  const ok = entries.filter((e) => res[e.k]?.totals);
+  const errs = entries.filter((e) => res[e.k]?.error);
+  const dupCount = entries.filter((e) => taken.has(e.k)).length;
+  const save = async () => {
+    setBusy(true);
+    try {
+      const r = await api.batch(ok.map((e) => e.body), false);
+      toast(`Saved ${r.saved} vehicle-month${r.saved === 1 ? '' : 's'}${r.failed ? `; ${r.failed} not saved` : ''}`);
+      const done = new Set(ok.map((e) => e.k));
+      setVals((o) => Object.fromEntries(Object.entries(o).map(([id, row]) => [id, row.map((x, m) => (done.has(`${id}|${m}`) ? '' : x))])));
+      setTaken((t) => new Set([...t, ...done]));
+      onSaved();
+    } finally { setBusy(false); }
+  };
+
+  if (!facilityId) return <div className="card empty">Choose a facility.</div>;
+  if (!fleet.length) return <div className="card empty">No vehicles in service at this facility in {year}. Add the fleet in Organisation & groups → the facility → Vehicle fleet.</div>;
+  return (
+    <div className="card flush" style={{ minWidth: 0 }}>
+      <div style={{ padding: '14px 16px 6px' }}>
+        <h2>Fleet · {year}, month by month</h2>
+        <p className="sub">Method and unit once per vehicle, one reading per month. Paste a block from Excel (vehicles down, months across) into any cell. Grey months are outside the vehicle's service; amber ones already have an entry.</p>
+      </div>
+      <div style={{ overflowX: 'auto' }}>
+        <table className="t fleetyear">
+          <thead><tr><th>Vehicle</th><th>Method · unit</th>{MON.map((m) => <th key={m} className="num">{m}</th>)}<th className="num">tCO₂e</th></tr></thead>
+          <tbody>{fleet.map((v, vi) => {
+            const l = lines[v.id]; if (!l) return null;
+            const s1 = rowSum(v.id, 'direct'), s2 = rowSum(v.id, 'scope2');
+            return (
+              <tr key={v.id}>
+                <td style={{ minWidth: 130, maxWidth: 170 }}><b>{v.name}</b><div className="sub" style={{ fontSize: 11.5 }}>{v.type}</div></td>
+                <td style={{ width: 110 }}>
+                  <select className="input sm" value={l.method} onChange={(e) => { const m = e.target.value as VehicleMethod; setLines((x) => ({ ...x, [v.id]: { ...l, method: m, unit: m === 'spend' ? (v.attrs.electric ? 'kWh_e' : 'L') : unitsFor(m)[0]![0] } })); }}>
+                    {methodsFor(v).map((m) => <option key={m} value={m}>{METHOD_LABEL[m]}</option>)}</select>
+                  {l.method === 'spend'
+                    ? <input className="input mono sm" style={{ width: 70, marginTop: 4 }} maxLength={3} value={l.currency} onChange={(e) => setLines((x) => ({ ...x, [v.id]: { ...l, currency: e.target.value.toUpperCase() } }))} />
+                    : <select className="input sm" style={{ marginTop: 4 }} value={l.unit} onChange={(e) => setLines((x) => ({ ...x, [v.id]: { ...l, unit: e.target.value } }))}>{unitsFor(l.method).map(([c, n]) => <option key={c} value={c}>{n}</option>)}</select>}
+                </td>
+                {MON.map((_, m) => {
+                  const k = `${v.id}|${m}`, on = open(v, m);
+                  return <td key={m} className={`num ${taken.has(k) ? 'taken' : ''}`} title={res[k]?.error ?? (taken.has(k) ? 'Already entered for this month' : '')}>
+                    <input className={`input num sm ${res[k]?.error ? 'badin' : ''}`} style={{ width: 56, padding: '0 4px' }} disabled={!on} value={on ? vals[v.id]?.[m] ?? '' : ''} placeholder={on ? '' : '—'}
+                      onPaste={(e) => { if (paste(vi, m, e.clipboardData.getData('text'))) e.preventDefault(); }}
+                      onChange={(e) => setCell(v.id, m, e.target.value.replace(/[^0-9.]/g, ''))} /></td>;
+                })}
+                <td className="num">{s1 || s2 ? <>{tco2e(s1)}{s2 ? <div className="sub">+{tco2e(s2)} S2</div> : null}</> : ''}</td>
+              </tr>);
+          })}</tbody>
+        </table>
+      </div>
+      {errs.slice(0, 5).map((e) => <div key={e.k} className="note bad" style={{ margin: '8px 12px 0' }}>{fleet.find((v) => e.k.startsWith(v.id))?.name}, {MON[Number(e.k.split('|')[1])]}: {res[e.k]!.error}</div>)}
+      {dupCount > 0 && <div className="note warn" style={{ margin: '8px 12px 0' }}>{dupCount} vehicle-month{dupCount === 1 ? '' : 's'} already entered (amber): saving adds a second entry.</div>}
+      <div className="row" style={{ justifyContent: 'flex-end', padding: 12, gap: 12 }}>
+        {ok.length > 0 && <span className="sub">{ok.length} vehicle-months · <b>{tco2e(ok.reduce((s, e) => s + (res[e.k]!.totals!.direct ?? 0), 0))} tCO₂e</b> Scope 1</span>}
+        <button className="btn p" disabled={!ok.length || busy} onClick={save}>Save {ok.length || ''} vehicle-month{ok.length === 1 ? '' : 's'}</button>
+      </div>
     </div>
   );
 }

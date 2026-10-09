@@ -10,6 +10,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useApp } from '../App';
 import { api, ApiError, num, tco2e, type CalcResponse, type Category, type Certificate, type GridRegion, type SupplierFactor } from '../lib/api';
 import { Result } from '../components/Result';
+import { MonthGrid } from '../components/MonthGrid';
 
 const UNITS: Record<string, [string, string][]> = {
   grid: [['kWh_e', 'kWh'], ['MWh_e', 'MWh']],
@@ -19,8 +20,10 @@ const UNITS: Record<string, [string, string][]> = {
 const ENERGY: Record<string, 'electricity' | 'heat' | 'cooling'> = { grid: 'electricity', heat_steam: 'heat', cooling: 'cooling' };
 const TECH: Record<string, string> = { solar: 'Solar', wind: 'Wind', hydro: 'Hydro', biomass: 'Biomass', biogas: 'Biogas', geothermal: 'Geothermal', nuclear: 'Nuclear', other: 'Other' };
 
-export function EnergyEntry({ cat, facilityId, facilityRegion, country, period, onSaved }: {
+export function EnergyEntry({ cat, facilityId, facilityRegion, country, period, onSaved, monthly }: {
   cat: Category; facilityId: string; facilityRegion: string | null; country: string; period: { periodStart: string; periodEnd: string }; onSaved: () => void;
+  /** month by month for this year */
+  monthly?: number;
 }) {
   const { toast } = useApp();
   const [subCode, setSubCode] = useState('grid');
@@ -71,6 +74,17 @@ export function EnergyEntry({ cat, facilityId, facilityRegion, country, period, 
     return { itemId: item.id, unit, quantity: Number(quantity), facilityId, ...period, energy: e };
   }, [item, quantity, unit, facilityId, period, region, supplierMode, supplierId, typed, claims, energy, coolMethod, eff, supUnit]);
 
+  /** Month by month: same supplier, region and plant; each month's reading. Certificates are claimed month by month. */
+  const buildMonth = useMemo(() => (q: number, p: { periodStart: string; periodEnd: string }) => {
+    if (!item || !facilityId) return null;
+    const e: Record<string, unknown> = {};
+    if (region) e.gridRegion = region;
+    if (supplierMode === 'list') { if (!supplierId) return null; e.supplierFactorId = supplierId; }
+    if (supplierMode === 'typed') { if (!(typed.name && typed.co2e !== '' && typed.source.length >= 2)) return null; e.supplier = { name: typed.name, co2e: Number(typed.co2e), unit: supUnit, source: typed.source }; }
+    if (energy === 'cooling') e.cooling = coolMethod === 'supplier' ? { method: 'supplier' } : { method: 'efficiency', [eff.kind]: Number(eff.value) || undefined };
+    return { itemId: item.id, unit, quantity: q, ...p, energy: e };
+  }, [item, unit, facilityId, region, supplierMode, supplierId, typed, energy, coolMethod, eff, supUnit]);
+
   useEffect(() => {
     setError(null);
     if (!payload) { setResult(null); return; }
@@ -106,10 +120,10 @@ export function EnergyEntry({ cat, facilityId, facilityRegion, country, period, 
 
       <div className="card" style={{ display: 'grid', gap: 14 }}>
         <div className="row" style={{ alignItems: 'flex-end' }}>
-          <label className="field" style={{ width: 170 }}>
+          {!monthly && <label className="field" style={{ width: 170 }}>
             <span>{energy === 'cooling' ? 'Cooling used' : energy === 'heat' ? 'Heat / steam used' : 'Electricity used'}</span>
             <input className="input num" inputMode="decimal" value={quantity} placeholder="0" onChange={(e) => setQuantity(e.target.value.replace(/[^0-9.]/g, ''))} />
-          </label>
+          </label>}
           <label className="field" style={{ width: 170 }}><span>Unit</span>
             <select className="input" value={unit} onChange={(e) => setUnit(e.target.value)}>{UNITS[subCode]!.map(([c, n]) => <option key={c} value={c}>{n}</option>)}</select></label>
           {energy !== 'heat' && (
@@ -167,7 +181,8 @@ export function EnergyEntry({ cat, facilityId, facilityRegion, country, period, 
           </fieldset>
         )}
 
-        {energy === 'electricity' && (
+        {energy === 'electricity' && monthly && <div className="sub">Certificates and contracts are claimed one month at a time: choose a month to claim them.</div>}
+        {energy === 'electricity' && !monthly && (
           <fieldset className="box">
             <legend>Market-based: certificates & contracts claimed (optional)</legend>
             {certs.length ? (
@@ -192,6 +207,11 @@ export function EnergyEntry({ cat, facilityId, facilityRegion, country, period, 
           </fieldset>
         )}
 
+        {monthly ? <MonthGrid year={monthly} facilityId={facilityId} build={buildMonth} onSaved={onSaved} bases={['scope2', 'scope2_market']}
+          label={energy === 'cooling' ? 'Cooling used' : energy === 'heat' ? 'Heat / steam used' : 'Electricity used'}
+          unitName={UNITS[subCode]!.find(([c]) => c === unit)?.[1] ?? unit}
+          hint="Tip: copy the 12 monthly readings from the bills or the meter sheet (a row or a column) and paste them into January."
+          dup={{ category: 'purchased_electricity', same: (a) => a.item === item?.name }} /> : <>
         <div className="row">
           <label className="field" style={{ width: 160 }}><span>Data type</span>
             <select className="input" value={dataType} onChange={(e) => setDataType(e.target.value)}><option value="actual">Actual</option><option value="estimated">Estimated</option><option value="proxy">Proxy</option></select></label>
@@ -201,7 +221,7 @@ export function EnergyEntry({ cat, facilityId, facilityRegion, country, period, 
         {result ? <Result r={result} energy /> : !error && <div className="note info">Enter the {energy === 'cooling' ? 'cooling' : energy === 'heat' ? 'heat' : 'electricity'} used to see both Scope 2 figures and how they were calculated.</div>}
         <div className="row" style={{ justifyContent: 'flex-end' }}>
           <button className="btn p" disabled={!result || !facilityId} onClick={save}>Save entry</button>
-        </div>
+        </div></>}
       </div>
     </div>
   );

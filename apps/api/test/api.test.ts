@@ -668,3 +668,18 @@ test('waste Scope 1: incineration (fossil CO2 + biogenic outside scopes), compos
   assert.equal(row.ghg_category, 5);
   assert.ok(Math.abs(Number(row.co2e_scope3) - 12 * Number(f.co2e)) < 1e-6);
 });
+
+test('wastewater with flow: nitrogen as mg/L gives the same result as kg; twelve months saved in one batch', async () => {
+  const ww = await itemId('waste:wastewater');
+  const base = { facilityId: facA, itemId: ww, unit: 'kg', periodStart: '2024-01-01', periodEnd: '2024-01-31' };
+  const w = { process: 'wastewater', kind: 'domestic', system: 'centralised_aerobic', measure: 'BOD', flowM3: 58000, mgPerL: 250, recovery: [] };
+  const a = await api('POST', '/api/calculate', { ...base, waste: { ...w, nInfluentMgPerL: 40 } }, tenantA);
+  const b = await api('POST', '/api/calculate', { ...base, waste: { ...w, nInfluentKg: 2320 } }, tenantA);
+  assert.equal(a.status, 200, JSON.stringify(a.body));
+  assert.ok(Math.abs(a.body.totals.direct - b.body.totals.direct) < 1e-9);
+  assert.ok(a.body.steps.some((s: string) => /58000 m³ × 40 mg\/L/.test(s)));
+  const months = Array.from({ length: 12 }, (_, m) => ({ ...base, periodStart: `2024-${String(m + 1).padStart(2, '0')}-01`,
+    periodEnd: new Date(Date.UTC(2024, m + 1, 0)).toISOString().slice(0, 10), waste: { ...w, flowM3: 50000 + m * 1000, nInfluentMgPerL: 40 } }));
+  const r = await api('POST', '/api/activities/batch', { entries: months, dryRun: false }, tenantA);
+  assert.equal(r.body.saved, 12, JSON.stringify(r.body));
+});
