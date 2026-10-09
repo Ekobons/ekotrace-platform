@@ -50,6 +50,28 @@ export async function catalogueRoutes(app: FastifyInstance) {
     };
   });
 
+  /**
+   * Units a user may enter for an item: the subcategory's list, limited to
+   * dimensions the item has a factor for (combustion). Fugitive items take any
+   * listed mass unit. Default first.
+   */
+  app.get('/api/items/:id/units', async (req) => {
+    const id = z.coerce.number().int().parse((req.params as { id: string }).id);
+    const [it] = await query(
+      `SELECT i.id, i.default_unit, s.units, s.default_unit AS sub_default, c.calc_method
+         FROM item i JOIN subcategory s ON s.id = i.subcategory_id JOIN category c ON c.id = s.category_id WHERE i.id = $1`, [id]);
+    if (!it) throw notFound('Item');
+    const rows = await query(
+      `SELECT u.code, u.name, u.dimension FROM unit u
+        WHERE u.active AND (cardinality($2::text[]) = 0 OR u.code = ANY($2))
+          AND ($3 = 'fugitive' AND u.dimension = 'mass'
+               OR u.dimension IN (SELECT DISTINCT uu.dimension FROM factor f JOIN unit uu ON uu.code = f.unit
+                                   WHERE f.item_id = $1 AND f.status = 'active' AND f.basis = 'direct'))
+        ORDER BY u.sort, u.code`, [id, it.units, it.calc_method]);
+    const def = [it.default_unit, it.sub_default].find((d) => d && rows.some((r) => r.code === d)) ?? rows[0]?.code ?? null;
+    return { units: rows, defaultUnit: def };
+  });
+
   // ---------------------------------------------------------- categories --
   app.post('/api/admin/categories', async (req) => {
     requirePlatformAdmin(req);

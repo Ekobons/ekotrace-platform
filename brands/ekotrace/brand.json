@@ -1,9 +1,18 @@
 {
   "name": "Ekotrace",
   "productName": "Ekotrace",
-  "colors": { "primary": "#88AD47", "primaryDark": "#5e7f2a", "background": "#F4F6F0" },
+  "colors": {
+    "primary": "#0E7C66",
+    "primaryDark": "#0B4F43",
+    "background": "#EEF2EF"
+  },
   "logo": "logo.svg",
   "supportEmail": "support@ekobon.com",
-  "legal": { "company": "Ekobon" },
-  "features": { "fugitive": true, "stationaryCombustion": true }
+  "legal": {
+    "company": "Ekobon"
+  },
+  "features": {
+    "fugitive": true,
+    "stationaryCombustion": true
+  }
 }

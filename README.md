@@ -9,6 +9,9 @@ packages/calc     Calculation engine (pure TypeScript, no database). Units, gase
                   factor selection, fuel combustion, fugitive emissions. Fully unit-tested.
 apps/api          API server (Fastify + PostgreSQL): editable catalogue, factor library,
                   DESNZ importer, calculate and save entries, per-gas reports.
+apps/web          Screens (React): add data (stationary combustion, fugitive), entries & results,
+                  factor library admin (factors, categories & items, units, gases & GWP, sources & import),
+                  company & facilities. Same design as the prototype.
 apps/api/migrations  Database tables (SQL, run in order).
 data/defra        DESNZ (UK government) conversion factor flat files, 2022–2026.
 data/gwp          Gases and GWP values (AR4, AR5, AR6) and verified refrigerant blend compositions.
@@ -16,7 +19,7 @@ brands/           Brand packs: name, colours, logo, support e-mail, enabled feat
 docs/             Design notes and change log.
 ```
 
-Not built yet (next steps): login (passwords, SSO, MFA), the web screens, other categories.
+Not built yet (next steps): login (passwords, SSO, MFA), approvals, dashboards, other categories.
 
 ## Run it on a Windows laptop
 
@@ -35,11 +38,15 @@ npm install
 npm run db:migrate
 npm run db:seed        # loads gases, GWP values, DESNZ 2022–2026, IPCC coals (≈10 s)
 
-# 3. Start
-npm run dev            # API on http://localhost:4000
+# 3. Start (builds the screens and starts everything)
+npm run app
 ```
 
-Check: open http://localhost:4000/api/health → `{"ok":true}`.
+Open **http://localhost:4000**. Stop with Ctrl + C. Next time only `npm run app` is needed.
+
+After pulling new code: `git pull`, `npm install`, `npm run db:migrate`, `npm run app`.
+
+For development with live reload: `npm run dev:api` and, in a second window, `npm run dev:web` (screens on http://localhost:5173).
 
 ## Tests
 

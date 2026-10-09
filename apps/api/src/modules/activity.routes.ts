@@ -32,6 +32,8 @@ export async function activityRoutes(app: FastifyInstance) {
     return r;
   });
 
+  app.get('/api/tenant', async (req) => tenantSettings(requireTenant(req)));
+
   app.patch('/api/tenant', async (req) => {
     const tenant = requireTenant(req);
     const b = z.object({ gwpSet: z.enum(['AR4', 'AR5', 'AR6']).optional(), country: z.string().length(2).optional() }).parse(req.body);

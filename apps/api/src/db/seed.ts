@@ -128,7 +128,7 @@ export async function seedIpccCoals(c: Tx) {
     }
   }
   await c.query(
-    `INSERT INTO import_issue (source_id, severity, message) VALUES ($1,'info',$2)`,
+    `INSERT INTO import_issue (source_id, severity, message) VALUES ($1,'warning',$2)`,
     [src, 'IPCC coal defaults were entered by hand from the 2006 Guidelines. Check them against the source before relying on them for a client report.'],
   );
   return IPCC_COALS.length;

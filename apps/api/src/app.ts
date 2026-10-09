@@ -2,6 +2,7 @@
  * Builds the API application (used by server.ts and by the tests).
  */
 import Fastify, { type FastifyInstance } from 'fastify';
+import fastifyStatic from '@fastify/static';
 import { readFileSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -13,7 +14,9 @@ import { referenceRoutes } from './modules/reference.routes.js';
 import { factorRoutes } from './modules/factors.routes.js';
 import { activityRoutes } from './modules/activity.routes.js';
 
-const BRANDS = join(dirname(fileURLToPath(import.meta.url)), '../../../brands');
+const HERE = dirname(fileURLToPath(import.meta.url));
+const BRANDS = join(HERE, '../../../brands');
+const WEB = join(HERE, '../../web/dist');
 
 export async function buildApp(opts: { logger?: boolean } = {}): Promise<FastifyInstance> {
   const app = Fastify({ logger: opts.logger ?? false, bodyLimit: 1024 * 1024 });
@@ -37,5 +40,15 @@ export async function buildApp(opts: { logger?: boolean } = {}): Promise<Fastify
     await secured.register(factorRoutes);
     await secured.register(activityRoutes);
   });
+
+  // The screens (apps/web, after `npm run build`) are served from the same
+  // address, so one process and one URL is all a deployment needs.
+  if (existsSync(join(WEB, 'index.html'))) {
+    await app.register(fastifyStatic, { root: WEB }); // files looked up per request, so a rebuild needs no restart
+    app.setNotFoundHandler((req, reply) => {
+      if (req.url.startsWith('/api/')) return reply.status(404).send({ error: 'NOT_FOUND', message: 'Not found' });
+      return reply.sendFile('index.html'); // client-side routes
+    });
+  }
   return app;
 }

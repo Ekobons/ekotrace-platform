@@ -193,3 +193,13 @@ test('per-gas report', async () => {
   const r = await api('GET', '/api/reports/by-gas?year=2025', undefined, tenantA);
   assert.ok(r.body.rows.some((x: { gas: string }) => x.gas === 'N2O'));
 });
+
+test('units offered per item follow its factors and the class list', async () => {
+  const id = await diesel();
+  const r = await api('GET', `/api/items/${id}/units`);
+  assert.equal(r.body.defaultUnit, 'L');
+  const codes = r.body.units.map((u: { code: string }) => u.code);
+  assert.ok(codes.includes('kL') && codes.includes('kWh_gcv') && !codes.includes('m3') && !codes.includes('lb'));
+  const sf6 = (await pool.query(`SELECT id FROM item WHERE code='gas:sf6'`)).rows[0].id;
+  assert.deepEqual((await api('GET', `/api/items/${sf6}/units`)).body.units.map((u: { code: string }) => u.code).sort(), ['g', 'kg', 'lb', 't']);
+});

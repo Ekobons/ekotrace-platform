@@ -10,12 +10,15 @@
     "node": ">=22"
   },
   "scripts": {
-    "build": "npm run build -w @ekotrace/calc && npm run build -w @ekotrace/api",
+    "app": "npm run build -w @ekotrace/calc && npm run build -w @ekotrace/web && npm run serve -w @ekotrace/api",
+    "build": "npm run build -w @ekotrace/calc && npm run build -w @ekotrace/api && npm run build -w @ekotrace/web",
+    "start": "node apps/api/dist/server.js",
     "test": "npm test -w @ekotrace/calc && npm test -w @ekotrace/api",
-    "typecheck": "tsc -p packages/calc && tsc -p apps/api --noEmit",
-    "db:migrate": "npm run migrate -w @ekotrace/api",
+    "typecheck": "tsc -p packages/calc --noEmit && tsc -p apps/api --noEmit && tsc -p apps/web",
+    "db:migrate": "npm run build -w @ekotrace/calc && npm run migrate -w @ekotrace/api",
     "db:seed": "npm run seed -w @ekotrace/api",
-    "dev": "npm run dev -w @ekotrace/api"
+    "dev:api": "npm run dev -w @ekotrace/api",
+    "dev:web": "npm run dev -w @ekotrace/web"
   },
   "devDependencies": {
     "@types/node": "22.20.5",

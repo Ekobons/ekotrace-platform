@@ -2,6 +2,16 @@
 
 Newest first.
 
+## 2026-10-09 (2) — Screens
+
+- **Add data**: stationary combustion and fugitive emissions. Facility, year and month (or whole year) on top; fuel classes / gas groups on the left; fuel or gas, quantity and unit (only units that class offers and the item has factors for). Fugitive: three methods (quantity refilled, screening, mass balance). Result recalculated while typing: Scope 1, well-to-tank, biogenic CO₂, memo; split per gas; calculation steps; warnings. Save, with recent entries below.
+- **Entries & results**: totals for the year, table per greenhouse gas, all entries; click one to see exactly how it was calculated.
+- **Factor library** (admin): Factors per item and year with gas split, history, add a corrected version; Categories & items — add, rename, units offered, default unit, move, switch off, remove, and show/hide per company; Units & conversions — edit the one number per unit, add units, conversion matrix; Gases & GWP (68 gases, AR4/AR5/AR6); Sources & import — upload next year's DESNZ file with a preview, review list.
+- **Company & facilities**: create companies, choose GWP set and country, add facilities.
+- Design tokens copied from the prototype (colours, Instrument Sans, cards, sidebar). Brand colour comes from the brand pack.
+- API serves the screens itself: one command (`npm run app`), one address (http://localhost:4000). Without login it only accepts connections from the same computer.
+- New API: units offered per item; current company settings. 24 tests pass (12 engine + 12 API).
+
 ## 2026-10-09 — Stationary combustion and fugitive emissions: engine, factor library, API
 
 **Calculation engine (`packages/calc`)**
