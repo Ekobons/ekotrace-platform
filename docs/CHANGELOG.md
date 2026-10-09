@@ -2,6 +2,12 @@
 
 Newest first.
 
+## 2026-10-10 (6) — User manual in the app; session inactivity timeout
+
+- **User manual** (Help → User manual, every role): getting started, each data category explained, entering data, meters, bills, factors & methodology, a dedicated **security** chapter, integrations & API, glossary. Flow charts, a scopes overview, protection layers and a month-split diagram. Searchable; "Print / save as PDF" prints all chapters.
+- Written as Markdown in `apps/web/src/manual/` (shipped with each release, so it always matches the version in use); diagrams are written as text blocks (```flow, ```layers, ```diagram). **Every feature change updates the manual in the same release.**
+- **Sessions end after 30 minutes without activity** (setting `IDLE_MINUTES`), besides the 12-hour maximum and logout — BEEAH security standard 4.9.
+
 ## 2026-10-10 (5) — Meters (readings by API), bills (PDF), API security
 
 **Meters** (Capture → Meters; set up per facility, or from Add data → Month by month → "Set up a meter with these inputs", which keeps every detail of the entry: supplier factor, grid region, cooling plant, waste process…)

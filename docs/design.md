@@ -49,3 +49,8 @@ PostgreSQL row-level security on facility, activity, activity_result and tenant_
 ## 7. One codebase, many deployments
 
 Brand pack (`brands/<name>/brand.json` + logo) and `.env` per deployment; everything else identical. Code updates never touch brand packs or data.
+
+
+## User manual
+
+The user manual lives in `apps/web/src/manual/NN-chapter.md` and is shown in the app (Help → User manual). Any change that users can see — a new category, screen, rule, safety check or security control — updates the manual in the same commit. Diagrams are text blocks: ```flow (steps: `>` step, `*` a person, `!` safety check, `?` decision `Title | yes … | no …`), ```layers (`Title | detail`), ```diagram <name> (scopes, month-split).

@@ -35,6 +35,8 @@ declare module 'fastify' {
 
 export const COOKIE = 'eko_sid';
 export const SESSION_HOURS = 12;
+/** A session ends after this many minutes without any request (BEEAH standard 4.9: inactivity timeout). */
+export const IDLE_MINUTES = Number(process.env.IDLE_MINUTES ?? 30);
 
 export function readCookie(req: FastifyRequest, name: string): string | null {
   const raw = req.headers.cookie;
@@ -63,8 +65,8 @@ export async function authenticate(req: FastifyRequest) {
   const row = await platformTx(async (c) => (await c.query(
     `UPDATE session s SET last_seen_at = now()
        FROM app_user u
-      WHERE s.token_hash = $1 AND u.id = s.user_id AND s.expires_at > now() AND NOT u.disabled
-      RETURNING u.id, u.name, u.email, u.role, u.tenant_id, u.scope_node_id, u.must_change_password`, [sha256(token)])).rows[0]);
+      WHERE s.token_hash = $1 AND u.id = s.user_id AND s.expires_at > now() AND s.last_seen_at > now() - make_interval(mins => $2) AND NOT u.disabled
+      RETURNING u.id, u.name, u.email, u.role, u.tenant_id, u.scope_node_id, u.must_change_password`, [sha256(token), IDLE_MINUTES])).rows[0]);
   if (!row) throw new AppError('Your session has ended — please log in again', 401, 'UNAUTHENTICATED');
 
   let tenantId: string | null = row.tenant_id;

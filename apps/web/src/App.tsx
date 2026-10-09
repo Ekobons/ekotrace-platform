@@ -17,6 +17,7 @@ import { AuditLog } from './pages/AuditLog';
 import { Meters } from './pages/Meters';
 import { Bills } from './pages/Bills';
 import { Integrations } from './pages/Integrations';
+import { Manual } from './pages/Manual';
 import { Console } from './pages/Console';
 
 interface Ctx {
@@ -55,7 +56,7 @@ const NAV: { group?: string; items: NavItem[] }[] = [
     { label: 'Metric registry', icon: 'list', stage: 4 }, { to: '/integrations', label: 'Integrations & API', icon: 'plug', roles: ['super_admin', 'admin'] }, { label: 'AI models', icon: 'spark', stage: 4 },
     { to: '/audit', label: 'Security & audit log', icon: 'lock', roles: ['super_admin', 'admin', 'verifier'] },
   ] },
-  { group: 'Help', items: [{ label: 'Information centre', icon: 'info', stage: 4 }, { label: 'Message centre', icon: 'chat', stage: 4 }] },
+  { group: 'Help', items: [{ to: '/help', label: 'User manual', icon: 'book' }, { label: 'Message centre', icon: 'chat', stage: 4 }] },
 ];
 
 export function App() {
@@ -150,6 +151,7 @@ function Shell() {
           <Route path="/people" element={<NeedCo><People /></NeedCo>} />
           <Route path="/methodology" element={<NeedCo><Methodology /></NeedCo>} />
           <Route path="/energy" element={<NeedCo><EnergyRegister /></NeedCo>} />
+          <Route path="/help" element={<Manual />} />
           <Route path="/meters" element={<NeedCo><Meters /></NeedCo>} />
           <Route path="/bills" element={<NeedCo><Bills /></NeedCo>} />
           <Route path="/integrations" element={<NeedCo><Integrations /></NeedCo>} />
