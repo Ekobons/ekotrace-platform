@@ -98,7 +98,33 @@ export interface FactorUsed {
   published?: { co2ePerUnit: number; gwpSet: string };
 }
 
+/**
+ * A calorific value supplied by the user (e.g. from the fuel supplier's
+ * certificate): energy per unit of mass or volume, net or gross by the energy
+ * unit chosen. Converts the entered quantity into the dimension of the factor.
+ */
+export interface CalorificValue {
+  value: number;
+  /** energy unit: MJ, GJ, kWh (net) or MJ_gcv, GJ_gcv, kWh_gcv, MMBtu… (gross) */
+  energyUnit: string;
+  /** mass or volume unit: kg, t, L, m3… */
+  perUnit: string;
+}
+
+/** What the calorific value did, for display and audit. */
+export interface CalorificValueUsed extends CalorificValue {
+  energyUnitName: string;
+  perUnitName: string;
+  basis: 'net' | 'gross';
+  /** the quantity the factors were applied to, and its unit */
+  convertedQuantity: number;
+  convertedUnit: string;
+  convertedUnitName: string;
+}
+
 export interface CalcResult {
+  /** present when the user supplied a calorific value */
+  cv?: CalorificValueUsed;
   lines: ResultLine[];
   /** CO2e factor per part of the result (one per basis) */
   factors: FactorUsed[];

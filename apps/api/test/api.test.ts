@@ -154,6 +154,26 @@ test('save an entry; other companies cannot see it (row-level security)', async 
   assert.ok(Math.abs(500 * f.perEnteredUnit - Number(detail.body.co2e_direct)) < 1e-6, 'saved entry keeps its CO2e factor');
 });
 
+test('own calorific value: default offered from DESNZ; entered value changes the result and is saved', async () => {
+  const id = await diesel();
+  const d = await api('GET', `/api/items/${id}/cv?energyUnit=MJ&perUnit=L&date=2025-01-01`, undefined, tenantA);
+  assert.equal(d.status, 200, JSON.stringify(d.body));
+  assert.ok(d.body.energyUnits.some((u: { code: string }) => u.code === 'MJ'));
+  assert.ok(d.body.energyUnits.some((u: { code: string }) => u.code === 'MJ_gcv'));
+  assert.ok(d.body.suggested.value > 35 && d.body.suggested.value < 40, String(d.body.suggested.value)); // diesel ≈ 36–38 MJ/L net
+  const base = { itemId: id, quantity: 1000, unit: 'L', periodStart: '2025-03-01', periodEnd: '2025-03-31' };
+  const std = await api('POST', '/api/calculate', base, tenantA);
+  const same = await api('POST', '/api/calculate', { ...base, cv: { value: d.body.suggested.value, energyUnit: 'MJ', perUnit: 'L' } }, tenantA);
+  assert.ok(Math.abs(same.body.totals.direct - std.body.totals.direct) / std.body.totals.direct < 0.01, 'DESNZ CV reproduces the per-litre result');
+  const own = await api('POST', '/api/calculate', { ...base, cv: { value: 30, energyUnit: 'MJ', perUnit: 'L' } }, tenantA);
+  assert.ok(own.body.totals.direct < std.body.totals.direct);
+  assert.equal(own.body.cv.basis, 'net');
+  const s = await api('POST', '/api/activities', { ...base, facilityId: facA, cv: { value: 30, energyUnit: 'MJ', perUnit: 'L' } }, tenantA);
+  assert.equal(s.status, 200, JSON.stringify(s.body));
+  const saved = await api('GET', `/api/activities/${s.body.id}`, undefined, tenantA);
+  assert.equal(saved.body.inputs.cv.value, 30);
+});
+
 test('fugitive: R-410A per gas (Kyoto), R-401A HCFC part as memo, blend without composition uses DESNZ total', async () => {
   const item = async (code: string) => (await pool.query('SELECT id FROM item WHERE code = $1', [code])).rows[0].id;
   const r410 = await api('POST', '/api/calculate', { itemId: await item('blend:r410a'), unit: 'kg', fugitive: { method: 'quantity', released: 10 }, periodStart: '2025-01-01', periodEnd: '2025-12-31' }, tenantA);

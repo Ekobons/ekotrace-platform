@@ -15,7 +15,9 @@ export interface FactorUsed {
   perEnteredUnit: number; enteredUnit: string; enteredUnitName: string; quantity: number; method: 'gas' | 'published';
   published?: { co2ePerUnit: number; gwpSet: string };
 }
-export interface CalcResponse { item: { id: number; name: string; category: string }; gwpSet: string; lines: ResultLine[]; factors: FactorUsed[]; totals: Record<Basis, number>; steps: string[]; warnings: string[] }
+/** A calorific value the user entered, and what it converted the quantity to. */
+export interface CvUsed { value: number; energyUnit: string; perUnit: string; energyUnitName: string; perUnitName: string; basis: 'net' | 'gross'; convertedQuantity: number; convertedUnit: string; convertedUnitName: string }
+export interface CalcResponse { cv?: CvUsed; item: { id: number; name: string; category: string }; gwpSet: string; lines: ResultLine[]; factors: FactorUsed[]; totals: Record<Basis, number>; steps: string[]; warnings: string[] }
 export interface Tenant { id: string; name: string; country: string; gwp_set: string; consolidation?: string; base_year?: number; plan?: string; status?: string; access_expiry?: string }
 export type Role = 'platform_admin' | 'super_admin' | 'admin' | 'manager' | 'preparer' | 'verifier';
 export interface Me { user: { id: string; name: string; email: string; role: Role; tenantId: string | null; scopeNodeId: string | null; mustChangePassword: boolean }; company: (Tenant & { scope_name: string | null }) | null }
@@ -60,6 +62,8 @@ async function call<T>(method: string, path: string, body?: unknown, raw?: Blob)
 export const api = {
   brand: () => call<{ name: string; productName?: string; colors?: Record<string, string> }>('GET', '/api/brand'),
   catalogue: (all = false) => call<{ categories: Category[] }>('GET', `/api/catalogue${all ? '?all=1' : ''}`),
+  itemCv: (id: number, q: { energyUnit: string; perUnit: string; date: string }) =>
+    call<{ energyUnits: { code: string; name: string; dimension: string }[]; suggested: { value: number; source: string } | null }>('GET', `/api/items/${id}/cv?${new URLSearchParams(q)}`),
   itemUnits: (id: number) => call<{ units: { code: string; name: string; dimension: string }[]; defaultUnit: string | null }>('GET', `/api/items/${id}/units`),
   units: () => call<{ units: Unit[] }>('GET', '/api/units'),
   gases: () => call<{ gases: { code: string; name: string; formula: string; family: string; kyoto: boolean; gwp: Record<string, number> | null }[]; gwpSets: { code: string; name: string; note: string }[] }>('GET', '/api/gases'),
@@ -96,7 +100,7 @@ export const api = {
   calculate: (b: unknown) => call<CalcResponse>('POST', '/api/calculate', b),
   saveActivity: (b: unknown) => call<{ id: string; totals: Record<Basis, number>; warnings: string[] }>('POST', '/api/activities', b),
   activities: (q: Record<string, string | number | undefined> = {}) => call<{ activities: Activity[] }>('GET', `/api/activities?${new URLSearchParams(Object.entries(q).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)]))}`),
-  activity: (id: string) => call<Activity & { steps: string[]; warnings: string[]; factors: FactorUsed[]; inputs: Record<string, unknown>; lines: { basis: Basis; gas: string; kg_gas: number | null; kg_co2e: number; method: string; source: string | null }[] }>('GET', `/api/activities/${id}`),
+  activity: (id: string) => call<Activity & { steps: string[]; warnings: string[]; factors: FactorUsed[]; inputs: Record<string, unknown> & { cv?: CvUsed }; lines: { basis: Basis; gas: string; kg_gas: number | null; kg_co2e: number; method: string; source: string | null }[] }>('GET', `/api/activities/${id}`),
   byGas: (year: number) => call<{ rows: { scope: number; category: string; basis: Basis; gas: string; kg_gas: number | null; kg_co2e: number }[] }>('GET', `/api/reports/by-gas?year=${year}`),
   // catalogue admin
   addSubcategory: (b: unknown) => call('POST', '/api/admin/subcategories', b),

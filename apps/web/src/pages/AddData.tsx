@@ -7,7 +7,7 @@
  * calculation steps and any warnings. "Save entry" stores it.
  */
 import { useEffect, useMemo, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useApp } from '../App';
 import { api, ApiError, BASIS_LABEL, num, tco2e, type Activity, type CalcResponse, type Category, type Facility } from '../lib/api';
 import { Result } from '../components/Result';
@@ -45,14 +45,24 @@ const METHOD_HELP: Record<Method, string> = {
 export function AddData() {
   const { category: catCode = 'stationary_combustion' } = useParams();
   const { tenant, toast } = useApp();
+  const navigate = useNavigate();
   const [cat, setCat] = useState<Category | null>(null);
+  const [cats, setCats] = useState<Category[]>([]);
   const [facilities, setFacilities] = useState<Facility[]>([]);
   const [facilityId, setFacilityId] = useState('');
   const [year, setYear] = useState(new Date().getFullYear());
   const [month, setMonth] = useState<number | 'year'>(new Date().getMonth());
   const [subId, setSubId] = useState<number | null>(null);
   const [itemId, setItemId] = useState<number | null>(null);
-  const [units, setUnits] = useState<{ code: string; name: string }[]>([]);
+  const [units, setUnits] = useState<{ code: string; name: string; dimension: string }[]>([]);
+  // Own calorific value (fuels only)
+  const [useCv, setUseCv] = useState(false);
+  const [cvValue, setCvValue] = useState('');
+  const [cvTouched, setCvTouched] = useState(false);
+  const [cvEnergy, setCvEnergy] = useState('MJ');
+  const [cvPer, setCvPer] = useState('');
+  const [cvUnits, setCvUnits] = useState<{ code: string; name: string; dimension: string }[]>([]);
+  const [cvSuggest, setCvSuggest] = useState<{ value: number; source: string } | null>(null);
   const [unit, setUnit] = useState('');
   const [quantity, setQuantity] = useState('');
   const [method, setMethod] = useState<Method>('quantity');
@@ -70,6 +80,7 @@ export function AddData() {
     api.catalogue().then((c) => {
       const found = c.categories.find((x) => x.code === catCode) ?? null;
       setCat(found);
+      setCats(c.categories.filter((x) => x.active !== false));
       setSubId(found?.subcategories[0]?.id ?? null);
     });
   }, [catCode, tenant?.id]);
@@ -86,6 +97,26 @@ export function AddData() {
     if (!itemId) { setUnits([]); return; }
     api.itemUnits(itemId).then((u) => { setUnits(u.units); setUnit(u.defaultUnit ?? u.units[0]?.code ?? ''); });
   }, [itemId]);
+
+  // Calorific value: offered when the quantity is a mass or volume and the fuel has energy-based factors.
+  const enteredDim = units.find((u) => u.code === unit)?.dimension;
+  const cvPossible = cat?.calc_method === 'combustion' && (enteredDim === 'mass' || enteredDim === 'volume') && cvUnits.length > 0;
+  const perOptions = units.filter((u) => u.dimension === enteredDim);
+  useEffect(() => { setCvPer(unit); }, [unit]);
+  useEffect(() => {
+    if (!itemId) return;
+    api.itemCv(itemId, { energyUnit: '', perUnit: '', date: `${year}-01-01` }).then((r) => {
+      setCvUnits(r.energyUnits);
+      setCvEnergy((e) => (r.energyUnits.some((u) => u.code === e) ? e : r.energyUnits.find((u) => u.code === 'MJ')?.code ?? r.energyUnits[0]?.code ?? ''));
+    }).catch(() => setCvUnits([]));
+  }, [itemId, year]);
+  useEffect(() => {
+    if (!itemId || !useCv || !cvEnergy || !cvPer) return;
+    api.itemCv(itemId, { energyUnit: cvEnergy, perUnit: cvPer, date: `${year}-01-01` }).then((r) => {
+      setCvSuggest(r.suggested);
+      if (!cvTouched && r.suggested) setCvValue(String(Number(r.suggested.value.toPrecision(5))));
+    }).catch(() => setCvSuggest(null));
+  }, [itemId, useCv, cvEnergy, cvPer, year]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const period = useMemo(() => {
     if (month === 'year') return { periodStart: iso(year, 0, 1), periodEnd: iso(year, 11, 31) };
@@ -106,8 +137,9 @@ export function AddData() {
       return { ...base, fugitive: data };
     }
     if (quantity === '') return null;
-    return { ...base, quantity: Number(quantity) };
-  }, [itemId, unit, facilityId, period, cat, method, fug, quantity]);
+    const cv = cvPossible && useCv && Number(cvValue) > 0 && cvPer ? { value: Number(cvValue), energyUnit: cvEnergy, perUnit: cvPer } : undefined;
+    return { ...base, quantity: Number(quantity), ...(cv ? { cv } : {}) };
+  }, [itemId, unit, facilityId, period, cat, method, fug, quantity, cvPossible, useCv, cvValue, cvEnergy, cvPer]);
 
   // Live preview (debounced).
   useEffect(() => {
@@ -151,6 +183,12 @@ export function AddData() {
           <h1>{cat.name}</h1>
           <p className="sub">{cat.description}</p>
         </div>
+      </div>
+
+      <div className="tabs">
+        {cats.map((c) => (
+          <button key={c.code} className={c.code === cat.code ? 'on' : ''} onClick={() => navigate(`/data/${c.code}`)}>{c.name}</button>
+        ))}
       </div>
 
       <div className="card" style={{ display: 'grid', gap: 12 }}>
@@ -218,6 +256,48 @@ export function AddData() {
             <div className="sub">
               {item.composition?.length ? <>Composition: {item.composition.map((c) => `${c.gas} ${num(c.fraction * 100, 4)} %`).join(' · ')}. </> : null}
               {item.note}
+            </div>
+          )}
+
+          {cvPossible && (
+            <div className="cvbox">
+              <label className="row" style={{ gap: 8, fontWeight: 600 }}>
+                <input type="checkbox" checked={useCv} onChange={(e) => { setUseCv(e.target.checked); setCvTouched(false); }} />
+                Use our own calorific value
+                <span className="sub" style={{ fontWeight: 400 }}>e.g. from the fuel supplier's certificate or a lab analysis</span>
+              </label>
+              {useCv && (
+                <>
+                  <div className="row" style={{ alignItems: 'flex-end' }}>
+                    <label className="field" style={{ width: 150 }}>
+                      <span>Calorific value</span>
+                      <input className="input num" inputMode="decimal" value={cvValue} placeholder="0"
+                        onChange={(e) => { setCvTouched(true); setCvValue(e.target.value.replace(/[^0-9.]/g, '')); }} />
+                    </label>
+                    <label className="field" style={{ width: 170 }}>
+                      <span>Energy unit</span>
+                      <select className="input" value={cvEnergy} onChange={(e) => { setCvEnergy(e.target.value); setCvTouched(false); }}>
+                        <optgroup label="Net (lower heating value)">{cvUnits.filter((u) => u.dimension === 'energy_net').map((u) => <option key={u.code} value={u.code}>{u.name}</option>)}</optgroup>
+                        <optgroup label="Gross (higher heating value)">{cvUnits.filter((u) => u.dimension === 'energy_gross').map((u) => <option key={u.code} value={u.code}>{u.name}</option>)}</optgroup>
+                      </select>
+                    </label>
+                    <span style={{ paddingBottom: 10 }}>per</span>
+                    <label className="field" style={{ width: 150 }}>
+                      <span>Unit</span>
+                      <select className="input" value={cvPer} onChange={(e) => { setCvPer(e.target.value); setCvTouched(false); }}>
+                        {perOptions.map((u) => <option key={u.code} value={u.code}>{u.name}</option>)}
+                      </select>
+                    </label>
+                  </div>
+                  <div className="sub">
+                    {cvSuggest
+                      ? <>{cvSuggest.source} default: <b>{num(cvSuggest.value, 5)}</b> {cvUnits.find((u) => u.code === cvEnergy)?.name} per {perOptions.find((u) => u.code === cvPer)?.name}.{' '}
+                        {cvTouched && <button className="btn ghost sm" onClick={() => { setCvTouched(false); setCvValue(String(Number(cvSuggest.value.toPrecision(5)))); }}>Use default</button>}</>
+                      : 'No default available for this combination.'}
+                    {' '}The quantity is converted to energy with your value, then the {item?.name} factors per unit of energy are applied.
+                  </div>
+                </>
+              )}
             </div>
           )}
 

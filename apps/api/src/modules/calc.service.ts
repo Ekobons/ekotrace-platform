@@ -4,7 +4,7 @@
  * calculation for the item's category, and returns the result with its steps.
  */
 import { z } from 'zod';
-import { calcCombustion, calcFugitive, chooseFactors, type CalcResult, type Factor } from '@ekotrace/calc';
+import { calcCombustion, calcFugitive, chooseFactors, impliedCalorificValue, type CalcResult, type Factor } from '@ekotrace/calc';
 import { query } from '../db/pool.js';
 import { AppError, notFound } from '../lib/errors.js';
 import { refdata } from './refdata.js';
@@ -29,6 +29,8 @@ export const calcInputSchema = z.object({
   itemId: z.number().int().positive(),
   unit: z.string().min(1),
   quantity: amount.optional(), // combustion
+  /** optional calorific value entered by the user (combustion only) */
+  cv: z.object({ value: z.number().finite().positive(), energyUnit: z.string().min(1), perUnit: z.string().min(1) }).optional(),
   fugitive: fugitiveSchema.optional(), // fugitive
   periodStart: isoDate,
   periodEnd: isoDate,
@@ -86,8 +88,9 @@ export async function calculate(input: CalcInput, ctx: { gwpSet: string; region:
   let result: CalcResult;
   if (item.calc_method === 'combustion') {
     if (input.quantity === undefined) throw new AppError('Enter the quantity of fuel');
-    result = calcCombustion({ itemName: item.name, quantity: input.quantity, unit: input.unit, date, region, factors: await loadFactors(item.id), gwp, units: ref.units });
+    result = calcCombustion({ itemName: item.name, quantity: input.quantity, unit: input.unit, date, region, factors: await loadFactors(item.id), gwp, units: ref.units, cv: input.cv });
   } else {
+    if (input.cv) throw new AppError('A calorific value applies to fuels only');
     if (!input.fugitive) throw new AppError('Choose a method and enter the gas quantities');
     const composition = item.gas_code
       ? [{ gas: item.gas_code, fraction: 1 }]
@@ -103,4 +106,18 @@ export async function calculate(input: CalcInput, ctx: { gwpSet: string; region:
     result.warnings.push(`The period spans two calendar years; factors for ${input.periodStart.slice(0, 4)} were used.`);
   }
   return { result, item, gwpSet };
+}
+
+/**
+ * Calorific value implied by the item's own factors (e.g. DESNZ per litre vs
+ * per kWh), offered as the default when a user enters their own value.
+ */
+export async function defaultCalorificValue(itemId: number, q: { energyUnit: string; perUnit: string; date: string; region: string }) {
+  const ref = await refdata();
+  const factors = await loadFactors(itemId);
+  try {
+    return impliedCalorificValue(factors, { ...q, units: ref.units });
+  } catch {
+    return null;
+  }
 }

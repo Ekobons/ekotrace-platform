@@ -2,6 +2,19 @@
 
 Newest first.
 
+## 2026-10-09 (6) — Own calorific value; category tabs on Add data
+
+**Own calorific value (fuels)**
+- On Add data, "Use our own calorific value" (e.g. from the supplier's certificate or a lab analysis): value, energy unit (net or gross: MJ, GJ, kWh, MMBtu, therm, Btu) per unit of mass or volume.
+- The quantity is converted to energy with that value, then the fuel's per-energy factors are applied (net or gross factors to match). If the source has no gross factor for that fuel, the message says so.
+- The default offered is the value implied by DESNZ's own factors for that year (CO₂ per litre ÷ CO₂ per kWh). With the default, the result matches the per-litre calculation.
+- Calculation steps, the emission factor table and the saved entry show the value used (`activity.inputs.cv`).
+- New units: MJ (gross CV), Btu (gross CV) (migration 005). New API: `GET /api/items/:id/cv`.
+
+**Add data** — tabs for each category (Stationary combustion, Fugitive emissions); fugitive emissions (refrigerants) could not be reached from the menu before. "Add data" stays highlighted on every tab.
+
+Tests: 17 engine + 19 API.
+
 ## 2026-10-09 (5) — CO₂e emission factor shown with every result
 
 - Below the totals, an **Emission factor** table: for Scope 1, well-to-tank, biogenic CO₂ and memo it shows the CO₂e factor per entered unit, the source (e.g. DESNZ 2026), how it was obtained (gas split × company GWP, or published total) and the check `quantity × factor = result`.

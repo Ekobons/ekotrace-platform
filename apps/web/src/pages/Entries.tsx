@@ -80,7 +80,7 @@ export function Entries() {
               <button className="btn ghost" onClick={() => dlg.current?.close()} aria-label="Close"><Icon name="x" /></button></div>
             <div className="sub">{num(open.quantity)} {open.unit} · {open.data_type} · saved {new Date(open.created_at).toLocaleString()}</div>
             <Result r={{ gwpSet: open.gwp_set, totals: { direct: Number(open.co2e_direct), wtt: Number(open.co2e_wtt), outside_scopes: Number(open.co2_biogenic), memo: Number(open.co2e_memo) },
-              lines: open.lines.map((l) => ({ basis: l.basis, gas: l.gas, kgGas: l.kg_gas, kgCo2e: l.kg_co2e, method: l.method, source: l.source })), steps: open.steps, warnings: open.warnings, factors: open.factors }} quantity={Number(open.quantity)} unitName={open.unit} />
+              lines: open.lines.map((l) => ({ basis: l.basis, gas: l.gas, kgGas: l.kg_gas, kgCo2e: l.kg_co2e, method: l.method, source: l.source })), steps: open.steps, warnings: open.warnings, factors: open.factors, cv: open.inputs?.cv }} quantity={Number(open.quantity)} unitName={open.unit} />
           </div>
         )}
       </dialog>

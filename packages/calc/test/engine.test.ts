@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { calcCombustion, calcFugitive, unitRegistry, convert, chooseFactors, type Factor, type GwpTable } from '../src/index.js';
+import { calcCombustion, calcFugitive, impliedCalorificValue, unitRegistry, convert, chooseFactors, type Factor, type GwpTable } from '../src/index.js';
 
 const units = unitRegistry([
   { code: 'kg', name: 'kilogram', dimension: 'mass', toBase: 1 },
@@ -136,4 +136,41 @@ test('CO2e factor of a refrigerant blend is its blend GWP', () => {
   const f = r.factors.find((x) => x.basis === 'direct')!;
   assert.ok(Math.abs(f.co2ePerUnit - 1923.5) < 1e-9);
   assert.ok(Math.abs(10 * f.perEnteredUnit - r.totals.direct) < 1e-6);
+});
+
+// Diesel per kWh (net) and per kWh (gross), for the calorific value tests.
+const dieselEnergy = (year: number): Factor[] => [
+  ...diesel(10, year),
+  { id: 30, itemId: 1, basis: 'direct', unit: 'kWh', co2ePerUnit: 0.25, sourceGwpSet: 'AR5', source: `DESNZ ${year}`, region: 'GLOBAL',
+    validFrom: `${year}-01-01`, validTo: `${year}-12-31`, gases: [{ gas: 'CO2', kgPerUnit: 0.25 }] },
+  { id: 31, itemId: 1, basis: 'wtt', unit: 'kWh', co2ePerUnit: 0.06, sourceGwpSet: 'AR5', source: `DESNZ ${year}`, region: 'GLOBAL',
+    validFrom: `${year}-01-01`, validTo: `${year}-12-31`, gases: [] },
+];
+const unitsCv = unitRegistry([...units.values(), { code: 'MJ', name: 'MJ (net CV)', dimension: 'energy_net', toBase: 1 / 3.6 },
+  { code: 'MJ_gcv', name: 'MJ (gross CV)', dimension: 'energy_gross', toBase: 1 / 3.6 }]);
+
+test('own calorific value: litres × MJ/L → kWh (net) → per-kWh factor', () => {
+  const r = calcCombustion({ itemName: 'Diesel', quantity: 1, unit: 'kL', date: '2024-03-01', region: 'AE', factors: dieselEnergy(2024), gwp: AR5, units: unitsCv,
+    cv: { value: 36, energyUnit: 'MJ', perUnit: 'L' } });
+  // 1 kL = 1,000 L × 36 MJ/L = 36,000 MJ = 10,000 kWh × 0.25 = 2,500 kg
+  assert.ok(Math.abs(r.totals.direct - 2500) < 1e-6, String(r.totals.direct));
+  assert.ok(Math.abs(r.totals.wtt - 600) < 1e-6);
+  assert.equal(r.cv?.basis, 'net');
+  assert.ok(Math.abs(r.cv!.convertedQuantity - 36000) < 1e-6);
+  const d = r.factors.find((f) => f.basis === 'direct')!;
+  assert.ok(Math.abs(d.perEnteredUnit - 2500) < 1e-6); // per kilolitre entered
+  assert.ok(r.steps[0].startsWith('Calorific value (net, entered)'));
+});
+
+test('own calorific value: gross CV with no gross factor gives a clear error; wrong dimension refused', () => {
+  assert.throws(() => calcCombustion({ itemName: 'Diesel', quantity: 1, unit: 'L', date: '2024-03-01', region: 'AE', factors: dieselEnergy(2024), gwp: AR5, units: unitsCv,
+    cv: { value: 38, energyUnit: 'MJ_gcv', perUnit: 'L' } }), /No factor for Diesel in MJ \(gross CV\)/);
+  assert.throws(() => calcCombustion({ itemName: 'Diesel', quantity: 1, unit: 'L', date: '2024-03-01', region: 'AE', factors: dieselEnergy(2024), gwp: AR5, units: unitsCv,
+    cv: { value: 36, energyUnit: 'MJ', perUnit: 'kg' } }), /does not fit/);
+});
+
+test('implied calorific value from the source factors', () => {
+  const v = impliedCalorificValue(dieselEnergy(2024), { date: '2024-05-01', region: 'AE', energyUnit: 'MJ', perUnit: 'L', units: unitsCv })!;
+  // 2.62818 kg CO2/L ÷ (0.25 kg CO2/kWh ÷ 3.6 MJ/kWh) = 37.845 MJ/L
+  assert.ok(Math.abs(v.value - 2.62818 / (0.25 / 3.6)) < 1e-9);
 });

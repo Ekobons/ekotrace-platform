@@ -2,7 +2,7 @@
  * App shell: login gate, prototype sidebar (by role), company context, routes.
  */
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
-import { NavLink, Navigate, Route, Routes, useNavigate } from 'react-router-dom';
+import { NavLink, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { api, currentTenant, setTenant, whenLoggedOut, ROLE_LABEL, type Company, type Me, type Role } from './lib/api';
 import { Icon } from './components/Icon';
 import { Login, ChangePassword } from './pages/Login';
@@ -83,6 +83,7 @@ export function App() {
 function Shell() {
   const { me, role, tenant, reload, can } = useApp();
   const nav = useNavigate();
+  const path = useLocation().pathname;
   const [companies, setCompanies] = useState<Company[]>([]);
   useEffect(() => { if (role === 'platform_admin') api.companies().then((c) => setCompanies(c.companies)).catch(() => {}); }, [role, tenant?.id]);
 
@@ -116,7 +117,7 @@ function Shell() {
               <div key={gi}>
                 {g.group && <div className="navgrp">{g.group}</div>}
                 {items.map((i) => i.to
-                  ? <NavLink key={i.label} to={i.to}><Icon name={i.icon} />{i.label}</NavLink>
+                  ? <NavLink key={i.label} to={i.to} className={({ isActive }) => (isActive || (i.to?.startsWith('/data/') && path.startsWith('/data/')) ? 'active' : '')}><Icon name={i.icon} />{i.label}</NavLink>
                   : <a key={i.label} className="soon" aria-disabled="true" title={`Coming in stage ${i.stage}`}><Icon name={i.icon} />{i.label}<span className="soonchip">S{i.stage}</span></a>)}
               </div>
             );

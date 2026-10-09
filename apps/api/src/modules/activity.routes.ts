@@ -125,7 +125,7 @@ export async function activityRoutes(app: FastifyInstance) {
         `INSERT INTO activity (tenant_id, facility_id, category_id, item_id, period_start, period_end, quantity, unit, inputs, data_type, gwp_set,
                                co2e_direct, co2e_wtt, co2_biogenic, co2e_memo, steps, warnings, note, created_by, factors)
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20) RETURNING id, created_at`,
-        [tenant, fac.id, item.category_id, item.id, b.periodStart, b.periodEnd, quantity, b.unit, JSON.stringify(b.fugitive ?? {}), b.dataType, gwpSet,
+        [tenant, fac.id, item.category_id, item.id, b.periodStart, b.periodEnd, quantity, b.unit, JSON.stringify(b.fugitive ?? (result.cv ? { cv: result.cv } : {})), b.dataType, gwpSet,
          result.totals.direct, result.totals.wtt, result.totals.outside_scopes, result.totals.memo,
          JSON.stringify(result.steps), JSON.stringify(result.warnings), b.note ?? null, req.user.id, JSON.stringify(result.factors)])).rows[0];
       if (result.lines.length) {

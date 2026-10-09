@@ -10,6 +10,7 @@
  * (PUT /api/catalogue/visibility), without affecting other clients.
  */
 import type { FastifyInstance } from 'fastify';
+import { defaultCalorificValue } from './calc.service.js';
 import { z } from 'zod';
 import { query, tx, tenantTx } from '../db/pool.js';
 import { requirePlatformAdmin, requireRole, requireTenant } from '../lib/auth.js';
@@ -70,6 +71,25 @@ export async function catalogueRoutes(app: FastifyInstance) {
         ORDER BY u.sort, u.code`, [id, it.units, it.calc_method]);
     const def = [it.default_unit, it.sub_default].find((d) => d && rows.some((r) => r.code === d)) ?? rows[0]?.code ?? null;
     return { units: rows, defaultUnit: def };
+  });
+
+  /**
+   * For entering an own calorific value: the energy units the item has factors
+   * in (net and/or gross), and the value implied by its factors as a default.
+   */
+  app.get('/api/items/:id/cv', async (req) => {
+    const id = z.coerce.number().int().parse((req.params as { id: string }).id);
+    const q = z.object({ energyUnit: z.string().optional(), perUnit: z.string().optional(), date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional() }).parse(req.query);
+    const energyUnits = await query<{ code: string; name: string; dimension: string }>(
+      `SELECT u.code, u.name, u.dimension FROM unit u
+        WHERE u.active AND u.dimension IN (SELECT DISTINCT uu.dimension FROM factor f JOIN unit uu ON uu.code = f.unit
+                                             WHERE f.item_id = $1 AND f.status = 'active' AND f.basis = 'direct'
+                                               AND uu.dimension IN ('energy_net', 'energy_gross'))
+        ORDER BY u.dimension DESC, u.to_base`, [id]);
+    const suggested = q.energyUnit && q.perUnit
+      ? await defaultCalorificValue(id, { energyUnit: q.energyUnit, perUnit: q.perUnit, date: q.date ?? new Date().toISOString().slice(0, 10), region: 'GLOBAL' })
+      : null;
+    return { energyUnits, suggested };
   });
 
   // ---------------------------------------------------------- categories --
