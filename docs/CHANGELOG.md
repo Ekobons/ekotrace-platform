@@ -18,7 +18,7 @@ Newest first.
 - Companies, facilities, entries, results per gas; row-level security between companies.
 
 **Data loaded**
-- DESNZ 2022–2026 flat files: 51 stationary fuels (6 classes), WTT and biogenic rows; 2,317 factors in total; 166 gas rows per year.
+- DESNZ 2022–2026 flat files: 52 stationary fuels across the five editions (51 in 2026), in 6 classes, with WTT and biogenic rows — 2,317 factors; 166 gas rows per edition.
 - 25 refrigerant blend compositions (each reproduces DESNZ AR4 and AR5 within 1 %); 59 other blends use the DESNZ total.
 - IPCC 2006 defaults for anthracite, other bituminous, sub-bituminous coal, lignite.
 - Old Ekotrace fuel names kept as aliases for later data migration.
