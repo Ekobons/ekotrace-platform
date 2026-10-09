@@ -8,3 +8,4 @@ export * from './fugitive.js';
 export * from './vehicle.js';
 export * from './energy.js';
 export * from './waste.js';
+export * from './meter.js';

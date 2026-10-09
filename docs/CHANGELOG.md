@@ -2,6 +2,28 @@
 
 Newest first.
 
+## 2026-10-10 (5) — Meters (readings by API), bills (PDF), API security
+
+**Meters** (Capture → Meters; set up per facility, or from Add data → Month by month → "Set up a meter with these inputs", which keeps every detail of the entry: supplier factor, grid region, cooling plant, waste process…)
+- Register (index, counts up) or consumption per period; hourly, daily, weekly, monthly or irregular; unit, multiplier (CT ratio / pulse value), register maximum (rollover), the meter's id in the sending system, utility account number (bills).
+- Readings → one entry per calendar month in the company time zone (default Asia/Dubai): register differences and periods across a month end are split by time; coverage per month; a partly covered month (at least a quarter) scaled up and marked estimated; gaps, resets, rollovers, overlaps and unusual values flagged in the entry's warnings; meter steps at the top of the calculation.
+- Entries are created / updated when a month has ended (automatic, or on demand); late readings and corrections update the month; **approved entries are never changed** — the difference is reported. Recalculation of meter entries goes through the meter.
+- Readings can also be pasted (time, value[, start]; day-first dates accepted) and deleted; the screen shows months (coverage bar, measured, used, entry) and the latest readings.
+
+**Machine API** (Setup → Integrations & API)
+- API clients per sending system: client id + secret (shown once, only its hash kept), revoke at once, last use shown.
+- OAuth 2.0 client credentials: `POST /api/v1/oauth/token` → 1-hour access token (JWT, HS256; `TOKEN_SECRET` setting on servers). `POST /api/v1/meter-readings` (up to 100,000 readings, each checked on its own; same meter + time = correction), `GET /api/v1/meters`. Rate limit 120 requests / minute per client. Every batch in the audit log.
+- Security headers on every response (CSP, X-Frame-Options, nosniff, Referrer-Policy; HSTS with `HTTPS=true`) — BEEAH security standard 4.7 / 4.9.
+
+**Bills** (Capture → Bills)
+- Drop many PDFs at once (15 MB each; PDF checked; the same file twice recognised). Text read with PDF.js 6 (no code from the file runs); scans without text flagged for typing in.
+- Reader for UAE / GCC bills (DEWA, SEWA, ADDC / AADC / TAQA, Etihad WE, Empower, Tabreed, Emicool, Emirates Gas) and generic layouts: supplier, account, bill no., billing period (or reading dates), bill date, consumption with unit (kWh, MWh, TRh/RTh, m³, kg, L — ignoring meter readings, rates, water), amount and currency; each value shows the line it came from; other figures offered with one click.
+- Matched to the meter by account number (or chosen; or "new meter for this account"). A person checks against the PDF shown beside the fields and books it: one reading for the billing period → monthly entries split by days. Reject (with a reason) and reopen (removes the reading, recalculates the months).
+- Email intake not built (see project notes): upload in one place instead.
+
+**Demo**: hourly BMS electricity at the data centre (2026, with a 2-day outage in June), daily gas register at the WtE plant, weekly compost weighbridge, and 8 SEWA-style bills for HQ (15th–14th; 7 booked, August to check) — all marked DEMO; the manual entries they replace were removed.
+**Tests**: 35 engine (incl. time zones, hourly / weekly / register / rollover / reset / partial months) + 38 API (incl. OAuth, ingest, corrections, approved lock, bills end to end with generated PDFs).
+
 ## 2026-10-10 (4) — Month by month entry; factor library filters
 
 **Month by month** (Add data → period row → "Month by month"): set the inputs once, then type or paste the 12 readings; one entry per month is saved.

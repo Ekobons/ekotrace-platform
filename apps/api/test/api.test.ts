@@ -683,3 +683,104 @@ test('wastewater with flow: nitrogen as mg/L gives the same result as kg; twelve
   const r = await api('POST', '/api/activities/batch', { entries: months, dryRun: false }, tenantA);
   assert.equal(r.body.saved, 12, JSON.stringify(r.body));
 });
+
+test('meters: register readings via the screen → monthly entries; API key ingest (hourly interval), corrections, approved entries locked, other company isolated', async () => {
+  const gas = await itemId('desnz:natural-gas');
+  const tz = (await api('GET', '/api/tenant', undefined, tenantA)).body.timezone;
+  assert.equal(tz, 'Asia/Dubai');
+  // 1. Daily register (cumulative) meter, m³, readings Jan 1 – Feb 10 2024 (local midnight), 100 m³ a day
+  const m1 = await api('POST', '/api/meters', { facilityId: facA, name: 'Boiler gas meter', readingType: 'cumulative', frequency: 'day', unit: 'm3', itemId: gas, template: {} }, tenantA);
+  assert.equal(m1.status, 200, JSON.stringify(m1.body));
+  const day = (d: number) => new Date(Date.UTC(2024, 0, 1 + d) - 4 * 3600_000).toISOString();
+  const rd = Array.from({ length: 41 }, (_, d) => ({ timestamp: day(d), value: 5000 + 100 * d }));
+  const up = await api('POST', `/api/meters/${m1.body.id}/readings`, { readings: rd }, tenantA);
+  assert.equal(up.status, 200, JSON.stringify(up.body));
+  assert.equal(up.body.inserted, 41);
+  assert.equal(up.body.sync.created, 2, JSON.stringify(up.body.sync)); // January (full) and February (partial, closed)
+  const detail = (await api('GET', `/api/meters/${m1.body.id}`, undefined, tenantA)).body;
+  const jan = detail.months.find((x: { month: string }) => x.month === '2024-01');
+  assert.ok(Math.abs(jan.consumption - 3100) < 1e-6 && jan.coverage === 1 && !jan.filled);
+  const feb = detail.months.find((x: { month: string }) => x.month === '2024-02');
+  assert.ok(feb.filled && Math.abs(feb.consumption - 900 / (9 / 29)) < 1e-6, JSON.stringify(feb));
+  const manual = await api('POST', '/api/calculate', { facilityId: facA, itemId: gas, unit: 'm3', quantity: 3100, periodStart: '2024-01-01', periodEnd: '2024-01-31' }, tenantA);
+  const janEntry = (await api('GET', `/api/activities/${jan.entry.id}`, undefined, tenantA)).body;
+  assert.ok(Math.abs(Number(janEntry.co2e_direct) - manual.body.totals.direct) < 1e-6);
+  assert.equal(janEntry.meter, 'Boiler gas meter');
+  assert.match(janEntry.steps[0], /Boiler gas meter/);
+  assert.equal((await api('GET', `/api/activities/${feb.entry.id}`, undefined, tenantA)).body.data_type, 'estimated');
+
+  // 2. API key + hourly interval meter (kWh), readings sent by a "BMS"
+  const m2 = await api('POST', '/api/meters', { facilityId: facA, name: 'Kitchen gas (BMS)', externalId: 'BMS-GAS-01', readingType: 'interval', frequency: 'hour', unit: 'kWh', itemId: gas, template: {} }, tenantA);
+  assert.equal(m2.status, 200, JSON.stringify(m2.body));
+  const key = await api('POST', '/api/api-keys', { name: 'BMS test' }, tenantA);
+  assert.match(key.body.key, /^ek_/);
+  const tokRes = await app.inject({ method: 'POST', url: '/api/v1/oauth/token', payload: `grant_type=client_credentials&client_id=${key.body.id}&client_secret=${encodeURIComponent(key.body.key)}`, headers: { 'content-type': 'application/x-www-form-urlencoded' } });
+  assert.equal(tokRes.statusCode, 200, tokRes.body);
+  const token = tokRes.json().access_token as string;
+  assert.equal(tokRes.json().token_type, 'Bearer');
+  const bad = await app.inject({ method: 'POST', url: '/api/v1/oauth/token', payload: { grant_type: 'client_credentials', client_id: key.body.id, client_secret: 'ek_wrongwrongwrongwrongwrong' } });
+  assert.equal(bad.statusCode, 401);
+  const send = (body: unknown, k = token) => app.inject({ method: 'POST', url: '/api/v1/meter-readings', payload: body as object, headers: { authorization: `Bearer ${k}`, 'content-type': 'application/json' } });
+  const hours = Array.from({ length: 29 * 24 }, (_, h) => ({ meterId: 'BMS-GAS-01', timestamp: new Date(Date.UTC(2024, 1, 1, h + 1) - 4 * 3600_000).toISOString(), value: 10 }));
+  const r1 = await send({ readings: [...hours, { meterId: 'NOPE', timestamp: '2024-02-01T00:00:00Z', value: 1 }, { meterId: 'BMS-GAS-01', timestamp: 'yesterday', value: 1 }] });
+  assert.equal(r1.statusCode, 200, r1.body);
+  const j1 = r1.json();
+  assert.equal(j1.inserted, 696); assert.equal(j1.rejected.length, 2);
+  assert.equal(j1.meters[0].entries.created, 1);
+  const e2 = (await api('GET', `/api/activities?category=stationary_combustion&limit=1000`, undefined, tenantA)).body.activities.find((a: { meter: string }) => a.meter === 'Kitchen gas (BMS)');
+  assert.ok(Math.abs(Number(e2.quantity) - 6960) < 1e-6);
+  // same readings again: nothing changes
+  const r2 = (await send({ readings: hours })).json();
+  assert.equal(r2.unchanged, 696); assert.equal(r2.inserted + r2.updated, 0);
+  // approved month is not changed by a correction
+  { const cl = await pool.connect(); await cl.query('BEGIN'); await cl.query(`SELECT set_config('app.platform','on',true)`);
+    await cl.query(`UPDATE activity SET status = 'approved' WHERE id = $1`, [e2.id]); await cl.query('COMMIT'); cl.release(); }
+  const r3 = (await send({ readings: [{ ...hours[5]!, value: 500 }] })).json();
+  assert.equal(r3.updated, 1);
+  assert.equal(r3.meters[0].entries.locked.length, 1);
+  // keys: listing the company's meters; revoked key refused; other company sees nothing
+  const list = await app.inject({ method: 'GET', url: '/api/v1/meters', headers: { authorization: `Bearer ${token}` } });
+  assert.equal(list.json().meters.length, 2);
+  assert.equal((await send({ readings: hours.slice(0, 1) }, key.body.key)).statusCode, 200, 'the secret itself also works');
+  await api('DELETE', `/api/api-keys/${key.body.id}`, undefined, tenantA);
+  assert.equal((await send({ readings: hours.slice(0, 1) })).statusCode, 401, 'token of a revoked client refused');
+  assert.equal((await api('GET', '/api/meters', undefined, tenantB)).body.meters.length, 0);
+  assert.equal((await api('GET', `/api/meters/${m1.body.id}`, undefined, tenantB)).status, 404);
+});
+
+test('bills: upload a PDF, read, match the account to a meter, check, confirm → reading and monthly entries split by days; duplicate file recognised; reopen', async () => {
+  const { makePdf, SAMPLE_ELECTRICITY } = await import('./helpers/pdf.js');
+  const grid = await itemId('grid:electricity');
+  const m = await api('POST', '/api/meters', { facilityId: facA, name: 'SEWA main account', readingType: 'interval', frequency: 'month', unit: 'kWh_e', itemId: grid, template: {}, accountNo: '2001458876' }, tenantA);
+  assert.equal(m.status, 200, JSON.stringify(m.body));
+  // A bill spanning two months: 15 Feb – 14 Mar 2026
+  const lines = SAMPLE_ELECTRICITY.map((l) => (Array.isArray(l) && l[0] === 'Billing Period:' ? ['Billing Period:', '15/02/2026 - 14/03/2026'] as [string, string] : l));
+  const pdf = Buffer.from(await makePdf(lines));
+  const up = await app.inject({ method: 'POST', url: '/api/bills/upload', payload: pdf, headers: { cookie: adminCookie, 'x-tenant-id': tenantA, 'content-type': 'application/octet-stream', 'x-filename': 'sewa-mar.pdf' } });
+  assert.equal(up.statusCode, 200, up.body);
+  const bill = up.json();
+  assert.equal(bill.meter_id, m.body.id, 'matched by account number');
+  assert.equal(Number(bill.quantity), 45500); assert.equal(bill.unit, 'kWh_e'); assert.equal(bill.status, 'to_check');
+  const again = await app.inject({ method: 'POST', url: '/api/bills/upload', payload: pdf, headers: { cookie: adminCookie, 'x-tenant-id': tenantA, 'content-type': 'application/octet-stream' } });
+  assert.equal(again.json().duplicate, true);
+  const notPdf = await app.inject({ method: 'POST', url: '/api/bills/upload', payload: Buffer.from('hello'), headers: { cookie: adminCookie, 'x-tenant-id': tenantA, 'content-type': 'application/octet-stream' } });
+  assert.equal(notPdf.statusCode, 400);
+  const doc = await app.inject({ method: 'GET', url: `/api/documents/${bill.document_id}`, headers: { cookie: adminCookie, 'x-tenant-id': tenantA } });
+  assert.equal(doc.headers['content-type'], 'application/pdf');
+  // Confirm with a correction (person checked: 45,600)
+  const ok = await api('POST', `/api/bills/${bill.id}/confirm`, { quantity: 45600 }, tenantA);
+  assert.equal(ok.status, 200, JSON.stringify(ok.body));
+  assert.equal(ok.body.sync.created, 2);
+  const ent = (await api('GET', `/api/bills/${bill.id}`, undefined, tenantA)).body.entries;
+  assert.equal(ent.length, 2);
+  const feb = ent.find((e: { period_start: string }) => e.period_start === '2026-02-01'), mar = ent.find((e: { period_start: string }) => e.period_start === '2026-03-01');
+  // February has 14 of the bill's 28 days; it is 14/28 of the month → scaled to the whole month (estimated)
+  assert.ok(Math.abs(Number(feb.quantity) - 45600 * (14 / 28) / (14 / 28)) < 1e-3, JSON.stringify(ent));
+  assert.ok(Math.abs(Number(mar.quantity) - 45600 * (14 / 28) / (14 / 31)) < 1e-3);
+  // Another bill for the same period cannot be booked; reopening removes the reading and the entries
+  assert.equal((await api('POST', `/api/bills/${bill.id}/confirm`, {}, tenantA)).status, 400);
+  const re = await api('POST', `/api/bills/${bill.id}/reopen`, {}, tenantA);
+  assert.equal(re.status, 200, JSON.stringify(re.body));
+  assert.equal((await api('GET', `/api/bills/${bill.id}`, undefined, tenantA)).body.entries.length, 0);
+  assert.equal((await api('GET', '/api/bills', undefined, tenantB)).body.bills.length, 0);
+});

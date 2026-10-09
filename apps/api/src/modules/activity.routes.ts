@@ -13,6 +13,7 @@ import { assertCan, scopeOf } from '../lib/access.js';
 import { AppError, notFound } from '../lib/errors.js';
 import { calcInputSchema, calculate, findPrice, type CalcContext, type CalcInput } from './calc.service.js';
 import type { Tx } from '../db/pool.js';
+import { syncMeter, type MeterRow } from './meters.routes.js';
 
 /**
  * A fleet vehicle chosen for the entry: its type, fuel and charging become the
@@ -147,9 +148,9 @@ function recalcInput(a: Record<string, any>, periodStart: string, periodEnd: str
 }
 
 export async function tenantSettings(tenantId: string) {
-  const [t] = await query('SELECT id, name, country, gwp_set, consolidation, base_year, plan, status, access_expiry FROM tenant WHERE id = $1', [tenantId]);
+  const [t] = await query('SELECT id, name, country, gwp_set, consolidation, base_year, plan, status, access_expiry, timezone FROM tenant WHERE id = $1', [tenantId]);
   if (!t) throw notFound('Company');
-  return t as { id: string; name: string; country: string; gwp_set: string; consolidation: string; base_year: number };
+  return t as { id: string; name: string; country: string; gwp_set: string; consolidation: string; base_year: number; timezone: string };
 }
 
 export async function activityRoutes(app: FastifyInstance) {
@@ -281,7 +282,18 @@ export async function activityRoutes(app: FastifyInstance) {
           ORDER BY a.period_start`, [b.ids ?? null, b.year ?? null, b.onlyWithWarnings])).rows.filter((a) => enter.has(a.facility_id));
       let changed = 0;
       const problems: string[] = [];
-      for (const a of rows) {
+      // Entries from a meter are rebuilt from its readings (keeps the meter steps and coverage).
+      const byMeter = new Map<string, Set<string>>();
+      for (const a of rows.filter((x) => x.meter_id)) {
+        const iso = (d: Date | string) => (d instanceof Date ? d.toISOString().slice(0, 7) : String(d).slice(0, 7));
+        byMeter.set(a.meter_id, (byMeter.get(a.meter_id) ?? new Set()).add(iso(a.period_start)));
+      }
+      for (const [mid, months] of byMeter) {
+        const m = (await c.query('SELECT * FROM meter WHERE id = $1', [mid])).rows[0] as MeterRow;
+        const r = await syncMeter(c, t, m, { id: req.user.id, name: req.user.name, req }, months);
+        changed += r.updated; problems.push(...r.problems, ...r.locked);
+      }
+      for (const a of rows.filter((x) => !x.meter_id)) {
         const iso = (d: Date | string) => (d instanceof Date ? d.toISOString().slice(0, 10) : String(d).slice(0, 10));
         const input = recalcInput(a, iso(a.period_start), iso(a.period_end));
         await c.query('SAVEPOINT recalc');
@@ -337,9 +349,9 @@ export async function activityRoutes(app: FastifyInstance) {
         activities: (await c.query(
           `SELECT a.id, a.facility_id, a.period_start, a.period_end, f.name AS facility, cat.name AS category, i.name AS item, a.quantity, a.unit, a.data_type, a.gwp_set,
                   a.co2e_direct, a.co2e_wtt, a.co2_biogenic, a.co2e_memo, a.co2e_scope2, a.co2e_scope2_market, a.co2e_td, a.co2e_scope3, a.status, a.created_at, a.vehicle_id, v.name AS vehicle,
-                  cat.scope, cat.ghg_category, ws.name AS waste_site
+                  cat.scope, cat.ghg_category, ws.name AS waste_site, a.meter_id, mt.name AS meter
              FROM activity a JOIN org_node f ON f.id = a.facility_id JOIN item i ON i.id = a.item_id JOIN category cat ON cat.id = a.category_id
-             LEFT JOIN vehicle v ON v.id = a.vehicle_id LEFT JOIN waste_site ws ON ws.id = a.waste_site_id
+             LEFT JOIN vehicle v ON v.id = a.vehicle_id LEFT JOIN waste_site ws ON ws.id = a.waste_site_id LEFT JOIN meter mt ON mt.id = a.meter_id
             WHERE a.facility_id = ANY($5) AND ($1::uuid IS NULL OR a.facility_id = $1) AND ($2::int IS NULL OR extract(year FROM a.period_start) = $2) AND ($3::text IS NULL OR cat.code = $3)
             ORDER BY a.period_start DESC, a.created_at DESC LIMIT $4`, [q.facilityId ?? null, q.year ?? null, q.category ?? null, q.limit, see])).rows,
       };
@@ -350,8 +362,8 @@ export async function activityRoutes(app: FastifyInstance) {
     const tenant = requireTenant(req);
     const id = z.string().uuid().parse((req.params as { id: string }).id);
     return tenantTx(tenant, async (c) => {
-      const a = (await c.query(`SELECT a.*, i.name AS item, v.name AS vehicle, ws.name AS waste_site FROM activity a JOIN item i ON i.id = a.item_id
-                                  LEFT JOIN vehicle v ON v.id = a.vehicle_id LEFT JOIN waste_site ws ON ws.id = a.waste_site_id WHERE a.id = $1`, [id])).rows[0];
+      const a = (await c.query(`SELECT a.*, i.name AS item, v.name AS vehicle, ws.name AS waste_site, mt.name AS meter FROM activity a JOIN item i ON i.id = a.item_id
+                                  LEFT JOIN vehicle v ON v.id = a.vehicle_id LEFT JOIN waste_site ws ON ws.id = a.waste_site_id LEFT JOIN meter mt ON mt.id = a.meter_id WHERE a.id = $1`, [id])).rows[0];
       if (!a || !(await scopeOf(c, req.user)).see.has(a.facility_id)) throw notFound('Entry');
       const lines = (await c.query(
         `SELECT r.basis, r.gas, r.kg_gas, r.kg_co2e, r.method, r.factor_id, s.code AS source

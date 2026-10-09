@@ -4,6 +4,7 @@
  */
 import { readFileSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { randomBytes } from 'node:crypto';
 
 // Minimal .env loader (no dependency): KEY=value lines, # comments.
 const envFile = resolve(process.cwd(), '.env');
@@ -30,4 +31,8 @@ export const config = {
   /** 127.0.0.1 = only this computer can connect (laptop). Servers set HOST=0.0.0.0 behind HTTPS. */
   host: process.env.HOST ?? '127.0.0.1',
   dbPoolSize: Number(process.env.DB_POOL_SIZE ?? 20),
+  /** signs API access tokens (OAuth 2.0 client credentials). Set it on servers; without it tokens end when the server restarts. */
+  tokenSecret: process.env.TOKEN_SECRET ?? randomBytes(32).toString('hex'),
+  /** HTTPS in front (servers): adds Strict-Transport-Security */
+  https: process.env.HTTPS === 'true',
 };

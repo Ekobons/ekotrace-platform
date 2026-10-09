@@ -352,6 +352,7 @@ function OwnSite({ cat, facilityId, period, onSaved, monthly }: { cat: Category;
       {monthOk ? <MonthGrid year={monthly!} facilityId={facilityId} build={buildMonth} onSaved={onSaved}
         label={proc === 'wastewater' ? (ww.mode === 'flow' ? 'Inflow' : `${ww.measure} treated`) : proc === 'incineration' ? 'Waste incinerated' : 'Waste treated'}
         unitName={proc === 'wastewater' ? (ww.mode === 'flow' ? 'm³' : `kg ${ww.measure}`) : 'tonnes'}
+        meterUnit={proc === 'wastewater' ? (ww.mode === 'flow' ? 'm3' : 'kg') : 't'}
         hint={`Paste 12 values from Excel (a row or a column) into January to fill all months.${proc === 'incineration' && inc.exportedMWh ? ' Energy exported is not repeated month by month.' : ''}${proc === 'wastewater' && wwRec.length ? ' Gas recovered is not repeated month by month.' : ''}`}
         dup={{ category: 'waste_treatment', same: (a) => a.item === cat.subcategories.flatMap((x) => x.items).find((i) => i.code === ITEM[proc])?.name }} /> : <>
       <div className="row">

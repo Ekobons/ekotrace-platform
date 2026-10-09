@@ -14,6 +14,9 @@ import { People } from './pages/People';
 import { Methodology } from './pages/Methodology';
 import { EnergyRegister } from './pages/EnergyRegister';
 import { AuditLog } from './pages/AuditLog';
+import { Meters } from './pages/Meters';
+import { Bills } from './pages/Bills';
+import { Integrations } from './pages/Integrations';
 import { Console } from './pages/Console';
 
 interface Ctx {
@@ -35,6 +38,8 @@ const NAV: { group?: string; items: NavItem[] }[] = [
   { group: 'Capture', items: [
     { to: '/data/stationary_combustion', label: 'Add data', icon: 'plus', roles: ['super_admin', 'admin', 'manager', 'preparer'] },
     { to: '/entries', label: 'Entries & results', icon: 'list' },
+    { to: '/meters', label: 'Meters', icon: 'gauge', roles: ['super_admin', 'admin', 'manager', 'preparer', 'verifier'] },
+    { to: '/bills', label: 'Bills', icon: 'doc', roles: ['super_admin', 'admin', 'manager', 'preparer', 'verifier'] },
     { label: 'Approvals', icon: 'check', stage: 2 }, { label: 'Data progress', icon: 'grid', stage: 2 }, { label: 'Collection calendar', icon: 'calendar', stage: 2 },
     { label: 'Inbox & to-dos', icon: 'inbox', stage: 2 }, { label: 'Document vault', icon: 'folder', stage: 2 }, { label: 'Batch runs', icon: 'upload', stage: 4 },
     { label: 'QR & field app', icon: 'qr', stage: 4 },
@@ -47,7 +52,7 @@ const NAV: { group?: string; items: NavItem[] }[] = [
     { to: '/energy', label: 'Energy certificates & suppliers', icon: 'bolt', roles: ['super_admin', 'admin', 'manager', 'verifier'] },
     { to: '/people', label: 'People & access', icon: 'users', roles: ['super_admin', 'admin', 'manager'] },
     { to: '/library', label: 'Factors & dictionary', icon: 'book', roles: [] },
-    { label: 'Metric registry', icon: 'list', stage: 4 }, { label: 'Integrations & API', icon: 'plug', stage: 4 }, { label: 'AI models', icon: 'spark', stage: 4 },
+    { label: 'Metric registry', icon: 'list', stage: 4 }, { to: '/integrations', label: 'Integrations & API', icon: 'plug', roles: ['super_admin', 'admin'] }, { label: 'AI models', icon: 'spark', stage: 4 },
     { to: '/audit', label: 'Security & audit log', icon: 'lock', roles: ['super_admin', 'admin', 'verifier'] },
   ] },
   { group: 'Help', items: [{ label: 'Information centre', icon: 'info', stage: 4 }, { label: 'Message centre', icon: 'chat', stage: 4 }] },
@@ -145,6 +150,9 @@ function Shell() {
           <Route path="/people" element={<NeedCo><People /></NeedCo>} />
           <Route path="/methodology" element={<NeedCo><Methodology /></NeedCo>} />
           <Route path="/energy" element={<NeedCo><EnergyRegister /></NeedCo>} />
+          <Route path="/meters" element={<NeedCo><Meters /></NeedCo>} />
+          <Route path="/bills" element={<NeedCo><Bills /></NeedCo>} />
+          <Route path="/integrations" element={<NeedCo><Integrations /></NeedCo>} />
           <Route path="/audit" element={<NeedCo><AuditLog /></NeedCo>} />
           <Route path="*" element={<div className="page"><div className="card empty">Page not found.</div></div>} />
         </Routes>

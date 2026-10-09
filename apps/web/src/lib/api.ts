@@ -20,7 +20,7 @@ export interface FactorUsed {
 /** A calorific value the user entered, and what it converted the quantity to. */
 export interface CvUsed { value: number; energyUnit: string; perUnit: string; energyUnitName: string; perUnitName: string; basis: 'net' | 'gross'; convertedQuantity: number; convertedUnit: string; convertedUnitName: string }
 export interface CalcResponse { cv?: CvUsed; stored?: { quantity: number; unit: string; inputs: Record<string, unknown> }; item: { id: number; name: string; category: string }; gwpSet: string; lines: ResultLine[]; factors: FactorUsed[]; totals: Record<Basis, number>; steps: string[]; warnings: string[] }
-export interface Tenant { id: string; name: string; country: string; gwp_set: string; consolidation?: string; base_year?: number; plan?: string; status?: string; access_expiry?: string }
+export interface Tenant { id: string; name: string; country: string; gwp_set: string; timezone?: string; consolidation?: string; base_year?: number; plan?: string; status?: string; access_expiry?: string }
 export type Role = 'platform_admin' | 'super_admin' | 'admin' | 'manager' | 'preparer' | 'verifier';
 export interface Me { user: { id: string; name: string; email: string; role: Role; tenantId: string | null; scopeNodeId: string | null; mustChangePassword: boolean }; company: (Tenant & { scope_name: string | null }) | null }
 export interface OrgNode { id: string; parent_id: string | null; kind: 'group' | 'subgroup' | 'facility'; name: string; facility_type: string | null; location: string | null; country: string; floor_area_m2: number | null; employees: number | null; ownership_pct: number; operational_control: boolean; financial_control: boolean; active: boolean; sort: number; manager_user_id: string | null; manager_name: string | null; grid_region?: string | null; entries: number; canEdit: boolean; canSee: boolean; canEnter: boolean }
@@ -29,7 +29,7 @@ export interface Company { id: string; name: string; country: string; gwp_set: s
 export const ROLE_LABEL: Record<Role, string> = { platform_admin: 'Platform admin', super_admin: 'Super admin', admin: 'Admin', manager: 'Manager', preparer: 'Data preparer', verifier: 'Verifier' };
 export interface Facility { id: string; name: string; country: string; grid_region?: string | null; active: boolean; facility_type?: string | null; parent_name?: string | null; canEnter?: boolean; canApprove?: boolean }
 export interface Factor { id: number; item_id: number; item: string; subcategory: string; basis: Basis; unit: string; co2e: number | null; region: string; valid_from: string; valid_to: string; status: string; version: number; supersedes_id: number | null; note: string | null; source: string; gwp_set: string | null; gases: { gas: string; kgPerUnit: number }[] | null }
-export interface Activity { id: string; period_start: string; period_end: string; facility: string; category: string; item: string; quantity: number; unit: string; data_type: string; gwp_set: string; co2e_direct: number; co2e_wtt: number; co2_biogenic: number; co2e_memo: number; co2e_scope2?: number; co2e_scope2_market?: number; co2e_td?: number; co2e_scope3?: number; scope?: number; ghg_category?: number | null; waste_site?: string | null; status: string; created_at: string; vehicle?: string | null; vehicle_id?: string | null }
+export interface Activity { id: string; period_start: string; period_end: string; facility: string; category: string; item: string; quantity: number; unit: string; data_type: string; gwp_set: string; co2e_direct: number; co2e_wtt: number; co2_biogenic: number; co2e_memo: number; co2e_scope2?: number; co2e_scope2_market?: number; co2e_td?: number; co2e_scope3?: number; scope?: number; ghg_category?: number | null; waste_site?: string | null; meter?: string | null; meter_id?: string | null; status: string; created_at: string; vehicle?: string | null; vehicle_id?: string | null }
 
 /** Platform admin only: the company being looked at (sent as x-tenant-id). Others are fixed to their own company. */
 let tenantId = localStorageGet('ekotrace.tenant');
@@ -73,9 +73,9 @@ export class ApiError extends Error {
 let onUnauthenticated: () => void = () => {};
 export function whenLoggedOut(fn: () => void) { onUnauthenticated = fn; }
 
-async function call<T>(method: string, path: string, body?: unknown, raw?: Blob): Promise<T> {
+async function call<T>(method: string, path: string, body?: unknown, raw?: Blob, extra?: Record<string, string>): Promise<T> {
   // eslint-disable-next-line no-param-reassign
-  const headers: Record<string, string> = {};
+  const headers: Record<string, string> = { ...extra };
   if (tenantId) headers['x-tenant-id'] = tenantId;
   if (body !== undefined || (method !== 'GET' && method !== 'DELETE' && !raw)) headers['content-type'] = 'application/json';
   if (body === undefined && method !== 'GET' && method !== 'DELETE' && !raw) body = {};
@@ -143,6 +143,28 @@ export const api = {
   vehicleRows: (b: { facilityId?: string; month?: string; rows: PastedRow[]; commit: boolean }) => call<{ rows: RowResult[]; valid: number; saved: number }>('POST', '/api/vehicles/entries/rows', b),
   batch: (entries: unknown[], dryRun: boolean) => call<{ results: { index: number; ok: boolean; id?: string; totals?: Record<Basis, number>; warnings?: string[]; error?: string }[]; saved: number; failed: number }>('POST', '/api/activities/batch', { entries, dryRun }),
   recalculate: (b: { ids?: string[]; year?: number; onlyWithWarnings?: boolean }) => call<{ checked: number; changed: number; problems: string[] }>('POST', '/api/activities/recalculate', b),
+  // Meters
+  meters: (facilityId?: string) => call<{ meters: Meter[] }>('GET', `/api/meters${facilityId ? `?facilityId=${facilityId}` : ''}`),
+  meter: (id: string) => call<MeterDetail>('GET', `/api/meters/${id}`),
+  addMeter: (b: unknown) => call<Meter>('POST', '/api/meters', b),
+  updateMeter: (id: string, b: unknown) => call<Meter>('PATCH', `/api/meters/${id}`, b),
+  deleteMeter: (id: string) => call<{ ok: true }>('DELETE', `/api/meters/${id}`),
+  addReadings: (id: string, readings: { timestamp: string; value: number; start?: string }[], source: 'upload' | 'manual' = 'upload') =>
+    call<{ inserted: number; updated: number; unchanged: number; rejected: { index: number; reason: string }[]; sync: SyncResult | null }>('POST', `/api/meters/${id}/readings`, { readings, source }),
+  deleteReading: (id: string, ts: string) => call<{ removed: number }>('DELETE', `/api/meters/${id}/readings?ts=${encodeURIComponent(ts)}`),
+  syncMeter: (id: string) => call<SyncResult>('POST', `/api/meters/${id}/sync`),
+  apiKeys: () => call<{ keys: ApiKey[] }>('GET', '/api/api-keys'),
+  addApiKey: (name: string) => call<ApiKey & { key: string }>('POST', '/api/api-keys', { name }),
+  revokeApiKey: (id: string) => call<{ ok: true }>('DELETE', `/api/api-keys/${id}`),
+  setTimezone: (timezone: string) => call<{ timezone: string }>('PATCH', '/api/tenant/timezone', { timezone }),
+  // Bills
+  bills: (status?: string) => call<{ bills: Bill[]; counts: Record<string, number> }>('GET', `/api/bills${status ? `?status=${status}` : ''}`),
+  bill: (id: string) => call<Bill & { text: string; entries: { id: string; period_start: string; quantity: number; unit: string; status: string; co2e_scope2: number; co2e_scope2_market: number; co2e_direct: number }[] }>('GET', `/api/bills/${id}`),
+  uploadBill: (f: File) => call<Bill & { duplicate: boolean }>('POST', '/api/bills/upload', undefined, f, { 'x-filename': encodeURIComponent(f.name) }),
+  patchBill: (id: string, b: unknown) => call<Bill>('PATCH', `/api/bills/${id}`, b),
+  confirmBill: (id: string, b: unknown) => call<Bill & { sync: SyncResult }>('POST', `/api/bills/${id}/confirm`, b),
+  reopenBill: (id: string) => call<Bill>('POST', `/api/bills/${id}/reopen`),
+  rejectBill: (id: string, note: string) => call<{ ok: true }>('POST', `/api/bills/${id}/reject`, { note }),
   // Waste
   wasteDefaults: () => call<WasteDefaults>('GET', '/api/waste/defaults'),
   wasteSites: (facilityId?: string) => call<{ sites: WasteSite[] }>('GET', `/api/waste/sites${facilityId ? `?facilityId=${facilityId}` : ''}`),
@@ -200,6 +222,15 @@ export const BASIS_SHORT: Record<Basis, string> = { direct: 'Scope 1', wtt: 'Ups
 export const BASIS_LABEL: Record<Basis, string> = { direct: 'Scope 1', wtt: 'Upstream / well-to-tank (Scope 3.3)', outside_scopes: 'Biogenic CO₂ (outside scopes)', memo: 'Memo: non-Kyoto gases', scope2: 'Scope 2 · location-based', scope2_market: 'Scope 2 · market-based', td_loss: 'T&D losses (Scope 3.3)', scope3: 'Scope 3' };
 
 /** Download a file from the API (keeps the company header), e.g. an Excel template. */
+/** A file from the API as a blob URL (e.g. a bill PDF for the preview). */
+export async function blobUrl(path: string) {
+  const headers: Record<string, string> = {};
+  if (tenantId) headers['x-tenant-id'] = tenantId;
+  const r = await fetch(path, { headers });
+  if (!r.ok) throw new ApiError(`Could not load the file (${r.status})`, r.status);
+  return URL.createObjectURL(await r.blob());
+}
+
 export async function download(path: string, filename: string) {
   const headers: Record<string, string> = {};
   if (tenantId) headers['x-tenant-id'] = tenantId;
@@ -229,3 +260,28 @@ export interface WasteDefaults {
 export interface WasteSiteParams { climate?: string; siteType?: string; mcf?: number; ox?: number; f?: number; delayMonths?: number; composition?: Record<string, number>; overrides?: Record<string, { doc?: number; docf?: number; k?: number }>; source?: string }
 export interface WasteSite { id: string; facility_id: string; facility: string; kind: 'landfill'; name: string; opened_year: number | null; closed_year: number | null; params: WasteSiteParams; note: string | null; active: boolean; entries: number; history: { first: number | null; last: number | null; tonnes: number; rows: number } | null; canEdit?: boolean }
 export interface WasteDeposit { id: number; year: number; type: string; tonnes: number; source: string | null; estimated: boolean }
+
+// ------------------------------------------------------------------ meters --
+export type Frequency = 'hour' | 'day' | 'week' | 'month' | 'irregular';
+export interface Meter {
+  id: string; facility_id: string; facility: string; name: string; serial: string | null; external_id: string; account_no: string | null;
+  reading_type: 'cumulative' | 'interval'; frequency: Frequency; unit: string; multiplier: number; rollover: number | null;
+  item_id: number; item: string; item_code: string; category: string; category_name: string; calc_method: string; template: Record<string, unknown>;
+  gap_fill: 'prorate' | 'none'; auto_entries: boolean; active: boolean; note: string | null;
+  readings: number; last: { ts: string; value: number; received_at: string } | null; entries: number; canEdit?: boolean;
+}
+export interface MeterMonth {
+  month: string; start: number; end: number; measured: number; consumption: number; coverage: number; readings: number; filled: boolean; closed: boolean; issues: string[];
+  entry: { id: string; period_start: string; quantity: number; unit: string; status: string; data_type: string; co2e_direct: number; co2e_scope2: number; co2e_scope2_market: number; co2e_scope3: number; updated_at: string } | null;
+}
+export interface MeterDetail extends Meter { timezone: string; months: MeterMonth[]; issues: string[]; recent: { ts: string; from_ts: string | null; value: number; source: string; received_at: string }[] }
+export interface SyncResult { created: number; updated: number; unchanged: number; locked: string[]; problems: string[] }
+export interface ApiKey { id: string; name: string; prefix: string; scopes: string[]; created_at: string; last_used_at: string | null; revoked_at: string | null }
+export interface Bill {
+  id: string; document_id: string; status: 'to_check' | 'confirmed' | 'rejected'; energy: string | null; supplier: string | null; account_no: string | null; bill_no: string | null;
+  period_from: string | null; period_to: string | null; issue_date: string | null; quantity: number | null; unit: string | null; amount: number | null; currency: string | null;
+  found: { missing?: string[]; problem?: string | null; matchedBy?: string | null; candidates?: { energy: string; value: number; unit: string; line: string; score: number }[];
+    supplier?: { value: string; line: string }; account?: { value: string; line: string }; periodFrom?: { value: string; line: string }; quantity?: { value: number; unit: string; line: string }; amount?: { value: number; line: string } };
+  scanned: boolean; meter_id: string | null; meter: string | null; facility_id: string | null; facility: string | null; meter_unit: string | null; reading_ts: string | null;
+  note: string | null; checked_by_name: string | null; checked_at: string | null; created_at: string; filename: string; size: number;
+}

@@ -12,6 +12,9 @@ import { platformTx, pool, type Tx } from '../db/pool.js';
 import { hashPassword, temporaryPassword } from '../lib/password.js';
 import { calculate } from '../modules/calc.service.js';
 import { contextFor } from '../modules/activity.routes.js';
+import { storeReadings, syncMeter, type MeterRow } from '../modules/meters.routes.js';
+import { bookBill, createBill } from '../modules/bills.routes.js';
+import { PDFDocument, StandardFonts } from 'pdf-lib';
 
 const NAME = 'BEEAH Group (demo)';
 const TREE: [string, [string, string, string][]][] = [
@@ -64,6 +67,7 @@ async function main() {
       for (const sql of [
         'DELETE FROM certificate_claim WHERE tenant_id = $1', 'DELETE FROM energy_certificate WHERE tenant_id = $1', 'DELETE FROM supplier_factor WHERE tenant_id = $1',
         'DELETE FROM activity_result WHERE tenant_id = $1', 'DELETE FROM activity WHERE tenant_id = $1', 'DELETE FROM vehicle WHERE tenant_id = $1',
+        'DELETE FROM bill WHERE tenant_id = $1', 'DELETE FROM document WHERE tenant_id = $1', 'DELETE FROM meter_reading WHERE tenant_id = $1', 'DELETE FROM meter WHERE tenant_id = $1', 'DELETE FROM api_key WHERE tenant_id = $1',
         'DELETE FROM waste_deposit WHERE tenant_id = $1', 'DELETE FROM waste_site WHERE tenant_id = $1',
         'DELETE FROM price WHERE tenant_id = $1', 'DELETE FROM user_facility WHERE tenant_id = $1',
         'DELETE FROM session WHERE user_id IN (SELECT id FROM app_user WHERE tenant_id = $1)', 'DELETE FROM audit_log WHERE tenant_id = $1',
@@ -100,6 +104,7 @@ async function main() {
     for (let y = 2025; y <= 2026; y++) {
       for (let m = 0; m < (y === 2026 ? 9 : 12); m++) {
         for (const [code, unit, qty, fac] of DATA) {
+          if (y === 2026 && code === 'desnz:natural-gas' && fac === 'Sharjah Waste-to-Energy') continue; // from the gas meter
           const item = (await c.query('SELECT id FROM item WHERE code = $1', [code])).rows[0]?.id;
           if (!item) continue;
           const q = Math.round(qty * (0.85 + 0.3 * Math.abs(Math.sin(m * 1.7 + y))));
@@ -186,6 +191,7 @@ async function main() {
         const start = `${y}-${String(m + 1).padStart(2, '0')}-01`;
         const end = new Date(Date.UTC(y, m + 1, 0)).toISOString().slice(0, 10);
         for (const [fac, code, unit, base, energy] of SCOPE2) {
+          if (code === 'grid:electricity' && ((y === 2026 && fac === 'Data Centre Dubai') || (fac === 'BEEAH Headquarters' && (y === 2026 || m === 11)))) continue; // from the BMS meter / SEWA bills
           const q = Math.round(base * (0.8 + 0.4 * Math.abs(Math.sin(m * 0.9 + y + base))));
           const f = (await c.query('SELECT id, country, grid_region FROM org_node WHERE id = $1', [ids.get(fac)])).rows[0];
           const { result, item: it, gwpSet, stored } = await calculate({ itemId: items[code], unit, quantity: q, periodStart: start, periodEnd: end, energy } as never, contextFor(c, 'AR5', 'AE', f));
@@ -252,7 +258,7 @@ async function main() {
         const k = 0.85 + 0.3 * Math.abs(Math.sin(m + y));
         await put('Sharjah Waste-to-Energy', { itemId: wItems['waste:incineration'], unit: 't', periodStart: ps, periodEnd: pe,
           waste: { process: 'incineration', streams: [{ type: 'msw', tonnes: Math.round(25000 * k) }], technology: 'continuous_stoker', exportedMWh: Math.round(14000 * k) } });
-        await put("Al Saja'a Recycling Complex", { itemId: wItems['waste:composting'], unit: 't', periodStart: ps, periodEnd: pe,
+        if (y === 2026) { /* composting 2026 from the weighbridge (weekly) */ } else await put("Al Saja'a Recycling Complex", { itemId: wItems['waste:composting'], unit: 't', periodStart: ps, periodEnd: pe,
           waste: { process: 'composting', tonnes: Math.round(3000 * k), basis: 'wet' } });
         await put('Al Zahia Community', { itemId: wItems['waste:wastewater'], unit: 'kg', periodStart: ps, periodEnd: pe,
           waste: { process: 'wastewater', kind: 'domestic', system: 'centralised_aerobic', measure: 'BOD', flowM3: Math.round(60000 * k), mgPerL: 250, nInfluentKg: Math.round(2400 * k), nEffluentKg: Math.round(600 * k), recovery: [] } });
@@ -261,6 +267,66 @@ async function main() {
         nw += 5;
       }
     }
+    // ------------------------------------------------------------ meters & bills --
+    // DEMO readings (not real): BMS hourly electricity at the data centre, a daily register gas
+    // meter at the WtE plant, a weekly weighbridge at the composting plant, SEWA bills at HQ.
+    const TZ = 'Asia/Dubai';
+    const actor = { id: users.get('preparer') ?? null, name: 'demo', req: { user: { id: null, name: 'demo', tenantId: t }, ip: '127.0.0.1' } } as const;
+    const tset = { id: t, gwp_set: 'AR5', timezone: TZ };
+    const item = async (code: string) => (await c.query('SELECT id FROM item WHERE code = $1', [code])).rows[0].id as number;
+    const addMeter = async (fac: string, v: Record<string, unknown>) => (await c.query(
+      `INSERT INTO meter (tenant_id, facility_id, name, external_id, reading_type, frequency, unit, multiplier, item_id, template, account_no, note)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'DEMO readings — not real') RETURNING *`,
+      [t, ids.get(fac), v.name, v.ext, v.type, v.freq, v.unit, v.mult ?? 1, v.item, JSON.stringify(v.template ?? {}), v.account ?? null])).rows[0] as MeterRow;
+    const local = (y: number, m: number, d: number, h = 0) => new Date(Date.UTC(y, m, d, h) - 4 * 3600_000).toISOString();
+    const end = Date.UTC(2026, 9, 1) - 4 * 3600_000;
+    let nr = 0;
+    // 1. Data centre: hourly kWh from the BMS (Jan–Sep 2026), DEMO supplier factor.
+    const dc = await addMeter('Data Centre Dubai', { name: 'Main incomer (BMS)', ext: 'BMS-DC-MAIN', type: 'interval', freq: 'hour', unit: 'kWh_e', item: await item('grid:electricity'),
+      template: { energy: { supplier: { name: 'Demo utility (replace)', co2e: 0.45, unit: 'kWh_e', source: DEMO } } } });
+    const hours: { timestamp: string; value: number }[] = [];
+    for (let ts = Date.UTC(2026, 0, 1) - 4 * 3600_000 + 3600_000; ts <= end; ts += 3600_000) {
+      const h = new Date(ts + 4 * 3600_000).getUTCHours();
+      const gap = ts > Date.UTC(2026, 5, 10) && ts < Date.UTC(2026, 5, 12); // two days missing in June (BMS outage)
+      if (!gap) hours.push({ timestamp: new Date(ts).toISOString(), value: Math.round((480 + 90 * Math.sin((h - 9) / 24 * 2 * Math.PI) + 20 * Math.sin(ts / 9e8)) * 10) / 10 });
+    }
+    nr += (await storeReadings(c, t, dc, hours, 'api', TZ)).inserted;
+    // 2. WtE boiler gas: daily register (m³), counts up.
+    const gm = await addMeter('Sharjah Waste-to-Energy', { name: 'Boiler gas meter', ext: 'WTE-GAS-01', type: 'cumulative', freq: 'day', unit: 'm3', item: await item('desnz:natural-gas') });
+    let reg = 1_250_000;
+    const days: { timestamp: string; value: number }[] = [];
+    for (let d = 0; Date.UTC(2026, 0, 1 + d) - 4 * 3600_000 <= end; d++) { days.push({ timestamp: local(2026, 0, 1 + d), value: reg }); reg += Math.round(1350 + 250 * Math.sin(d / 5)); }
+    nr += (await storeReadings(c, t, gm, days, 'api', TZ)).inserted;
+    // 3. Composting: weekly weighbridge totals (tonnes per week, ending Sunday midnight).
+    const cm = await addMeter("Al Saja'a Recycling Complex", { name: 'Compost weighbridge', ext: 'WB-COMPOST', type: 'interval', freq: 'week', unit: 't', item: wItems['waste:composting'],
+      template: { waste: { process: 'composting', basis: 'wet', tonnes: 0 } } });
+    const weeks: { timestamp: string; value: number }[] = [];
+    for (let w = 0; Date.UTC(2026, 0, 4 + 7 * w) - 4 * 3600_000 <= end; w++) weeks.push({ timestamp: local(2026, 0, 4 + 7 * w), value: Math.round(700 + 80 * Math.sin(w / 3)), ...(w === 0 ? { start: local(2026, 0, 1) } : {}) });
+    nr += (await storeReadings(c, t, cm, weeks, 'upload', TZ)).inserted;
+    let ns = 0;
+    for (const m of [dc, gm, cm]) ns += (await syncMeter(c, tset, m, actor)).created;
+    // 4. HQ electricity: SEWA bills 15th to 14th (PDFs made here, in a SEWA-like layout); Jan–Jul booked, August to check.
+    await addMeter('BEEAH Headquarters', { name: 'SEWA account 2001458876', ext: 'SEWA-2001458876', type: 'interval', freq: 'month', unit: 'kWh_e', item: await item('grid:electricity'), account: '2001458876' });
+    const pdf = async (lines: (string | [string, string])[]) => {
+      const doc = await PDFDocument.create(); const page = doc.addPage([595, 842]); const font = await doc.embedFont(StandardFonts.Helvetica);
+      let yy = 800;
+      for (const l of lines) { if (Array.isArray(l)) { page.drawText(l[0], { x: 40, y: yy, size: 10, font }); page.drawText(l[1], { x: 300, y: yy, size: 10, font }); } else page.drawText(l, { x: 40, y: yy, size: 10, font }); yy -= 18; }
+      page.drawText('DEMO bill generated by Ekotrace - not a real SEWA document', { x: 40, y: 40, size: 8, font });
+      return Buffer.from(await doc.save());
+    };
+    const dd = (d: Date) => `${String(d.getUTCDate()).padStart(2, '0')}/${String(d.getUTCMonth() + 1).padStart(2, '0')}/${d.getUTCFullYear()}`;
+    let nb = 0;
+    for (let k = 0; k < 8; k++) {
+      const from = new Date(Date.UTC(2025, 11 + k, 15)), to = new Date(Date.UTC(2026, k, 14)), issued = new Date(Date.UTC(2026, k, 20));
+      const kwh = Math.round(95000 * (0.8 + 0.4 * Math.abs(Math.sin(k * 0.9 + 3))));
+      const buf = await pdf(['Sharjah Electricity, Water and Gas Authority', 'TAX INVOICE', ['Account No:', '2001458876'], ['Bill No:', `INV-26-${String(41000 + k)}`], ['Bill Date:', dd(issued)],
+        ['Billing Period:', `${dd(from)} - ${dd(to)}`], 'Electricity', ['Consumption', `${kwh.toLocaleString('en')} kWh`], ['Rate', '0.38 AED/kWh'], 'Water', ['Consumption', '1,250 IG'],
+        ['Total Amount Due', `AED ${(kwh * 0.38 + 2400).toLocaleString('en', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`]]);
+      const b = await createBill(c, t, buf, `SEWA-2001458876-${to.toISOString().slice(0, 7)}.pdf`, String(users.get('preparer')));
+      if (k < 7) await bookBill(c, tset, b.id, actor);
+      nb++;
+    }
+    console.log(`Meters: ${nr.toLocaleString('en')} DEMO readings (hourly, daily register, weekly), ${ns} monthly entries; ${nb} DEMO SEWA bills (7 booked, 1 to check).`);
     console.log(`Waste: a landfill with a DEMO tonnage history 2000–2025, ${nw} waste entries (landfill, waste-to-energy, composting, wastewater, office waste sent out).`);
     console.log(`\nDemo company "${NAME}" created: ${TREE.length} sub-groups, ${[...ids.keys()].length - TREE.length} facilities, ${n} fuel entries (Jan 2025 – Sep 2026).`);
   });
