@@ -2,11 +2,13 @@
  * Talking to the API. One function per call, typed results.
  * The chosen company travels in the x-tenant-id header (temporary, until login exists).
  */
-export type Basis = 'direct' | 'wtt' | 'outside_scopes' | 'memo';
+export type Basis = 'direct' | 'wtt' | 'outside_scopes' | 'memo' | 'scope2';
 
-export interface Item { id: number; subcategory_id: number; code: string; name: string; aliases: string[]; default_unit: string | null; gas_code: string | null; note: string | null; sort: number; active: boolean; composition: { gas: string; fraction: number }[] | null; hiddenForClient?: boolean }
-export interface Subcategory { id: number; category_id: number; code: string; name: string; units: string[]; default_unit: string | null; is_bioenergy: boolean; sort: number; active: boolean; hiddenForClient?: boolean; items: Item[] }
-export interface Category { id: number; scope: number; code: string; name: string; calc_method: 'combustion' | 'fugitive'; description: string | null; active: boolean; subcategories: Subcategory[] }
+export interface Item { id: number; subcategory_id: number; code: string; name: string; aliases: string[]; default_unit: string | null; gas_code: string | null; note: string | null; sort: number; active: boolean; composition: { gas: string; fraction: number }[] | null; hiddenForClient?: boolean; attrs?: VehicleAttrs }
+/** Vehicle types: class, powertrain, the fuel it burns, electric / plug-in, distance factors or not. */
+export interface VehicleAttrs { vehicle?: string; powertrain?: string; load?: string; fuel?: string | null; electric?: boolean; phev?: boolean; distance?: boolean }
+export interface Subcategory { id: number; category_id: number; code: string; name: string; grp?: string | null; units: string[]; default_unit: string | null; is_bioenergy: boolean; sort: number; active: boolean; hiddenForClient?: boolean; items: Item[] }
+export interface Category { id: number; scope: number; code: string; name: string; calc_method: 'combustion' | 'fugitive' | 'vehicle' | 'electricity'; description: string | null; active: boolean; subcategories: Subcategory[] }
 export interface Unit { code: string; name: string; dimension: string; to_base: number; is_base: boolean; aliases: string[]; active: boolean }
 export interface ResultLine { basis: Basis; gas: string; kgGas: number | null; kgCo2e: number; factorId: number | null; method: 'gas' | 'published' }
 /** CO2e emission factor behind one part of a result: quantity × perEnteredUnit = total. */
@@ -17,7 +19,7 @@ export interface FactorUsed {
 }
 /** A calorific value the user entered, and what it converted the quantity to. */
 export interface CvUsed { value: number; energyUnit: string; perUnit: string; energyUnitName: string; perUnitName: string; basis: 'net' | 'gross'; convertedQuantity: number; convertedUnit: string; convertedUnitName: string }
-export interface CalcResponse { cv?: CvUsed; item: { id: number; name: string; category: string }; gwpSet: string; lines: ResultLine[]; factors: FactorUsed[]; totals: Record<Basis, number>; steps: string[]; warnings: string[] }
+export interface CalcResponse { cv?: CvUsed; stored?: { quantity: number; unit: string; inputs: Record<string, unknown> }; item: { id: number; name: string; category: string }; gwpSet: string; lines: ResultLine[]; factors: FactorUsed[]; totals: Record<Basis, number>; steps: string[]; warnings: string[] }
 export interface Tenant { id: string; name: string; country: string; gwp_set: string; consolidation?: string; base_year?: number; plan?: string; status?: string; access_expiry?: string }
 export type Role = 'platform_admin' | 'super_admin' | 'admin' | 'manager' | 'preparer' | 'verifier';
 export interface Me { user: { id: string; name: string; email: string; role: Role; tenantId: string | null; scopeNodeId: string | null; mustChangePassword: boolean }; company: (Tenant & { scope_name: string | null }) | null }
@@ -27,7 +29,7 @@ export interface Company { id: string; name: string; country: string; gwp_set: s
 export const ROLE_LABEL: Record<Role, string> = { platform_admin: 'Platform admin', super_admin: 'Super admin', admin: 'Admin', manager: 'Manager', preparer: 'Data preparer', verifier: 'Verifier' };
 export interface Facility { id: string; name: string; country: string; active: boolean; facility_type?: string | null; parent_name?: string | null; canEnter?: boolean; canApprove?: boolean }
 export interface Factor { id: number; item_id: number; item: string; subcategory: string; basis: Basis; unit: string; co2e: number | null; region: string; valid_from: string; valid_to: string; status: string; version: number; supersedes_id: number | null; note: string | null; source: string; gwp_set: string | null; gases: { gas: string; kgPerUnit: number }[] | null }
-export interface Activity { id: string; period_start: string; period_end: string; facility: string; category: string; item: string; quantity: number; unit: string; data_type: string; gwp_set: string; co2e_direct: number; co2e_wtt: number; co2_biogenic: number; co2e_memo: number; status: string; created_at: string }
+export interface Activity { id: string; period_start: string; period_end: string; facility: string; category: string; item: string; quantity: number; unit: string; data_type: string; gwp_set: string; co2e_direct: number; co2e_wtt: number; co2_biogenic: number; co2e_memo: number; co2e_scope2?: number; status: string; created_at: string; vehicle?: string | null; vehicle_id?: string | null }
 
 /** Platform admin only: the company being looked at (sent as x-tenant-id). Others are fixed to their own company. */
 let tenantId = localStorageGet('ekotrace.tenant');
@@ -37,6 +39,16 @@ export function setTenant(id: string | null) {
   try { id ? localStorage.setItem('ekotrace.tenant', id) : localStorage.removeItem('ekotrace.tenant'); } catch { /* private mode */ }
 }
 export const currentTenant = () => tenantId;
+
+export type VehicleMethod = 'distance' | 'fuel' | 'electricity' | 'spend';
+export interface Vehicle {
+  id: string; facility_id: string; name: string; registration: string | null; item_id: number; type: string; class: string; grp: string | null; attrs: VehicleAttrs;
+  fuel_item_id: number | null; fuel: string | null; ownership: 'owned' | 'leased'; charging: 'site' | 'elsewhere' | null; default_method: VehicleMethod;
+  in_service_from: string; retired_on: string | null; retired_reason: string | null; note: string | null; entries: number;
+}
+export interface VehicleType { id: number; name: string; code: string; sub: string; grp: string | null; attrs: VehicleAttrs }
+export interface Price { id: string; platform: boolean; region: string; item_id: number; item: string; currency: string; price: number; unit: string; valid_from: string; valid_to: string; source: string }
+export interface UploadRow { row: number; errors: string[]; warnings?: string[]; totals?: Record<Basis, number> | null; [k: string]: unknown }
 
 export class ApiError extends Error {
   constructor(message: string, public status: number, public code?: string, public details?: { field: string; message: string }[]) { super(message); }
@@ -102,6 +114,23 @@ export const api = {
   activities: (q: Record<string, string | number | undefined> = {}) => call<{ activities: Activity[] }>('GET', `/api/activities?${new URLSearchParams(Object.entries(q).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)]))}`),
   activity: (id: string) => call<Activity & { steps: string[]; warnings: string[]; factors: FactorUsed[]; inputs: Record<string, unknown> & { cv?: CvUsed }; lines: { basis: Basis; gas: string; kg_gas: number | null; kg_co2e: number; method: string; source: string | null }[] }>('GET', `/api/activities/${id}`),
   byGas: (year: number) => call<{ rows: { scope: number; category: string; basis: Basis; gas: string; kg_gas: number | null; kg_co2e: number }[] }>('GET', `/api/reports/by-gas?year=${year}`),
+  // vehicles
+  vehicleTypes: () => call<{ types: VehicleType[] }>('GET', '/api/vehicle-types'),
+  vehicles: (facilityId: string, period?: { from: string; to: string }) => call<{ vehicles: Vehicle[] }>('GET', `/api/facilities/${facilityId}/vehicles${period ? `?${new URLSearchParams(period)}` : ''}`),
+  addVehicle: (facilityId: string, b: unknown) => call<Vehicle>('POST', `/api/facilities/${facilityId}/vehicles`, b),
+  updateVehicle: (id: string, b: unknown) => call<Vehicle>('PATCH', `/api/vehicles/${id}`, b),
+  retireVehicle: (id: string, b: { retiredOn: string; reason?: string }) => call('POST', `/api/vehicles/${id}/retire`, b),
+  reinstateVehicle: (id: string) => call('POST', `/api/vehicles/${id}/reinstate`),
+  deleteVehicle: (id: string) => call('DELETE', `/api/vehicles/${id}`),
+  uploadFleet: (facilityId: string, file: Blob, commit: boolean) => call<{ rows: UploadRow[]; valid: number; added: number }>('POST', `/api/facilities/${facilityId}/vehicles/upload${commit ? '?commit=1' : ''}`, undefined, file),
+  uploadVehicleData: (file: Blob, commit: boolean) => call<{ rows: UploadRow[]; valid: number; saved: number }>('POST', `/api/vehicles/entries/upload${commit ? '?commit=1' : ''}`, undefined, file),
+  batch: (entries: unknown[], dryRun: boolean) => call<{ results: { index: number; ok: boolean; id?: string; totals?: Record<Basis, number>; warnings?: string[]; error?: string }[]; saved: number; failed: number }>('POST', '/api/activities/batch', { entries, dryRun }),
+  recalculate: (b: { ids?: string[]; year?: number; onlyWithWarnings?: boolean }) => call<{ checked: number; changed: number; problems: string[] }>('POST', '/api/activities/recalculate', b),
+  // price list
+  priceItems: () => call<{ items: { id: number; name: string; default_unit: string | null; sub: string }[] }>('GET', '/api/price-items'),
+  prices: (q: { region?: string; itemId?: number } = {}) => call<{ prices: Price[] }>('GET', `/api/prices?${new URLSearchParams(Object.entries(q).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)]))}`),
+  addPrice: (b: unknown) => call('POST', '/api/prices', b),
+  deletePrice: (id: string) => call('DELETE', `/api/prices/${id}`),
   // catalogue admin
   addSubcategory: (b: unknown) => call('POST', '/api/admin/subcategories', b),
   updateSubcategory: (id: number, b: unknown) => call('PATCH', `/api/admin/subcategories/${id}`, b),
@@ -129,5 +158,17 @@ export function num(v: number | null | undefined, sig = 6): string {
   if (a >= 1e-4 && a < 1e9) return Number(v.toPrecision(sig)).toLocaleString('en', { maximumFractionDigits: 10 });
   return v.toExponential(3);
 }
-export const BASIS_SHORT: Record<Basis, string> = { direct: 'Scope 1', wtt: 'WTT · S3.3', outside_scopes: 'Biogenic', memo: 'Memo' };
-export const BASIS_LABEL: Record<Basis, string> = { direct: 'Scope 1', wtt: 'Well-to-tank (Scope 3.3)', outside_scopes: 'Biogenic CO₂ (outside scopes)', memo: 'Memo: non-Kyoto gases' };
+export const BASIS_SHORT: Record<Basis, string> = { direct: 'Scope 1', wtt: 'WTT · S3.3', outside_scopes: 'Biogenic', memo: 'Memo', scope2: 'Scope 2' };
+export const BASIS_LABEL: Record<Basis, string> = { direct: 'Scope 1', wtt: 'Well-to-tank (Scope 3.3)', outside_scopes: 'Biogenic CO₂ (outside scopes)', memo: 'Memo: non-Kyoto gases', scope2: 'Scope 2 (EV charging)' };
+
+/** Download a file from the API (keeps the company header), e.g. an Excel template. */
+export async function download(path: string, filename: string) {
+  const headers: Record<string, string> = {};
+  if (tenantId) headers['x-tenant-id'] = tenantId;
+  const r = await fetch(path, { headers });
+  if (!r.ok) { const d = await r.json().catch(() => ({})); throw new ApiError(d.message ?? `Download failed (${r.status})`, r.status); }
+  const url = URL.createObjectURL(await r.blob());
+  const a = document.createElement('a');
+  a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+}

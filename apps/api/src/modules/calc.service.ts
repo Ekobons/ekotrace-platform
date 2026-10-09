@@ -4,7 +4,7 @@
  * calculation for the item's category, and returns the result with its steps.
  */
 import { z } from 'zod';
-import { calcCombustion, calcFugitive, chooseFactors, impliedCalorificValue, type CalcResult, type Factor } from '@ekotrace/calc';
+import { calcCombustion, calcFugitive, calcVehicle, chooseFactors, convert, impliedCalorificValue, type CalcResult, type Factor } from '@ekotrace/calc';
 import { query } from '../db/pool.js';
 import { AppError, notFound } from '../lib/errors.js';
 import { refdata } from './refdata.js';
@@ -25,6 +25,23 @@ export const fugitiveSchema = z.discriminatedUnion('method', [
   }),
 ]);
 
+/** Vehicles: how the entry was measured, and what the money bought (spend). */
+export const vehicleSchema = z.object({
+  method: z.enum(['distance', 'fuel', 'electricity', 'spend']),
+  /** fuel used, when it differs from the vehicle type's usual fuel (or the type's fuel is unknown) */
+  fuelItemId: z.number().int().positive().optional(),
+  /** electric / plug-in hybrid: charged at the company's own site (already on its meter) or elsewhere */
+  charging: z.enum(['site', 'elsewhere']).optional(),
+  spend: z.object({
+    amount: amount,
+    currency: z.string().regex(/^[A-Z]{3}$/, 'Currency as a 3-letter code, e.g. AED'),
+    /** price per unit (the entry's unit); when omitted, the price list is used */
+    price: z.number().finite().positive().optional(),
+  }).optional(),
+  /** a vehicle of the facility's fleet */
+  vehicleId: z.string().uuid().optional(),
+});
+
 export const calcInputSchema = z.object({
   itemId: z.number().int().positive(),
   unit: z.string().min(1),
@@ -36,17 +53,19 @@ export const calcInputSchema = z.object({
   periodEnd: isoDate,
   region: z.string().length(2).or(z.literal('GLOBAL')).optional(),
   gwpSet: z.enum(['AR4', 'AR5', 'AR6']).optional(),
+  vehicle: vehicleSchema.optional(),
 });
 export type CalcInput = z.infer<typeof calcInputSchema>;
 
 interface ItemRow {
-  id: number; name: string; active: boolean; category_id: number; category: string; calc_method: 'combustion' | 'fugitive';
-  sub_units: string[]; gas_code: string | null; sub_active: boolean;
+  id: number; name: string; active: boolean; category_id: number; category: string; calc_method: 'combustion' | 'fugitive' | 'vehicle' | 'electricity';
+  sub_units: string[]; gas_code: string | null; sub_active: boolean; code: string;
+  attrs: { vehicle?: string; powertrain?: string; fuel?: string | null; electric?: boolean; phev?: boolean; distance?: boolean };
 }
 
 export async function loadItem(itemId: number): Promise<ItemRow> {
   const [row] = await query<ItemRow>(
-    `SELECT i.id, i.name, i.active, i.gas_code, s.units AS sub_units, s.active AS sub_active,
+    `SELECT i.id, i.code, i.name, i.active, i.gas_code, i.attrs, s.units AS sub_units, s.active AS sub_active,
             c.id AS category_id, c.name AS category, c.calc_method
        FROM item i JOIN subcategory s ON s.id = i.subcategory_id JOIN category c ON c.id = s.category_id
       WHERE i.id = $1`, [itemId]);
@@ -71,12 +90,23 @@ export async function loadFactors(itemId: number): Promise<Factor[]> {
   }));
 }
 
-export async function calculate(input: CalcInput, ctx: { gwpSet: string; region: string }): Promise<{ result: CalcResult; item: ItemRow; gwpSet: string }> {
+export interface PriceFound { price: number; unit: string; currency: string; source: string }
+export interface CalcContext {
+  gwpSet: string;
+  region: string;
+  /** price list lookup (company price first, then the platform list) */
+  lookupPrice?: (itemId: number, region: string, date: string, currency: string) => Promise<PriceFound | null>;
+}
+
+/** What is stored as the entry's quantity: for spend, the fuel / kWh bought. */
+export interface Stored { quantity: number; unit: string; inputs: Record<string, unknown> }
+
+export async function calculate(input: CalcInput, ctx: CalcContext): Promise<{ result: CalcResult; item: ItemRow; gwpSet: string; stored: Stored }> {
   if (input.periodEnd < input.periodStart) throw new AppError('The period ends before it starts');
   const ref = await refdata();
   const item = await loadItem(input.itemId);
   if (!item.active || !item.sub_active) throw new AppError(`${item.name} is switched off in the catalogue`);
-  if (item.sub_units.length && !item.sub_units.includes(input.unit)) {
+  if (item.calc_method !== 'vehicle' && item.sub_units.length && !item.sub_units.includes(input.unit)) {
     throw new AppError(`${input.unit} is not offered for this fuel class. Use one of: ${item.sub_units.join(', ')}`);
   }
   const gwpSet = input.gwpSet ?? ctx.gwpSet;
@@ -86,7 +116,12 @@ export async function calculate(input: CalcInput, ctx: { gwpSet: string; region:
   const date = input.periodStart;
 
   let result: CalcResult;
-  if (item.calc_method === 'combustion') {
+  let stored: Stored = { quantity: input.quantity ?? 0, unit: input.unit, inputs: input.cv ? { cv: input.cv } : {} };
+  if (item.calc_method === 'vehicle') {
+    if (input.quantity === undefined && !input.vehicle?.spend) throw new AppError('Enter the distance, fuel, electricity or spend');
+    const v = await vehicleCalc(input, item, ctx, ref.units, gwp, region, date);
+    result = v.result; stored = v.stored;
+  } else if (item.calc_method === 'combustion') {
     if (input.quantity === undefined) throw new AppError('Enter the quantity of fuel');
     result = calcCombustion({ itemName: item.name, quantity: input.quantity, unit: input.unit, date, region, factors: await loadFactors(item.id), gwp, units: ref.units, cv: input.cv });
   } else {
@@ -105,7 +140,9 @@ export async function calculate(input: CalcInput, ctx: { gwpSet: string; region:
   if (input.periodStart.slice(0, 4) !== input.periodEnd.slice(0, 4)) {
     result.warnings.push(`The period spans two calendar years; factors for ${input.periodStart.slice(0, 4)} were used.`);
   }
-  return { result, item, gwpSet };
+  if (item.calc_method === 'fugitive') stored = { quantity: result.lines.reduce((s, l) => s + (l.kgGas ?? 0), 0), unit: input.unit, inputs: input.fugitive ?? {} };
+  if (result.cv) stored.inputs = { ...stored.inputs, cv: result.cv };
+  return { result, item, gwpSet, stored };
 }
 
 /**
@@ -120,4 +157,81 @@ export async function defaultCalorificValue(itemId: number, q: { energyUnit: str
   } catch {
     return null;
   }
+}
+
+// ------------------------------------------------------------------ vehicles --
+async function itemByCode(code: string) {
+  const [r] = await query<{ id: number; name: string }>('SELECT id, name FROM item WHERE code = $1', [code]);
+  return r ?? null;
+}
+
+/** kWh per km / mile of an electric or plug-in hybrid vehicle valid on the date (else the latest earlier). */
+async function evEnergy(itemId: number, date: string, unit: string) {
+  const rows = await query<{ unit: string; kwh: number; valid_from: string; source: string }>(
+    `SELECT e.unit, e.kwh_per_unit AS kwh, e.valid_from::text, replace(s.code, '-', ' ') AS source
+       FROM vehicle_energy e JOIN factor_source s ON s.id = e.source_id
+      WHERE e.item_id = $1 AND e.status = 'active' AND e.valid_from <= $2::date
+      ORDER BY e.valid_from DESC, (e.unit = $3) DESC LIMIT 1`, [itemId, date, unit]);
+  const r = rows[0];
+  return r ? { unit: r.unit, kwhPerUnit: Number(r.kwh), source: r.source } : null;
+}
+
+async function vehicleCalc(input: CalcInput, item: ItemRow, ctx: CalcContext, units: Awaited<ReturnType<typeof refdata>>['units'],
+  gwp: Parameters<typeof calcVehicle>[0]['gwp'], region: string, date: string): Promise<{ result: CalcResult; stored: Stored }> {
+  const v = input.vehicle ?? { method: 'distance' as const };
+  const a = item.attrs ?? {};
+  const electric = !!a.electric, phev = !!a.phev;
+  if (v.method === 'distance' && a.distance === false) throw new AppError(`${item.name} is entered by fuel used or spend (no distance factors)`);
+
+  // Fuel burned (fuel and spend methods, not for electric vehicles).
+  let fuel: { id: number; name: string; factors: Factor[] } | undefined;
+  if (!electric && (v.method === 'fuel' || v.method === 'spend')) {
+    const f = v.fuelItemId
+      ? (await query<{ id: number; name: string }>('SELECT id, name FROM item WHERE id = $1', [v.fuelItemId]))[0]
+      : a.fuel ? await itemByCode(a.fuel) : null;
+    if (!f) throw new AppError(`Choose the fuel ${item.name} uses`);
+    fuel = { ...f, factors: await loadFactors(f.id) };
+  }
+  const grid = await itemByCode('grid:electricity');
+  const gridFactors = grid ? (await loadFactors(grid.id)).filter((f) => f.basis === 'scope2') : [];
+
+  // Spend: find the price (entered, company list, platform list).
+  let spend: Parameters<typeof calcVehicle>[0]['spend'];
+  let qty = input.quantity ?? 0;
+  let unit = input.unit;
+  if (v.method === 'spend') {
+    if (!v.spend) throw new AppError('Enter the amount spent and its currency');
+    const buys = electric ? 'electricity' as const : 'fuel' as const;
+    if (buys === 'electricity') unit = 'kWh_e';
+    const priceItem = buys === 'fuel' ? fuel! : grid;
+    if (!priceItem) throw new AppError('Grid electricity item missing');
+    let found: PriceFound | null = v.spend.price ? { price: v.spend.price, unit, currency: v.spend.currency, source: 'price entered' } : null;
+    if (!found && ctx.lookupPrice) found = await ctx.lookupPrice(priceItem.id, region, date, v.spend.currency);
+    if (!found) throw new AppError(`No ${v.spend.currency} price for ${buys === 'fuel' ? priceItem.name : 'electricity'} in ${region} on ${date}. Enter the price, or add it to the price list.`);
+    // Price per the entry's unit (e.g. a price per US gallon used for litres).
+    const pricePerUnit = found.unit === unit ? found.price : found.price * convert(units, 1, unit, found.unit);
+    spend = { currency: v.spend.currency, price: pricePerUnit, priceUnit: unit, priceSource: found.source, buys };
+    qty = v.spend.amount;
+  }
+  const result = calcVehicle({
+    vehicleName: item.name, electric, phev, method: v.method, quantity: qty, unit, date, region,
+    vehicleFactors: a.distance === false ? [] : await loadFactors(item.id),
+    fuel: fuel ? { name: fuel.name, factors: fuel.factors, cv: input.cv } : undefined,
+    evEnergy: (electric || phev) && v.method === 'distance' ? await evEnergy(item.id, date, unit) : null,
+    gridFactors, charging: v.charging ?? 'elsewhere', spend, gwp, units,
+  });
+  const stored: Stored = v.method === 'spend'
+    ? { quantity: v.spend!.amount / spend!.price, unit, inputs: { vehicle: { ...v, price: spend!.price, priceUnit: unit, priceSource: spend!.priceSource, fuelItemId: fuel?.id } } }
+    : { quantity: qty, unit, inputs: { vehicle: { ...v, fuelItemId: fuel?.id ?? v.fuelItemId } } };
+  return { result, stored };
+}
+
+/** Price list lookup: the company's own price first, then the platform list; latest valid on the date. */
+export async function findPrice(c: { query: (q: string, p: unknown[]) => Promise<{ rows: Record<string, unknown>[] }> },
+  itemId: number, region: string, date: string, currency: string): Promise<PriceFound | null> {
+  const r = (await c.query(
+    `SELECT price, unit, currency, source, tenant_id FROM price
+      WHERE item_id = $1 AND region = $2 AND currency = $4 AND valid_from <= $3::date AND valid_to >= $3::date
+      ORDER BY (tenant_id IS NOT NULL) DESC, valid_from DESC LIMIT 1`, [itemId, region, date, currency])).rows[0];
+  return r ? { price: Number(r.price), unit: String(r.unit), currency: String(r.currency), source: `price list: ${r.source}` } : null;
 }

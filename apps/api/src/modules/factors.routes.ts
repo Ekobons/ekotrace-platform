@@ -21,7 +21,7 @@ export async function factorRoutes(app: FastifyInstance) {
   app.get('/api/factors', async (req) => {
     const q = z.object({
       itemId: z.coerce.number().int().optional(), subcategoryId: z.coerce.number().int().optional(), year: z.coerce.number().int().optional(),
-      basis: z.enum(['direct', 'wtt', 'outside_scopes', 'memo']).optional(), status: z.enum(['active', 'superseded', 'all']).default('active'),
+      basis: z.enum(['direct', 'wtt', 'outside_scopes', 'memo', 'scope2']).optional(), status: z.enum(['active', 'superseded', 'all']).default('active'),
       limit: z.coerce.number().int().min(1).max(2000).default(500),
     }).parse(req.query);
     const rows = await query(
@@ -46,7 +46,7 @@ export async function factorRoutes(app: FastifyInstance) {
     requirePlatformAdmin(req);
     const b = z.object({
       itemId: z.number().int(), sourceCode: z.string().min(2).max(40), sourceTitle: z.string().max(200).optional(),
-      region: z.string().length(2).or(z.literal('GLOBAL')).default('GLOBAL'), basis: z.enum(['direct', 'wtt', 'outside_scopes', 'memo']),
+      region: z.string().length(2).or(z.literal('GLOBAL')).default('GLOBAL'), basis: z.enum(['direct', 'wtt', 'outside_scopes', 'memo', 'scope2']),
       unit: z.string(), co2e: z.number().finite().nullable(), gases: z.array(z.object({ gas: z.string(), kgPerUnit: z.number().finite().min(0) })).max(10).default([]),
       validFrom: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), validTo: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), note: z.string().max(500).optional(),
     }).parse(req.body);

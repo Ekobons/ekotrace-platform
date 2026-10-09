@@ -17,8 +17,8 @@ export function Result({ r, quantity, unitName }: {
   const [showSteps, setShowSteps] = useState(false);
   const [showGas, toggleGas] = useGasSplit();
   const gasCount = new Set(r.lines.filter((l) => l.kgGas != null).map((l) => l.gas)).size;
-  const order: Basis[] = ['direct', 'wtt', 'outside_scopes', 'memo'];
-  const cls: Record<Basis, string> = { direct: 's1', wtt: 's3', outside_scopes: 'bio', memo: 'memo' };
+  const order: Basis[] = ['direct', 'scope2', 'wtt', 'outside_scopes', 'memo'];
+  const cls: Record<Basis, string> = { direct: 's1', scope2: 's2', wtt: 's3', outside_scopes: 'bio', memo: 'memo' };
   return (
     <div style={{ display: 'grid', gap: 12 }}>
       <div className="total">

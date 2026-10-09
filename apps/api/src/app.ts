@@ -17,6 +17,8 @@ import { authRoutes } from './modules/auth.routes.js';
 import { orgRoutes } from './modules/org.routes.js';
 import { peopleRoutes } from './modules/people.routes.js';
 import { platformRoutes } from './modules/platform.routes.js';
+import { vehicleRoutes, vehicleUploadRoutes } from './modules/vehicles.routes.js';
+import { priceRoutes } from './modules/prices.routes.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const BRANDS = join(HERE, '../../../brands');
@@ -48,6 +50,9 @@ export async function buildApp(opts: { logger?: boolean } = {}): Promise<Fastify
     await secured.register(referenceRoutes);
     await secured.register(factorRoutes);
     await secured.register(activityRoutes);
+    await secured.register(vehicleRoutes);
+    await secured.register(vehicleUploadRoutes);
+    await secured.register(priceRoutes);
   });
 
   // The screens (apps/web, after `npm run build`) are served from the same

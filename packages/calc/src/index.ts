@@ -5,3 +5,4 @@ export * from './gwp.js';
 export * from './factors.js';
 export * from './combustion.js';
 export * from './fugitive.js';
+export * from './vehicle.js';

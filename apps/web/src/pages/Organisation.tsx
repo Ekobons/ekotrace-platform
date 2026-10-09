@@ -7,6 +7,7 @@ import { useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
 import { useApp } from '../App';
 import { api, type OrgNode, type Person } from '../lib/api';
 import { Icon } from '../components/Icon';
+import { Fleet } from '../components/Fleet';
 
 const TYPES = ['Office', 'Plant', 'Warehouse', 'Fleet depot', 'Data centre', 'Residential', 'Retail', 'Landfill', 'Laboratory', 'Other'];
 
@@ -93,7 +94,7 @@ export function Organisation() {
         <div className="tree">{root && row(root, 0)}</div>
       </div>
 
-      <dialog ref={dlg} className="drawer" onClose={() => setSel(null)}>
+      <dialog ref={dlg} className={`drawer${sel?.kind === 'facility' ? ' wide' : ''}`} onClose={() => setSel(null)}>
         {sel && <Profile key={sel.id} node={sel} nodes={nodes} managers={managers} onClose={() => dlg.current?.close()}
           onSaved={async (m) => { toast(m); await load(); dlg.current?.close(); }} />}
       </dialog>
@@ -153,15 +154,27 @@ function NodeForm({ f, setF, kind, managers, disabled }: { f: F; setF: (f: F) =>
 }
 
 function Profile({ node, nodes, managers, onClose, onSaved }: { node: OrgNode; nodes: OrgNode[]; managers: Person[]; onClose: () => void; onSaved: (m: string) => void }) {
+  const [tab, setTab] = useState<'profile' | 'fleet'>('profile');
+  const [fleetCount, setFleetCount] = useState<number | null>(null);
   const [f, setF] = useState(fieldsFrom(node));
   const [parent, setParent] = useState(node.parent_id ?? '');
   const [err, setErr] = useState<string | null>(null);
   const parents = nodes.filter((n) => n.kind !== 'facility' && n.id !== node.id && n.active && n.canEdit);
+  const { role } = useApp();
+  const canManageFleet = ['platform_admin', 'super_admin', 'admin', 'manager'].includes(role);
   const run = async (fn: () => Promise<unknown>, m: string) => { setErr(null); try { const r = await fn() as { message?: string }; onSaved(r?.message ?? m); } catch (e) { setErr((e as Error).message); } };
   return (
     <div className="in">
       <div className="row"><div className="grow"><div className="eyebrow">{node.kind === 'group' ? 'Main entity' : node.kind === 'subgroup' ? 'Sub-group' : 'Facility profile'}</div><h2>{node.name}</h2></div>
         <button className="btn ghost" onClick={onClose} aria-label="Close"><Icon name="x" /></button></div>
+      {node.kind === 'facility' && (
+        <div className="tabs">
+          <button className={tab === 'profile' ? 'on' : ''} onClick={() => setTab('profile')}>Profile</button>
+          <button className={tab === 'fleet' ? 'on' : ''} onClick={() => setTab('fleet')}>Vehicle fleet{fleetCount != null ? ` (${fleetCount})` : ''}</button>
+        </div>
+      )}
+      {tab === 'fleet' && node.kind === 'facility' && <Fleet facilityId={node.id} canEdit={node.canEnter && node.active && canManageFleet} onCount={setFleetCount} />}
+      {tab === 'profile' && <>
       {!node.canEdit && <div className="note info">Read-only: this is outside the part of the organisation you manage.</div>}
       <NodeForm f={f} setF={setF} kind={node.kind} managers={managers} disabled={!node.canEdit} />
       {node.kind !== 'group' && node.canEdit && (
@@ -177,6 +190,7 @@ function Profile({ node, nodes, managers, onClose, onSaved }: { node: OrgNode; n
           <button className="btn p" onClick={() => run(() => api.updateNode(node.id, { ...toBody(f, node.kind), ...(parent && parent !== node.parent_id ? { parentId: parent } : {}) }), 'Saved')}>Save</button>
         </div>
       )}
+      </>}
     </div>
   );
 }

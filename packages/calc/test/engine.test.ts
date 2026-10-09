@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { calcCombustion, calcFugitive, impliedCalorificValue, unitRegistry, convert, chooseFactors, type Factor, type GwpTable } from '../src/index.js';
+import { calcCombustion, calcFugitive, calcVehicle, impliedCalorificValue, unitRegistry, convert, chooseFactors, type Factor, type GwpTable } from '../src/index.js';
 
 const units = unitRegistry([
   { code: 'kg', name: 'kilogram', dimension: 'mass', toBase: 1 },
@@ -173,4 +173,58 @@ test('implied calorific value from the source factors', () => {
   const v = impliedCalorificValue(dieselEnergy(2024), { date: '2024-05-01', region: 'AE', energyUnit: 'MJ', perUnit: 'L', units: unitsCv })!;
   // 2.62818 kg CO2/L ÷ (0.25 kg CO2/kWh ÷ 3.6 MJ/kWh) = 37.845 MJ/L
   assert.ok(Math.abs(v.value - 2.62818 / (0.25 / 3.6)) < 1e-9);
+});
+
+// ------------------------------------------------------------------ vehicles --
+const unitsV = unitRegistry([...units.values(),
+  { code: 'km', name: 'km', dimension: 'distance', toBase: 1 }, { code: 'mi', name: 'mile', dimension: 'distance', toBase: 1.609344 },
+  { code: 'kWh_e', name: 'kWh (electricity)', dimension: 'electricity', toBase: 1 }]);
+const vf = (id: number, basis: 'direct' | 'wtt', unit: string, co2e: number, gases: { gas: string; kgPerUnit: number }[] = []): Factor =>
+  ({ id, itemId: 9, basis, unit, co2ePerUnit: co2e, sourceGwpSet: 'AR5', source: 'DESNZ 2026', region: 'GLOBAL', validFrom: '2026-01-01', validTo: '2026-12-31', gases });
+// DESNZ 2026 Average car · Diesel per km: 0.17265 = CO2 0.17097 + CH4 0.0000046368 + N2O 0.00167 (kg CO2e)
+const dieselCar = [vf(1, 'direct', 'km', 0.17265, [{ gas: 'CO2', kgPerUnit: 0.17097 }, { gas: 'CH4_fossil', kgPerUnit: 0.0000046368 / 28 }, { gas: 'N2O', kgPerUnit: 0.00167 / 265 }]), vf(2, 'wtt', 'km', 0.04146)];
+const bevCar = [vf(3, 'direct', 'km', 0, [{ gas: 'CO2', kgPerUnit: 0 }])];
+const ukGrid: Factor[] = [{ id: 7, itemId: 8, basis: 'scope2', unit: 'kWh_e', co2ePerUnit: 0.13096, sourceGwpSet: 'AR5', source: 'DESNZ 2026', region: 'GB', validFrom: '2026-01-01', validTo: '2026-12-31',
+  gases: [{ gas: 'CO2', kgPerUnit: 0.12943 }, { gas: 'CH4_fossil', kgPerUnit: 0.00067 / 28 }, { gas: 'N2O', kgPerUnit: 0.00086 / 265 }] }];
+const baseV = { vehicleName: 'Average car', electric: false, phev: false, date: '2026-05-01', region: 'GB', gridFactors: ukGrid, charging: 'elsewhere' as const, gwp: AR5, units: unitsV };
+
+test('vehicle by distance: 1,000 km diesel car = DESNZ per-km factor; miles convert', () => {
+  const r = calcVehicle({ ...baseV, method: 'distance', quantity: 1000, unit: 'km', vehicleFactors: dieselCar });
+  // gas split × AR5 = 0.1726446 kg/km (DESNZ published total 0.17265: rounding in the source, 0.003 %)
+  assert.ok(Math.abs(r.totals.direct - 172.6446368) < 1e-6, String(r.totals.direct));
+  assert.ok(Math.abs(r.totals.direct - 172.65) / 172.65 < 1e-4);
+  assert.ok(Math.abs(r.totals.wtt - 41.46) < 1e-6);
+  assert.equal(r.totals.scope2, 0);
+  const m = calcVehicle({ ...baseV, method: 'distance', quantity: 1000, unit: 'mi', vehicleFactors: dieselCar });
+  assert.ok(Math.abs(m.totals.direct - 172.6446368 * 1.609344) < 1e-6);
+});
+
+test('electric car by distance: Scope 1 = 0, kWh = km × kWh/km, Scope 2 = kWh × grid; on-site charging not counted', () => {
+  const ev = { unit: 'km', kwhPerUnit: 0.20358, source: 'DESNZ 2026' };
+  const r = calcVehicle({ ...baseV, electric: true, method: 'distance', quantity: 1000, unit: 'km', vehicleFactors: bevCar, evEnergy: ev });
+  assert.equal(r.totals.direct, 0);
+  assert.ok(Math.abs(r.totals.scope2 - 203.58 * 0.13096) < 1e-6, String(r.totals.scope2));
+  const s2 = r.factors.find((f) => f.basis === 'scope2')!;
+  assert.ok(Math.abs(s2.perEnteredUnit * 1000 - r.totals.scope2) < 1e-6, 'factor per km shown');
+  const site = calcVehicle({ ...baseV, electric: true, method: 'distance', quantity: 1000, unit: 'km', vehicleFactors: bevCar, evEnergy: ev, charging: 'site' });
+  assert.equal(site.totals.scope2, 0);
+  assert.ok(site.steps.some((x) => /not counted again/.test(x)));
+  const ae = calcVehicle({ ...baseV, region: 'AE', electric: true, method: 'distance', quantity: 1000, unit: 'km', vehicleFactors: bevCar, evEnergy: ev });
+  assert.equal(ae.totals.scope2, 0);
+  assert.ok(ae.warnings.some((w) => /No grid electricity factor for AE/.test(w)));
+});
+
+test('vehicle by fuel and by spend; electric car cannot be entered by fuel', () => {
+  const fuel = { name: 'Diesel', factors: diesel(10, 2026) };
+  const f = calcVehicle({ ...baseV, method: 'fuel', quantity: 100, unit: 'L', vehicleFactors: dieselCar, fuel });
+  assert.ok(Math.abs(f.totals.direct - 266.155) < 1e-6);
+  const s = calcVehicle({ ...baseV, method: 'spend', quantity: 300, unit: 'AED', vehicleFactors: dieselCar, fuel,
+    spend: { currency: 'AED', price: 3, priceUnit: 'L', priceSource: 'test price', buys: 'fuel' } });
+  assert.ok(Math.abs(s.totals.direct - 266.155) < 1e-6, '300 AED ÷ 3 AED/L = 100 L');
+  assert.ok(s.steps[0].startsWith('Spend: 300 AED ÷ 3 AED/L'));
+  const d = s.factors.find((x) => x.basis === 'direct')!;
+  assert.ok(Math.abs(d.perEnteredUnit * 300 - s.totals.direct) < 1e-6, 'factor per AED');
+  assert.throws(() => calcVehicle({ ...baseV, electric: true, method: 'fuel', quantity: 1, unit: 'L', vehicleFactors: bevCar, fuel }), /is electric/);
+  const kwh = calcVehicle({ ...baseV, electric: true, method: 'electricity', quantity: 500, unit: 'kWh_e', vehicleFactors: bevCar });
+  assert.ok(Math.abs(kwh.totals.scope2 - 500 * 0.13096) < 1e-6);
 });

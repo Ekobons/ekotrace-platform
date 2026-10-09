@@ -12,7 +12,12 @@
  *                memo            non-Kyoto gases (e.g. HCFC-22): reported separately
  */
 
-export type Basis = 'direct' | 'wtt' | 'outside_scopes' | 'memo';
+/**
+ * direct = Scope 1; wtt = Scope 3 cat. 3 (well-to-tank); outside_scopes = biogenic CO2;
+ * memo = non-Kyoto gases (reported separately); scope2 = purchased electricity (EV charging).
+ */
+export type Basis = 'direct' | 'wtt' | 'outside_scopes' | 'memo' | 'scope2';
+export const emptyTotals = (): Record<Basis, number> => ({ direct: 0, wtt: 0, outside_scopes: 0, memo: 0, scope2: 0 });
 
 /** A unit of measure. `toBase` = how many base units one of this unit equals. */
 export interface Unit {

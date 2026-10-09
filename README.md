@@ -9,7 +9,7 @@ packages/calc     Calculation engine (pure TypeScript, no database). Units, gase
                   factor selection, fuel combustion, fugitive emissions. Fully unit-tested.
 apps/api          API server (Fastify + PostgreSQL): editable catalogue, factor library,
                   DESNZ importer, calculate and save entries, per-gas reports.
-apps/web          Screens (React): add data (stationary combustion, fugitive), entries & results,
+apps/web          Screens (React): add data (stationary combustion, vehicles, fugitive), fleet register, entries & results,
                   factor library admin (factors, categories & items, units, gases & GWP, sources & import),
                   company & facilities. Same design as the prototype.
 apps/api/migrations  Database tables (SQL, run in order).
@@ -43,8 +43,8 @@ npm run db:seed        # loads gases, GWP values, DESNZ 2022–2026, IPCC coals 
 # 3. Your login (platform admin) — prints a temporary password once
 npm run admin:create -- --email you@ekobon.com --name "Your Name"
 
-# 4. Optional: demo company "BEEAH Group (demo)" with one login per role and 21 months of fuel data
-npm run demo
+# 4. Optional: demo company "BEEAH Group (demo)" with one login per role, 21 months of fuel data and a vehicle fleet
+npm run demo              # add "-- --reset" to delete the demo company and create it again
 
 # 5. Start (builds the screens and starts everything)
 npm run app
@@ -52,7 +52,7 @@ npm run app
 
 Open **http://localhost:4000**. Stop with Ctrl + C. Next time only `npm run app` is needed.
 
-After pulling new code: `git pull`, `npm install`, `npm run db:migrate`, `npm run app`.
+After pulling new code: `git pull`, `npm install`, `npm run db:migrate`, `npm run db:seed` (only when the change log says so), `npm run app`.
 
 For development with live reload: `npm run dev:api` and, in a second window, `npm run dev:web` (screens on http://localhost:5173).
 

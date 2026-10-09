@@ -4,6 +4,7 @@
  *   Catalogue    add / rename / move / switch off subcategories and items; per-company visibility
  *   Units        the conversion matrix (one size per unit) and new units
  *   Gases & GWP  68 gases with AR4 / AR5 / AR6 values
+ *   Grid & prices grid electricity factor per country (Scope 2); shared fuel price list for spend entries
  *   Sources      factor sources, DESNZ upload with preview, import review
  */
 import { useState } from 'react';
@@ -12,9 +13,10 @@ import { CatalogueTab } from './library/CatalogueTab';
 import { UnitsTab } from './library/UnitsTab';
 import { GasesTab } from './library/GasesTab';
 import { SourcesTab } from './library/SourcesTab';
+import { GridTab } from './library/GridTab';
 
 const TABS = [
-  ['factors', 'Factors'], ['catalogue', 'Categories & items'], ['units', 'Units & conversions'], ['gases', 'Gases & GWP'], ['sources', 'Sources & import'],
+  ['factors', 'Factors'], ['catalogue', 'Categories & items'], ['units', 'Units & conversions'], ['gases', 'Gases & GWP'], ['grid', 'Grid electricity & prices'], ['sources', 'Sources & import'],
 ] as const;
 type Tab = (typeof TABS)[number][0];
 
@@ -34,6 +36,7 @@ export function Library() {
       {tab === 'catalogue' && <CatalogueTab />}
       {tab === 'units' && <UnitsTab />}
       {tab === 'gases' && <GasesTab />}
+      {tab === 'grid' && <GridTab />}
       {tab === 'sources' && <SourcesTab />}
     </div>
   );

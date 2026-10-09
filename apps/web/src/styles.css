@@ -8,7 +8,7 @@
   --primary: #0E7C66; --primary-ink: #FFFFFF; --primary-soft: #E3F3EC; --ink: #0B2A25; --lime: #C6F06B;
   --side: #5B6B66; --side-fg: #F2F6F4; --side-dim: #DCE6E1; --side-on: #1F4A41; --side-chip: #1E3A34;
   --ok: #0A6B57; --ok-bg: #DCEFE7; --warn: #7A4A06; --warn-bg: #FBEBCB; --bad: #A63E2A; --bad-bg: #FBE3DE; --info: #1D5E80; --info-bg: #E3F0F7;
-  --s1: #0B4F43; --s2: #2BA38A; --s3: #E3B25A;
+  --s1: #0B4F43; --s2: #2BA38A; --s3: #E3B25A; --bio: #8A7B3C;
   --f-ui: 'Instrument Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --f-mono: 'JetBrains Mono', ui-monospace, Menlo, monospace;
 }
@@ -103,7 +103,8 @@ table.t { width: 100%; border-collapse: collapse; }
 .stat small { color: var(--muted); font-size: 11.5px; }
 .stat.s1 { border-left: 4px solid var(--s1); }
 .stat.s3 { border-left: 4px solid var(--s3); }
-.stat.bio { border-left: 4px solid var(--s2); }
+.stat.bio { border-left: 4px solid var(--bio); }
+.stat.s2 { border-left: 4px solid var(--s2); }
 .stat.memo { border-left: 4px solid var(--line2); }
 .steps { margin: 0; padding-left: 18px; color: var(--fg2); font-size: 12.5px; display: grid; gap: 3px; }
 .note { border-radius: 10px; padding: 9px 12px; font-size: 13px; }
@@ -161,3 +162,12 @@ dialog.drawer::backdrop { background: #0B2A2533; }
 /* Own calorific value */
 .cvbox { display: grid; gap: 10px; padding: 12px 14px; border: 1px dashed var(--line); border-radius: 12px; background: #F7FAF8; }
 .tabs + .grid2, .tabs + .card { margin-top: 0; }
+
+/* Wider modal / drawer (fleet, uploads) */
+.modal.wide { width: min(880px, 96vw); }
+dialog.drawer.wide { width: min(880px, 100vw); }
+.bad-text { color: var(--bad, #B3261E); font-size: 12.5px; }
+.input.sm { height: 32px; padding: 0 8px; font-size: 12.5px; }
+table.t tfoot td { border-top: 2px solid var(--line); background: #F7FAF8; }
+.modal.wide table.t td { white-space: nowrap; }
+.modal.wide table.t td:last-child { white-space: normal; min-width: 200px; }

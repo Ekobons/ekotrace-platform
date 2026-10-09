@@ -6,6 +6,7 @@
 import { useEffect, useState } from 'react';
 import { useApp } from '../App';
 import { api, tco2e } from '../lib/api';
+import { Prices } from '../components/Prices';
 
 type Approach = 'operational' | 'financial' | 'equity';
 const CARDS: [Approach, string, string][] = [
@@ -15,7 +16,7 @@ const CARDS: [Approach, string, string][] = [
 ];
 
 export function Methodology() {
-  const { can, tenant, reload, toast } = useApp();
+  const { can, tenant, reload, toast, role } = useApp();
   const [year, setYear] = useState(new Date().getFullYear() - 1);
   const [b, setB] = useState<Awaited<ReturnType<typeof api.boundaries>> | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -87,7 +88,8 @@ export function Methodology() {
           <p className="sub">The year targets are measured from. Restatements (when the base year must be recalculated) come with the targets module.</p>
         </div>
       </div>
-      <div className="note info">Standards: GHG Protocol Corporate Standard; factors DESNZ (UK) 2022–2026 and IPCC 2006 where DESNZ has none; kWh on net calorific value unless entered as gross.</div>
+      <Prices canEdit={['platform_admin', 'super_admin', 'admin'].includes(role)} />
+      <div className="note info">Standards: GHG Protocol Corporate Standard; factors DESNZ (UK) 2022–2026 and IPCC 2006 where DESNZ has none; kWh on net calorific value unless entered as gross. Vehicles: DESNZ per km / mile by class and powertrain, or by fuel used; electricity for electric vehicles in Scope 2 (location-based grid factor of the facility's country).</div>
     </div>
   );
 }

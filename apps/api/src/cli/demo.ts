@@ -3,6 +3,7 @@
  * prototype's structure, one person per role and a few months of fuel data.
  *
  *   npm run demo
+ *   npm run demo -- --reset     delete the demo company (and all its data) and create it again
  *
  * All demo people share one password, printed once. Demo only — never run this
  * on a server with real clients.
@@ -34,11 +35,41 @@ const DATA: [string, string, number, string][] = [
   ['desnz:diesel-100-mineral-diesel', 'L', 2400, 'Data Centre Dubai'],
 ];
 
+// Fleet: name, registration, vehicle type code, facility, in service from, retired on, usual method, charging, monthly quantity, unit
+const FLEET: [string, string, string, string, string, string | null, 'distance' | 'fuel', 'site' | 'elsewhere' | null, number, string][] = [
+  ['Refuse truck 01', 'SHJ 40101', 'veh:hgv:rigid-17-tonnes:average-laden', 'Fleet Depot Sharjah', '2023-03-01', null, 'distance', null, 4600, 'km'],
+  ['Refuse truck 02', 'SHJ 40102', 'veh:hgv:rigid-17-tonnes:average-laden', 'Fleet Depot Sharjah', '2023-03-01', null, 'distance', null, 4300, 'km'],
+  ['Refuse truck 03', 'SHJ 40103', 'veh:hgv:rigid-17-tonnes:average-laden', 'Fleet Depot Sharjah', '2024-06-01', null, 'fuel', null, 1650, 'L'],
+  ['Refuse truck 04 (old)', 'SHJ 31877', 'veh:hgv:rigid-17-tonnes:average-laden', 'Fleet Depot Sharjah', '2019-01-01', '2025-12-31', 'distance', null, 3900, 'km'],
+  ['Service van 1', 'SHJ 22301', 'veh:vans:average-up-to-3-5-tonnes:diesel', 'Fleet Depot Sharjah', '2024-01-01', null, 'distance', null, 2500, 'km'],
+  ['Service van 2', 'SHJ 22302', 'veh:vans:average-up-to-3-5-tonnes:diesel', 'Fleet Depot Sharjah', '2024-01-01', null, 'distance', null, 2200, 'km'],
+  ['Supervisor EV', 'SHJ 77001', 'veh:cars_by_size:medium-car:battery-electric-vehicle', 'Fleet Depot Sharjah', '2025-04-01', null, 'distance', 'site', 1500, 'km'],
+  ['Forklift 1', '', 'mach:lpg', 'Sharjah Waste-to-Energy', '2022-01-01', null, 'fuel', null, 320, 'kg'],
+  ['Forklift 2', '', 'mach:lpg', 'Sharjah Waste-to-Energy', '2022-01-01', null, 'fuel', null, 280, 'kg'],
+  ['Wheel loader', '', 'mach:diesel', 'Sharjah Waste-to-Energy', '2021-05-01', null, 'fuel', null, 1900, 'L'],
+  ['CEO car', 'SHJ 1', 'veh:cars_by_segment:executive:petrol', 'BEEAH Headquarters', '2024-02-01', null, 'distance', null, 1800, 'km'],
+  ['Pool car (EV)', 'SHJ 1205', 'veh:cars_by_size:average-car:battery-electric-vehicle', 'BEEAH Headquarters', '2025-01-01', null, 'distance', 'elsewhere', 1400, 'km'],
+  ['Pool car (plug-in)', 'SHJ 1206', 'veh:cars_by_size:medium-car:plug-in-hybrid-electric-vehicle', 'BEEAH Headquarters', '2025-01-01', null, 'distance', 'elsewhere', 1600, 'km'],
+];
+
 async function main() {
   const pw = temporaryPassword();
   const hash = await hashPassword(pw);
   await platformTx(async (c: Tx) => {
-    if ((await c.query('SELECT 1 FROM tenant WHERE name = $1', [NAME])).rowCount) throw new Error(`"${NAME}" already exists`);
+    const old = (await c.query('SELECT id FROM tenant WHERE name = $1', [NAME])).rows[0]?.id as string | undefined;
+    if (old && !process.argv.includes('--reset')) throw new Error(`"${NAME}" already exists. Run "npm run demo -- --reset" to delete it and create it again.`);
+    if (old) {
+      // Demo company only (matched by its exact name): remove everything it holds.
+      for (const sql of [
+        'DELETE FROM activity_result WHERE tenant_id = $1', 'DELETE FROM activity WHERE tenant_id = $1', 'DELETE FROM vehicle WHERE tenant_id = $1',
+        'DELETE FROM price WHERE tenant_id = $1', 'DELETE FROM user_facility WHERE tenant_id = $1',
+        'DELETE FROM session WHERE user_id IN (SELECT id FROM app_user WHERE tenant_id = $1)', 'DELETE FROM audit_log WHERE tenant_id = $1',
+        'UPDATE org_node SET manager_user_id = NULL WHERE tenant_id = $1', 'DELETE FROM app_user WHERE tenant_id = $1', 'DELETE FROM tenant_catalogue WHERE tenant_id = $1',
+        'DELETE FROM org_node WHERE tenant_id = $1 AND kind = \'facility\'', 'DELETE FROM org_node WHERE tenant_id = $1 AND kind = \'subgroup\'', 'DELETE FROM org_node WHERE tenant_id = $1',
+        'DELETE FROM tenant WHERE id = $1',
+      ]) await c.query(sql, [old]);
+      console.log(`Old "${NAME}" deleted.`);
+    }
     const t = (await c.query(`INSERT INTO tenant (name, country, gwp_set, consolidation, base_year) VALUES ($1,'AE','AR5','operational',2025) RETURNING id`, [NAME])).rows[0].id;
     const group = (await c.query(`INSERT INTO org_node (tenant_id, kind, name, country) VALUES ($1,'group',$2,'AE') RETURNING id`, [t, 'BEEAH Group'])).rows[0].id;
     const ids = new Map<string, string>();
@@ -86,6 +117,46 @@ async function main() {
         }
       }
     }
+    // Fleet and monthly vehicle data (only months each vehicle was in service).
+    const veh: { id: string; item: number; fac: string; from: string; to: string | null; method: 'distance' | 'fuel'; charging: 'site' | 'elsewhere' | null; qty: number; unit: string }[] = [];
+    for (const [name, reg, code, fac, from, retired, method, charging, qty, unit] of FLEET) {
+      const item = (await c.query('SELECT id FROM item WHERE code = $1', [code])).rows[0]?.id;
+      if (!item) { console.log(`  (skipped ${name}: vehicle type ${code} not loaded)`); continue; }
+      const id = (await c.query(
+        `INSERT INTO vehicle (tenant_id, facility_id, name, registration, item_id, ownership, charging, default_method, in_service_from, retired_on, retired_reason)
+         VALUES ($1,$2,$3,$4,$5,'owned',$6,$7,$8,$9,$10) RETURNING id`,
+        [t, ids.get(fac), name, reg || null, item, charging, method, from, retired, retired ? 'Replaced by a new truck' : null])).rows[0].id;
+      veh.push({ id, item, fac, from, to: retired, method, charging, qty, unit });
+    }
+    let nv = 0;
+    for (let y = 2025; y <= 2026; y++) {
+      for (let m = 0; m < (y === 2026 ? 9 : 12); m++) {
+        const start = `${y}-${String(m + 1).padStart(2, '0')}-01`;
+        const end = new Date(Date.UTC(y, m + 1, 0)).toISOString().slice(0, 10);
+        for (const v of veh) {
+          if (v.from > end || (v.to && v.to < start)) continue;
+          const q = Math.round(v.qty * (0.85 + 0.3 * Math.abs(Math.sin(m * 1.3 + y + v.qty))));
+          const { result, item: it, gwpSet, stored } = await calculate(
+            { itemId: v.item, unit: v.unit, quantity: q, periodStart: start, periodEnd: end, vehicle: { method: v.method, charging: v.charging ?? undefined } },
+            { gwpSet: 'AR5', region: 'AE' });
+          const a = (await c.query(
+            `INSERT INTO activity (tenant_id, facility_id, category_id, item_id, period_start, period_end, quantity, unit, inputs, data_type, gwp_set,
+                                   co2e_direct, co2e_wtt, co2_biogenic, co2e_memo, co2e_scope2, steps, warnings, status, created_by, factors, vehicle_id)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'actual',$10,$11,$12,$13,$14,$15,$16,$17,'approved',$18,$19,$20) RETURNING id`,
+            [t, ids.get(v.fac), it.category_id, v.item, start, end, stored.quantity, stored.unit, JSON.stringify(stored.inputs), gwpSet,
+             result.totals.direct, result.totals.wtt, result.totals.outside_scopes, result.totals.memo, result.totals.scope2,
+             JSON.stringify(result.steps), JSON.stringify(result.warnings), users.get('preparer'), JSON.stringify(result.factors), v.id])).rows[0].id;
+          if (result.lines.length) {
+            await c.query(`INSERT INTO activity_result (activity_id, tenant_id, basis, gas, kg_gas, kg_co2e, factor_id, method)
+                           SELECT $1, $2, * FROM unnest($3::text[], $4::text[], $5::numeric[], $6::numeric[], $7::bigint[], $8::text[])`,
+              [a, t, result.lines.map((l) => l.basis), result.lines.map((l) => l.gas), result.lines.map((l) => l.kgGas), result.lines.map((l) => l.kgCo2e),
+               result.lines.map((l) => l.factorId), result.lines.map((l) => l.method)]);
+          }
+          nv++;
+        }
+      }
+    }
+    console.log(`Fleet: ${veh.length} vehicles (one retired), ${nv} monthly vehicle entries.`);
     console.log(`\nDemo company "${NAME}" created: ${TREE.length} sub-groups, ${[...ids.keys()].length - TREE.length} facilities, ${n} fuel entries (Jan 2025 – Sep 2026).`);
   });
   console.log('\nDemo logins (all with the same password, shown once):');

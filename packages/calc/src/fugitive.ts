@@ -20,7 +20,7 @@
  * Kyoto basket (HCFC-22, CFCs, halons) are kept as "memo" lines: reported
  * separately, never added to the scope totals (GHG Protocol).
  */
-import { CalcError, type Basis, type CalcResult, type Factor, type FactorUsed, type GwpTable, type ResultLine } from './types.js';
+import { CalcError, emptyTotals, type Basis, type CalcResult, type Factor, type FactorUsed, type GwpTable, type ResultLine } from './types.js';
 import { type UnitRegistry, convert, getUnit } from './units.js';
 import { tryGwp } from './gwp.js';
 import { fmt } from './combustion.js';
@@ -110,7 +110,7 @@ export function calcFugitive(input: FugitiveInput): CalcResult {
   const { kg, steps } = releasedMassKg(input);
   const lines: ResultLine[] = [];
   const warnings: string[] = [];
-  const totals: Record<Basis, number> = { direct: 0, wtt: 0, outside_scopes: 0, memo: 0 };
+  const totals: Record<Basis, number> = emptyTotals();
   const factors: FactorUsed[] = [];
   const kgUnit = getUnit(input.units, 'kg');
   const entered = getUnit(input.units, input.unit);

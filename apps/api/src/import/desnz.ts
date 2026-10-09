@@ -37,7 +37,25 @@ export interface DesnzGasRow {
   total: number | null;
 }
 
+/** Road vehicle factor per km or mile (Scope 1 tailpipe, or its well-to-tank). */
+export interface DesnzVehicleRow {
+  group: VehicleGroup;
+  vehicle: string; // 'Medium car', 'Class II (1.305 to 1.74 tonnes)', 'Rigid (>17 tonnes)'…
+  variant: string; // powertrain ('Diesel', 'Battery Electric Vehicle'…) or load ('Average laden'); '' for motorbikes
+  unit: 'km' | 'mi';
+  basis: 'direct' | 'wtt';
+  co2e: number | null;
+  gasCo2e: { CO2?: number; CH4?: number; N2O?: number };
+}
+/** Electricity used per km / mile by electric and plug-in hybrid vehicles. */
+export interface DesnzEvEnergyRow { group: VehicleGroup; vehicle: string; variant: string; unit: 'km' | 'mi'; kwh: number }
+export type VehicleGroup = 'cars_by_size' | 'cars_by_segment' | 'vans' | 'hgv' | 'hgv_refrigerated' | 'motorbikes';
+
 export interface DesnzParsed {
+  vehicles: DesnzVehicleRow[];
+  evEnergy: DesnzEvEnergyRow[];
+  /** UK grid electricity (Scope 2, location-based), kg CO2e per kWh and its gas split */
+  ukGrid: { co2e: number | null; gasCo2e: { CO2?: number; CH4?: number; N2O?: number } } | null;
   year: number;
   version: string;
   gwpSet: 'AR4' | 'AR5' | 'AR6';
@@ -51,6 +69,18 @@ const FUEL_L2 = new Map([
   ['Biofuel', 'Biofuel'], ['Biomass', 'Biomass'], ['Biogas', 'Biogas'],
   ['WTT- biofuel', 'Biofuel'], ['WTT- biomass', 'Biomass'], ['WTT- biogas', 'Biogas'],
 ]);
+
+/** DESNZ level-2 names of vehicle tables (spelling changed between editions). */
+export function vehicleGroup(l2: string): VehicleGroup | null {
+  const x = l2.replace(/^WTT-\s*/i, '').toLowerCase();
+  if (/by size/.test(x)) return 'cars_by_size';
+  if (/market segment/.test(x)) return 'cars_by_segment';
+  if (/motorbike/.test(x)) return 'motorbikes';
+  if (/^vans?$/.test(x)) return 'vans';
+  if (/hgv/.test(x)) return /refrigerated/.test(x) && !/non-refrigerated/.test(x) ? 'hgv_refrigerated' : 'hgv';
+  return null;
+}
+const VEH_UNIT: Record<string, 'km' | 'mi'> = { km: 'km', miles: 'mi' };
 
 const text = (v: ExcelJS.CellValue): string => {
   if (v == null) return '';
@@ -102,6 +132,9 @@ export async function parseDesnz(path: string): Promise<DesnzParsed> {
 
   const fuels = new Map<string, DesnzFuelRow>();
   const gases = new Map<string, DesnzGasRow>();
+  const vehicles = new Map<string, DesnzVehicleRow>();
+  const evEnergy: DesnzEvEnergyRow[] = [];
+  let ukGrid: DesnzParsed['ukGrid'] = null;
   ws.eachRow((row, n) => {
     if (n <= headerRow) return;
     const g = (k: string) => row.getCell(col[k]!).value;
@@ -109,6 +142,34 @@ export async function parseDesnz(path: string): Promise<DesnzParsed> {
     const uom = text(g('UOM')), ghg = text(g('GHG/Unit')).toLowerCase(), colText = col['Column Text'] ? text(g('Column Text')) : '';
     const v = num(row.getCell(col[valueCol]!).value);
     if (!l3) return;
+
+    // Road vehicles: Scope 1 per km/mile, and their well-to-tank (Scope 3).
+    const vunit = VEH_UNIT[uom];
+    const vgroup = vunit ? vehicleGroup(l2) : null;
+    if (vgroup && vunit && ((scope === 'Scope 1' && /^(Passenger|Delivery) vehicles$/.test(l1)) || (scope === 'Scope 3' && /^WTT- (pass vehs|delivery vehs)/.test(l1)))) {
+      const basis = scope === 'Scope 1' ? 'direct' : 'wtt';
+      const variant = colText === 'None' ? '' : colText;
+      const key = `${vgroup}|${l3}|${variant}|${vunit}|${basis}`;
+      const r = vehicles.get(key) ?? { group: vgroup, vehicle: l3, variant, unit: vunit, basis, co2e: null, gasCo2e: {} };
+      if (/of co2/.test(ghg)) r.gasCo2e.CO2 = v ?? undefined;
+      else if (/of ch4/.test(ghg)) r.gasCo2e.CH4 = v ?? undefined;
+      else if (/of n2o/.test(ghg)) r.gasCo2e.N2O = v ?? undefined;
+      else if (ghg.startsWith('kg co2e')) r.co2e = v;
+      vehicles.set(key, r);
+      return;
+    }
+    if (vgroup && vunit && /^SECR kWh UK electricity for EVs$/.test(l1) && v != null) {
+      evEnergy.push({ group: vgroup, vehicle: l3, variant: colText, unit: vunit, kwh: v });
+      return;
+    }
+    if (scope === 'Scope 2' && l1 === 'UK electricity' && uom === 'kWh') {
+      ukGrid ??= { co2e: null, gasCo2e: {} };
+      if (/of co2/.test(ghg)) ukGrid.gasCo2e.CO2 = v ?? undefined;
+      else if (/of ch4/.test(ghg)) ukGrid.gasCo2e.CH4 = v ?? undefined;
+      else if (/of n2o/.test(ghg)) ukGrid.gasCo2e.N2O = v ?? undefined;
+      else if (ghg.startsWith('kg co2e')) ukGrid.co2e = v;
+      return;
+    }
 
     let basis: DesnzFuelRow['basis'] | null = null;
     let cls: string | undefined;
@@ -146,6 +207,8 @@ export async function parseDesnz(path: string): Promise<DesnzParsed> {
     year, version, gwpSet,
     fuels: [...fuels.values()].filter((r) => r.co2e != null || Object.keys(r.gasCo2e).length),
     gases: [...gases.values()],
+    vehicles: [...vehicles.values()].filter((r) => r.co2e != null),
+    evEnergy, ukGrid,
     sha256: createHash('sha256').update(buf).digest('hex'),
   };
 }

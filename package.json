@@ -20,7 +20,7 @@
     "dev:api": "npm run dev -w @ekotrace/api",
     "dev:web": "npm run dev -w @ekotrace/web",
     "admin:create": "npm run admin:create -w @ekotrace/api --",
-    "demo": "npm run demo -w @ekotrace/api"
+    "demo": "npm run demo -w @ekotrace/api --"
   },
   "devDependencies": {
     "@types/node": "22.20.5",

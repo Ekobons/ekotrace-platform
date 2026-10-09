@@ -8,6 +8,7 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import pg from 'pg';
+import ExcelJS from 'exceljs';
 
 const url = process.env.TEST_DATABASE_URL ?? 'postgres://ekotrace:ekotrace@127.0.0.1:5432/ekotrace_test';
 const dbName = new URL(url).pathname.slice(1);
@@ -352,4 +353,151 @@ test('suspended company cannot log in; platform admin sees all companies', async
   const sa = await login(superA.email, superA.temporaryPassword);
   assert.equal((await call(sa, 'GET', '/api/platform/companies')).status, 403);
   await api('PATCH', `/api/platform/companies/${tenantB}`, { status: 'active' });
+});
+
+// ------------------------------------------------------------------ vehicles --
+const itemId = async (code: string) => (await pool.query('SELECT id FROM item WHERE code = $1', [code])).rows[0].id as number;
+
+test('vehicles: fleet add / retire; distance, fuel and spend entries; EV charging in Scope 2', async () => {
+  const dieselVan = await itemId('veh:vans:average-up-to-3-5-tonnes:diesel');
+  const bevCar = await itemId('veh:cars_by_size:average-car:battery-electric-vehicle');
+  const period = { periodStart: '2026-03-01', periodEnd: '2026-03-31' };
+
+  // Fleet
+  const van = await api('POST', `/api/facilities/${facA}/vehicles`, { name: 'Van 1', registration: 'SHJ 1', itemId: dieselVan, inServiceFrom: '2025-01-01' }, tenantA);
+  assert.equal(van.status, 200, JSON.stringify(van.body));
+  const dup = await api('POST', `/api/facilities/${facA}/vehicles`, { name: 'Van 1b', registration: 'shj 1', itemId: dieselVan, inServiceFrom: '2025-01-01' }, tenantA);
+  assert.equal(dup.status, 400, 'same registration twice');
+  const ev = await api('POST', `/api/facilities/${facA}/vehicles`, { name: 'EV 1', itemId: bevCar, inServiceFrom: '2026-01-01', defaultMethod: 'fuel' }, tenantA);
+  assert.equal(ev.body.charging, 'elsewhere');
+  assert.equal(ev.body.default_method, 'electricity', 'electric car cannot default to fuel');
+
+  // Distance: 1,000 km × DESNZ 2026 van factor
+  const d = await api('POST', '/api/calculate', { facilityId: facA, itemId: 0 + dieselVan, unit: 'km', quantity: 1000, ...period, vehicle: { method: 'distance', vehicleId: van.body.id } }, tenantA);
+  assert.equal(d.status, 200, JSON.stringify(d.body));
+  const pub = Number((await pool.query(`SELECT co2e FROM factor f JOIN factor_source s ON s.id = f.source_id WHERE item_id = $1 AND s.code = 'DESNZ-2026' AND basis = 'direct' AND unit = 'km' AND status = 'active'`, [dieselVan])).rows[0].co2e);
+  assert.ok(Math.abs(d.body.totals.direct - 1000 * pub) / (1000 * pub) < 0.005, `${d.body.totals.direct} vs ${1000 * pub}`);
+
+  // Fuel: litres of the van's fuel (diesel)
+  const f = await api('POST', '/api/calculate', { facilityId: facA, itemId: dieselVan, unit: 'L', quantity: 100, ...period, vehicle: { method: 'fuel', vehicleId: van.body.id } }, tenantA);
+  const std = await api('POST', '/api/calculate', { itemId: await diesel(), unit: 'L', quantity: 100, ...period }, tenantA);
+  assert.ok(Math.abs(f.body.totals.direct - std.body.totals.direct) < 1e-9);
+
+  // Spend: no price yet → clear error; company price → litres
+  const noPrice = await api('POST', '/api/calculate', { facilityId: facA, itemId: dieselVan, unit: 'L', ...period, vehicle: { method: 'spend', vehicleId: van.body.id, spend: { amount: 300, currency: 'AED' } } }, tenantA);
+  assert.equal(noPrice.status, 400);
+  assert.match(noPrice.body.message, /No AED price/);
+  const p = await api('POST', '/api/prices', { region: 'AE', itemId: await diesel(), currency: 'AED', price: 3, unit: 'L', validFrom: '2026-03-01', validTo: '2026-03-31', source: 'Test price' }, tenantA);
+  assert.equal(p.status, 200, JSON.stringify(p.body));
+  const sp = await api('POST', '/api/calculate', { facilityId: facA, itemId: dieselVan, unit: 'L', ...period, vehicle: { method: 'spend', vehicleId: van.body.id, spend: { amount: 300, currency: 'AED' } } }, tenantA);
+  assert.equal(sp.status, 200, JSON.stringify(sp.body));
+  assert.ok(Math.abs(sp.body.totals.direct - std.body.totals.direct) < 1e-9, '300 AED ÷ 3 = 100 L');
+  assert.equal((await api('GET', '/api/prices', undefined, tenantB)).body.prices.length, 0, "another company does not see A's prices");
+
+  // EV in the UAE without a UAE grid factor: Scope 2 = 0 with a warning; saved with scope2 column
+  const e = await api('POST', '/api/activities', { facilityId: facA, itemId: bevCar, unit: 'km', quantity: 2000, ...period, vehicle: { method: 'distance', vehicleId: ev.body.id } }, tenantA);
+  assert.equal(e.status, 200, JSON.stringify(e.body));
+  assert.ok(e.body.warnings.some((w: string) => /No grid electricity factor for AE/.test(w)));
+  // Add a UAE grid factor (platform) → Scope 2 = km × kWh/km × factor
+  const grid = await itemId('grid:electricity');
+  const gf = await api('POST', '/api/admin/factors', { itemId: grid, sourceCode: 'TEST-AE-GRID', region: 'AE', basis: 'scope2', unit: 'kWh_e', co2e: 0.4, validFrom: '2026-01-01', validTo: '2026-12-31' });
+  assert.equal(gf.status, 200, JSON.stringify(gf.body));
+  const { refdata } = await import('../src/modules/refdata.js'); void refdata;
+  const e2 = await api('POST', '/api/calculate', { facilityId: facA, itemId: bevCar, unit: 'km', quantity: 2000, ...period, vehicle: { method: 'distance', vehicleId: ev.body.id } }, tenantA);
+  const kwhPerKm = Number((await pool.query(`SELECT kwh_per_unit FROM vehicle_energy WHERE item_id = $1 AND unit = 'km' AND valid_from = '2026-01-01' AND status = 'active'`, [bevCar])).rows[0].kwh_per_unit);
+  assert.equal(e2.body.totals.direct, 0);
+  assert.ok(Math.abs(e2.body.totals.scope2 - 2000 * kwhPerKm * 0.4) < 1e-6, `${e2.body.totals.scope2}`);
+  const site = await api('POST', '/api/calculate', { facilityId: facA, itemId: bevCar, unit: 'km', quantity: 2000, ...period, vehicle: { method: 'distance', vehicleId: ev.body.id, charging: 'site' } }, tenantA);
+  assert.equal(site.body.totals.scope2, 0, 'charged on site: already in the site meter');
+
+  // Retire: not offered after the date; entries after it are refused
+  assert.equal((await api('POST', `/api/vehicles/${van.body.id}/retire`, { retiredOn: '2026-01-31' }, tenantA)).status, 200);
+  const list = await api('GET', `/api/facilities/${facA}/vehicles?from=2026-03-01&to=2026-03-31`, undefined, tenantA);
+  assert.ok(!list.body.vehicles.some((v: { id: string }) => v.id === van.body.id));
+  const late = await api('POST', '/api/calculate', { facilityId: facA, itemId: dieselVan, unit: 'km', quantity: 10, ...period, vehicle: { method: 'distance', vehicleId: van.body.id } }, tenantA);
+  assert.equal(late.status, 400);
+  assert.equal((await api('POST', `/api/vehicles/${ev.body.id}/retire`, { retiredOn: '2026-02-01' }, tenantA)).status, 400, 'has an entry in March');
+  assert.equal((await api('DELETE', `/api/vehicles/${ev.body.id}`, undefined, tenantA)).status, 400, 'has entries: retire, not delete');
+  // Another company cannot see the fleet
+  assert.equal((await api('GET', `/api/facilities/${facA}/vehicles`, undefined, tenantB)).status, 404);
+});
+
+test('vehicles: fleet upload from Excel — preview, then add valid rows', async () => {
+  const t = await app.inject({ method: 'GET', url: '/api/vehicles/template.xlsx', headers: { cookie: adminCookie, 'x-tenant-id': tenantA } });
+  assert.equal(t.statusCode, 200);
+  const wb = new ExcelJS.Workbook();
+  await wb.xlsx.load(t.rawPayload as unknown as ArrayBuffer);
+  const ws = wb.getWorksheet('Fleet')!;
+  ws.spliceRows(2, 1);
+  ws.addRow(['Truck 7', 'SHJ 77', 'Rigid (>17 tonnes) · Average laden', '', 'owned', '', '2025-06-01', 'distance', '']);
+  ws.addRow(['Forklift 2', '', 'Machinery · LPG (e.g. forklift)', '', 'leased', '', '01/02/2024', 'fuel', '']);
+  ws.addRow(['Mystery', '', 'Flying car', '', 'owned', '', '2025-01-01', 'distance', '']);
+  ws.addRow(['No date', '', 'Average car · Petrol', '', 'owned', '', '', 'distance', '']);
+  const buf = Buffer.from(await wb.xlsx.writeBuffer());
+  const up = (commit: boolean) => app.inject({ method: 'POST', url: `/api/facilities/${facA}/vehicles/upload${commit ? '?commit=1' : ''}`, payload: buf,
+    headers: { cookie: adminCookie, 'x-tenant-id': tenantA, 'content-type': 'application/octet-stream' } });
+  const pre = (await up(false)).json();
+  assert.equal(pre.rows.length, 4, JSON.stringify(pre));
+  assert.equal(pre.valid, 2, JSON.stringify(pre.rows.map((r: { errors: string[] }) => r.errors)));
+  assert.match(pre.rows[2].errors[0], /Unknown vehicle type/);
+  assert.match(pre.rows[3].errors.join(), /date/);
+  assert.equal(pre.rows[1].inServiceFrom, '2024-02-01');
+  const done = (await up(true)).json();
+  assert.equal(done.added, 2);
+  const list = await api('GET', `/api/facilities/${facA}/vehicles`, undefined, tenantA);
+  assert.ok(list.body.vehicles.some((v: { name: string; default_method: string }) => v.name === 'Forklift 2' && v.default_method === 'fuel'));
+});
+
+test('vehicles: data template per fleet and month; upload preview then save; batch keeps good rows', async () => {
+  const t = await app.inject({ method: 'GET', url: `/api/vehicles/entries-template.xlsx?facilityId=${facA}&from=2026-04&to=2026-05`, headers: { cookie: adminCookie, 'x-tenant-id': tenantA } });
+  assert.equal(t.statusCode, 200, t.body);
+  const wb = new ExcelJS.Workbook();
+  await wb.xlsx.load(t.rawPayload as unknown as ArrayBuffer);
+  const ws = wb.getWorksheet('Vehicle data')!;
+  const prefilled: string[] = [];
+  ws.eachRow((r, n) => { if (n > 1) prefilled.push(`${r.getCell(2).value}|${r.getCell(3).value}|${r.getCell(5).value}`); });
+  assert.ok(prefilled.includes('2026-04|SHJ 77|distance'), prefilled.join(','));
+  assert.ok(prefilled.includes('2026-05|Forklift 2|fuel'));
+  ws.eachRow((r, n) => { if (n > 1) r.getCell(6).value = 100; });
+  ws.addRow(['Sharjah plant', '2026-05', 'Not a vehicle', '', 'distance', 5, 'km', '', '', '', '', 'actual', '']);
+  const buf = Buffer.from(await wb.xlsx.writeBuffer());
+  const up = (commit: boolean) => app.inject({ method: 'POST', url: `/api/vehicles/entries/upload${commit ? '?commit=1' : ''}`, payload: buf,
+    headers: { cookie: adminCookie, 'x-tenant-id': tenantA, 'content-type': 'application/octet-stream' } });
+  const pre = (await up(false)).json();
+  assert.equal(pre.rows.length, prefilled.length + 1, JSON.stringify(pre).slice(0, 500));
+  assert.equal(pre.valid, prefilled.length, JSON.stringify(pre.rows.filter((r: { errors: string[] }) => r.errors.length)));
+  assert.match(pre.rows.at(-1).errors[0], /not in the fleet/);
+  const before = (await api('GET', '/api/activities?limit=1000', undefined, tenantA)).body.activities.length;
+  assert.equal(pre.saved, 0);
+  const done = (await up(true)).json();
+  assert.equal(done.saved, prefilled.length);
+  assert.equal((await api('GET', '/api/activities?limit=1000', undefined, tenantA)).body.activities.length, before + prefilled.length);
+
+  const truck = (await api('GET', `/api/facilities/${facA}/vehicles`, undefined, tenantA)).body.vehicles.find((v: { name: string }) => v.name === 'Truck 7');
+  const b = await api('POST', '/api/activities/batch', { dryRun: true, entries: [
+    { facilityId: facA, itemId: truck.item_id, unit: 'km', quantity: 10, periodStart: '2026-06-01', periodEnd: '2026-06-30', vehicle: { method: 'distance', vehicleId: truck.id } },
+    { facilityId: facA, itemId: truck.item_id, unit: 'km', quantity: -1, periodStart: '2026-06-01', periodEnd: '2026-06-30', vehicle: { method: 'distance', vehicleId: truck.id } },
+  ] }, tenantA);
+  assert.equal(b.status, 200, JSON.stringify(b.body));
+  assert.deepEqual(b.body.results.map((r: { ok: boolean }) => r.ok), [true, false]);
+});
+
+test('recalculate: an EV entry saved before the grid factor existed gets its Scope 2 once recalculated', async () => {
+  const bevCar = await itemId('veh:cars_by_size:average-car:battery-electric-vehicle');
+  // Company B (AE, no AE grid factor at first? A's test added one valid 2026) — use 2025, which has none.
+  const b = (await api('GET', '/api/org', undefined, tenantB)).body.nodes.find((n: { kind: string }) => n.kind === 'facility').id;
+  const v = await api('POST', `/api/facilities/${b}/vehicles`, { name: 'B EV', itemId: bevCar, inServiceFrom: '2025-01-01' }, tenantB);
+  const saved = await api('POST', '/api/activities', { facilityId: b, itemId: bevCar, unit: 'km', quantity: 1000, periodStart: '2025-05-01', periodEnd: '2025-05-31', vehicle: { method: 'distance', vehicleId: v.body.id } }, tenantB);
+  assert.equal(saved.status, 200, JSON.stringify(saved.body));
+  assert.equal(saved.body.totals.scope2, 0);
+  const grid = await itemId('grid:electricity');
+  assert.equal((await api('POST', '/api/admin/factors', { itemId: grid, sourceCode: 'TEST-AE-GRID-2025', region: 'AE', basis: 'scope2', unit: 'kWh_e', co2e: 0.5, validFrom: '2025-01-01', validTo: '2025-12-31' })).status, 200);
+  const r = await api('POST', '/api/activities/recalculate', { year: 2025 }, tenantB);
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  assert.ok(r.body.changed >= 1, JSON.stringify(r.body));
+  const after = (await api('GET', `/api/activities/${saved.body.id}`, undefined, tenantB)).body;
+  assert.ok(Number(after.co2e_scope2) > 0);
+  assert.equal(after.warnings.length, 0);
+  // Recalculating again changes nothing.
+  assert.equal((await api('POST', '/api/activities/recalculate', { ids: [saved.body.id], onlyWithWarnings: false }, tenantB)).body.changed, 0);
 });

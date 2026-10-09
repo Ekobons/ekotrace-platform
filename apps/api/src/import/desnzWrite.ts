@@ -13,6 +13,9 @@
 import type { Tx } from '../db/pool.js';
 import { DESNZ_UNIT, slug, type DesnzParsed } from './desnz.js';
 
+/** Raise when the importer learns to read more of the file: editions already loaded are read again once. */
+export const IMPORTER_VERSION = 2;
+
 export interface ImportSummary {
   source: string;
   skipped: boolean;
@@ -49,16 +52,16 @@ const SUB_FOR_GAS_FAMILY = (family: string, code: string): string =>
 
 export async function importDesnz(c: Tx, p: DesnzParsed, opts: { createdBy?: string } = {}): Promise<ImportSummary> {
   const code = `DESNZ-${p.year}`;
-  const existing = (await c.query('SELECT id, file_sha256 FROM factor_source WHERE code = $1', [code])).rows[0];
-  if (existing?.file_sha256 === p.sha256) return { source: code, skipped: true, items: 0, factors: 0, issues: 0 };
+  const existing = (await c.query('SELECT id, file_sha256, importer_version FROM factor_source WHERE code = $1', [code])).rows[0];
+  if (existing?.file_sha256 === p.sha256 && existing.importer_version >= IMPORTER_VERSION) return { source: code, skipped: true, items: 0, factors: 0, issues: 0 };
 
   const sourceId: number = existing
-    ? (await c.query('UPDATE factor_source SET version=$2, gwp_set=$3, file_sha256=$4, imported_at=now() WHERE id=$1 RETURNING id', [existing.id, p.version, p.gwpSet, p.sha256])).rows[0].id
+    ? (await c.query('UPDATE factor_source SET version=$2, gwp_set=$3, file_sha256=$4, importer_version=$5, imported_at=now() WHERE id=$1 RETURNING id', [existing.id, p.version, p.gwpSet, p.sha256, IMPORTER_VERSION])).rows[0].id
     : (await c.query(
-        `INSERT INTO factor_source (code, publisher, title, year, version, gwp_set, url, licence, file_sha256)
-         VALUES ($1,'UK Department for Energy Security and Net Zero (DESNZ)',$2,$3,$4,$5,$6,'Open Government Licence v3.0',$7) RETURNING id`,
+        `INSERT INTO factor_source (code, publisher, title, year, version, gwp_set, url, licence, file_sha256, importer_version)
+         VALUES ($1,'UK Department for Energy Security and Net Zero (DESNZ)',$2,$3,$4,$5,$6,'Open Government Licence v3.0',$7,$8) RETURNING id`,
         [code, `Greenhouse gas reporting: conversion factors ${p.year}`, p.year, p.version, p.gwpSet,
-         `https://www.gov.uk/government/publications/greenhouse-gas-reporting-conversion-factors-${p.year}`, p.sha256],
+         `https://www.gov.uk/government/publications/greenhouse-gas-reporting-conversion-factors-${p.year}`, p.sha256, IMPORTER_VERSION],
       )).rows[0].id;
 
   const issues: { severity: string; message: string; detail?: unknown }[] = [];
@@ -66,12 +69,19 @@ export async function importDesnz(c: Tx, p: DesnzParsed, opts: { createdBy?: str
   const gwp = new Map<string, number>((await c.query('SELECT gas, value FROM gwp_value WHERE gwp_set = $1', [p.gwpSet])).rows.map((r) => [r.gas, r.value]));
   const gasRows = (await c.query('SELECT code, family, name FROM gas')).rows as { code: string; family: string; name: string }[];
 
-  // Previous active factors of this source → superseded, remembered for linking.
-  const previous = new Map<string, number>();
+  // Previous active factors of this source, with their values: an unchanged factor is
+  // kept as it is; a changed one is superseded (kept as history) and linked to its successor.
+  const previous = new Map<string, { id: number; co2e: number | null; gases: Map<string, number> }>();
   if (existing) {
-    const old = await c.query(`UPDATE factor SET status = 'superseded' WHERE source_id = $1 AND status = 'active' RETURNING id, item_id, unit, basis, region`, [sourceId]);
-    for (const r of old.rows) previous.set(`${r.item_id}|${r.unit}|${r.basis}|${r.region}`, r.id);
+    const old = await c.query(
+      `SELECT f.id, f.item_id, f.unit, f.basis, f.region, f.co2e,
+              COALESCE((SELECT json_object_agg(g.gas, g.kg_per_unit) FROM factor_gas g WHERE g.factor_id = f.id), '{}') AS gases
+         FROM factor f WHERE f.source_id = $1 AND f.status = 'active'`, [sourceId]);
+    for (const r of old.rows) {
+      previous.set(`${r.item_id}|${r.unit}|${r.basis}|${r.region}`, { id: r.id, co2e: r.co2e == null ? null : Number(r.co2e), gases: new Map(Object.entries(r.gases).map(([k, v]) => [k, Number(v)])) });
+    }
   }
+  const same = (a: number | null, b: number | null) => (a == null || b == null ? a === b : Math.abs(a - b) <= 1e-12 * Math.max(1, Math.abs(a)));
 
   // ---- items ----------------------------------------------------------------
   const itemIds = new Map<string, number>();
@@ -156,15 +166,63 @@ export async function importDesnz(c: Tx, p: DesnzParsed, opts: { createdBy?: str
     }
   }
 
+  // ---- road vehicles (per km / mile), EV electricity use, UK grid ----------------
+  let order = 0;
+  for (const r of p.vehicles) {
+    if (r.basis === 'wtt' && r.variant === 'Battery Electric Vehicle') continue; // upstream of UK grid only; not applicable elsewhere
+    const v = vehicleItem(r.group, r.vehicle, r.variant);
+    // "Average laden" first in the list: what most companies know about their trucks.
+    const item = itemIds.get(v.code) ?? (await upsertVehicleItem(v, (/^Average laden$/i.test(r.variant) ? 0 : 10000) + order++));
+    const split: [string, number][] = [];
+    if (r.basis === 'direct' && r.gasCo2e.CO2 != null) {
+      split.push(['CO2', r.gasCo2e.CO2]);
+      if (r.gasCo2e.CH4 != null) split.push(['CH4_fossil', r.gasCo2e.CH4 / gwp.get('CH4_fossil')!]);
+      if (r.gasCo2e.N2O != null) split.push(['N2O', r.gasCo2e.N2O / gwp.get('N2O')!]);
+    }
+    factors.push({ item, basis: r.basis, unit: r.unit, co2e: r.co2e, gases: split });
+  }
+  async function upsertVehicleItem(v: ReturnType<typeof vehicleItem>, sort: number) {
+    const id = await upsertItem(v.code, v.sub, v.name, { defaultUnit: 'km', sort });
+    await c.query('UPDATE item SET attrs = $2, sort = $3 WHERE id = $1', [id, JSON.stringify(v.attrs), sort]);
+    return id;
+  }
+  const vf0 = `${p.year}-01-01`, vt0 = `${p.year}-12-31`;
+  if (existing) await c.query(`UPDATE vehicle_energy SET status = 'superseded' WHERE source_id = $1 AND status = 'active'`, [sourceId]);
+  let evRows = 0;
+  for (const e of p.evEnergy) {
+    const v = vehicleItem(e.group, e.vehicle, e.variant);
+    const item = itemIds.get(v.code) ?? (await upsertVehicleItem(v, order++));
+    await c.query(
+      `INSERT INTO vehicle_energy (item_id, source_id, unit, kwh_per_unit, valid_from, valid_to) VALUES ($1,$2,$3,$4,$5,$6)
+       ON CONFLICT (item_id, unit, valid_from) WHERE status = 'active' DO UPDATE SET kwh_per_unit = EXCLUDED.kwh_per_unit, source_id = EXCLUDED.source_id`,
+      [item, sourceId, e.unit, e.kwh, vf0, vt0]);
+    evRows++;
+  }
+  if (evRows) issues.push({ severity: 'info', message: `${evRows} electricity-use values (kWh per km/mile) for electric and plug-in hybrid vehicles loaded` });
+  const gridItem = (await c.query(`SELECT id FROM item WHERE code = 'grid:electricity'`)).rows[0]?.id as number | undefined;
+  const ukGridRows: typeof factors = [];
+  if (gridItem && p.ukGrid?.co2e != null) {
+    const g = p.ukGrid.gasCo2e;
+    const split: [string, number][] = g.CO2 != null ? [['CO2', g.CO2], ...(g.CH4 != null ? [['CH4_fossil', g.CH4 / gwp.get('CH4_fossil')!] as [string, number]] : []), ...(g.N2O != null ? [['N2O', g.N2O / gwp.get('N2O')!] as [string, number]] : [])] : [];
+    ukGridRows.push({ item: gridItem, basis: 'scope2', unit: 'kWh_e', co2e: p.ukGrid.co2e, gases: split });
+  }
+
   // ---- bulk insert factors + gas split ------------------------------------------
   const vf = `${p.year}-01-01`, vt = `${p.year}-12-31`;
   let inserted = 0;
-  for (const f of factors) {
-    const prev = previous.get(`${f.item}|${f.unit}|${f.basis}|GLOBAL`) ?? null;
+  const kept = new Set<number>();
+  for (const f of [...factors.map((x) => ({ ...x, region: 'GLOBAL' })), ...ukGridRows.map((x) => ({ ...x, region: 'GB' }))]) {
+    const old = previous.get(`${f.item}|${f.unit}|${f.basis}|${f.region}`);
+    if (old && same(old.co2e, f.co2e) && old.gases.size === f.gases.length && f.gases.every(([g, v]) => same(old.gases.get(g) ?? null, v))) {
+      kept.add(old.id);
+      continue;
+    }
+    const prev = old?.id ?? null;
+    if (prev) await c.query(`UPDATE factor SET status = 'superseded' WHERE id = $1`, [prev]);
     const r = await c.query(
       `INSERT INTO factor (item_id, source_id, region, basis, unit, co2e, valid_from, valid_to, version, supersedes_id, created_by)
-       VALUES ($1,$2,'GLOBAL',$3,$4,$5,$6,$7, COALESCE((SELECT version + 1 FROM factor WHERE id = $8), 1), $8, $9) RETURNING id`,
-      [f.item, sourceId, f.basis, f.unit, f.co2e, vf, vt, prev, opts.createdBy ?? 'import'],
+       VALUES ($1,$2,$10,$3,$4,$5,$6,$7, COALESCE((SELECT version + 1 FROM factor WHERE id = $8), 1), $8, $9) RETURNING id`,
+      [f.item, sourceId, f.basis, f.unit, f.co2e, vf, vt, prev, opts.createdBy ?? 'import', f.region],
     );
     if (f.gases.length) {
       await c.query(
@@ -174,9 +232,43 @@ export async function importDesnz(c: Tx, p: DesnzParsed, opts: { createdBy?: str
     }
     inserted++;
   }
+  // Factors of the previous import that the new file no longer contains.
+  const gone = [...previous.values()].filter((o) => !kept.has(o.id)).map((o) => o.id);
+  if (gone.length) await c.query(`UPDATE factor SET status = 'superseded' WHERE id = ANY($1) AND status = 'active'`, [gone]);
   for (const i of issues) {
     await c.query('INSERT INTO import_issue (source_id, severity, message, detail) VALUES ($1,$2,$3,$4)', [sourceId, i.severity, i.message, i.detail ? JSON.stringify(i.detail) : null]);
   }
   await c.query("SELECT pg_notify('refdata_changed', $1)", [code]);
   return { source: code, skipped: false, items: itemIds.size, factors: inserted, issues: issues.length };
+}
+
+// ---------------------------------------------------------------- vehicles --
+const POWERTRAIN: Record<string, { label: string; key: string; fuel: string | null; electric?: boolean; phev?: boolean }> = {
+  Diesel: { label: 'Diesel', key: 'Diesel', fuel: 'desnz:diesel-100-mineral-diesel' },
+  Petrol: { label: 'Petrol', key: 'Petrol', fuel: 'desnz:petrol-100-mineral-petrol' },
+  Hybrid: { label: 'Hybrid (HEV, petrol)', key: 'Hybrid', fuel: 'desnz:petrol-100-mineral-petrol' },
+  CNG: { label: 'CNG', key: 'CNG', fuel: 'desnz:cng' },
+  LPG: { label: 'LPG', key: 'LPG', fuel: 'desnz:lpg' },
+  Unknown: { label: 'Fuel unknown', key: 'Unknown', fuel: null },
+  'Plug-in Hybrid Electric Vehicle': { label: 'Plug-in hybrid (PHEV)', key: 'PHEV', fuel: 'desnz:petrol-100-mineral-petrol', phev: true },
+  'Battery Electric Vehicle': { label: 'Electric (BEV)', key: 'BEV', fuel: null, electric: true },
+};
+
+/** Catalogue item for a DESNZ vehicle row: class × powertrain (cars, vans) or class × load (HGV). */
+export function vehicleItem(group: string, vehicleName: string, variant: string) {
+  // 2026 renamed "All HGVs / rigids / artics" to "Average (non-)refrigerated HGVs / rigids / artics".
+  const m = /^Average (?:non-)?refrigerated (HGVs|rigids|artics)$/i.exec(vehicleName);
+  const vehicle = m ? `All ${m[1]}` : vehicleName;
+  const code = `veh:${group}:${slug(vehicle)}:${slug(variant || 'any')}`;
+  if (group === 'hgv' || group === 'hgv_refrigerated') {
+    return { code, sub: group, name: `${vehicle} · ${variant.replace(/ laden$/i, ' laden')}`,
+      attrs: { vehicle, load: variant, powertrain: 'Diesel', fuel: 'desnz:diesel-100-mineral-diesel', distance: true, refrigerated: group === 'hgv_refrigerated' } };
+  }
+  if (group === 'motorbikes') {
+    return { code, sub: group, name: `Motorbike · ${vehicle}`, attrs: { vehicle: `Motorbike (${vehicle})`, powertrain: 'Petrol', fuel: 'desnz:petrol-100-mineral-petrol', distance: true } };
+  }
+  const pt = POWERTRAIN[variant] ?? { label: variant, key: variant, fuel: null };
+  const name = `${group === 'vans' ? `Van ${vehicle}` : vehicle} · ${pt.label}`;
+  return { code, sub: group, name,
+    attrs: { vehicle, powertrain: pt.key, fuel: pt.fuel, distance: true, ...(pt.electric ? { electric: true } : {}), ...(pt.phev ? { phev: true } : {}) } };
 }

@@ -10,7 +10,7 @@
  * Every step is written out in plain language and stored with the entry,
  * so an auditor can follow the number back to the factor and its source.
  */
-import { CalcError, type Basis, type CalcResult, type CalorificValue, type CalorificValueUsed, type Factor, type FactorUsed, type GwpTable, type ResultLine } from './types.js';
+import { CalcError, emptyTotals, type Basis, type CalcResult, type CalorificValue, type CalorificValueUsed, type Factor, type FactorUsed, type GwpTable, type ResultLine } from './types.js';
 import { chooseFactors } from './factors.js';
 import { type UnitRegistry, convert, getUnit } from './units.js';
 import { tryGwp } from './gwp.js';
@@ -73,7 +73,7 @@ export function calcCombustion(input: CombustionInput): CalcResult {
   const calcU = getUnit(units, calcUnit);
 
   const choices = chooseFactors(input.factors, { date: input.date, region: input.region, unit: calcUnit, units });
-  if (!choices.has('direct')) {
+  if (!choices.has('direct') && !choices.has('scope2')) {
     const dims = [...new Set(input.factors.map((f) => units.get(f.unit)?.name).filter(Boolean))].join(', ');
     throw new CalcError(
       `No factor for ${input.itemName} in ${calcU.name}. Factors exist in: ${dims || 'none'}.`,
@@ -83,7 +83,7 @@ export function calcCombustion(input: CombustionInput): CalcResult {
 
   const warnings: string[] = [];
   const factors: FactorUsed[] = [];
-  const totals: Record<Basis, number> = { direct: 0, wtt: 0, outside_scopes: 0, memo: 0 };
+  const totals: Record<Basis, number> = emptyTotals();
 
   for (const [basis, { factor, fallback }] of choices) {
     const fu = getUnit(units, factor.unit);
@@ -141,7 +141,7 @@ export function calcCombustion(input: CombustionInput): CalcResult {
 }
 
 export function basisLabel(b: Basis): string {
-  return { direct: 'Direct', wtt: 'Well-to-tank', outside_scopes: 'Biogenic CO2 (outside scopes)', memo: 'Memo (non-Kyoto)' }[b];
+  return { direct: 'Direct', wtt: 'Well-to-tank', outside_scopes: 'Biogenic CO2 (outside scopes)', memo: 'Memo (non-Kyoto)', scope2: 'Scope 2 electricity' }[b];
 }
 
 /** Up to 6 significant digits, no exponent for normal magnitudes. */

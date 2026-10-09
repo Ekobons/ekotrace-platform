@@ -2,6 +2,33 @@
 
 Newest first.
 
+## 2026-10-09 (7) — Vehicles (mobile combustion), EV charging in Scope 2, fleet register, price list
+
+**Vehicle types and factors** (DESNZ 2022–2026, per km and per mile, with gas split and well-to-tank)
+- Passenger vehicles: cars by size (4) and by market segment (9) × powertrain (diesel, petrol, hybrid, CNG, LPG, plug-in hybrid, battery electric, unknown); motorbikes.
+- Delivery vehicles: vans Class I–III and average × powertrain; HGVs rigid / articulated, refrigerated or not, 0 / 50 / 100 % / average laden (2026's renamed averages mapped to the same items).
+- Off-road machinery (forklifts, loaders, excavators, sweepers, generators): fuel used or spend only.
+- Electric and plug-in hybrid vehicles: DESNZ electricity use per km / mile; UK grid factor per year (Scope 2).
+
+**Calculation**
+- Distance × vehicle factor; fuel used × fuel factor (same factors as stationary combustion, 100 % mineral diesel / petrol by default, own calorific value possible); spend ÷ price = litres (or kWh), then as fuel (or electricity).
+- Battery electric: Scope 1 = 0; kWh (charged, or km × kWh/km) × grid factor of the facility's country → **Scope 2**. Plug-in hybrid: petrol share in Scope 1 + electric share in Scope 2. Charged at the company's own site: shown, not added again (already on the site's meter).
+- No grid factor for the country (or none valid for that year): saved with a warning; recalculate once the factor is added.
+
+**Fleet register** (facility profile → Vehicle fleet): add, edit, retire with a date, reinstate, delete only without entries; Excel template with drop-down lists; upload with a preview of every row. Data entry offers the vehicles in service in the month.
+
+**Add data → Vehicles**: one entry (fleet vehicle or type; distance / fuel / electricity / spend), fleet grid for the month (all vehicles, calculated as you type, saved together), Excel upload (template pre-filled with the fleet per month, preview, save valid rows).
+
+**Price list** (Factor library → Grid electricity & prices for the shared list; Methodology for a company's own prices): fuel or electricity, country, currency, price per unit, months, source. Company prices win over the shared list. **Grid electricity factors** per country and year, with source.
+
+**Recalculate** (Entries & results): entries with warnings, or one entry from its drawer; only changed entries are updated, each change audit-logged with before / after.
+
+**Also**: Scope 2 column and card in Entries; batch save endpoint (each row on its own); `npm run demo -- --reset` recreates the demo company, now with 13 vehicles and 261 monthly vehicle entries; importer version so editions already loaded are re-read once, keeping unchanged factors as they are.
+
+**Checks**: 20 engine + 23 API tests. Saved demo results hand-checked against the DESNZ 2026 file (trucks, vans, cars, plug-in hybrid by distance; trucks by litres): within 0.015 % (DESNZ rounding between gas split and total).
+
+**Open**: the UAE grid factor must be entered with its source (none is preloaded); fuel prices likewise.
+
 ## 2026-10-09 (6) — Own calorific value; category tabs on Add data
 
 **Own calorific value (fuels)**

@@ -33,9 +33,9 @@ export async function catalogueRoutes(app: FastifyInstance) {
 
     const cats = await query(`SELECT id, scope, code, name, calc_method, description, sort, active FROM category
                                WHERE ($1 OR active) AND ($2::text IS NULL OR code = $2) ORDER BY scope, sort, id`, [showAll, q.category ?? null]);
-    const subs = await query(`SELECT id, category_id, code, name, units, default_unit, is_bioenergy, sort, active FROM subcategory
+    const subs = await query(`SELECT id, category_id, code, name, grp, units, default_unit, is_bioenergy, sort, active FROM subcategory
                                WHERE ($1 OR active) ORDER BY sort, id`, [showAll]);
-    const items = await query(`SELECT i.id, i.subcategory_id, i.code, i.name, i.aliases, i.default_unit, i.gas_code, i.note, i.sort, i.active,
+    const items = await query(`SELECT i.id, i.subcategory_id, i.code, i.name, i.aliases, i.default_unit, i.gas_code, i.note, i.sort, i.active, i.attrs,
                                       (SELECT json_agg(json_build_object('gas', g.gas, 'fraction', g.fraction) ORDER BY g.fraction DESC)
                                          FROM item_gas g WHERE g.item_id = i.id) AS composition
                                  FROM item i WHERE ($1 OR i.active) ORDER BY i.sort, i.name`, [showAll]);
