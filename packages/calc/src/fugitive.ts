@@ -53,10 +53,14 @@ export interface FugitiveInput {
   /** mass unit for every quantity in `data` (kg, t, lb…) */
   unit: string;
   data: FugitiveMethod;
-  /** gas make-up by mass; fractions add up to 1. Empty → use `blendFactor`. */
+  /** gas make-up by mass; fractions add up to 1. Empty → use `blendFactors`. */
   composition: { gas: string; fraction: number }[];
-  /** published kg CO2e per kg for a blend with unknown composition */
-  blendFactor?: Factor | null;
+  /**
+   * For a blend whose composition is not recorded: the published kg CO2e per
+   * kg, already chosen for the activity date. A 'direct' factor holds the
+   * Kyoto part and a 'memo' factor the non-Kyoto part (HCFCs inside the blend).
+   */
+  blendFactors?: Factor[];
   gwp: GwpTable;
   units: UnitRegistry;
   kyoto: (gas: string) => boolean;
@@ -121,15 +125,19 @@ export function calcFugitive(input: FugitiveInput): CalcResult {
       lines.push({ basis, gas: c.gas, kgGas, kgCo2e: co2e, factorId: null, method: 'gas' });
       steps.push(`${c.gas}: ${fmt(kg)} kg × ${fmt(c.fraction * 100)} % = ${fmt(kgGas)} kg × GWP ${gw} (${input.gwp.set}) = ${fmt(co2e)} kg CO2e${basis === 'memo' ? ' — non-Kyoto, reported separately' : ''}`);
     }
-  } else if (input.blendFactor?.co2ePerUnit != null) {
-    const f = input.blendFactor;
-    // CO2e per kg: a value "per tonne" is 1/1000 of it per kg, i.e. convert the amount kg → factor unit.
-    const perKg = convert(input.units, f.co2ePerUnit!, 'kg', f.unit);
-    const co2e = kg * perKg;
-    totals.direct += co2e;
-    lines.push({ basis: 'direct', gas: 'CO2e', kgGas: null, kgCo2e: co2e, factorId: f.id, method: 'published' });
-    steps.push(`${input.itemName}: ${fmt(kg)} kg × ${fmt(perKg)} kg CO2e/kg (${f.source}) = ${fmt(co2e)} kg CO2e`);
-    warnings.push(`${input.itemName}: composition not recorded, so the gases cannot be reported separately${f.sourceGwpSet && f.sourceGwpSet !== input.gwp.set ? ` and the ${f.sourceGwpSet} value is used although the company reports in ${input.gwp.set}` : ''}. Add the composition in the factor library.`);
+  } else if (input.blendFactors?.some((f) => f.co2ePerUnit != null)) {
+    let gwpNote = '';
+    for (const f of input.blendFactors) {
+      if (f.co2ePerUnit == null || (f.basis !== 'direct' && f.basis !== 'memo')) continue;
+      // CO2e per kg: a value "per tonne" is 1/1000 of it per kg, i.e. convert the amount kg → factor unit.
+      const perKg = convert(input.units, f.co2ePerUnit, 'kg', f.unit);
+      const co2e = kg * perKg;
+      totals[f.basis] += co2e;
+      lines.push({ basis: f.basis, gas: 'CO2e', kgGas: null, kgCo2e: co2e, factorId: f.id, method: 'published' });
+      steps.push(`${input.itemName}${f.basis === 'memo' ? ' (non-Kyoto part, reported separately)' : ''}: ${fmt(kg)} kg × ${fmt(perKg)} kg CO2e/kg (${f.source}) = ${fmt(co2e)} kg CO2e`);
+      if (f.sourceGwpSet && f.sourceGwpSet !== input.gwp.set) gwpNote = ` and the ${f.sourceGwpSet} value is used although the company reports in ${input.gwp.set}`;
+    }
+    warnings.push(`${input.itemName}: composition not recorded, so the gases cannot be reported separately${gwpNote}. Add the composition in the factor library.`);
   } else {
     throw new CalcError(`${input.itemName} has neither a gas composition nor a factor`, 'NO_FACTOR');
   }

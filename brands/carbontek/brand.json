@@ -1,0 +1,10 @@
+{
+  "name": "Carbontek",
+  "productName": "Carbontek",
+  "colors": { "primary": "#1F6F8B", "primaryDark": "#14495c", "background": "#F3F7F9" },
+  "logo": "logo.svg",
+  "supportEmail": "TO BE CONFIRMED BY CARBONTEK",
+  "legal": { "company": "Carbontek" },
+  "features": { "fugitive": true, "stationaryCombustion": true },
+  "dataResidency": "AE"
+}

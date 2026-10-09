@@ -107,7 +107,7 @@ test('HCFC-22 is reported as memo, not in Scope 1', () => {
 
 test('blend without composition uses the published blend factor and says so', () => {
   const f: Factor = { id: 7, itemId: 3, basis: 'direct', unit: 'kg', co2ePerUnit: 1924, sourceGwpSet: 'AR5', gases: [], source: 'DESNZ 2026', region: 'GLOBAL', validFrom: '2026-01-01', validTo: '2026-12-31' };
-  const r = calcFugitive({ itemName: 'R-410A', unit: 't', data: { method: 'quantity', released: 0.01 }, composition: [], blendFactor: f, gwp: AR5, units, kyoto });
+  const r = calcFugitive({ itemName: 'R-410A', unit: 't', data: { method: 'quantity', released: 0.01 }, composition: [], blendFactors: [f], gwp: AR5, units, kyoto });
   assert.ok(Math.abs(r.totals.direct - 19240) < 1e-6);
   assert.ok(r.warnings.length === 1);
 });
