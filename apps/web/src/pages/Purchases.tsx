@@ -91,7 +91,7 @@ export function Purchases() {
   );
 }
 
-function UploadBox({ onUploaded }: { onUploaded: (u: UploadResult) => void }) {
+export function UploadBox({ onUploaded }: { onUploaded: (u: UploadResult) => void }) {
   const [drag, setDrag] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -120,7 +120,7 @@ function UploadBox({ onUploaded }: { onUploaded: (u: UploadResult) => void }) {
 }
 
 // ------------------------------------------------------------ column setup --
-function ColumnSetup({ meta, up, onCancel, onStarted }: { meta: PurchaseMeta; up: UploadResult; onCancel: () => void; onStarted: (id: string) => void }) {
+export function ColumnSetup({ meta, up, onCancel, onStarted, defaultFacility }: { meta: PurchaseMeta; up: UploadResult; onCancel: () => void; onStarted: (id: string) => void; defaultFacility?: string }) {
   const [sheetIx, setSheetIx] = useState(() => Math.max(0, up.sheets.findIndex((s) => s.profile)) || 0);
   const sheet = up.sheets[sheetIx]!;
   const [headerRow, setHeaderRow] = useState(sheet.profile?.settings.headerRow ?? sheet.headerRow);
@@ -129,7 +129,7 @@ function ColumnSetup({ meta, up, onCancel, onStarted }: { meta: PurchaseMeta; up
   const [dateFormat, setDateFormat] = useState<'dmy' | 'mdy' | 'ymd'>(sheet.profile?.settings.dateFormat ?? 'dmy');
   const [currency, setCurrency] = useState(sheet.profile?.settings.currency ?? up.defaultCurrency);
   const [facilities, setFacilities] = useState<Facility[]>([]);
-  const [facilityId, setFacilityId] = useState(sheet.profile?.settings.facilityId ?? '');
+  const [facilityId, setFacilityId] = useState(sheet.profile?.settings.facilityId ?? defaultFacility ?? '');
   const [year, setYear] = useState(String(new Date().getFullYear() - 1));
   const [name, setName] = useState(up.filename.replace(/\.(xlsx|csv|txt)$/i, ''));
   const [remember, setRemember] = useState(true);
@@ -146,7 +146,7 @@ function ColumnSetup({ meta, up, onCancel, onStarted }: { meta: PurchaseMeta; up
     setErr(null); setBusy(true);
     try {
       const r = await api.setupBatch(up.batchId, {
-        sheet: sheet.name === 'CSV' ? undefined : sheet.name, headerRow, columns: cols, dateFormat, currency, facilityId: cols.facility ? null : facilityId || null,
+        sheet: sheet.name === 'CSV' ? undefined : sheet.name, headerRow, columns: cols, dateFormat, currency, facilityId: facilityId || null,
         period: cols.date ? null : { year: Number(year) }, name, remember, headers,
       });
       onStarted(r.batchId);
@@ -185,8 +185,8 @@ function ColumnSetup({ meta, up, onCancel, onStarted }: { meta: PurchaseMeta; up
           <option value="dmy">day/month/year (31/03/2026)</option><option value="mdy">month/day/year (03/31/2026)</option><option value="ymd">year-month-day (2026-03-31)</option></select></label>}
         {!cols.date && <label className="field"><span>No date column: year of the file</span><input className="input" type="number" value={year} onChange={(e) => setYear(e.target.value)} style={{ width: 110 }} /></label>}
         <label className="field"><span>{cols.currency ? 'Currency when the cell is empty' : 'Currency of the amounts'}</span><input className="input" value={currency} maxLength={3} onChange={(e) => setCurrency(e.target.value.toUpperCase())} style={{ width: 90 }} /></label>
-        {!cols.facility && <label className="field" style={{ minWidth: 260 }}><span>No facility column: facility of the whole file</span><select className="input" value={facilityId} onChange={(e) => setFacilityId(e.target.value)}>
-          <option value="">— choose —</option>{facilities.map((f) => <option key={f.id} value={f.id}>{f.parent_name ? `${f.parent_name} › ` : ''}{f.name}</option>)}</select></label>}
+        <label className="field" style={{ minWidth: 280 }}><span>{cols.facility ? 'Lines with no facility written go to' : 'No facility column: facility of the whole file *'}</span><select className="input" value={facilityId} onChange={(e) => setFacilityId(e.target.value)}>
+          <option value="">{cols.facility ? '— decide later, in the review —' : '— choose —'}</option>{facilities.map((f) => <option key={f.id} value={f.id}>{f.parent_name ? `${f.parent_name} › ` : ''}{f.name}</option>)}</select></label>
         <label className="row" style={{ gap: 6, fontSize: 13 }}><input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} />Remember this layout</label>
       </div>
       <div className="scrollx"><table className="t compact">
@@ -194,7 +194,7 @@ function ColumnSetup({ meta, up, onCancel, onStarted }: { meta: PurchaseMeta; up
         <tbody>{sample.map((r, i) => (
           <tr key={i}><td>{desc.map((h) => r[idx(h)]).filter(Boolean).join(' — ') || <span className="bad">—</span>}</td><td>{r[idx(cols.date as string)] ?? (cols.date ? '' : year)}</td>
             <td className="num">{r[idx(cols.amount as string)] ?? ''}</td><td>{r[idx(cols.currency as string)] || currency}</td><td>{r[idx(cols.supplier as string)] ?? ''}</td>
-            <td>{[r[idx(cols.category as string)], r[idx(cols.gl as string)]].filter(Boolean).join(' · ')}</td><td>{cols.facility ? r[idx(cols.facility as string)] : facilities.find((f) => f.id === facilityId)?.name ?? ''}</td></tr>))}</tbody>
+            <td>{[r[idx(cols.category as string)], r[idx(cols.gl as string)]].filter(Boolean).join(' · ')}</td><td>{(cols.facility && r[idx(cols.facility as string)]) || <span className={facilityId ? '' : 'bad'}>{facilities.find((f) => f.id === facilityId)?.name ?? 'no facility'}</span>}</td></tr>))}</tbody>
       </table></div>
       {err && <div className="note bad">{err}</div>}
       <div className="row" style={{ justifyContent: 'flex-end' }}>

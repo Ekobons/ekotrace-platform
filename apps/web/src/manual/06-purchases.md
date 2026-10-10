@@ -6,9 +6,9 @@ Purchased goods & services usually come from the ERP or finance system — often
 
 | Way | When | Where |
 |---|---|---|
-| Upload | an export from the ERP or finance system, any layout, up to 200,000 lines (60 MB) | Capture → Purchases |
+| Upload | an export from the ERP or finance system, any layout, up to 200,000 lines (60 MB) | Add data → Purchases → Upload Excel / CSV, or Capture → Purchases |
 | ERP API | the ERP sends the lines itself, in calls of up to 10,000 | Setup → Integrations & API |
-| By hand | a few purchases | Add data → Purchases |
+| By hand | a few purchases | Add data → Purchases → Type by hand |
 
 All three go through the same steps; an upload or API batch is reviewed before publishing, purchases typed by hand are published when every row is complete.
 
@@ -27,6 +27,18 @@ All three go through the same steps; an upload or API batch is reviewed before p
 * Review | fix problems, choose categories for unclear groups, decide on flagged groups
 ? Publish | ready lines become entries | the rest wait in the batch
 ```
+
+## Facility of each line
+
+Every line needs a facility, because entries are kept per facility.
+
+| The file has | What happens |
+|---|---|
+| no facility column | choose the facility of the whole file when saying which column is which (on Add data → Purchases, the facility chosen at the top is suggested) |
+| a facility / site / cost-centre column | each value is matched to a facility name; values not recognised are listed in the review, where you choose the facility each one stands for |
+| a column, but some lines blank | choose where **lines with no facility written** go — or leave it, and choose in the review under “no facility written” |
+
+Purchases made centrally for the whole group (audit, insurance, software) are usually booked to the head office or a “Corporate” facility; create one under Organisation if the group has none.
 
 ## How fast
 

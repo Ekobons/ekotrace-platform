@@ -35,7 +35,7 @@ export interface BatchSettings {
   columns: Columns;
   dateFormat: DateFormat;
   currency: string;                  // when the file has no currency column
-  facilityId?: string | null;        // when the file has no facility column
+  facilityId?: string | null;        // the whole file (no facility column), or lines with no facility written
   period?: { year?: number; month?: string } | null; // when the file has no dates
   facilityMap?: Record<string, string>;
   includeDuplicates?: boolean;

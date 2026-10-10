@@ -400,7 +400,8 @@ export async function purchaseRoutes(app: FastifyInstance) {
       const r = await c.query(
         `UPDATE purchase_line SET facility_id = $3, problems = array(SELECT p FROM unnest(problems) p WHERE p NOT LIKE 'Facility %')
           WHERE batch_id = $1 AND facility_id IS NULL AND status <> 'published' AND coalesce(facility_text, '') = coalesce($2, '') RETURNING group_key`, [id, b.value, b.facilityId]);
-      const settings = { ...batch.settings, facilityMap: { ...(batch.settings.facilityMap ?? {}), ...(b.value ? { [b.value]: b.facilityId } : {}) } };
+      // a value → its facility; no value written → the batch's facility for lines without one
+      const settings = b.value ? { ...batch.settings, facilityMap: { ...(batch.settings.facilityMap ?? {}), [b.value]: b.facilityId } } : { ...batch.settings, facilityId: b.facilityId };
       await c.query('UPDATE purchase_batch SET settings = $2 WHERE id = $1', [id, JSON.stringify(settings)]);
       await calcLines(c, id, { keys: [...new Set(r.rows.map((x) => x.group_key))] });
       return { lines: r.rowCount };

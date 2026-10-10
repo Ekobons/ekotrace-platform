@@ -2,6 +2,12 @@
 
 Newest first.
 
+## 2026-10-10 (12) — Upload purchases from Add data; lines without a facility
+
+- Add data → Purchases now offers **Upload Excel / CSV** (default) or **Type by hand**; the upload is the same as Capture → Purchases, with the page's facility suggested for lines without one, and opens the batch when read.
+- Column setup: with a facility column, choose where **lines with no facility written** go (or decide in the review). Choosing a facility for "no facility written" in the review is kept for the batch (re-reads and recalculation). Test added.
+- Manual: Purchases → Facility of each line.
+
 ## 2026-10-10 (11) — Suppliers without duplicates, supplier analytics, Dashboards, 10k test files
 
 **Suppliers registered from every purchase (upload, ERP API, by hand), one record however written** (migration 012, `supplierMatch.ts`):

@@ -1,21 +1,46 @@
 /**
- * Add data → Purchases: a few purchases typed by hand (larger volumes: upload or ERP API).
+ * Add data → Purchases: upload an Excel / CSV export (any layout, any size — the same
+ * upload as Capture → Purchases, with this page's facility for lines that name none), or
+ * type a few purchases by hand.
  * Each row: date, description, spend category (suggested as you type), amount and
  * currency, supplier and — when the supplier gave one — its own factor. "Check" calculates
  * without saving; "Save" publishes the rows as entries when all are complete.
  */
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useApp } from '../App';
-import { api, num, tco2e, type Category, type ManualLine, type ManualResult } from '../lib/api';
+import { api, num, tco2e, type Category, type ManualLine, type ManualResult, type PurchaseMeta, type UploadResult } from '../lib/api';
 import { ItemPicker } from '../components/ItemPicker';
 import { Icon } from '../components/Icon';
-import { TARGETS } from './Purchases';
+import { ColumnSetup, TARGETS, UploadBox } from './Purchases';
 
 interface Row extends ManualLine { itemName: string | null; cands: { itemId: number; name: string }[] }
 const blank = (date: string, currency: string): Row => ({ date, description: '', itemId: null, itemName: null, cands: [], target: 'purchased_goods', amount: null, currency, supplier: '', supplierEf: null, supplierEfUnit: null, quantity: null, unit: null });
 
-export function PurchaseEntry({ facilityId, period, onSaved }: { cat: Category; facilityId: string; period: { periodStart: string; periodEnd: string }; onSaved: () => void }) {
+export function PurchaseEntry(props: { cat: Category; facilityId: string; period: { periodStart: string; periodEnd: string }; onSaved: () => void }) {
+  const [mode, setMode] = useState<'upload' | 'hand'>('upload');
+  const [meta, setMeta] = useState<PurchaseMeta | null>(null);
+  const [up, setUp] = useState<UploadResult | null>(null);
+  const nav = useNavigate();
+  useEffect(() => { api.purchaseMeta().then(setMeta).catch(() => {}); }, []);
+  return (
+    <div style={{ display: 'grid', gap: 12 }}>
+      <div className="row" style={{ gap: 10 }}>
+        <div className="seg" role="group" aria-label="How to add purchases">
+          <button className={mode === 'upload' ? 'on' : ''} onClick={() => setMode('upload')}><Icon name="upload" /> Upload Excel / CSV</button>
+          <button className={mode === 'hand' ? 'on' : ''} onClick={() => setMode('hand')}><Icon name="edit" /> Type by hand</button>
+        </div>
+        <span className="sub grow">{mode === 'upload' ? <>An export from the ERP or finance system, any layout, up to 200,000 lines. All batches: <Link to="/purchases">Capture → Purchases</Link>.</> : 'For a few purchases; saved straight as entries.'}</span>
+      </div>
+      {mode === 'upload' && !up && <UploadBox onUploaded={setUp} />}
+      {mode === 'upload' && up && meta && <ColumnSetup meta={meta} up={up} defaultFacility={props.facilityId}
+        onCancel={() => { api.deleteBatch(up.batchId).catch(() => {}); setUp(null); }} onStarted={(id) => nav(`/purchases/${id}`)} />}
+      {mode === 'hand' && <ManualGrid {...props} />}
+    </div>
+  );
+}
+
+function ManualGrid({ facilityId, period, onSaved }: { cat: Category; facilityId: string; period: { periodStart: string; periodEnd: string }; onSaved: () => void }) {
   const { toast } = useApp();
   const [currency, setCurrency] = useState('AED');
   const [rows, setRows] = useState<Row[]>(() => [blank(period.periodStart, 'AED')]);
@@ -46,7 +71,7 @@ export function PurchaseEntry({ facilityId, period, onSaved }: { cat: Category; 
   return (
     <div className="card" style={{ display: 'grid', gap: 10 }}>
       <div className="row"><div className="grow"><h3>Purchases typed by hand</h3>
-        <div className="sub">For a few purchases. Exports from the ERP or finance system go through <Link to="/purchases">Capture → Purchases</Link> (any layout, any size) or the ERP API.</div></div></div>
+        <div className="sub">For a few purchases, at the facility chosen above. Larger volumes: upload a file, or connect the ERP through the API.</div></div></div>
       <div className="scrollx"><table className="t compact entrygrid">
         <thead><tr><th>Date</th><th style={{ minWidth: 220 }}>Description</th><th style={{ minWidth: 240 }}>Spend category</th><th>Scope 3</th><th className="num">Amount</th><th>Cur.</th><th>Supplier</th><th>Supplier factor</th><th className="num">kg CO₂e</th><th /></tr></thead>
         <tbody>{rows.map((r, i) => {

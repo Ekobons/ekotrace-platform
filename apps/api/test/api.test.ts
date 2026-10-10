@@ -1039,6 +1039,28 @@ test('suppliers: one record however written (vendor number, spellings, typos), p
   assert.equal((await api('GET', '/api/dashboard?year=2024', undefined, tenantB)).body.totals.entries, 0 + (await pq(`SELECT count(*)::int AS n FROM activity WHERE tenant_id = $1 AND extract(year FROM period_start) = 2024 AND status <> 'rejected'`, [tenantB])).rows[0].n);
 });
 
+test('purchases: lines with no facility written go to the facility chosen for the file, or wait for one in the review', async () => {
+  const csv = 'Date;Description;Amount;Site\n05/03/2024;Office chairs;3800;Sharjah plant\n06/03/2024;Courier charges;260;\n07/03/2024;Consultancy fees;45000;\n';
+  const run = async (facilityId: string | null) => {
+    const up = (await raw('/api/purchases/upload?again=1', Buffer.from(csv), tenantA, { 'x-filename': 'nofac.csv' })).json();
+    const sh = up.sheets[0];
+    const r = await api('POST', `/api/purchases/batches/${up.batchId}/setup`, { headerRow: sh.headerRow, columns: sh.guess, dateFormat: 'dmy', currency: 'AED', facilityId, remember: false }, tenantA);
+    assert.equal(r.status, 200, JSON.stringify(r.body));
+    await drain();
+    return up.batchId as string;
+  };
+  const withDefault = await run(facA);
+  const lines = (await pq(`SELECT facility_id, problems FROM purchase_line WHERE batch_id = $1 ORDER BY row_no`, [withDefault])).rows;
+  assert.ok(lines.every((l) => l.facility_id === facA && !l.problems.some((p: string) => p.startsWith('Facility'))), JSON.stringify(lines));
+  // without one: listed as "no facility written"; choosing a facility fixes those lines and is kept for the batch
+  const later = await run(null);
+  const d = (await api('GET', `/api/purchases/batches/${later}`, undefined, tenantA)).body;
+  const blank = d.facilitiesMissing.find((m: { value: string | null }) => !m.value);
+  assert.equal(blank?.lines, 2, JSON.stringify(d.facilitiesMissing));
+  assert.equal((await api('POST', `/api/purchases/batches/${later}/facilities`, { value: null, facilityId: facA }, tenantA)).body.lines, 2);
+  assert.equal((await pq(`SELECT settings->>'facilityId' AS f FROM purchase_batch WHERE id = $1`, [later])).rows[0].f, facA);
+});
+
 test('purchases: 50,000 lines (CSV) read, mapped, calculated and published in the background within a minute', async () => {
   const descs = ['A4 paper', 'Laptop', 'Office cleaning', 'Consultancy fees', 'Ready mix concrete', 'Security guards', 'Hotel stay Riyadh', 'Courier DHL', 'Software licence', 'Catering'];
   const lines = ['Date;Description;Amount;Supplier;Site'];
