@@ -417,12 +417,12 @@ export async function meterRoutes(app: FastifyInstance) {
   app.post('/api/api-keys', async (req) => {
     const tenant = requireTenant(req);
     requireRole(req, 'super_admin');
-    const b = z.object({ name: z.string().trim().min(2).max(80) }).parse(req.body);
+    const b = z.object({ name: z.string().trim().min(2).max(80), scopes: z.array(z.enum(['meter_readings', 'purchases'])).min(1).max(2).default(['meter_readings']) }).parse(req.body);
     return tenantTx(tenant, async (c) => {
       const key = `ek_${newToken()}`;
-      const r = (await c.query('INSERT INTO api_key (tenant_id, name, prefix, key_hash, created_by) VALUES ($1,$2,$3,$4,$5) RETURNING id, name, prefix, created_at',
-        [tenant, b.name, key.slice(0, 10), sha256(key), req.user.id])).rows[0];
-      await audit(c, req, 'api_key.create', 'api_key', r.id, { name: b.name, prefix: r.prefix });
+      const r = (await c.query('INSERT INTO api_key (tenant_id, name, prefix, key_hash, scopes, created_by) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id, name, prefix, scopes, created_at',
+        [tenant, b.name, key.slice(0, 10), sha256(key), [...new Set(b.scopes)], req.user.id])).rows[0];
+      await audit(c, req, 'api_key.create', 'api_key', r.id, { name: b.name, prefix: r.prefix, scopes: r.scopes });
       return { ...r, key };
     });
   });
@@ -488,24 +488,27 @@ function rateLimit(id: string) {
   if (++w.n > RATE) throw new AppError(`Too many requests: at most ${RATE} a minute. Send readings in batches (up to 100,000 per request).`, 429, 'RATE_LIMITED');
 }
 
+const KEY_SQL = `SELECT k.id, k.name, k.tenant_id, k.scopes FROM api_key k JOIN tenant t ON t.id = k.tenant_id
+                  WHERE k.revoked_at IS NULL AND t.status = 'active' AND `;
+const SCOPE_TEXT: Record<string, string> = { meter_readings: 'send meter readings', purchases: 'send purchase lines' };
+/** The client calling: an access token from /api/v1/oauth/token (or, for simple set-ups, the secret itself), allowed `scope`. */
+export async function apiClient(req: FastifyRequest, scope: 'meter_readings' | 'purchases') {
+  const h = String(req.headers.authorization ?? '');
+  const m = /^Bearer\s+(\S+)$/.exec(h);
+  if (!m) throw new AppError('Send an access token as "Authorization: Bearer …" (POST /api/v1/oauth/token)', 401, 'UNAUTHENTICATED');
+  const tok = m[1]!;
+  const claims = tok.startsWith('ek_') ? null : verifyToken(tok);
+  if (!tok.startsWith('ek_') && !claims) throw new AppError('Access token not valid or expired', 401, 'UNAUTHENTICATED');
+  const k = await platformTx(async (c) => (await c.query(claims ? `${KEY_SQL} k.id = $1` : `${KEY_SQL} k.key_hash = $1`, [claims ? claims.sub : sha256(tok)])).rows[0]);
+  if (!k || (claims && claims.tid !== k.tenant_id)) throw new AppError('API client not valid or revoked', 401, 'UNAUTHENTICATED');
+  if (!k.scopes.includes(scope)) throw new AppError(`This client cannot ${SCOPE_TEXT[scope]}`, 403, 'FORBIDDEN');
+  rateLimit(k.id);
+  await platformTx((c) => c.query('UPDATE api_key SET last_used_at = now() WHERE id = $1', [k.id]));
+  return k as { id: string; name: string; tenant_id: string };
+}
+
 export async function meterIngestRoutes(app: FastifyInstance) {
-  const KEY_SQL = `SELECT k.id, k.name, k.tenant_id, k.scopes FROM api_key k JOIN tenant t ON t.id = k.tenant_id
-                    WHERE k.revoked_at IS NULL AND t.status = 'active' AND `;
-  /** The client calling: an access token from /api/v1/oauth/token (or, for simple set-ups, the secret itself). */
-  async function keyOf(req: FastifyRequest) {
-    const h = String(req.headers.authorization ?? '');
-    const m = /^Bearer\s+(\S+)$/.exec(h);
-    if (!m) throw new AppError('Send an access token as "Authorization: Bearer …" (POST /api/v1/oauth/token)', 401, 'UNAUTHENTICATED');
-    const tok = m[1]!;
-    const claims = tok.startsWith('ek_') ? null : verifyToken(tok);
-    if (!tok.startsWith('ek_') && !claims) throw new AppError('Access token not valid or expired', 401, 'UNAUTHENTICATED');
-    const k = await platformTx(async (c) => (await c.query(claims ? `${KEY_SQL} k.id = $1` : `${KEY_SQL} k.key_hash = $1`, [claims ? claims.sub : sha256(tok)])).rows[0]);
-    if (!k || (claims && claims.tid !== k.tenant_id)) throw new AppError('API client not valid or revoked', 401, 'UNAUTHENTICATED');
-    if (!k.scopes.includes('meter_readings')) throw new AppError('This client cannot send meter readings', 403, 'FORBIDDEN');
-    rateLimit(k.id);
-    await platformTx((c) => c.query('UPDATE api_key SET last_used_at = now() WHERE id = $1', [k.id]));
-    return k as { id: string; name: string; tenant_id: string };
-  }
+  const keyOf = (req: FastifyRequest) => apiClient(req, 'meter_readings');
 
   /** OAuth 2.0 token endpoint (client credentials grant), form-encoded or JSON. */
   app.addContentTypeParser('application/x-www-form-urlencoded', { parseAs: 'string', bodyLimit: 4096 }, (_r, body, done) => done(null, Object.fromEntries(new URLSearchParams(String(body)))));

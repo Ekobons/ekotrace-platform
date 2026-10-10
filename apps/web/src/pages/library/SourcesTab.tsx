@@ -49,6 +49,8 @@ export function SourcesTab() {
         {err && <div className="note bad">{err}</div>}
       </div>
 
+      <SpendImports onDone={load} />
+
       <div className="card flush">
         <div style={{ padding: '14px 16px 6px' }}><h2>Sources</h2></div>
         <table className="t">
@@ -73,6 +75,37 @@ export function SourcesTab() {
           </table>
         </div>
       </div>
+    </div>
+  );
+}
+
+/** Spend-based factors for purchased goods & services: the EPA file, and the previous Ekotrace list. */
+function SpendImports({ onDone }: { onDone: () => void }) {
+  const { toast } = useApp();
+  const [epa, setEpa] = useState<{ file: File; p: Awaited<ReturnType<typeof api.importEpa>> } | null>(null);
+  const [old, setOld] = useState<Record<string, File>>({});
+  const [oldPrev, setOldPrev] = useState<Awaited<ReturnType<typeof api.importOldPurchases>> | null>(null);
+  const [cur, setCur] = useState('USD'); const [py, setPy] = useState('2022');
+  const [err, setErr] = useState<string | null>(null);
+  const oldBody = async (preview: boolean) => ({ factors: await old.factors!.text(), categories: await old.categories?.text(), subcategories: await old.subcategories?.text(), types: await old.types?.text(), currency: cur, priceYear: Number(py), preview });
+  return (
+    <div className="card" style={{ display: 'grid', gap: 10 }}>
+      <h2>Spend-based factors (purchased goods &amp; services)</h2>
+      <p className="sub">US EPA <b>Supply Chain GHG Emission Factors v1.3</b> by NAICS-6: the CSV <span className="mono">SupplyChainGHGEmissionFactors_v1.3.0_NAICS_CO2e_USD2022.csv</span> (kg CO₂e per 2022 USD, purchaser price). The factors with margins are used. Demo placeholder factors are retired automatically.</p>
+      <div className="row"><input type="file" accept=".csv" onChange={async (e) => { const f = e.target.files?.[0]; if (!f) return; setErr(null); try { setEpa({ file: f, p: await api.importEpa(f, true) }); } catch (x) { setErr((x as Error).message); } }} /></div>
+      {epa && <div className="note ok"><b>EPA v{epa.p.version}</b> · {epa.p.rows} NAICS commodities · per {epa.p.priceYear} USD · e.g. {epa.p.sample.slice(0, 3).map((x) => `${x.title} ${x.withMargins}`).join('; ')}
+        <div className="row" style={{ marginTop: 8 }}><button className="btn p" onClick={async () => { try { const r = await api.importEpa(epa.file, false); toast(r.skipped === true ? 'Already imported' : `Imported: ${r.factors} factors`); setEpa(null); onDone(); } catch (x) { setErr((x as Error).message); } }}>Import</button><button className="btn" onClick={() => setEpa(null)}>Cancel</button></div></div>}
+      <details><summary className="small">The previous Ekotrace purchased-goods list (CSV exports of its database)</summary>
+        <div className="grid3" style={{ marginTop: 8 }}>
+          {[['factors', 'purchase_goods_categories_ef *'], ['categories', 'dbo.purchase_category'], ['subcategories', 'dbo.purchase_subcategory'], ['types', 'dbo.typesofpurchase']].map(([k, l]) => (
+            <label key={k} className="field"><span>{l}</span><input type="file" accept=".csv" onChange={(e) => { const f = e.target.files?.[0]; setOld((o) => { const n = { ...o }; if (f) n[k!] = f; else delete n[k!]; return n; }); setOldPrev(null); }} /></label>))}
+          <label className="field"><span>EFkgC02e_ccy is per</span><span className="row" style={{ gap: 6 }}><input className="input sm" value={cur} maxLength={3} onChange={(e) => setCur(e.target.value.toUpperCase())} style={{ width: 70 }} /><input className="input sm" value={py} onChange={(e) => setPy(e.target.value)} style={{ width: 80 }} /></span></label>
+        </div>
+        <p className="sub">Products with a NAICS code are linked to the EPA commodity (their old names become search names); the others are added as the company list with their factors. Only the newest fiscal year of each product is loaded.</p>
+        <div className="row"><button className="btn" disabled={!old.factors} onClick={async () => { setErr(null); try { setOldPrev(await api.importOldPurchases(await oldBody(true))); } catch (x) { setErr((x as Error).message); } }}>Check</button>
+          {oldPrev?.preview && <><span className="sub">{oldPrev.rows} rows, {oldPrev.withNaics} with a NAICS code.</span><button className="btn p" onClick={async () => { try { const r = await api.importOldPurchases(await oldBody(false)); toast(`Linked ${r.linked}, added ${r.created} (${r.factors} factors)`); setOldPrev(null); onDone(); } catch (x) { setErr((x as Error).message); } }}>Import</button></>}</div>
+      </details>
+      {err && <div className="note bad">{err}</div>}
     </div>
   );
 }

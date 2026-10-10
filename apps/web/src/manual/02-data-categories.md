@@ -72,3 +72,18 @@ The scope follows **who runs the treatment site**: one Waste tab with a switch.
 - Both Scope 2 figures are always reported side by side and never added together.
 - **Certificates** (Setup → Energy certificates & suppliers): each MWh can be claimed once — the tool refuses a claim beyond what is held, also when two people save at the same moment.
 - **Cooling:** the supplier's factor per TRh, or the plant's efficiency (kWh per TRh, or COP) × the grid factor.
+
+## Purchased goods & services — Scope 3.1 (and 3.2, 3.4, 3.6, 3.8)
+
+**What:** everything the company buys that is not fuel or energy it uses itself: materials, equipment, IT, services, travel and freight paid for, rent.
+**Enter:** purchase lines — uploaded from the ERP or finance system (Capture → Purchases), sent by the ERP through the API, or typed under Add data → Purchases. Each line: date, description, amount and currency; supplier, category and GL account help the mapping.
+
+```flow
+> Spend category | each description is mapped to a spend category (US EPA NAICS commodity)
+> Best factor | the supplier's own factor (per kg, t, L, piece or per currency) when there is one, else the spend-based factor
+> Money brought to the factor | amount → US dollars at the month's exchange rate → 2022 prices with the US consumer price index
+> Result | money (or quantity) × factor = kg CO₂e, line by line; entries per facility, month and category
+```
+
+- **Other categories:** air tickets, hotels and taxis belong to business travel (3.6); freight and couriers to upstream transport (3.4); rent to upstream leased assets (3.8); capitalised assets to capital goods (3.2). Fuel, electricity and waste are usually already counted from activity data — those lines are **excluded** to avoid counting twice. The tool flags them; a person decides.
+- Spend-based factors are averages: supplier-specific factors are better and are shown separately in the data-quality split.

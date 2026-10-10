@@ -11,6 +11,7 @@
  *     each reproducing the DESNZ AR4 and AR5 blend GWP within 1 %).
  *  3. DESNZ flat files in data/defra/ (one edition per year).
  *  4. IPCC 2006 defaults for coal types DESNZ does not cover.
+ *  5. US EPA supply chain factors in data/epa/ (purchased goods & services), when the file is there.
  */
 import { readFileSync, readdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
@@ -18,6 +19,7 @@ import { fileURLToPath } from 'node:url';
 import { pool, platformTx, type Tx } from './pool.js';
 import { parseDesnz } from '../import/desnz.js';
 import { importDesnz } from '../import/desnzWrite.js';
+import { importEpa, parseEpa } from '../import/epa.js';
 
 const DATA = join(dirname(fileURLToPath(import.meta.url)), '../../../../data');
 
@@ -146,6 +148,12 @@ export async function seed(log = console.log) {
     log(`[seed] ${s.source}: ${s.skipped ? 'already imported' : `${s.factors} factors, ${s.items} items, ${s.issues} issues`}`);
   }
   await platformTx(async (c) => log(`[seed] IPCC coals: ${await seedIpccCoals(c)}`));
+  // US EPA supply chain factors (purchased goods & services), when the file is in data/epa/
+  for (const f of readdirSync(join(DATA, 'epa')).filter((x) => /^SupplyChainGHGEmissionFactors.*\.csv$/i.test(x)).sort()) {
+    const parsed = parseEpa(readFileSync(join(DATA, 'epa', f), 'utf8'), f);
+    const s = await platformTx((c) => importEpa(c, parsed, { createdBy: 'seed' }));
+    log(`[seed] ${s.source}: ${s.skipped ? 'already imported' : `${s.factors} spend factors (${parsed.priceYear} USD)`}`);
+  }
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {

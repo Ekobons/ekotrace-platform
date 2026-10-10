@@ -9,3 +9,5 @@ export * from './vehicle.js';
 export * from './energy.js';
 export * from './waste.js';
 export * from './meter.js';
+export * from './spend.js';
+export * from './classify.js';

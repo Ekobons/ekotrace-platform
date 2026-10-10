@@ -35,4 +35,13 @@ export const config = {
   tokenSecret: process.env.TOKEN_SECRET ?? randomBytes(32).toString('hex'),
   /** HTTPS in front (servers): adds Strict-Transport-Security */
   https: process.env.HTTPS === 'true',
+  /** background jobs (large uploads, mapping, publishing) run in this process; WORKER=off on API-only servers */
+  worker: process.env.WORKER !== 'off',
+  /**
+   * Optional AI mapping of purchase descriptions: an OpenAI-compatible chat endpoint the client has
+   * approved (e.g. a model hosted in the UAE). Off unless all three are set AND the company switches it on.
+   * Only descriptions, category texts and candidate category names are sent: never amounts, suppliers or files.
+   */
+  aiMap: process.env.AI_MAP_URL && process.env.AI_MAP_KEY && process.env.AI_MAP_MODEL
+    ? { url: process.env.AI_MAP_URL.replace(/\/$/, ''), key: process.env.AI_MAP_KEY, model: process.env.AI_MAP_MODEL, name: process.env.AI_MAP_NAME ?? 'AI service' } : null,
 };

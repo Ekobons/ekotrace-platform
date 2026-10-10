@@ -16,6 +16,8 @@ import { requirePlatformAdmin } from '../lib/auth.js';
 import { AppError, notFound } from '../lib/errors.js';
 import { parseDesnz } from '../import/desnz.js';
 import { importDesnz } from '../import/desnzWrite.js';
+import { importEpa, importOldList, parseEpa } from '../import/epa.js';
+import { csvObjects } from '../lib/csv.js';
 
 export async function factorRoutes(app: FastifyInstance) {
   app.get('/api/factors', async (req) => {
@@ -94,6 +96,37 @@ export async function factorRoutes(app: FastifyInstance) {
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
+  });
+
+  /**
+   * US EPA supply chain factors (CSV, raw body, header x-filename). ?preview=1 first.
+   */
+  app.post('/api/admin/import/epa', { bodyLimit: 20 * 1024 * 1024 }, async (req) => {
+    requirePlatformAdmin(req);
+    const preview = z.object({ preview: z.coerce.boolean().optional() }).parse(req.query).preview;
+    if (!Buffer.isBuffer(req.body) || req.body.length < 100) throw new AppError('Send the EPA .csv file as the request body (Content-Type: application/octet-stream)');
+    const filename = String(req.headers['x-filename'] ?? '');
+    let parsed;
+    try { parsed = parseEpa(req.body.toString('utf8'), filename); } catch (e) { throw new AppError((e as Error).message); }
+    const summary = { version: parsed.version, priceYear: parsed.priceYear, rows: parsed.rows.length, skipped: parsed.skipped, sample: parsed.rows.slice(0, 5) };
+    if (preview) return { preview: true, ...summary };
+    return { preview: false, ...summary, ...(await platformTx((c) => importEpa(c, parsed, { createdBy: req.user.id }))) };
+  });
+
+  /**
+   * The previous Ekotrace purchased-goods list, exported from its database as CSV:
+   * purchase_goods_categories_ef (required), purchase_category, purchase_subcategory, typesofpurchase.
+   */
+  app.post('/api/admin/import/old-purchases', { bodyLimit: 30 * 1024 * 1024 }, async (req) => {
+    requirePlatformAdmin(req);
+    const b = z.object({
+      factors: z.string().min(10), categories: z.string().optional(), subcategories: z.string().optional(), types: z.string().optional(),
+      currency: z.string().regex(/^[A-Z]{3}$/).default('USD'), priceYear: z.number().int().min(1990).max(2100).default(2022), preview: z.boolean().optional(),
+    }).parse(req.body);
+    const list = { factors: csvObjects(b.factors), categories: b.categories ? csvObjects(b.categories) : undefined, subcategories: b.subcategories ? csvObjects(b.subcategories) : undefined, types: b.types ? csvObjects(b.types) : undefined };
+    if (!list.factors.length || !Object.keys(list.factors[0]!).some((k) => /^product$/i.test(k))) throw new AppError('purchase_goods_categories_ef export expected (columns id, product, NAIC_code, EFkgC02e_ccy…)');
+    if (b.preview) return { preview: true, rows: list.factors.length, withNaics: list.factors.filter((r) => Object.entries(r).some(([k, v]) => /^naic_code$/i.test(k) && /\d/.test(v))).length, columns: Object.keys(list.factors[0]!) };
+    return { preview: false, ...(await platformTx((c) => importOldList(c, list, { currency: b.currency, priceYear: b.priceYear, createdBy: req.user.id }))) };
   });
 
   app.get('/api/admin/import-issues', async (req) => {

@@ -784,3 +784,210 @@ test('bills: upload a PDF, read, match the account to a meter, check, confirm �
   assert.equal((await api('GET', `/api/bills/${bill.id}`, undefined, tenantA)).body.entries.length, 0);
   assert.equal((await api('GET', '/api/bills', undefined, tenantB)).body.bills.length, 0);
 });
+
+// ------------------------------------------------------------ purchases --
+const raw = (path: string, body: Buffer, tenant: string, headers: Record<string, string> = {}) =>
+  app.inject({ method: 'POST', url: path, payload: body, headers: { cookie: adminCookie, 'x-tenant-id': tenant, 'content-type': 'application/octet-stream', ...headers } });
+const drain = async () => (await import('../src/lib/jobs.js')).drainJobs();
+const CPI_24_22 = 292.655 / 313.689;
+/** Direct query as the platform (row-level security is forced on company tables). */
+const pq = async (sql: string, params: unknown[] = []) => {
+  const c = await pool.connect();
+  try { await c.query('BEGIN'); await c.query(`SELECT set_config('app.platform','on',true)`); const r = await c.query(sql, params); await c.query('COMMIT'); return r; }
+  finally { c.release(); }
+};
+
+test('purchases: EPA factor file import; ERP export in its own layout → groups, mapping, overlap, facilities, FX, supplier factor, publish, reopen, duplicates', async () => {
+  const { readFileSync } = await import('node:fs');
+  const csv = readFileSync(new URL('../../../data/epa/DEMO_placeholder_factors_USD2022.csv', import.meta.url));
+  const pre = await raw('/api/admin/import/epa?preview=1', csv, tenantA, { 'x-filename': 'SupplyChainGHGEmissionFactors_v1.3.0_NAICS_CO2e_USD2022.csv' });
+  assert.equal(pre.statusCode, 200, pre.body);
+  assert.deepEqual([pre.json().priceYear, pre.json().version, pre.json().rows], [2022, '1.3.0', 56]);
+  const imp = await raw('/api/admin/import/epa', csv, tenantA, { 'x-filename': 'SupplyChainGHGEmissionFactors_v1.3.0_NAICS_CO2e_USD2022.csv' });
+  assert.equal(imp.json().factors, 56);
+  assert.equal((await raw('/api/admin/import/epa', csv, tenantA, { 'x-filename': 'SupplyChainGHGEmissionFactors_v1.3.0_NAICS_CO2e_USD2022.csv' })).json().skipped, true);
+  const paperMills = await itemId('epa:naics:322121'); // copier paper: paper mills (stationery is envelopes, notebooks…)
+
+  // An ERP export: two title rows, then the header; several descriptive columns.
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet('ERP Jul - Dec 24');
+  ws.addRow(['Purchase order lines']); ws.addRow(['Exported 2024-12-31']);
+  ws.addRow(['Order', 'Line', 'Category Name', 'Description', 'Item Name', 'UOM Name', 'Qty', 'Price', 'Purchase Order Line Amount', 'Account Description', 'Supplier', 'Order Date', 'Site']);
+  const rows: unknown[][] = [
+    [4500101, 1, 'Office supplies', 'A4 paper', 'Copier paper 80gsm', 'box', 50, 73.45, '3,672.50', 'Office expenses', 'Gulf Stationery LLC', new Date('2024-03-10'), 'Sharjah plant'],
+    [4500102, 1, 'Office supplies', 'A4 paper', 'Copier paper 80gsm', 'box', 50, 73.45, 3672.5, 'Office expenses', 'Gulf Stationery L.L.C.', '15/04/2024', 'Sharjah plant'],
+    [4500103, 1, 'IT hardware', 'Dell Latitude laptop', 'Laptop 14"', 'pcs', 2, 7345, 14690, 'IT equipment', 'Tech Distribution FZE', '20/03/2024', 'Sharjah plant'],
+    [4500104, 1, 'Travel', 'Airfare DXB-LHR', 'Air ticket', 'EA', 1, 3672.5, 3672.5, 'Travel expenses', 'Emirates', '05/05/2024', 'Sharjah plant'],
+    [4500105, 1, 'Fuel', 'Diesel for generators', 'Diesel', 'L', 1000, 3.6725, 3672.5, 'Fuel', 'ENOC', '06/05/2024', 'Sharjah plant'],
+    [4500106, 1, 'Construction materials', 'OPC cement 50kg bags', 'Cement', 't', 10, 367.25, 3672.5, 'Materials', 'Emirates Cement LLC', '07/05/2024', 'Sharjah plant'],
+    [4500107, 1, 'Professional services', 'Consultancy fees strategy', 'Consulting', 'EA', 1, 18362.5, 18362.5, 'Consulting', 'Advisory Partners', '08/05/2024', 'Mars base'],
+    [4500108, 1, 'Office supplies', 'A4 paper (credit note)', 'Copier paper 80gsm', 'box', -5, 73.45, '(367.25)', 'Office expenses', 'Gulf Stationery LLC', '09/05/2024', 'Sharjah plant'],
+    [4500109, 1, 'Software', 'Microsoft 365 licence EUR', 'Licence', 'EA', 1, 920, 'EUR 920', 'IT', 'Microsoft Ireland', '10/06/2024', 'Sharjah plant'],
+  ];
+  rows.forEach((r) => ws.addRow(r));
+  const buf = Buffer.from(await wb.xlsx.writeBuffer());
+  const up = await raw('/api/purchases/upload', buf, tenantA, { 'x-filename': 'ERP H2 2024.xlsx' });
+  assert.equal(up.statusCode, 200, up.body);
+  const u = up.json();
+  const sh = u.sheets[0];
+  assert.equal(sh.headerRow, 2);
+  assert.equal(sh.guess.amount, 'Purchase Order Line Amount');
+  assert.deepEqual(sh.guess.description, ['Description', 'Item Name']);
+  assert.deepEqual([sh.guess.date, sh.guess.supplier, sh.guess.facility, sh.guess.category, sh.guess.gl, sh.guess.quantity, sh.guess.unit],
+    ['Order Date', 'Supplier', 'Site', 'Category Name', 'Account Description', 'Qty', 'UOM Name']);
+  const setup = await api('POST', `/api/purchases/batches/${u.batchId}/setup`, { headerRow: 2, columns: { ...sh.guess, description: 'Description' }, dateFormat: 'dmy', currency: 'AED', headers: sh.headers }, tenantA);
+  assert.equal(setup.status, 200, JSON.stringify(setup.body));
+  await drain();
+  const d = (await api('GET', `/api/purchases/batches/${u.batchId}`, undefined, tenantA)).body;
+  assert.equal(d.batch.status, 'review', JSON.stringify(d.batch));
+  const count = (s: string) => d.counts.find((x: { status: string }) => x.status === s)?.lines ?? 0;
+  assert.equal(count('problem'), 2, JSON.stringify(d.problems)); // Mars base, EUR rate missing
+  assert.equal(count('flagged'), 2); // airfare, diesel
+  assert.ok(d.problems.some((p: { problem: string }) => p.problem === 'Facility "Mars base" not found'));
+  assert.ok(d.problems.some((p: { problem: string }) => /No exchange rate for EUR/.test(p.problem)));
+  // suppliers: two spellings of Gulf Stationery are one supplier
+  assert.equal(Number((await pq(`SELECT count(*) FROM supplier WHERE tenant_id = $1 AND norm = 'gulf stationery'`, [tenantA])).rows[0].count), 1);
+
+  const groups = (await api('GET', `/api/purchases/batches/${u.batchId}/groups?limit=50`, undefined, tenantA)).body.groups as { key: string; description: string; item_id: number; lines: number; overlap: string; map_method: string; confidence: number }[];
+  const g = (d0: string) => groups.find((x) => x.description.startsWith(d0))!;
+  assert.equal(g('A4 paper').lines, 2); // same description, different PO numbers and dates → one group
+  assert.equal(g('A4 paper').item_id, paperMills);
+  assert.equal(g('OPC cement').item_id, await itemId('epa:naics:327310'));
+  assert.equal(g('Airfare').overlap, 'business_travel');
+  assert.equal(g('Diesel').overlap, 'fuel');
+  assert.equal(g('Dell').item_id, await itemId('epa:naics:334111'));
+  // the paper line: AED 3,672.50 at the peg = USD 1,000 of 2024 → 2022 dollars × 0.7 (placeholder factor)
+  const lines = (await api('GET', `/api/purchases/batches/${u.batchId}/lines?limit=100`, undefined, tenantA)).body.lines as { id: string; row_no: number; co2e: number; status: string; method: string; amount: number }[];
+  const paper = lines.find((l) => l.row_no === 1)!;
+  assert.ok(Math.abs(paper.co2e - 1000 * CPI_24_22 * 0.7) < 1e-6, String(paper.co2e));
+  const credit = lines.find((l) => l.row_no === 8)!;
+  assert.ok(Math.abs(credit.amount + 367.25) < 1e-9 && credit.co2e < 0);
+  const steps = (await api('GET', `/api/purchases/lines/${paper.id}`, undefined, tenantA)).body;
+  assert.match(steps.steps[0], /AED 3,672.5 ÷ 3.6725 AED\/USD \(peg\) = USD 1,000/);
+  assert.match(steps.steps[1], /CPI 2022 \/ CPI 2024/);
+
+  // decisions: airfare → business travel; diesel → excluded (already in Scope 1); remember both
+  assert.equal((await api('PATCH', `/api/purchases/batches/${u.batchId}/groups`, { keys: [g('Airfare').key], decision: 'move', target: 'business_travel' }, tenantA)).status, 200);
+  assert.equal((await api('PATCH', `/api/purchases/batches/${u.batchId}/groups`, { keys: [g('Diesel').key], decision: 'exclude' }, tenantA)).status, 200);
+  // a facility written differently in the file
+  assert.equal((await api('POST', `/api/purchases/batches/${u.batchId}/facilities`, { value: 'Mars base', facilityId: facA }, tenantA)).body.lines, 1);
+  // EUR rate for June 2024 → recalculate
+  assert.equal((await api('POST', '/api/currency/rates', { rows: [{ currency: 'EUR', kind: 'month', period: '2024-06', perUsd: 0.92, source: 'ECB monthly average' }] }, tenantA)).status, 200);
+  // the cement supplier's own factor, per tonne
+  const cementSup = (await pq(`SELECT id FROM supplier WHERE tenant_id = $1 AND norm = 'emirates cement'`, [tenantA])).rows[0].id;
+  const sf = await api('POST', `/api/suppliers/${cementSup}/factors`, { co2e: 650, unit: 't', source: 'EPD 2023 (cradle to gate)' }, tenantA);
+  assert.equal(sf.status, 200, JSON.stringify(sf.body));
+  assert.equal(sf.body.linesRecalculated, 1);
+  assert.equal((await api('POST', `/api/purchases/batches/${u.batchId}/recalculate`, {}, tenantA)).status, 200);
+  await drain();
+  const d2 = (await api('GET', `/api/purchases/batches/${u.batchId}`, undefined, tenantA)).body;
+  const c2 = (s: string) => d2.counts.find((x: { status: string }) => x.status === s)?.lines ?? 0;
+  assert.deepEqual([c2('ready'), c2('excluded'), c2('problem'), c2('flagged')], [8, 1, 0, 0], JSON.stringify(d2.counts));
+  const l2 = (await api('GET', `/api/purchases/batches/${u.batchId}/lines?limit=100`, undefined, tenantA)).body.lines as { row_no: number; co2e: number; method: string; fx: number }[];
+  assert.deepEqual([l2.find((l) => l.row_no === 6)!.method, l2.find((l) => l.row_no === 6)!.co2e], ['supplier', 6500]);
+  const eur = l2.find((l) => l.row_no === 9)!;
+  assert.ok(Math.abs(eur.co2e - (920 / 0.92) * CPI_24_22 * 0.06) < 1e-6 && eur.fx === 0.92);
+
+  // publish → entries per facility × month × category × spend category × method
+  const pub = await api('POST', `/api/purchases/batches/${u.batchId}/publish`, {}, tenantA);
+  assert.equal(pub.status, 200, JSON.stringify(pub.body));
+  await drain();
+  const acts = (await pq(
+    `SELECT c.code, a.co2e_scope3::float8 AS co2e, a.unit, a.quantity::float8 AS q, a.inputs FROM activity a JOIN category c ON c.id = a.category_id WHERE a.purchase_batch_id = $1`, [u.batchId])).rows;
+  const sumLines = Number((await pq(`SELECT sum(co2e) FROM purchase_line WHERE batch_id = $1 AND status = 'published'`, [u.batchId])).rows[0].sum);
+  assert.ok(Math.abs(acts.reduce((s, a) => s + a.co2e, 0) - sumLines) < 1e-6);
+  assert.ok(acts.some((a) => a.code === 'business_travel'));
+  assert.ok(acts.some((a) => a.code === 'purchased_goods' && a.unit === 't' && a.q === 10));
+  const paperMarch = acts.find((a) => a.inputs.spend?.AED === 3672.5 && a.code === 'purchased_goods' && a.unit === 'USD');
+  assert.ok(paperMarch, JSON.stringify(acts.map((a) => a.inputs)));
+  // published lines cannot change until the batch is reopened
+  assert.equal((await api('PATCH', `/api/purchases/batches/${u.batchId}/groups`, { keys: [g('A4 paper').key], itemId: await itemId('epa:naics:322121') }, tenantA)).status, 409);
+  const re = await api('POST', `/api/purchases/batches/${u.batchId}/reopen`, {}, tenantA);
+  assert.equal(re.body.removed, acts.length);
+  assert.equal(Number((await pq(`SELECT count(*) FROM activity WHERE purchase_batch_id = $1`, [u.batchId])).rows[0].count), 0);
+
+  // the same file again: refused; on purpose → every line is a duplicate, and remembered decisions apply
+  assert.equal((await raw('/api/purchases/upload', buf, tenantA, { 'x-filename': 'ERP H2 2024.xlsx' })).statusCode, 409);
+  const again = (await raw('/api/purchases/upload?again=1', buf, tenantA, { 'x-filename': 'ERP H2 2024 (2).xlsx' })).json();
+  const profile = again.sheets[0].profile;
+  assert.ok(profile, 'layout remembered');
+  await api('POST', `/api/purchases/batches/${again.batchId}/setup`, { ...profile.settings, columns: profile.settings.columns, headers: again.sheets[0].headers }, tenantA);
+  await drain();
+  const d3 = (await api('GET', `/api/purchases/batches/${again.batchId}`, undefined, tenantA)).body;
+  assert.ok(d3.problems.some((p: { problem: string; lines: number }) => p.problem === 'Duplicate of a line uploaded earlier' && p.lines === 9), JSON.stringify(d3.problems));
+  const g3 = (await api('GET', `/api/purchases/batches/${again.batchId}/groups?filter=moved`, undefined, tenantA)).body.groups;
+  assert.equal(g3[0]?.description.startsWith('Airfare'), true);
+  assert.equal((await api('DELETE', `/api/purchases/batches/${again.batchId}`, undefined, tenantA)).status, 200);
+
+  // the other company sees nothing
+  assert.equal((await api('GET', '/api/purchases/batches', undefined, tenantB)).body.batches.length, 0);
+  assert.equal((await api('GET', `/api/purchases/batches/${u.batchId}`, undefined, tenantB)).status, 404);
+  assert.equal((await api('GET', '/api/suppliers', undefined, tenantB)).body.total, 0);
+});
+
+test('purchases: manual entry (check, then save) and ERP API (several calls, then complete)', async () => {
+  const laptop = await itemId('epa:naics:334111');
+  const lines = [{ date: '2024-03-01', description: 'Laptops for new joiners', itemId: laptop, amount: 7345, currency: 'AED', supplier: 'Tech Distribution FZE' },
+    { date: '2024-03-02', description: 'Excavator', itemId: await itemId('epa:naics:333120'), amount: 367250, currency: 'AED', target: 'capital_goods' }];
+  const check = await api('POST', '/api/purchases/manual', { facilityId: facA, dryRun: true, lines }, tenantA);
+  assert.equal(check.status, 200, JSON.stringify(check.body));
+  assert.equal(check.body.saved, false);
+  assert.ok(Math.abs(check.body.lines[0].co2e - 2000 * CPI_24_22 * 0.15) < 1e-6);
+  assert.equal(Number((await pq(`SELECT count(*) FROM purchase_batch WHERE source = 'manual'`)).rows[0].count), 0); // nothing kept
+  const save = await api('POST', '/api/purchases/manual', { facilityId: facA, lines }, tenantA);
+  assert.equal(save.body.saved, true, JSON.stringify(save.body));
+  const cats = (await pq(`SELECT c.code FROM activity a JOIN category c ON c.id = a.category_id WHERE a.purchase_batch_id = $1 ORDER BY 1`, [save.body.batchId])).rows.map((r) => r.code);
+  assert.deepEqual(cats, ['capital_goods', 'purchased_goods']);
+
+  // ERP: a client allowed to send purchases (a meters-only client is refused)
+  const meterKey = (await api('POST', '/api/api-keys', { name: 'BMS' }, tenantA)).body.key;
+  const key = await api('POST', '/api/api-keys', { name: 'SAP S/4', scopes: ['purchases'] }, tenantA);
+  assert.deepEqual(key.body.scopes, ['purchases']);
+  const send = (k: string, path: string, body: unknown) => app.inject({ method: 'POST', url: path, payload: body as object, headers: { authorization: `Bearer ${k}`, 'content-type': 'application/json' } });
+  assert.equal((await send(meterKey, '/api/v1/purchases', { reference: 'x', lines: [] })).statusCode, 403);
+  const part = (n: number, start: number) => Array.from({ length: n }, (_, i) => ({ date: '2024-04-15', description: i % 2 ? 'Office cleaning contract' : 'Security guards monthly', amount: 3672.5, supplier: `Vendor ${(start + i) % 7}`, facility: 'Sharjah plant' }));
+  const r1 = await send(key.body.key, '/api/v1/purchases', { reference: 'SAP-2024-04', lines: part(600, 0) });
+  assert.equal(r1.statusCode, 200, r1.body);
+  const r2 = await send(key.body.key, '/api/v1/purchases', { reference: 'SAP-2024-04', lines: part(400, 600), complete: true });
+  assert.equal(r2.json().totalLines, 1000);
+  assert.equal((await send(key.body.key, '/api/v1/purchases', { reference: 'SAP-2024-04', lines: part(1, 0) })).statusCode, 409);
+  await drain();
+  const st = await app.inject({ method: 'GET', url: '/api/v1/purchases/SAP-2024-04', headers: { authorization: `Bearer ${key.body.key}` } });
+  assert.deepEqual([st.json().status, st.json().lines.ready], ['review', 1000], st.body);
+});
+
+test('purchases: 50,000 lines (CSV) read, mapped, calculated and published in the background within a minute', async () => {
+  const descs = ['A4 paper', 'Laptop', 'Office cleaning', 'Consultancy fees', 'Ready mix concrete', 'Security guards', 'Hotel stay Riyadh', 'Courier DHL', 'Software licence', 'Catering'];
+  const lines = ['Date;Description;Amount;Supplier;Site'];
+  for (let i = 0; i < 50_000; i++) lines.push(`${String(1 + (i % 28)).padStart(2, '0')}/${String(1 + (i % 12)).padStart(2, '0')}/2025;${descs[i % 10]} ${i % 500};"${(100 + (i % 997)).toLocaleString('de-DE')},50";Vendor ${i % 300};Sharjah plant`);
+  const buf = Buffer.from(lines.join('\r\n'), 'utf8');
+  const t0 = Date.now();
+  const up = (await raw('/api/purchases/upload', buf, tenantA, { 'x-filename': 'big.csv' })).json();
+  const sh = up.sheets[0];
+  assert.deepEqual([sh.guess.description, sh.guess.amount, sh.guess.date, sh.guess.facility], ['Description', 'Amount', 'Date', 'Site']);
+  await api('POST', `/api/purchases/batches/${up.batchId}/setup`, { headerRow: sh.headerRow, columns: sh.guess, dateFormat: 'dmy', currency: 'AED', headers: sh.headers }, tenantA);
+  await drain();
+  const t1 = Date.now();
+  const d = (await api('GET', `/api/purchases/batches/${up.batchId}`, undefined, tenantA)).body;
+  const total = d.counts.reduce((s: number, x: { lines: number }) => s + x.lines, 0);
+  assert.equal(total, 50_000);
+  assert.ok(d.groups.total <= 5000, `groups ${d.groups.total}`);
+  // European decimals read correctly: "1.096,50" → 1096.5
+  const amt = Number((await pq(`SELECT amount FROM purchase_line WHERE batch_id = $1 AND row_no = 997`, [up.batchId])).rows[0].amount);
+  assert.equal(amt, 1096.5);
+  // decide the flagged groups (hotels → business travel, courier → upstream transport) in bulk, then publish
+  const flagged = (await api('GET', `/api/purchases/batches/${up.batchId}/groups?filter=flagged&limit=200`, undefined, tenantA)).body.groups as { key: string; overlap: string }[];
+  for (const target of ['business_travel', 'upstream_transport']) {
+    const keys = flagged.filter((x) => x.overlap === target).map((x) => x.key);
+    if (keys.length) assert.equal((await api('PATCH', `/api/purchases/batches/${up.batchId}/groups`, { keys, decision: 'move', target, remember: false }, tenantA)).status, 200);
+  }
+  const ready = (await api('GET', `/api/purchases/batches/${up.batchId}`, undefined, tenantA)).body.counts.find((x: { status: string }) => x.status === 'ready').lines;
+  await api('POST', `/api/purchases/batches/${up.batchId}/publish`, {}, tenantA);
+  await drain();
+  const t2 = Date.now();
+  const pubLines = Number((await pq(`SELECT count(*) FROM purchase_line WHERE batch_id = $1 AND status = 'published'`, [up.batchId])).rows[0].count);
+  assert.equal(pubLines, ready);
+  const entries = Number((await pq(`SELECT count(*) FROM activity WHERE purchase_batch_id = $1`, [up.batchId])).rows[0].count);
+  console.log(`[perf] 50,000 lines: read+map+calculate ${((t1 - t0) / 1000).toFixed(1)} s, publish ${((t2 - t1) / 1000).toFixed(1)} s; ${d.groups.total} groups, ${pubLines} lines → ${entries} entries`);
+  assert.ok(t2 - t0 < 60_000, `took ${t2 - t0} ms`);
+});

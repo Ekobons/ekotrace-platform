@@ -13,6 +13,9 @@ import { Organisation } from './pages/Organisation';
 import { People } from './pages/People';
 import { Methodology } from './pages/Methodology';
 import { EnergyRegister } from './pages/EnergyRegister';
+import { PurchaseBatchPage, Purchases } from './pages/Purchases';
+import { Suppliers } from './pages/Suppliers';
+import { Currencies } from './pages/Currencies';
 import { AuditLog } from './pages/AuditLog';
 import { Meters } from './pages/Meters';
 import { Bills } from './pages/Bills';
@@ -41,16 +44,19 @@ const NAV: { group?: string; items: NavItem[] }[] = [
     { to: '/entries', label: 'Entries & results', icon: 'list' },
     { to: '/meters', label: 'Meters', icon: 'gauge', roles: ['super_admin', 'admin', 'manager', 'preparer', 'verifier'] },
     { to: '/bills', label: 'Bills', icon: 'doc', roles: ['super_admin', 'admin', 'manager', 'preparer', 'verifier'] },
+    { to: '/purchases', label: 'Purchases', icon: 'upload', roles: ['super_admin', 'admin', 'manager', 'preparer', 'verifier'] },
     { label: 'Approvals', icon: 'check', stage: 2 }, { label: 'Data progress', icon: 'grid', stage: 2 }, { label: 'Collection calendar', icon: 'calendar', stage: 2 },
     { label: 'Inbox & to-dos', icon: 'inbox', stage: 2 }, { label: 'Document vault', icon: 'folder', stage: 2 }, { label: 'Batch runs', icon: 'upload', stage: 4 },
     { label: 'QR & field app', icon: 'qr', stage: 4 },
   ] },
+  { group: 'Value chain', items: [{ to: '/suppliers', label: 'Suppliers', icon: 'users', roles: ['super_admin', 'admin', 'manager', 'preparer', 'verifier'] }, { label: 'Product LCA', icon: 'leaf', stage: 4 }] },
   { group: 'Net zero', items: [{ label: 'Targets & actions', icon: 'target', stage: 4 }, { label: 'Carbon credits', icon: 'leaf', stage: 4 }] },
   { group: 'Disclose', items: [{ label: 'Reports', icon: 'doc', stage: 3 }, { label: 'Audit & assurance', icon: 'shield', stage: 3 }] },
   { group: 'Setup', items: [
     { to: '/organisation', label: 'Organisation & groups', icon: 'tree' },
     { to: '/methodology', label: 'Methodology & boundaries', icon: 'scale', roles: ['super_admin', 'admin', 'verifier'] },
     { to: '/energy', label: 'Energy certificates & suppliers', icon: 'bolt', roles: ['super_admin', 'admin', 'manager', 'verifier'] },
+    { to: '/currency', label: 'Currencies & price index', icon: 'scale', roles: ['super_admin', 'admin', 'manager', 'verifier'] },
     { to: '/people', label: 'People & access', icon: 'users', roles: ['super_admin', 'admin', 'manager'] },
     { to: '/library', label: 'Factors & dictionary', icon: 'book', roles: [] },
     { label: 'Metric registry', icon: 'list', stage: 4 }, { to: '/integrations', label: 'Integrations & API', icon: 'plug', roles: ['super_admin', 'admin'] }, { label: 'AI models', icon: 'spark', stage: 4 },
@@ -154,6 +160,10 @@ function Shell() {
           <Route path="/help" element={<Manual />} />
           <Route path="/meters" element={<NeedCo><Meters /></NeedCo>} />
           <Route path="/bills" element={<NeedCo><Bills /></NeedCo>} />
+          <Route path="/purchases" element={<NeedCo><Purchases /></NeedCo>} />
+          <Route path="/purchases/:id" element={<NeedCo><PurchaseBatchPage /></NeedCo>} />
+          <Route path="/suppliers" element={<NeedCo><Suppliers /></NeedCo>} />
+          <Route path="/currency" element={<NeedCo><Currencies /></NeedCo>} />
           <Route path="/integrations" element={<NeedCo><Integrations /></NeedCo>} />
           <Route path="/audit" element={<NeedCo><AuditLog /></NeedCo>} />
           <Route path="*" element={<div className="page"><div className="card empty">Page not found.</div></div>} />

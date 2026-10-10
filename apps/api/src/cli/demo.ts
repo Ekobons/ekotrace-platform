@@ -15,6 +15,7 @@ import { contextFor } from '../modules/activity.routes.js';
 import { storeReadings, syncMeter, type MeterRow } from '../modules/meters.routes.js';
 import { bookBill, createBill } from '../modules/bills.routes.js';
 import { PDFDocument, StandardFonts } from 'pdf-lib';
+import { demoPurchases } from './demoPurchases.js';
 
 const NAME = 'BEEAH Group (demo)';
 const TREE: [string, [string, string, string][]][] = [
@@ -59,6 +60,7 @@ const FLEET: [string, string, string, string, string, string | null, 'distance' 
 async function main() {
   const pw = temporaryPassword();
   const hash = await hashPassword(pw);
+  let tenantId = '';
   await platformTx(async (c: Tx) => {
     const old = (await c.query('SELECT id FROM tenant WHERE name = $1', [NAME])).rows[0]?.id as string | undefined;
     if (old && !process.argv.includes('--reset')) throw new Error(`"${NAME}" already exists. Run "npm run demo -- --reset" to delete it and create it again.`);
@@ -66,7 +68,8 @@ async function main() {
       // Demo company only (matched by its exact name): remove everything it holds.
       for (const sql of [
         'DELETE FROM certificate_claim WHERE tenant_id = $1', 'DELETE FROM energy_certificate WHERE tenant_id = $1', 'DELETE FROM supplier_factor WHERE tenant_id = $1',
-        'DELETE FROM activity_result WHERE tenant_id = $1', 'DELETE FROM activity WHERE tenant_id = $1', 'DELETE FROM vehicle WHERE tenant_id = $1',
+        'DELETE FROM job WHERE tenant_id = $1', 'UPDATE purchase_line SET activity_id = NULL WHERE tenant_id = $1', 'DELETE FROM activity_result WHERE tenant_id = $1', 'DELETE FROM activity WHERE tenant_id = $1',
+        'DELETE FROM purchase_batch WHERE tenant_id = $1', 'DELETE FROM purchase_rule WHERE tenant_id = $1', 'DELETE FROM purchase_profile WHERE tenant_id = $1', 'DELETE FROM supplier_ef WHERE tenant_id = $1', 'DELETE FROM supplier WHERE tenant_id = $1', 'DELETE FROM fx_rate WHERE tenant_id = $1', 'DELETE FROM vehicle WHERE tenant_id = $1',
         'DELETE FROM bill WHERE tenant_id = $1', 'DELETE FROM document WHERE tenant_id = $1', 'DELETE FROM meter_reading WHERE tenant_id = $1', 'DELETE FROM meter WHERE tenant_id = $1', 'DELETE FROM api_key WHERE tenant_id = $1',
         'DELETE FROM waste_deposit WHERE tenant_id = $1', 'DELETE FROM waste_site WHERE tenant_id = $1',
         'DELETE FROM price WHERE tenant_id = $1', 'DELETE FROM user_facility WHERE tenant_id = $1',
@@ -78,6 +81,7 @@ async function main() {
       console.log(`Old "${NAME}" deleted.`);
     }
     const t = (await c.query(`INSERT INTO tenant (name, country, gwp_set, consolidation, base_year) VALUES ($1,'AE','AR5','operational',2025) RETURNING id`, [NAME])).rows[0].id;
+    tenantId = t;
     const group = (await c.query(`INSERT INTO org_node (tenant_id, kind, name, country) VALUES ($1,'group',$2,'AE') RETURNING id`, [t, 'BEEAH Group'])).rows[0].id;
     const ids = new Map<string, string>();
     for (const [sub, facs] of TREE) {
@@ -330,6 +334,9 @@ async function main() {
     console.log(`Waste: a landfill with a DEMO tonnage history 2000–2025, ${nw} waste entries (landfill, waste-to-energy, composting, wastewater, office waste sent out).`);
     console.log(`\nDemo company "${NAME}" created: ${TREE.length} sub-groups, ${[...ids.keys()].length - TREE.length} facilities, ${n} fuel entries (Jan 2025 – Sep 2026).`);
   });
+  // purchases run after the company exists (the pipeline commits in chunks, like a real upload)
+  const sa = (await platformTx((c: Tx) => c.query(`SELECT id, name, email, role, tenant_id, scope_node_id FROM app_user WHERE tenant_id = $1 AND role = 'super_admin' LIMIT 1`, [tenantId]))).rows[0];
+  await demoPurchases(tenantId, { id: sa.id, name: sa.name, email: sa.email, role: 'super_admin', tenantId, scopeNodeId: null, mustChangePassword: false });
   console.log('\nDemo logins (all with the same password, shown once):');
   for (const [name, email] of PEOPLE) console.log(`  ${email.padEnd(24)} ${name}`);
   console.log(`\n  Password: ${pw}\n`);

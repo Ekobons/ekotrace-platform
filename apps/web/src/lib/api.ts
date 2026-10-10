@@ -8,7 +8,7 @@ export interface Item { id: number; subcategory_id: number; code: string; name: 
 /** Vehicle types: class, powertrain, the fuel it burns, electric / plug-in, distance factors or not. */
 export interface VehicleAttrs { vehicle?: string; powertrain?: string; load?: string; fuel?: string | null; electric?: boolean; phev?: boolean; distance?: boolean }
 export interface Subcategory { id: number; category_id: number; code: string; name: string; grp?: string | null; units: string[]; default_unit: string | null; is_bioenergy: boolean; sort: number; active: boolean; hiddenForClient?: boolean; items: Item[] }
-export interface Category { id: number; scope: number; code: string; name: string; calc_method: 'combustion' | 'fugitive' | 'vehicle' | 'electricity' | 'waste' | 'waste_disposal'; ghg_category?: number | null; description: string | null; active: boolean; subcategories: Subcategory[] }
+export interface Category { id: number; scope: number; code: string; name: string; calc_method: 'combustion' | 'fugitive' | 'vehicle' | 'electricity' | 'waste' | 'waste_disposal' | 'spend'; ghg_category?: number | null; description: string | null; active: boolean; subcategories: Subcategory[] }
 export interface Unit { code: string; name: string; dimension: string; to_base: number; is_base: boolean; aliases: string[]; active: boolean }
 export interface ResultLine { basis: Basis; gas: string; kgGas: number | null; kgCo2e: number; factorId: number | null; method: 'gas' | 'published' }
 /** CO2e emission factor behind one part of a result: quantity × perEnteredUnit = total. */
@@ -30,6 +30,47 @@ export const ROLE_LABEL: Record<Role, string> = { platform_admin: 'Platform admi
 export interface Facility { id: string; name: string; country: string; grid_region?: string | null; active: boolean; facility_type?: string | null; parent_name?: string | null; canEnter?: boolean; canApprove?: boolean }
 export interface Factor { id: number; item_id: number; item: string; subcategory: string; basis: Basis; unit: string; co2e: number | null; region: string; valid_from: string; valid_to: string; status: string; version: number; supersedes_id: number | null; note: string | null; source: string; gwp_set: string | null; gases: { gas: string; kgPerUnit: number }[] | null }
 export interface Activity { id: string; period_start: string; period_end: string; facility: string; category: string; item: string; quantity: number; unit: string; data_type: string; gwp_set: string; co2e_direct: number; co2e_wtt: number; co2_biogenic: number; co2e_memo: number; co2e_scope2?: number; co2e_scope2_market?: number; co2e_td?: number; co2e_scope3?: number; scope?: number; ghg_category?: number | null; waste_site?: string | null; meter?: string | null; meter_id?: string | null; status: string; created_at: string; vehicle?: string | null; vehicle_id?: string | null }
+
+// ------------------------------------------------------------- purchases --
+export type PurchaseField = 'date' | 'description' | 'amount' | 'currency' | 'quantity' | 'unit' | 'supplier' | 'category' | 'gl' | 'po' | 'facility' | 'supplierEf' | 'supplierEfUnit' | 'capital';
+export type Columns = Partial<Record<PurchaseField, string | string[]>>;
+export interface PurchaseMeta {
+  fields: { field: PurchaseField; label: string }[]; fxMethod: 'month' | 'year' | 'fixed'; currency: string; aiMapping: boolean; aiAvailable: boolean; aiName: string | null;
+  overlap: Record<string, string>; categories: { id: number; code: string; name: string; ghg_category: number }[]; factorSets: { code: string; title: string; n: number }[]; maxLines: number;
+}
+export interface UploadSheet { name: string; headerRow: number; headers: string[]; rows: string[][]; guess: Columns; signature: string; profile: { id: string; name: string; settings: { headerRow: number; columns: Columns; dateFormat: 'dmy' | 'mdy' | 'ymd'; currency: string; facilityId?: string | null; period?: { year?: number; month?: string } | null; sheet?: string } } | null }
+export interface UploadResult { batchId: string; filename: string; kind: string; defaultCurrency: string; sheets: UploadSheet[] }
+export type LineStatus = 'new' | 'problem' | 'unmapped' | 'flagged' | 'excluded' | 'ready' | 'published';
+export interface PurchaseBatch {
+  id: string; name: string; source: 'upload' | 'manual' | 'api'; status: string; error: string | null; created_at: string; published_at: string | null; created_by_name: string | null;
+  lines: number; ready: number; published: number; attention: number; usd: number; co2e: number; progress: { stage?: string; done?: number; total?: number } | null; job_status: string | null;
+}
+export interface BatchDetail {
+  batch: PurchaseBatch & { settings: Record<string, unknown>; file: { filename: string; size: number } | null; external_ref: string | null };
+  job: { id: number; kind: string; status: string; progress: { stage?: string; done?: number; total?: number }; error: string | null } | null;
+  counts: { status: LineStatus; lines: number; usd: number; co2e: number }[]; byCategory: { category: string; lines: number; co2e: number; usd: number }[];
+  byMethod: { method: 'spend' | 'supplier'; lines: number; co2e: number }[]; problems: { problem: string; lines: number }[];
+  groups: { total: number; unmapped: number; flagged: number; capital_hint: number; check: number }; facilitiesMissing: { value: string | null; lines: number }[];
+  entries: { n: number; approved: number }; period: { from: string | null; to: string | null };
+}
+export interface PurchaseGroup {
+  key: string; description: string; category_text: string | null; gl_account: string | null; supplier: string | null; lines: number; usd: number; co2e: number | null;
+  item_id: number | null; item_name: string | null; naics: string | null; map_method: 'rule' | 'text' | 'ai' | 'manual' | 'code' | null; confidence: number | null;
+  candidates: { itemId: number; score: number; name?: string }[]; overlap: string | null; overlap_why: string | null; decision: 'keep' | 'move' | 'exclude' | null; target: string | null;
+  capital: boolean; statuses: Partial<Record<LineStatus, number>> | null;
+}
+export interface PurchaseLine {
+  id: string; row_no: number; date: string | null; month: string | null; description: string; category_text: string | null; supplier_text: string | null; po_ref: string | null;
+  facility: string | null; facility_text: string | null; amount: number | null; currency: string | null; quantity: number | null; unit: string | null; status: LineStatus;
+  method: 'spend' | 'supplier' | null; item: string | null; co2e: number | null; usd: number | null; fx: number | null; fx_kind: string | null; cpi: number | null;
+  problems: string[]; warnings: string[]; calc_error: string | null; dup_of: string | null; activity_id: string | null;
+}
+export interface SpendItem { id: number; name: string; naics: string | null; group: string; co2e: number | null; unit: string | null; price_year: number | null; source: string | null }
+export interface Supplier { id: string; name: string; aliases: string[]; country: string | null; reference: string | null; contact_email: string | null; origin: string; active: boolean; lines: number; usd: number; co2e: number; supplier_lines: number; factors: number }
+export interface SupplierFactor2 { id: string; item_id: number | null; item: string | null; co2e: number; unit: string; price_year: number | null; valid_from: string; valid_to: string; source: string; boundary: string | null }
+export interface FxRow { id: number; currency: string; kind: 'month' | 'year' | 'fixed' | 'peg'; period: string; per_usd: number; source: string; own: boolean }
+export interface ManualLine { date: string; description: string; itemId: number | null; target: string; amount: number | null; currency: string; quantity?: number | null; unit?: string | null; supplier?: string | null; supplierEf?: number | null; supplierEfUnit?: string | null }
+export interface ManualResult { saved: boolean; allReady: boolean; batchId?: string; entries?: number; co2e?: number; lines: { row_no: number; status: LineStatus; method: string | null; co2e: number | null; problems: string[]; calc_error: string | null; warnings: string[]; item: string | null; steps: string[]; factor: { name: string; source: string; value: number; unit: string } | null }[] }
 
 /** Platform admin only: the company being looked at (sent as x-tenant-id). Others are fixed to their own company. */
 let tenantId = localStorageGet('ekotrace.tenant');
@@ -100,6 +141,9 @@ export const api = {
   sources: () => call<{ sources: { id: number; code: string; title: string; year: number | null; version: string | null; gwp_set: string | null; url: string | null; imported_at: string }[] }>('GET', '/api/factor-sources'),
   issues: () => call<{ issues: { id: number; source: string; severity: string; message: string; resolved: boolean }[] }>('GET', '/api/admin/import-issues'),
   resolveIssue: (id: number, resolved: boolean) => call('PATCH', `/api/admin/import-issues/${id}`, { resolved }),
+  importEpa: (file: File, preview: boolean) => call<{ version: string; priceYear: number; rows: number; skipped?: boolean | number; factors?: number; items?: number; sample: { naics: string; title: string; withMargins: number }[] }>('POST', `/api/admin/import/epa${preview ? '?preview=1' : ''}`, undefined, file, { 'x-filename': encodeURIComponent(file.name) }),
+  importOldPurchases: (b: { factors: string; categories?: string; subcategories?: string; types?: string; currency: string; priceYear: number; preview?: boolean }) =>
+    call<{ preview: boolean; rows?: number; withNaics?: number; columns?: string[]; linked?: number; created?: number; factors?: number; skipped?: number; notes?: string[] }>('POST', '/api/admin/import/old-purchases', b),
   importDesnz: (file: Blob, preview: boolean) => call<{ year: number; version: string; gwpSet: string; fuelRows: number; gasRows: number; skipped?: boolean; factors?: number; items?: number; issues?: number }>('POST', `/api/admin/import/desnz${preview ? '?preview=1' : ''}`, undefined, file),
   addFactor: (b: unknown) => call<{ factor: Factor; replaced: number | null }>('POST', '/api/admin/factors', b),
   // auth
@@ -154,7 +198,7 @@ export const api = {
   deleteReading: (id: string, ts: string) => call<{ removed: number }>('DELETE', `/api/meters/${id}/readings?ts=${encodeURIComponent(ts)}`),
   syncMeter: (id: string) => call<SyncResult>('POST', `/api/meters/${id}/sync`),
   apiKeys: () => call<{ keys: ApiKey[] }>('GET', '/api/api-keys'),
-  addApiKey: (name: string) => call<ApiKey & { key: string }>('POST', '/api/api-keys', { name }),
+  addApiKey: (name: string, scopes: string[] = ['meter_readings']) => call<ApiKey & { key: string }>('POST', '/api/api-keys', { name, scopes }),
   revokeApiKey: (id: string) => call<{ ok: true }>('DELETE', `/api/api-keys/${id}`),
   setTimezone: (timezone: string) => call<{ timezone: string }>('PATCH', '/api/tenant/timezone', { timezone }),
   // Bills
@@ -201,6 +245,40 @@ export const api = {
   setVisibility: (b: { subcategoryId?: number; itemId?: number; enabled: boolean }) => call('PUT', '/api/catalogue/visibility', b),
   updateUnit: (code: string, b: unknown) => call<Unit>('PATCH', `/api/admin/units/${encodeURIComponent(code)}`, b),
   addUnit: (b: unknown) => call<Unit>('POST', '/api/admin/units', b),
+  // purchases
+  purchaseMeta: () => call<PurchaseMeta>('GET', '/api/purchases/meta'),
+  purchaseSettings: (b: { aiMapping: boolean }) => call<{ aiMapping: boolean }>('PATCH', '/api/purchases/settings', b),
+  uploadPurchases: (f: File, again = false) => call<UploadResult>('POST', `/api/purchases/upload${again ? '?again=1' : ''}`, undefined, f, { 'x-filename': encodeURIComponent(f.name) }),
+  setupBatch: (id: string, b: unknown) => call<{ batchId: string; jobId: number }>('POST', `/api/purchases/batches/${id}/setup`, b),
+  purchaseBatches: () => call<{ batches: PurchaseBatch[] }>('GET', '/api/purchases/batches'),
+  purchaseBatch: (id: string) => call<BatchDetail>('GET', `/api/purchases/batches/${id}`),
+  purchaseGroups: (id: string, q: Record<string, string | number | undefined>) => call<{ total: number; groups: PurchaseGroup[] }>('GET', `/api/purchases/batches/${id}/groups?${new URLSearchParams(Object.entries(q).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)]))}`),
+  patchGroups: (id: string, b: { keys: string[]; itemId?: number | null; decision?: 'keep' | 'move' | 'exclude' | null; target?: string | null; capital?: boolean; remember?: boolean }) =>
+    call<{ groups: number; lines: number; background: boolean }>('PATCH', `/api/purchases/batches/${id}/groups`, b),
+  purchaseLines: (id: string, q: Record<string, string | number | undefined>) => call<{ total: number; lines: PurchaseLine[] }>('GET', `/api/purchases/batches/${id}/lines?${new URLSearchParams(Object.entries(q).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)]))}`),
+  purchaseLine: (id: string) => call<{ status: LineStatus; method: string | null; co2e: number | null; steps: string[]; warnings: string[]; error: string | null; factor: { name: string; source: string; value: number; unit: string } | null }>('GET', `/api/purchases/lines/${id}`),
+  mapFacility: (id: string, value: string | null, facilityId: string) => call<{ lines: number }>('POST', `/api/purchases/batches/${id}/facilities`, { value, facilityId }),
+  recalcBatch: (id: string, remap = false) => call<{ jobId: number }>('POST', `/api/purchases/batches/${id}/recalculate`, { remap }),
+  publishBatch: (id: string) => call<{ jobId: number; lines: number }>('POST', `/api/purchases/batches/${id}/publish`),
+  reopenBatch: (id: string) => call<{ removed: number; kept: number }>('POST', `/api/purchases/batches/${id}/reopen`),
+  patchBatch: (id: string, b: { name?: string; includeDuplicates?: boolean }) => call<{ ok: true }>('PATCH', `/api/purchases/batches/${id}`, b),
+  deleteBatch: (id: string) => call<{ ok: true }>('DELETE', `/api/purchases/batches/${id}`),
+  spendItems: (q: string, limit = 30) => call<{ items: SpendItem[] }>('GET', `/api/purchases/items?${new URLSearchParams({ q, limit: String(limit) })}`),
+  purchaseRules: () => call<{ rules: { id: string; field: string; pattern: string; item: string | null; decision: string | null; target: string | null; capital: boolean | null; hits: number; created_at: string; created_by: string | null }[] }>('GET', '/api/purchases/rules'),
+  deleteRule: (id: string) => call<{ ok: true }>('DELETE', `/api/purchases/rules/${id}`),
+  manualPurchases: (b: { facilityId: string; dryRun?: boolean; name?: string; lines: ManualLine[] }) => call<ManualResult>('POST', '/api/purchases/manual', b),
+  suppliers: (q: Record<string, string | number | undefined>) => call<{ total: number; suppliers: Supplier[] }>('GET', `/api/suppliers?${new URLSearchParams(Object.entries(q).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)]))}`),
+  supplier: (id: string) => call<{ supplier: Supplier & { note: string | null; norm: string }; factors: SupplierFactor2[]; categories: { item: string | null; lines: number; usd: number; co2e: number }[] }>('GET', `/api/suppliers/${id}`),
+  addSupplier: (b: unknown) => call<{ id: string }>('POST', '/api/suppliers', b),
+  patchSupplier: (id: string, b: unknown) => call<{ ok: true }>('PATCH', `/api/suppliers/${id}`, b),
+  mergeSupplier: (id: string, intoId: string) => call<{ lines: number }>('POST', `/api/suppliers/${id}/merge`, { intoId }),
+  addSupplierEf: (id: string, b: unknown) => call<{ id: string; linesRecalculated: number }>('POST', `/api/suppliers/${id}/factors`, b),
+  deleteSupplierEf: (id: string, fid: string) => call<{ ok: true }>('DELETE', `/api/suppliers/${id}/factors/${fid}`),
+  currency: (currency?: string) => call<{ fxMethod: 'month' | 'year' | 'fixed'; currency: string; rates: FxRow[]; cpi: { region: string; year: number; value: number; source: string }[]; missing: { currency: string; month: string; lines: number }[]; used: { currency: string; lines: number }[]; fallbacks: { warning: string; lines: number }[] }>('GET', `/api/currency${currency ? `?currency=${currency}` : ''}`),
+  currencySettings: (b: { fxMethod?: string; currency?: string }) => call('PATCH', '/api/currency/settings', b),
+  addRates: (rows: { currency: string; kind: string; period: string; perUsd: number; source: string }[], shared = false) => call<{ saved: number }>('POST', '/api/currency/rates', { rows, shared }),
+  deleteRate: (id: number) => call<{ ok: true }>('DELETE', `/api/currency/rates/${id}`),
+  addPriceIndex: (b: { region: string; year: number; value: number; source: string }) => call('POST', '/api/admin/price-index', b),
 };
 
 /** kg → tonnes, shown with sensible precision. */

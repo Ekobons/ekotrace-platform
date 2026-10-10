@@ -39,3 +39,29 @@ Example:
 - Each reading is checked on its own; refused readings are listed, the others are stored.
 - Approved monthly entries are never changed; the difference is reported in the answer.
 - Keep the client secret in the sending system's secret store. If it may have leaked, revoke the client and create a new one.
+
+## Purchase lines from an ERP
+
+The client needs the **Purchase lines** permission (tick it when creating the client). Send the lines of a period under one reference, in as many calls as needed, then complete it:
+
+    POST /api/v1/purchases
+    { "reference": "SAP-2026-03", "currency": "AED", "facility": "BEEAH Headquarters",
+      "lines": [ { "date": "2026-03-10", "description": "Copier paper A4", "amount": 4250,
+                   "supplier": "Gulf Stationery LLC", "category": "Office supplies", "glAccount": "Office expenses",
+                   "poNumber": "4500123", "quantity": 50, "unit": "box" } ] }
+
+    POST /api/v1/purchases/SAP-2026-03/complete      (or "complete": true on the last call)
+    GET  /api/v1/purchases/SAP-2026-03               status and counts
+
+| Field | Required | Meaning |
+|---|---|---|
+| description | yes | what was bought |
+| amount | yes, unless quantity + supplier factor | what was paid; negative for a credit note |
+| date | yes | yyyy-mm-dd |
+| currency | no | 3 letters; default the call's, else the company currency |
+| facility | per line or per call | facility name |
+| supplier, category, glAccount, poNumber | no | help mapping and checking |
+| quantity, unit, supplierEf, supplierEfUnit | no | for a supplier's own factor (kg CO₂e per unit) |
+| capital | no | true for capitalised purchases (Scope 3.2) |
+
+At most 10,000 lines per call and 200,000 per reference. A completed reference is closed; corrections go under a new one. The batch is then reviewed and published under Capture → Purchases.

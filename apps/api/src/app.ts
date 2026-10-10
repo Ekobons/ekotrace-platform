@@ -23,6 +23,8 @@ import { energyRoutes } from './modules/energy.routes.js';
 import { wasteRoutes } from './modules/waste.routes.js';
 import { meterIngestRoutes, meterRoutes } from './modules/meters.routes.js';
 import { billRoutes } from './modules/bills.routes.js';
+import { purchaseIngestRoutes, purchaseRoutes } from './modules/purchases/purchases.routes.js';
+import { supplierRoutes } from './modules/purchases/suppliers.routes.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const BRANDS = join(HERE, '../../../brands');
@@ -32,7 +34,7 @@ export async function buildApp(opts: { logger?: boolean } = {}): Promise<Fastify
   const app = Fastify({ logger: opts.logger ?? false, bodyLimit: 1024 * 1024 });
   app.setErrorHandler(errorHandler);
   // Raw uploads (DESNZ .xlsx files) arrive as application/octet-stream.
-  app.addContentTypeParser('application/octet-stream', { parseAs: 'buffer', bodyLimit: 20 * 1024 * 1024 }, (_req, body, done) => done(null, body));
+  app.addContentTypeParser('application/octet-stream', { parseAs: 'buffer', bodyLimit: 60 * 1024 * 1024 }, (_req, body, done) => done(null, body));
 
   // Security headers on every response (BEEAH web application security standard 4.9).
   app.addHook('onSend', async (_req, reply) => {
@@ -56,6 +58,7 @@ export async function buildApp(opts: { logger?: boolean } = {}): Promise<Fastify
   await app.register(authRoutes);
   // Machine API for systems that send meter readings: API key, no session.
   await app.register(meterIngestRoutes);
+  await app.register(purchaseIngestRoutes);
   await app.register(async (secured) => {
     secured.addHook('onRequest', authenticate);
     await secured.register(orgRoutes);
@@ -72,6 +75,8 @@ export async function buildApp(opts: { logger?: boolean } = {}): Promise<Fastify
     await secured.register(wasteRoutes);
     await secured.register(meterRoutes);
     await secured.register(billRoutes);
+    await secured.register(purchaseRoutes);
+    await secured.register(supplierRoutes);
   });
 
   // The screens (apps/web, after `npm run build`) are served from the same

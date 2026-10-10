@@ -1,0 +1,57 @@
+2017 NAICS Code,2017 NAICS Title,GHG,Unit,Supply Chain Emission Factors without Margins,Margins of Supply Chain Emission Factors,Supply Chain Emission Factors with Margins,Reference USEEIO Code
+221100,"Electric Power Generation, Transmission and Distribution",All GHGs,"kg CO2e/2022 USD, purchaser price",2.5,0,2.5,DEMO
+221300,"Water, Sewage and Other Systems",All GHGs,"kg CO2e/2022 USD, purchaser price",0.5,0,0.5,DEMO
+236220,Commercial and Institutional Building Construction,All GHGs,"kg CO2e/2022 USD, purchaser price",0.3,0,0.3,DEMO
+237310,"Highway, Street, and Bridge Construction",All GHGs,"kg CO2e/2022 USD, purchaser price",0.45,0,0.45,DEMO
+315250,Cut and Sew Apparel Manufacturing (except Contractors),All GHGs,"kg CO2e/2022 USD, purchaser price",0.2,0.05,0.25,DEMO
+322121,Paper (except Newsprint) Mills,All GHGs,"kg CO2e/2022 USD, purchaser price",0.6,0.1,0.7,DEMO
+322230,Stationery Product Manufacturing,All GHGs,"kg CO2e/2022 USD, purchaser price",0.3,0.05,0.35,DEMO
+323111,Commercial Printing (except Screen and Books),All GHGs,"kg CO2e/2022 USD, purchaser price",0.25,0.03,0.28,DEMO
+324110,Petroleum Refineries,All GHGs,"kg CO2e/2022 USD, purchaser price",1.0,0.2,1.2,DEMO
+325180,Other Basic Inorganic Chemical Manufacturing,All GHGs,"kg CO2e/2022 USD, purchaser price",0.9,0.1,1.0,DEMO
+325411,Medicinal and Botanical Manufacturing,All GHGs,"kg CO2e/2022 USD, purchaser price",0.15,0.03,0.18,DEMO
+325510,Paint and Coating Manufacturing,All GHGs,"kg CO2e/2022 USD, purchaser price",0.4,0.05,0.45,DEMO
+326111,Plastics Bag and Pouch Manufacturing,All GHGs,"kg CO2e/2022 USD, purchaser price",0.5,0.05,0.55,DEMO
+326211,Tire Manufacturing (except Retreading),All GHGs,"kg CO2e/2022 USD, purchaser price",0.4,0.05,0.45,DEMO
+327310,Cement Manufacturing,All GHGs,"kg CO2e/2022 USD, purchaser price",3.0,0.3,3.3,DEMO
+327320,Ready-Mix Concrete Manufacturing,All GHGs,"kg CO2e/2022 USD, purchaser price",0.9,0.1,1.0,DEMO
+331110,Iron and Steel Mills and Ferroalloy Manufacturing,All GHGs,"kg CO2e/2022 USD, purchaser price",1.2,0.1,1.3,DEMO
+332510,Hardware Manufacturing,All GHGs,"kg CO2e/2022 USD, purchaser price",0.3,0.05,0.35,DEMO
+333120,Construction Machinery Manufacturing,All GHGs,"kg CO2e/2022 USD, purchaser price",0.35,0.05,0.4,DEMO
+333415,Air-Conditioning and Warm Air Heating Equipment and Commercial and Industrial Refrigeration Equipment Manufacturing,All GHGs,"kg CO2e/2022 USD, purchaser price",0.3,0.05,0.35,DEMO
+334111,Electronic Computer Manufacturing,All GHGs,"kg CO2e/2022 USD, purchaser price",0.1,0.05,0.15,DEMO
+334118,Computer Terminal and Other Computer Peripheral Equipment Manufacturing,All GHGs,"kg CO2e/2022 USD, purchaser price",0.15,0.05,0.2,DEMO
+336112,Light Truck and Utility Vehicle Manufacturing,All GHGs,"kg CO2e/2022 USD, purchaser price",0.3,0.05,0.35,DEMO
+336120,Heavy Duty Truck Manufacturing,All GHGs,"kg CO2e/2022 USD, purchaser price",0.35,0.05,0.4,DEMO
+337214,Office Furniture (except Wood) Manufacturing,All GHGs,"kg CO2e/2022 USD, purchaser price",0.3,0.05,0.35,DEMO
+339113,Surgical Appliance and Supplies Manufacturing,All GHGs,"kg CO2e/2022 USD, purchaser price",0.15,0.05,0.2,DEMO
+423430,Computer and Computer Peripheral Equipment and Software Merchant Wholesalers,All GHGs,"kg CO2e/2022 USD, purchaser price",0.08,0,0.08,DEMO
+481111,Scheduled Passenger Air Transportation,All GHGs,"kg CO2e/2022 USD, purchaser price",1.1,0,1.1,DEMO
+484110,"General Freight Trucking, Local",All GHGs,"kg CO2e/2022 USD, purchaser price",0.8,0,0.8,DEMO
+485310,Taxi Service,All GHGs,"kg CO2e/2022 USD, purchaser price",0.4,0,0.4,DEMO
+492110,Couriers and Express Delivery Services,All GHGs,"kg CO2e/2022 USD, purchaser price",0.5,0,0.5,DEMO
+493110,General Warehousing and Storage,All GHGs,"kg CO2e/2022 USD, purchaser price",0.2,0,0.2,DEMO
+511210,Software Publishers,All GHGs,"kg CO2e/2022 USD, purchaser price",0.06,0,0.06,DEMO
+517311,Wired Telecommunications Carriers,All GHGs,"kg CO2e/2022 USD, purchaser price",0.1,0,0.1,DEMO
+517312,Wireless Telecommunications Carriers (except Satellite),All GHGs,"kg CO2e/2022 USD, purchaser price",0.08,0,0.08,DEMO
+518210,"Data Processing, Hosting, and Related Services",All GHGs,"kg CO2e/2022 USD, purchaser price",0.1,0,0.1,DEMO
+524126,Direct Property and Casualty Insurance Carriers,All GHGs,"kg CO2e/2022 USD, purchaser price",0.05,0,0.05,DEMO
+531120,Lessors of Nonresidential Buildings (except Miniwarehouses),All GHGs,"kg CO2e/2022 USD, purchaser price",0.12,0,0.12,DEMO
+541110,Offices of Lawyers,All GHGs,"kg CO2e/2022 USD, purchaser price",0.04,0,0.04,DEMO
+541211,Offices of Certified Public Accountants,All GHGs,"kg CO2e/2022 USD, purchaser price",0.05,0,0.05,DEMO
+541330,Engineering Services,All GHGs,"kg CO2e/2022 USD, purchaser price",0.08,0,0.08,DEMO
+541511,Custom Computer Programming Services,All GHGs,"kg CO2e/2022 USD, purchaser price",0.05,0,0.05,DEMO
+541611,Administrative Management and General Management Consulting Services,All GHGs,"kg CO2e/2022 USD, purchaser price",0.06,0,0.06,DEMO
+541810,Advertising Agencies,All GHGs,"kg CO2e/2022 USD, purchaser price",0.07,0,0.07,DEMO
+561320,Temporary Help Services,All GHGs,"kg CO2e/2022 USD, purchaser price",0.05,0,0.05,DEMO
+561612,Security Guards and Patrol Services,All GHGs,"kg CO2e/2022 USD, purchaser price",0.06,0,0.06,DEMO
+561720,Janitorial Services,All GHGs,"kg CO2e/2022 USD, purchaser price",0.1,0,0.1,DEMO
+561730,Landscaping Services,All GHGs,"kg CO2e/2022 USD, purchaser price",0.2,0,0.2,DEMO
+562111,Solid Waste Collection,All GHGs,"kg CO2e/2022 USD, purchaser price",0.6,0,0.6,DEMO
+611430,Professional and Management Development Training,All GHGs,"kg CO2e/2022 USD, purchaser price",0.07,0,0.07,DEMO
+621111,Offices of Physicians (except Mental Health Specialists),All GHGs,"kg CO2e/2022 USD, purchaser price",0.06,0,0.06,DEMO
+721110,Hotels (except Casino Hotels) and Motels,All GHGs,"kg CO2e/2022 USD, purchaser price",0.15,0,0.15,DEMO
+722310,Food Service Contractors,All GHGs,"kg CO2e/2022 USD, purchaser price",0.25,0,0.25,DEMO
+722511,Full-Service Restaurants,All GHGs,"kg CO2e/2022 USD, purchaser price",0.2,0,0.2,DEMO
+811111,General Automotive Repair,All GHGs,"kg CO2e/2022 USD, purchaser price",0.12,0,0.12,DEMO
+811310,Commercial and Industrial Machinery and Equipment (except Automotive and Electronic) Repair and Maintenance,All GHGs,"kg CO2e/2022 USD, purchaser price",0.15,0,0.15,DEMO

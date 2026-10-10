@@ -377,7 +377,7 @@ export async function processRows(c: Tx, req: FastifyRequest, t: { id: string; g
     if (q.qty == null || q.qty < 0) errors.push(String(r.quantity ?? '').trim() ? `"${r.quantity}" is not a quantity` : 'Quantity missing');
     else read.quantity = q.qty;
     const unitText = (r.unit || q.unit || '').trim();
-    const currencyGiven = /^[A-Za-z]{3}$/.test(unitText) && !unitBy.has(unitText.toLowerCase());
+    const currencyGiven = /^[A-Za-z]{3}$/.test(unitText) && (!unitBy.has(unitText.toLowerCase()) || !!unitBy.get(unitText.toLowerCase())?.dimension.startsWith('money_'));
     const u = unitText && !currencyGiven ? unitBy.get(unitText.toLowerCase()) : undefined;
     if (unitText && !u && !currencyGiven) errors.push(`Unknown unit "${unitText}"`);
     // Method: given, else from the unit (km → distance, litres → fuel, kWh → electricity, AED → spend).

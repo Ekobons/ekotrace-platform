@@ -22,3 +22,9 @@
 | Consolidation approach | which facilities count, and how much: operational control, financial control, equity share |
 | OAuth 2.0 client credentials | standard way for one system to obtain a short-lived token to call another |
 | Row-level security | database rule that keeps each company's rows invisible to the others |
+| Spend-based method | Scope 3 estimate from money spent × kg CO₂e per unit of money for that kind of product (environmentally-extended input-output data) |
+| NAICS | North American Industry Classification System: the 6-digit codes of the EPA spend categories (e.g. 322121 paper mills) |
+| Purchaser price / margins | price paid including transport, wholesale and retail margins; the EPA factors "with margins" are per dollar of purchaser price |
+| CPI | consumer price index; brings money of one year to the prices of another |
+| Supplier-specific factor | a supplier's own emission factor for what it sells (EPD, product footprint, its inventory divided by its revenue) |
+| EPD | Environmental Product Declaration: a verified product footprint (ISO 14025) |

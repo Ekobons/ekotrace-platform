@@ -2,6 +2,20 @@
 
 Newest first.
 
+## 2026-10-10 (9) — Purchased goods & services (Scope 3.1), suppliers, currencies
+
+**Ways in:** upload any CSV / Excel layout (up to 200,000 lines, 60 MB; header row and columns guessed, layout remembered per header signature); ERP API `POST /api/v1/purchases` (OAuth client with the new `purchases` permission, ≤10,000 lines per call, batches by reference, then complete); Add data → Purchases (rows typed by hand, check then save).
+
+**Pipeline (background jobs, `job` table, worker in the API process, FOR UPDATE SKIP LOCKED):** read (streamed xlsx / CSV any delimiter, UTF-8 or Windows-1252; chunks of 2,000) → suppliers registered (normalised names, aliases) → duplicates of earlier uploads marked → lines grouped by normalised description (PO numbers, dates, pack sizes ignored) → mapping per group: remembered rules → NAICS code in the file → text matching (BM25 with procurement synonyms; description counts more than category / GL text; confidence) → optional approved AI service (OpenAI-compatible, off by default; only descriptions and candidate names sent; may only choose among candidates) → overlap flags (business travel, upstream transport, leased assets, fuel, energy, waste, capital-goods hint) → calculation per line (chunks of 5,000) → publish: entries per facility × month × Scope 3 category × spend category × method, linked to their lines; reopen.
+- 50,000 lines: read, mapped and calculated in ~19 s, published in ~5 s (test).
+
+**Calculation:** supplier factor per unit (kg, t, L, m³, kWh, piece) → supplier factor per currency → spend-based (EPA v1.3, kg CO₂e per 2022 USD, purchaser price). Money: amount ÷ currency per USD (company method: month average by default, annual average, or fixed budget rate; pegs AED/SAR/QAR/OMR/BHD) × CPI-U(2022) / CPI-U(purchase year). Fallbacks (missing month, missing CPI year) are warnings on the line. Every step shown per line.
+
+**New:** categories capital_goods (3.2), upstream_transport (3.4), business_travel (3.6), upstream_leased (3.8) (spend-based for now); money units; `fx_rate`, `price_index` (CPI-U 2019–2024), suppliers and supplier factors, purchase batches / groups / lines / rules / layouts. Screens: Capture → Purchases (batches, upload with column choice, review by description with bulk actions, lines with steps, facilities not recognised, publish / reopen), Value chain → Suppliers (factors, merge spellings), Setup → Currencies & price index, Library → EPA import and import of the previous Ekotrace list. Integrations: client permissions (meter readings / purchase lines) and ERP API documentation.
+- **Factors:** importer for the EPA CSV (`data/epa/`, or Library upload) and for the old Ekotrace tables (linked by NAICS; old names become search names). The demo uses `DEMO_placeholder_factors_USD2022.csv` (real NAICS codes, made-up values, marked DEMO; retired automatically when the EPA file is loaded).
+- Vehicles: a currency typed as the unit still means spend (now that currencies are units).
+- Manual: new chapter Purchases; data categories, entering data, security, integrations, glossary updated. Migration 011.
+
 ## 2026-10-10 (8) — Organisation: colour-coded hierarchy, org chart, clearer clicks
 
 - Hierarchy list restyled as in the prototype: main entity teal, sub-groups olive, facilities blue (row tint, left bar, type badges, legend); icons; counts of sub-groups and facilities.

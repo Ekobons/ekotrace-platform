@@ -41,12 +41,23 @@ Every table holding company data carries the company id, and PostgreSQL row-leve
 ! Files stay inside | bills are stored in the company's own, separated data and shown only to people allowed to see that facility
 ```
 
+## Safety checks for purchases
+
+```flow
+! Files checked | Excel or CSV only, 60 MB at most, read row by row without running anything from the file
+! Duplicates | the same file is refused unless uploaded on purpose; lines seen before are marked and not counted
+! Lines checked one by one | problems listed with the reason; good lines continue
+! Facility rights | lines are published only for facilities the person may enter data for
+! Published lines locked | changes need the batch reopened; approved entries are never removed
+! Remembered choices visible | every remembered mapping is listed with who made it, and can be removed
+```
+
 ## API security (systems sending readings)
 
 ```flow
 > Client registered | a super admin creates one API client per sending system; the secret is shown once, only its fingerprint is kept
 > Token | the system exchanges client id + secret for an access token valid 1 hour (OAuth 2.0 client credentials)
-! Every call checked | valid token, client not revoked, company active, permission for meter readings
+! Every call checked | valid token, client not revoked, company active, permission for what it sends (meter readings, purchase lines)
 ! Rate limit | 120 calls a minute per client; readings sent in batches (up to 100,000 per call)
 ! Validated | each reading checked against the schema; meters matched only within the client's own company
 > Logged | each batch recorded: client, readings received, stored, corrected, refused
@@ -65,7 +76,7 @@ Every table holding company data carries the company id, and PostgreSQL row-leve
 ## Decisions with security in mind
 
 - **No email intake** of bills for now (mailbox access, phishing and malicious attachments) — upload in one place instead.
-- **No AI service** receives company data unless the company approves the service and its location.
+- **No AI service** receives company data unless the company approves the service and its location. Purchase mapping works without AI (remembered choices and text matching on the server); if the company switches on an approved AI service, it receives only descriptions and category names — never amounts, supplier names or files — and may only choose among the categories the text matching found.
 - **Data residency:** where the data is hosted and backed up is agreed per deployment.
 
 ## Not yet available

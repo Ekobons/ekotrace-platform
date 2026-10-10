@@ -13,6 +13,7 @@ export function Integrations() {
   const { toast, role, tenant } = useApp();
   const [keys, setKeys] = useState<ApiKey[]>([]);
   const [name, setName] = useState('');
+  const [scopes, setScopes] = useState<string[]>(['meter_readings']);
   const [fresh, setFresh] = useState<(ApiKey & { key: string }) | null>(null);
   const [tz, setTz] = useState('');
   const [err, setErr] = useState<string | null>(null);
@@ -24,7 +25,7 @@ export function Integrations() {
   return (
     <div className="page">
       <div className="head"><div><div className="eyebrow">Setup</div><h1>Integrations & API</h1>
-        <p className="sub">Systems that send data to {tenant?.name ?? 'the company'}: building management, utility portals, IoT platforms, data loggers. Readings are matched to meters by the meter's id.</p></div></div>
+        <p className="sub">Systems that send data to {tenant?.name ?? 'the company'}: building management, utility portals, IoT platforms and data loggers (meter readings, matched by the meter's id); ERP and finance systems (purchase lines, reviewed under Capture → Purchases).</p></div></div>
       {err && <div className="note bad">{err}</div>}
 
       {admin && (
@@ -33,7 +34,9 @@ export function Integrations() {
           <p className="sub">Each sending system gets its own client id and secret. The secret is shown once; only a fingerprint of it is kept. Revoke a client to stop it at once.</p>
           <div className="row" style={{ gap: 8 }}>
             <input className="input grow" value={name} maxLength={80} placeholder="Name of the system, e.g. BMS Al Saja'a, DEWA portal export" onChange={(e) => setName(e.target.value)} />
-            <button className="btn p" disabled={name.trim().length < 2} onClick={async () => { try { setFresh(await api.addApiKey(name.trim())); setName(''); load(); } catch (e) { setErr((e as Error).message); } }}><Icon name="plus" />New client</button>
+            {[['meter_readings', 'Meter readings'], ['purchases', 'Purchase lines']].map(([k, l]) => (
+              <label key={k} className="row" style={{ gap: 4, fontSize: 13 }}><input type="checkbox" checked={scopes.includes(k!)} onChange={(e) => setScopes((s) => (e.target.checked ? [...s, k!] : s.filter((x) => x !== k)))} />{l}</label>))}
+            <button className="btn p" disabled={name.trim().length < 2 || !scopes.length} onClick={async () => { try { setFresh(await api.addApiKey(name.trim(), scopes)); setName(''); load(); } catch (e) { setErr((e as Error).message); } }}><Icon name="plus" />New client</button>
           </div>
           {fresh && (
             <div className="note warn" style={{ display: 'grid', gap: 6 }}>
@@ -45,11 +48,11 @@ export function Integrations() {
           )}
           {keys.length ? (
             <table className="t">
-              <thead><tr><th>Client</th><th>Client id</th><th>Secret starts</th><th>Created</th><th>Last used</th><th /></tr></thead>
+              <thead><tr><th>Client</th><th>May send</th><th>Client id</th><th>Secret starts</th><th>Created</th><th>Last used</th><th /></tr></thead>
               <tbody>{keys.map((k) => (
                 <tr key={k.id} className={k.revoked_at ? 'off' : ''}>
                   <td><b>{k.name}</b>{k.revoked_at && <span className="chip grey" style={{ marginLeft: 6 }}>revoked</span>}</td>
-                  <td className="mono small">{k.id}</td><td className="mono">{k.prefix}…</td>
+                  <td className="small">{k.scopes.map((x) => (x === 'purchases' ? 'purchases' : 'meter readings')).join(', ')}</td><td className="mono small">{k.id}</td><td className="mono">{k.prefix}…</td>
                   <td>{k.created_at.slice(0, 10)}</td><td>{k.last_used_at ? new Date(k.last_used_at).toLocaleString('en-GB') : 'never'}</td>
                   <td>{!k.revoked_at && <button className="btn ghost sm danger" onClick={async () => { await api.revokeApiKey(k.id); toast(`${k.name} revoked`); load(); }}>Revoke</button>}</td>
                 </tr>))}</tbody>
@@ -82,6 +85,30 @@ Content-Type: application/json
           <li><b>value</b>: register reading (index) or consumption for the period, as the meter is set up, in the meter's unit before its multiplier.</li>
           <li>The same meter and time sent again replaces the earlier value (a correction, recorded in the audit log). Approved entries are never changed by new readings: the difference is reported instead.</li>
           <li>Hourly, daily, weekly, monthly and irregular readings all work: periods across a month end are split by time; a month's coverage is shown and a partly covered month can be scaled up (marked estimated).</li>
+        </ul>
+      </div>
+
+      <div className="card" style={{ display: 'grid', gap: 10 }}>
+        <h2>Sending purchase lines (ERP)</h2>
+        <p className="sub">For SAP, Oracle, Dynamics or any finance system: send the lines of a period under one reference, in as many calls as needed (up to 10,000 lines each), then mark the batch complete. It is then mapped and calculated, and reviewed and published under Capture → Purchases like an upload. The client needs the “Purchase lines” permission.</p>
+        <pre className="code">{`POST ${origin}/api/v1/purchases
+Authorization: Bearer <access token>
+Content-Type: application/json
+
+{ "reference": "SAP-2026-03", "currency": "AED", "facility": "BEEAH Headquarters", "complete": false,
+  "lines": [
+    { "date": "2026-03-10", "description": "Copier paper A4 80gsm", "amount": 4250, "supplier": "Gulf Stationery LLC",
+      "category": "Office supplies", "glAccount": "Office expenses", "poNumber": "4500123", "quantity": 50, "unit": "box" },
+    { "date": "2026-03-12", "description": "Ready mix concrete C40", "amount": 182000, "facility": "Al Saja'a Recycling Complex",
+      "supplierEf": 210, "supplierEfUnit": "m3", "quantity": 400, "unit": "m3", "capital": true }
+] }
+
+POST ${origin}/api/v1/purchases/SAP-2026-03/complete     (or "complete": true on the last call)
+GET  ${origin}/api/v1/purchases/SAP-2026-03              status and counts`}</pre>
+        <ul className="sub" style={{ margin: 0, paddingLeft: 18 }}>
+          <li><b>description</b> and <b>amount</b> (or a quantity with a supplier factor) are required; <b>date</b> as yyyy-mm-dd; <b>facility</b> by name, per line or for the whole call.</li>
+          <li>Each line is checked on its own: lines with problems are listed in the answer (index and reason) and kept for review; the others continue.</li>
+          <li>A completed reference is closed: send corrections under a new reference. The same line sent twice (same date, amount, supplier, description, PO) is marked as a duplicate.</li>
         </ul>
       </div>
 
