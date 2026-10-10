@@ -31,3 +31,8 @@
 | Vendor number | the number the ERP gives a supplier; the surest way to link purchase lines to a supplier |
 | Possible duplicate | a new supplier name that may be an existing supplier; a person merges it or keeps it apart |
 | Supplier concentration | how many suppliers make up 50 % or 80 % of purchased emissions |
+| Ready to publish | A bill a person has checked, waiting in the preview with its months, estimated emissions and anything that stops it |
+| Reading batch | Meter readings sent through the API in one request, waiting for review: new, corrections, duplicates (skipped), conflicts (skipped) |
+| Published lines | The purchase lines behind published purchase entries, kept line by line and downloadable |
+| What moved | On each dashboard tab: the three sources that changed most against the comparison year, calculated from the entries |
+

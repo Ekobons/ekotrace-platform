@@ -294,7 +294,7 @@ export function PurchaseBatchPage() {
       <div className="stats">
         <div className={`stat ${count('check') ? 'warnb' : ''}`}><div className="lbl">To confirm</div><div className="v">{count('check').toLocaleString('en')}</div><div className="muted small">lines in {G.check} large groups · {tco2e(co2('check'))} tCO₂e</div></div>
         <div className="stat"><div className="lbl">Ready to publish</div><div className="v">{count('ready').toLocaleString('en')}</div><div className="muted small">{tco2e(co2('ready'))} tCO₂e</div></div>
-        <div className="stat s3"><div className="lbl">Published</div><div className="v">{count('published').toLocaleString('en')}</div><div className="muted small">{tco2e(co2('published'))} tCO₂e</div></div>
+        <div className="stat s3"><div className="lbl">Published</div><div className="v">{count('published').toLocaleString('en')}</div><div className="muted small">{tco2e(co2('published'))} tCO₂e{count('published') > 0 && <> · <Link to={`/purchases/published?batch=${id}`}>open lines</Link></>}</div></div>
         <div className={`stat ${attention ? 'warnb' : ''}`}><div className="lbl">Problems</div><div className="v">{attention.toLocaleString('en')}</div>
           <div className="muted small">{count('problem')} to fix{count('unmapped') ? ` · ${count('unmapped')} no category` : ''}{count('flagged') ? ` · ${count('flagged')} other category?` : ''}</div></div>
         <div className="stat"><div className="lbl">Excluded</div><div className="v">{count('excluded').toLocaleString('en')}</div><div className="muted small">already counted elsewhere, or not a purchase</div></div>

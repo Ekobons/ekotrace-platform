@@ -16,6 +16,7 @@
 import { createHash } from 'node:crypto';
 import type { Tx } from '../db/pool.js';
 import { csvObjects } from '../lib/csv.js';
+import { capitalOf } from './capitalList.js';
 
 export interface EpaRow { naics: string; title: string; withMargins: number; withoutMargins: number | null; margins: number | null; useeio: string | null }
 export interface EpaParsed { version: string; priceYear: number; rows: EpaRow[]; sha256: string; skipped: number; gasRowsIgnored: number }
@@ -201,8 +202,8 @@ export async function importOldProducts(c: Tx, products: OldProduct[], opts: { c
     if (n !== p.naics && !naicsMapped.some((m) => m.from === p.naics)) naicsMapped.push({ from: p.naics, to: n });
     const e = epa.get(n)!;
     const code = `old:${slugOf(p.type || 'x')}:${n}:${slugOf(p.product)}`;
-    const capital = /capital/i.test(p.type);
-    const attrs = { naics: n, group: [p.category, p.subcategory].filter(Boolean).join(' › '), oldType: p.type, capital, otherCategory: p.otherCategory, source: 'previous Ekotrace list' };
+    const { capital, note } = capitalOf(p.type, n, p.product);
+    const attrs = { naics: n, group: [p.category, p.subcategory].filter(Boolean).join(' › '), oldType: p.type, capital, ...(note ? { capitalNote: note } : {}), otherCategory: p.otherCategory, source: 'previous Ekotrace list' };
     const r = (await c.query(
       `INSERT INTO item (subcategory_id, code, name, default_unit, attrs, sort) VALUES ($1, $2, $3, 'USD', $4, 200)
        ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name, attrs = EXCLUDED.attrs, active = true RETURNING id, (xmax = 0) AS inserted`,

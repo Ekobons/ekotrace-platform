@@ -10,7 +10,7 @@ import { api, blobUrl, num, tco2e, unitLabel, type Bill, type Facility, type Met
 import { MeterForm, type MeterDraft } from '../components/MeterForm';
 import { Icon } from '../components/Icon';
 
-const STATUS: Record<string, string> = { to_check: 'To check', confirmed: 'Booked', rejected: 'Rejected' };
+const STATUS: Record<string, string> = { to_check: 'To check', checked: 'Ready to publish', confirmed: 'Published', rejected: 'Rejected' };
 const UNITS: [string, string][] = [['kWh_e', 'kWh (electricity)'], ['MWh_e', 'MWh (electricity)'], ['TRh', 'TRh (cooling)'], ['kWh_c', 'kWh (cooling)'], ['kWh_th', 'kWh (heat)'], ['m3', 'm³'], ['kWh', 'kWh (gas, net CV)'], ['kg', 'kg'], ['L', 'litres']];
 const ITEM_FOR: Record<string, string> = { electricity: 'grid:electricity', cooling: 'cooling:district', heat: 'heat:district', gas: 'desnz:natural-gas' };
 
@@ -84,7 +84,7 @@ export function Bills() {
   );
 }
 
-function BillReview({ id, onChanged, onClose }: { id: string; onChanged: () => void; onClose: () => void }) {
+export function BillReview({ id, onChanged, onClose, category }: { id: string; onChanged: () => void; onClose: () => void; category?: string }) {
   const { toast, role } = useApp();
   const [b, setB] = useState<Awaited<ReturnType<typeof api.bill>> | null>(null);
   const [pdf, setPdf] = useState<string | null>(null);
@@ -103,13 +103,13 @@ function BillReview({ id, onChanged, onClose }: { id: string; onChanged: () => v
   };
   useEffect(() => {
     load().catch((e) => setErr(e.message));
-    api.meters().then((r) => setMeters(r.meters.filter((m) => m.reading_type === 'interval' && m.active)));
+    api.meters().then((r) => setMeters(r.meters.filter((m) => m.reading_type === 'interval' && m.active && (!category || m.category === category || (category === 'waste' && m.category.startsWith('waste_'))))));
     api.facilities().then((r) => setFacilities(r.facilities.filter((x) => x.canEnter)));
   }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { let url: string | null = null; if (b?.document_id) blobUrl(`/api/documents/${b.document_id}`).then((u) => { url = u; setPdf(u); }).catch(() => setPdf(null)); return () => { if (url) URL.revokeObjectURL(url); }; }, [b?.document_id]);
 
   if (!b) return <div className="card empty">{err ?? 'Loading…'}</div>;
-  const locked = b.status !== 'to_check';
+  const locked = b.status === 'confirmed' || b.status === 'rejected';
   const body = () => ({ meterId: f.meterId || null, supplier: f.supplier || null, accountNo: f.accountNo || null, billNo: f.billNo || null, periodFrom: f.periodFrom || null, periodTo: f.periodTo || null,
     issueDate: f.issueDate || null, quantity: f.quantity === '' ? null : Number(f.quantity), unit: f.unit || null, amount: f.amount === '' ? null : Number(f.amount), currency: f.currency || null, note: f.note || null });
   const act = async (fn: () => Promise<unknown>, ok: string) => { setErr(null); try { await fn(); toast(ok); await load(); onChanged(); } catch (e) { setErr((e as Error).message); } };
@@ -130,7 +130,8 @@ function BillReview({ id, onChanged, onClose }: { id: string; onChanged: () => v
         {b.found.problem && <div className="note bad">{b.found.problem}</div>}
         {b.scanned && <div className="note warn">This PDF is a scan (an image, no text): type the figures from the preview.</div>}
         {!b.scanned && (b.found.missing?.length ?? 0) > 0 && !locked && <div className="note warn">Not found on the bill: {b.found.missing!.join(', ')}. Please fill in from the preview.</div>}
-        {b.status === 'confirmed' && <div className="note ok">Booked by {b.checked_by_name ?? 'a user'} on {b.checked_at?.slice(0, 10)}.</div>}
+        {b.status === 'checked' && <div className="note info">Checked by {b.checked_by_name ?? 'a user'}: waiting in “Ready to publish”. A change sends it back to check.</div>}
+        {b.status === 'confirmed' && <div className="note ok">Published by {b.checked_by_name ?? 'a user'} on {b.checked_at?.slice(0, 10)}.</div>}
         {b.status === 'rejected' && <div className="note info">Rejected: {b.note}</div>}
 
         <div className="row" style={{ gap: 8, flexWrap: 'wrap', alignItems: 'flex-start' }}>
@@ -176,18 +177,15 @@ function BillReview({ id, onChanged, onClose }: { id: string; onChanged: () => v
         <div className="row" style={{ gap: 8, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
           <button className="btn ghost sm" onClick={() => setShowText(!showText)}>{showText ? 'Hide' : 'Show'} text read</button>
           <div className="grow" />
-          {b.status === 'to_check' && <>
+          {(b.status === 'to_check' || b.status === 'checked') && <>
             {rejecting === null ? <button className="btn ghost danger" onClick={() => setRejecting('')}>Reject</button> : <>
               <input className="input" style={{ width: 240 }} autoFocus value={rejecting} placeholder="Why? e.g. duplicate, not ours, water only" onChange={(e) => setRejecting(e.target.value)} />
               <button className="btn danger" disabled={rejecting.trim().length < 2} onClick={() => act(() => api.rejectBill(id, rejecting.trim()), 'Bill rejected')}>Reject</button>
               <button className="btn ghost" onClick={() => setRejecting(null)}>Cancel</button></>}
             <button className="btn" onClick={() => act(() => api.patchBill(id, body()), 'Saved')}>Save</button>
-            <button className="btn p" disabled={!f.meterId || !f.periodFrom || !f.periodTo || f.quantity === ''} onClick={() => act(async () => {
-              const r = await api.confirmBill(id, body());
-              toast(`Booked · entries: ${r.sync.created} created, ${r.sync.updated} updated${r.sync.locked.length ? `, ${r.sync.locked.length} approved month(s) not changed` : ''}`);
-            }, 'Bill booked')}><Icon name="check" />Checked — book it</button>
+            <button className="btn p" disabled={!f.meterId || !f.periodFrom || !f.periodTo || f.quantity === ''} onClick={() => act(() => api.checkBill(id, body()), 'Checked: the bill is in the preview, ready to publish')}><Icon name="check" />Checked — add to preview</button>
           </>}
-          {b.status !== 'to_check' && ['platform_admin', 'super_admin', 'admin', 'manager'].includes(role) && <button className="btn" onClick={() => act(() => api.reopenBill(id), 'Bill reopened')}>Reopen</button>}
+          {(b.status === 'confirmed' || b.status === 'rejected') && ['platform_admin', 'super_admin', 'admin', 'manager'].includes(role) && <button className="btn" onClick={() => act(() => api.reopenBill(id), 'Bill reopened')}>Reopen</button>}
         </div>
         {showText && <pre className="code" style={{ maxHeight: 300, overflow: 'auto', whiteSpace: 'pre-wrap' }}>{b.text || '(no text)'}</pre>}
       </div>

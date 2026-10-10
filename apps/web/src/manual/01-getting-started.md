@@ -48,7 +48,7 @@ The hierarchy can be seen as a **List** or an **Org chart** (switch at the top r
 - **Click a facility** (anywhere on its row, or its card in the chart) to open it.
 - **Click a sub-group or the main entity** to fold or unfold it; **Details** opens its profile.
 - Search finds entities, facilities and locations; the type filter narrows to one kind of facility. In the chart, − / + zooms.
-- A facility's name on other pages (for example a meter in Capture → Meters) links straight to it.
+- A facility's name on other pages (for example a meter in a bill or a dashboard row) links straight to it.
 
 Everything that **describes** a facility — set up once, changed rarely — is on the facility itself, in tabs (Organisation → click the facility):
 

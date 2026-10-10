@@ -33,7 +33,7 @@ export function Meters() {
 }
 
 /**
- * The meter list with its add form and the open meter's panel. Used on Capture → Meters
+ * The meter list with its add form and the open meter's panel. Used on the Meters page
  * (all facilities) and on the facility page (one facility, `embedded`).
  */
 export function MeterRegister({ facilityId, facilities, embedded, canEditFacility = true, onCount }: { facilityId?: string; facilities: Facility[]; embedded?: boolean; canEditFacility?: boolean; onCount?: (n: number) => void }) {
@@ -52,7 +52,7 @@ export function MeterRegister({ facilityId, facilities, embedded, canEditFacilit
   return (
     <div style={{ display: 'grid', gap: 12, minWidth: 0 }}>
       {canManage && adding === false && <div className="row" style={{ justifyContent: embedded ? 'space-between' : 'flex-end' }}>
-        {embedded && <span className="sub">Readings arrive through the API, from bills or pasted in the meter. To follow all meters at once: Capture → Meters.</span>}
+        {embedded && <span className="sub">Readings arrive through the API, from bills or pasted in the meter.</span>}
         <button className="btn p sm" onClick={() => setAdding(null)}><Icon name="plus" />Add meter</button></div>}
       {adding !== false && <MeterForm draft={adding} facilities={formFacilities} onDone={(m) => { setAdding(false); load(); if (m) setOpen(m.id); }} />}
       <div className={embedded ? 'scrollx' : 'card flush'}>

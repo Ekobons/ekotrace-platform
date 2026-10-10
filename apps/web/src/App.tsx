@@ -14,6 +14,7 @@ import { People } from './pages/People';
 import { Methodology } from './pages/Methodology';
 import { EnergyRegister } from './pages/EnergyRegister';
 import { PurchaseBatchPage, Purchases } from './pages/Purchases';
+import { PublishedPurchasesPage } from './pages/PublishedPurchases';
 import { Suppliers } from './pages/Suppliers';
 import { Dashboards } from './pages/Dashboards';
 import { Currencies } from './pages/Currencies';
@@ -43,8 +44,6 @@ const NAV: { group?: string; items: NavItem[] }[] = [
   { group: 'Capture', items: [
     { to: '/data/stationary_combustion', label: 'Add data', icon: 'plus', roles: ['super_admin', 'admin', 'manager', 'preparer'] },
     { to: '/entries', label: 'Entries & results', icon: 'list' },
-    { to: '/meters', label: 'Meters', icon: 'gauge', roles: ['super_admin', 'admin', 'manager', 'preparer', 'verifier'] },
-    { to: '/bills', label: 'Bills', icon: 'doc', roles: ['super_admin', 'admin', 'manager', 'preparer', 'verifier'] },
     { label: 'Approvals', icon: 'check', stage: 2 }, { label: 'Data progress', icon: 'grid', stage: 2 }, { label: 'Collection calendar', icon: 'calendar', stage: 2 },
     { label: 'Inbox & to-dos', icon: 'inbox', stage: 2 }, { label: 'Document vault', icon: 'folder', stage: 2 }, { label: 'Batch runs', icon: 'upload', stage: 4 },
     { label: 'QR & field app', icon: 'qr', stage: 4 },
@@ -162,6 +161,7 @@ function Shell() {
           <Route path="/meters" element={<NeedCo><Meters /></NeedCo>} />
           <Route path="/bills" element={<NeedCo><Bills /></NeedCo>} />
           <Route path="/purchases" element={<NeedCo><Purchases /></NeedCo>} />
+          <Route path="/purchases/published" element={<NeedCo><PublishedPurchasesPage /></NeedCo>} />
           <Route path="/purchases/:id" element={<NeedCo><PurchaseBatchPage /></NeedCo>} />
           <Route path="/suppliers" element={<NeedCo><Suppliers /></NeedCo>} />
           <Route path="/currency" element={<NeedCo><Currencies /></NeedCo>} />

@@ -78,7 +78,7 @@ Content-Type: application/json
   { "meterId": "BMS-GAS-01", "timestamp": "2026-03-01T01:00:00+04:00", "value": 10.4 },
   { "meterId": "DEWA-2001458876", "timestamp": "2026-04-01T00:00:00+04:00", "value": 45500, "start": "2026-03-01T00:00:00+04:00" }
 ] }`}</pre></li>
-          <li>The answer lists what was stored, corrected or refused (with the reason), and the monthly entries created or updated. List the meters and their ids with <span className="mono">GET /api/v1/meters</span>.</li>
+          <li>The answer gives the batch id and what it holds — new readings, corrections, duplicates (skipped), conflicts with booked bills (skipped), refused (with the reason). The batch waits for review under Add data → the category → Meter readings and counts once published (a super admin can switch review off). List the meters and their ids with <span className="mono">GET /api/v1/meters</span>.</li>
         </ol>
         <ul className="sub" style={{ margin: 0, paddingLeft: 18 }}>
           <li><b>timestamp</b>: time of the reading — for consumption per period, the end of the period. With a zone (Z or +04:00); without one it is read in the company time zone.</li>

@@ -175,6 +175,9 @@ async function lines(c: Tx, activityId: string, tenantId: string, ls: { basis: s
 export function parseTs(s: string, tz: string): number | null {
   const x = s.trim().replace(' ', 'T');
   if (!/^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}(:\d{2}(\.\d+)?)?)?(Z|[+-]\d{2}:?\d{2})?$/.test(x)) return null;
+  // a date that does not exist (31 September) is refused, not rolled over to the next month
+  const [y, mo, d] = x.slice(0, 10).split('-').map(Number);
+  if (new Date(Date.UTC(y!, mo! - 1, d!)).getUTCDate() !== d) return null;
   if (/(Z|[+-]\d{2}:?\d{2})$/.test(x)) { const t = Date.parse(x); return Number.isFinite(t) ? t : null; }
   const asUtc = Date.parse(`${x.length === 10 ? `${x}T00:00` : x}Z`);
   if (!Number.isFinite(asUtc)) return null;
@@ -240,6 +243,58 @@ export async function storeReadings(c: Tx, tenantId: string, m: MeterRow, rows: 
     months.add(mon(hi));
   }
   return { inserted, updated, unchanged: list.length - inserted - updated, rejected, months };
+}
+
+/**
+ * Readings received through the API, kept for review: each compared with what the meter
+ * already has — new, a correction (different value at the same time), the same again
+ * (duplicate, skipped), or inside a period a booked bill already covers (conflict, skipped).
+ */
+export async function stageReadings(c: Tx, tenantId: string, batchId: string, m: MeterRow, rows: z.infer<typeof readingSchema>[], tz: string) {
+  const rejected: { index: number; reason: string }[] = [];
+  const ok = new Map<number, { t: number; f: number | null; v: number }>();
+  rows.forEach((r, index) => {
+    const t = parseTs(r.timestamp, tz), f = r.start ? parseTs(r.start, tz) : null;
+    if (t === null) return rejected.push({ index, reason: `timestamp "${r.timestamp}" not understood (use ISO 8601, e.g. 2026-03-01T00:00:00+04:00)` });
+    if (r.start && f === null) return rejected.push({ index, reason: `start "${r.start}" not understood` });
+    if (f !== null && f >= t) return rejected.push({ index, reason: 'start must be before the timestamp' });
+    if (t > Date.now() + 36 * 3_600_000) return rejected.push({ index, reason: 'timestamp is in the future' });
+    if (m.reading_type === 'interval' && r.value < 0) return rejected.push({ index, reason: 'negative consumption' });
+    ok.set(t, { t, f, v: r.value });
+  });
+  const list = [...ok.values()];
+  if (list.length) await c.query(
+    `INSERT INTO reading_staged (batch_id, tenant_id, meter_id, ts, from_ts, value, state, old_value, note)
+     SELECT $1, $2, $3, x.ts, x.fr, x.v,
+            CASE WHEN b.id IS NOT NULL THEN 'conflict' WHEN o.ts IS NOT NULL AND (r.ts IS NULL OR r.value <> x.v) THEN 'same' WHEN r.ts IS NULL THEN 'new'
+                 WHEN r.value = x.v AND r.from_ts IS NOT DISTINCT FROM x.fr THEN 'same' ELSE 'changed' END,
+            r.value, CASE WHEN b.id IS NOT NULL THEN 'a booked bill covers ' || b.period_from || ' – ' || b.period_to WHEN o.ts IS NOT NULL AND (r.ts IS NULL OR r.value <> x.v) THEN 'also in an earlier batch waiting for review' END
+       FROM (SELECT to_timestamp(t / 1000.0) AS ts, CASE WHEN f IS NULL THEN NULL ELSE to_timestamp(f / 1000.0) END AS fr, v
+               FROM unnest($4::float8[], $5::float8[], $6::numeric[]) AS u(t, f, v)) x
+       LEFT JOIN meter_reading r ON r.meter_id = $3 AND r.ts = x.ts
+       LEFT JOIN LATERAL (SELECT o.ts FROM reading_staged o JOIN reading_batch ob ON ob.id = o.batch_id
+                           WHERE o.meter_id = $3 AND o.ts = x.ts AND o.batch_id <> $1 AND ob.status = 'review' AND o.value = x.v LIMIT 1) o ON true
+       LEFT JOIN LATERAL (SELECT bl.id, bl.period_from, bl.period_to FROM bill bl JOIN meter_reading br ON br.meter_id = bl.meter_id AND br.ts = bl.reading_ts
+                           WHERE bl.meter_id = $3 AND bl.status = 'confirmed' AND x.ts > coalesce(br.from_ts, br.ts) AND coalesce(x.fr, x.ts) < br.ts AND (r.source IS NULL OR r.source <> 'bill') LIMIT 1) b ON true
+     ON CONFLICT (batch_id, meter_id, ts) DO UPDATE SET value = EXCLUDED.value, from_ts = EXCLUDED.from_ts, state = EXCLUDED.state, old_value = EXCLUDED.old_value, note = EXCLUDED.note`,
+    [batchId, tenantId, m.id, list.map((x) => x.t), list.map((x) => x.f), list.map((x) => x.v)]);
+  return { staged: list.length, rejected };
+}
+
+/** Publish a reviewed batch: new readings and corrections are stored, duplicates and conflicts skipped; entries follow. */
+export async function publishReadings(c: Tx, t: { id: string; gwp_set: string; timezone: string }, batchId: string, actor: Actor) {
+  const rows = (await c.query(`SELECT meter_id, ts, from_ts, value FROM reading_staged WHERE batch_id = $1 AND state IN ('new','changed') ORDER BY meter_id, ts`, [batchId])).rows;
+  const per = new Map<string, z.infer<typeof readingSchema>[]>();
+  for (const r of rows) { const a = per.get(r.meter_id) ?? []; a.push({ timestamp: new Date(r.ts).toISOString(), value: Number(r.value), ...(r.from_ts ? { start: new Date(r.from_ts).toISOString() } : {}) }); per.set(r.meter_id, a); }
+  let inserted = 0, updated = 0, created = 0, changed = 0;
+  const locked: string[] = [];
+  for (const [mid, list] of per) {
+    const m = (await c.query('SELECT * FROM meter WHERE id = $1', [mid])).rows[0] as MeterRow;
+    const s = await storeReadings(c, t.id, m, list, 'api', t.timezone);
+    inserted += s.inserted; updated += s.updated;
+    if (m.auto_entries && (s.inserted || s.updated)) { const y = await syncMeter(c, t, m, actor, s.months); created += y.created; changed += y.updated; locked.push(...y.locked); }
+  }
+  return { inserted, updated, entries: { created, updated: changed, locked } };
 }
 
 // ------------------------------------------------------------------------ routes --
@@ -438,6 +493,93 @@ export async function meterRoutes(app: FastifyInstance) {
     });
   });
 
+  // ------------------------------------------------- readings received, for review --
+  const batchSummary = async (c: Tx, id: string) => (await c.query(
+    `SELECT m.id AS meter_id, m.name AS meter, f.name AS facility, f.id AS facility_id, m.unit, m.reading_type, c.code AS category,
+            count(*) FILTER (WHERE s.state = 'new')::int AS new, count(*) FILTER (WHERE s.state = 'changed')::int AS changed,
+            count(*) FILTER (WHERE s.state = 'same')::int AS same, count(*) FILTER (WHERE s.state = 'conflict')::int AS conflict,
+            min(coalesce(s.from_ts, s.ts)) AS first, max(s.ts) AS last,
+            sum(s.value) FILTER (WHERE s.state IN ('new','changed') AND m.reading_type = 'interval')::float8 AS total,
+            (SELECT json_agg(x ORDER BY x.month) FROM (SELECT to_char((s2.ts - interval '1 second') AT TIME ZONE (SELECT timezone FROM tenant WHERE id = s2.tenant_id), 'YYYY-MM') AS month, sum(s2.value)::float8 AS qty, count(*)::int AS n
+                                                     FROM reading_staged s2 WHERE s2.batch_id = s.batch_id AND s2.meter_id = s.meter_id AND s2.state IN ('new','changed') GROUP BY 1) x) AS months,
+            (SELECT json_agg(json_build_object('ts', s3.ts, 'value', s3.value, 'old', s3.old_value, 'state', s3.state, 'note', s3.note) ORDER BY s3.ts)
+               FROM (SELECT * FROM reading_staged s3 WHERE s3.batch_id = s.batch_id AND s3.meter_id = s.meter_id AND s3.state IN ('changed','conflict') ORDER BY s3.ts LIMIT 20) s3) AS samples
+       FROM reading_staged s JOIN meter m ON m.id = s.meter_id JOIN org_node f ON f.id = m.facility_id JOIN item i ON i.id = m.item_id
+       JOIN subcategory sc ON sc.id = i.subcategory_id JOIN category c ON c.id = sc.category_id
+      WHERE s.batch_id = $1 GROUP BY s.batch_id, s.meter_id, m.id, f.id, c.code ORDER BY f.name, m.name`, [id])).rows;
+
+  app.get('/api/reading-batches', async (req) => {
+    const tenant = requireTenant(req);
+    const q = z.object({ status: z.enum(['review', 'published', 'discarded']).optional(), category: z.string().max(40).optional() }).parse(req.query);
+    return tenantTx(tenant, async (c) => {
+      const see = (await scopeOf(c, req.user)).see;
+      const batches = (await c.query(
+        `SELECT b.id, b.source, b.client, b.status, b.received, jsonb_array_length(b.rejected)::int AS rejected, b.result, b.created_at, b.decided_at, b.decided_by,
+                (SELECT count(*)::int FROM reading_staged s WHERE s.batch_id = b.id) AS readings,
+                (SELECT array_agg(DISTINCT c.code) FROM reading_staged s JOIN meter m ON m.id = s.meter_id JOIN item i ON i.id = m.item_id JOIN subcategory sc ON sc.id = i.subcategory_id JOIN category c ON c.id = sc.category_id WHERE s.batch_id = b.id) AS categories,
+                (SELECT array_agg(DISTINCT m.facility_id) FROM reading_staged s JOIN meter m ON m.id = s.meter_id WHERE s.batch_id = b.id) AS facilities
+           FROM reading_batch b WHERE ($1::text IS NULL OR b.status = $1) ORDER BY b.created_at DESC LIMIT 200`, [q.status ?? null])).rows;
+      const review = (await c.query(`SELECT review_readings FROM tenant WHERE id = $1`, [tenant])).rows[0].review_readings;
+      return {
+        review,
+        batches: batches.filter((b) => (b.facilities ?? []).some((f: string) => see.has(f)) && (!q.category || (b.categories ?? []).some((x: string) => x === q.category || (q.category === 'waste' && x.startsWith('waste_'))))),
+      };
+    });
+  });
+
+  app.get('/api/reading-batches/:id', async (req) => {
+    const tenant = requireTenant(req);
+    const id = z.string().uuid().parse((req.params as { id: string }).id);
+    return tenantTx(tenant, async (c) => {
+      const b = (await c.query('SELECT * FROM reading_batch WHERE id = $1', [id])).rows[0];
+      if (!b) throw notFound('Batch');
+      const see = (await scopeOf(c, req.user)).see;
+      return { ...b, meters: (await batchSummary(c, id)).filter((m) => see.has(m.facility_id)) };
+    });
+  });
+
+  app.post('/api/reading-batches/:id/publish', async (req) => {
+    const tenant = requireTenant(req);
+    requireRole(req, 'super_admin', 'admin', 'manager');
+    const id = z.string().uuid().parse((req.params as { id: string }).id);
+    const t = await tenantSettings(tenant);
+    return tenantTx(tenant, async (c) => {
+      const b = (await c.query('SELECT * FROM reading_batch WHERE id = $1 FOR UPDATE', [id])).rows[0];
+      if (!b) throw notFound('Batch');
+      if (b.status !== 'review') throw new AppError('This batch is already ' + b.status);
+      const scope = await scopeOf(c, req.user);
+      for (const m of await batchSummary(c, id)) assertCan(scope.enter, m.facility_id, 'publish readings of this facility');
+      const r = await publishReadings(c, t, id, { id: req.user.id, name: req.user.name, req });
+      await c.query(`UPDATE reading_batch SET status = 'published', result = $2, decided_at = now(), decided_by = $3 WHERE id = $1`, [id, JSON.stringify(r), req.user.name]);
+      await audit(c, req, 'meter.readings_publish', 'reading_batch', id, r);
+      return r;
+    });
+  });
+
+  app.post('/api/reading-batches/:id/discard', async (req) => {
+    const tenant = requireTenant(req);
+    requireRole(req, 'super_admin', 'admin', 'manager');
+    const id = z.string().uuid().parse((req.params as { id: string }).id);
+    return tenantTx(tenant, async (c) => {
+      const r = await c.query(`UPDATE reading_batch SET status = 'discarded', decided_at = now(), decided_by = $2 WHERE id = $1 AND status = 'review' RETURNING id`, [id, req.user.name]);
+      if (!r.rowCount) throw new AppError('Only a batch waiting for review can be discarded');
+      await audit(c, req, 'meter.readings_discard', 'reading_batch', id, {});
+      return { ok: true };
+    });
+  });
+
+  /** Readings sent through the API: kept for review (default) or stored at once. */
+  app.patch('/api/tenant/review-readings', async (req) => {
+    const tenant = requireTenant(req);
+    requireRole(req, 'super_admin');
+    const b = z.object({ review: z.boolean() }).parse(req.body);
+    return tenantTx(tenant, async (c) => {
+      await c.query('UPDATE tenant SET review_readings = $2 WHERE id = $1', [tenant, b.review]);
+      await audit(c, req, 'methodology.review_readings', 'tenant', tenant, b);
+      return b;
+    });
+  });
+
   /** Company time zone (month boundaries for meters). */
   app.patch('/api/tenant/timezone', async (req) => {
     const tenant = requireTenant(req);
@@ -553,6 +695,23 @@ export async function meterIngestRoutes(app: FastifyInstance) {
         g.idx.push(i); g.rows.push({ timestamp: r.timestamp, value: r.value, ...(r.start ? { start: r.start } : {}) });
         per.set(m.id, g);
       });
+      if ((await c.query('SELECT review_readings FROM tenant WHERE id = $1', [k.tenant_id])).rows[0].review_readings) {
+        const batch = (await c.query(`INSERT INTO reading_batch (tenant_id, source, client, received) VALUES ($1, 'api', $2, $3) RETURNING id`, [k.tenant_id, k.name, b.readings.length])).rows[0].id as string;
+        let staged = 0;
+        for (const [mid, g] of per) {
+          const m = [...meters.values()].find((x) => x.id === mid)!;
+          const s = await stageReadings(c, k.tenant_id, batch, m, g.rows, t.timezone);
+          s.rejected.forEach((x) => rejected.push({ index: g.idx[x.index]!, reason: x.reason }));
+          staged += s.staged;
+        }
+        const st = Object.fromEntries((await c.query(`SELECT state, count(*)::int AS n FROM reading_staged WHERE batch_id = $1 GROUP BY 1`, [batch])).rows.map((r) => [r.state, r.n]));
+        await c.query(`UPDATE reading_batch SET rejected = $2 WHERE id = $1`, [batch, JSON.stringify(rejected.slice(0, 1000))]);
+        await c.query(
+          'INSERT INTO audit_log (tenant_id, user_id, user_name, action, entity, entity_id, detail, ip) VALUES ($1,NULL,$2,$3,$4,$5,$6,$7)',
+          [k.tenant_id, `API key: ${k.name}`, 'meter.readings_api', 'reading_batch', batch, JSON.stringify({ received: b.readings.length, staged, rejected: rejected.length }), req.ip]);
+        return { received: b.readings.length, batchId: batch, status: 'review', new: st.new ?? 0, corrections: st.changed ?? 0, duplicates: st.same ?? 0, conflicts: st.conflict ?? 0,
+          rejected: rejected.sort((a, z2) => a.index - z2.index).slice(0, 1000), note: 'Readings wait for review in Ekotrace (Add data → the category → Meter readings) before they are published.' };
+      }
       let inserted = 0, updated = 0, unchanged = 0;
       const out: { meterId: string; inserted: number; updated: number; entries?: unknown }[] = [];
       const actor = { id: null, name: `api:${k.name}`, req: pseudo(req, k) };

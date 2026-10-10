@@ -60,6 +60,12 @@ export interface PurchaseGroup {
   candidates: { itemId: number; score: number; name?: string }[]; overlap: string | null; overlap_why: string | null; decision: 'keep' | 'move' | 'exclude' | null; target: string | null;
   capital: boolean; capital_why: string | null; material: boolean; confirmed: boolean; supplier_id: string | null; batch_co2e: number | null; statuses: Partial<Record<LineStatus, number>> | null;
 }
+export interface PublishedLine { id: number; row_no: number; file: string | null; date: string | null; month: string; facility: string; description: string; gl_account: string | null; category_text: string | null; po_ref: string | null; supplier: string | null; amount: number | null; currency: string | null; usd: number | null; category: string; item: string; estimate: boolean; method: string; co2e: number | null; activity_id: string; batch_id: string }
+export interface PublishedLines {
+  total: { lines: number; usd: number; co2e: number; entries: number; suppliers: number; estimated: number }; lines: PublishedLine[];
+  options: { facilities: { id: string; name: string; co2e: number; n: number }[]; categories: { id: string; name: string; co2e: number; n: number }[]; items: { id: number; name: string; co2e: number; n: number }[]; months: string[] };
+}
+export interface CapitalItem { id: number; name: string; naics: string | null; group: string | null; capital: boolean; note: string | null; factor: number | null }
 export interface PurchaseAccount { account: string; groups: number; lines: number; usd: number; co2e: number | null; capital_groups: number; accountType: 'purchase' | 'capital' | 'not_purchase' | null; itemId: number | null; item: string | null; decision: string | null; target: string | null }
 export interface PurchaseLine {
   id: string; row_no: number; date: string | null; month: string | null; description: string; category_text: string | null; supplier_text: string | null; po_ref: string | null;
@@ -234,9 +240,17 @@ export const api = {
   revokeApiKey: (id: string) => call<{ ok: true }>('DELETE', `/api/api-keys/${id}`),
   setTimezone: (timezone: string) => call<{ timezone: string }>('PATCH', '/api/tenant/timezone', { timezone }),
   // Bills
-  bills: (status?: string) => call<{ bills: Bill[]; counts: Record<string, number> }>('GET', `/api/bills${status ? `?status=${status}` : ''}`),
+  bills: (status?: string, category?: string) => call<{ bills: Bill[]; counts: Record<string, number> }>('GET', `/api/bills?${new URLSearchParams({ ...(status ? { status } : {}), ...(category ? { category } : {}) })}`),
+  checkBill: (id: string, b: unknown) => call<Bill>('POST', `/api/bills/${id}/check`, b),
+  billPreview: (category?: string) => call<{ bills: BillPreview[] }>('GET', `/api/bills/preview${category ? `?category=${category}` : ''}`),
+  publishBills: (ids: string[]) => call<{ booked: number; failed: { id: string; error: string }[]; entries: { created: number; updated: number } }>('POST', '/api/bills/publish', { ids }),
+  readingBatches: (q: { status?: string; category?: string }) => call<{ review: boolean; batches: ReadingBatch[] }>('GET', `/api/reading-batches?${new URLSearchParams(Object.entries(q).filter(([, v]) => v) as [string, string][])}`),
+  readingBatch: (id: string) => call<ReadingBatch & { meters: ReadingBatchMeter[] }>('GET', `/api/reading-batches/${id}`),
+  publishReadings: (id: string) => call<{ inserted: number; updated: number; entries: { created: number; updated: number; locked: string[] } }>('POST', `/api/reading-batches/${id}/publish`),
+  discardReadings: (id: string) => call<{ ok: true }>('POST', `/api/reading-batches/${id}/discard`),
+  setReviewReadings: (review: boolean) => call<{ review: boolean }>('PATCH', '/api/tenant/review-readings', { review }),
   bill: (id: string) => call<Bill & { text: string; entries: { id: string; period_start: string; quantity: number; unit: string; status: string; co2e_scope2: number; co2e_scope2_market: number; co2e_direct: number }[] }>('GET', `/api/bills/${id}`),
-  uploadBill: (f: File) => call<Bill & { duplicate: boolean }>('POST', '/api/bills/upload', undefined, f, { 'x-filename': encodeURIComponent(f.name) }),
+  uploadBill: (f: File, category?: string) => call<Bill & { duplicate: boolean }>('POST', '/api/bills/upload', undefined, f, { 'x-filename': encodeURIComponent(f.name), ...(category ? { 'x-category': category } : {}) }),
   patchBill: (id: string, b: unknown) => call<Bill>('PATCH', `/api/bills/${id}`, b),
   confirmBill: (id: string, b: unknown) => call<Bill & { sync: SyncResult }>('POST', `/api/bills/${id}/confirm`, b),
   reopenBill: (id: string) => call<Bill>('POST', `/api/bills/${id}/reopen`),
@@ -280,6 +294,9 @@ export const api = {
   // purchases
   purchaseMeta: () => call<PurchaseMeta>('GET', '/api/purchases/meta'),
   purchaseSettings: (b: { aiMapping?: boolean; reviewCoverage?: number }) => call<{ aiMapping?: boolean; reviewCoverage?: number }>('PATCH', '/api/purchases/settings', b),
+  publishedLines: (q: Record<string, string>) => call<PublishedLines>('GET', `/api/purchases/published?${new URLSearchParams(q)}`),
+  capitalList: () => call<{ items: CapitalItem[] }>('GET', '/api/purchases/capital-list'),
+  setCapital: (id: number, capital: boolean, note?: string) => call<{ id: number; capital: boolean }>('PATCH', `/api/purchases/capital-list/${id}`, { capital, note }),
   purchaseAccounts: (batchId: string) => call<{ accounts: PurchaseAccount[] }>('GET', `/api/purchases/batches/${batchId}/accounts`),
   setPurchaseAccount: (b: { account: string; accountType?: string | null; itemId?: number | null; target?: string | null; batchId?: string }) => call<{ ok: true; lines: number }>('PUT', '/api/purchases/accounts', b),
   uploadPurchases: (f: File, again = false) => call<UploadResult>('POST', `/api/purchases/upload${again ? '?again=1' : ''}`, undefined, f, { 'x-filename': encodeURIComponent(f.name) }),
@@ -308,7 +325,7 @@ export const api = {
   supplierAnalytics: (year?: number) => call<SupplierAnalytics>('GET', `/api/suppliers/analytics${year ? `?year=${year}` : ''}`),
   keepSupplierSeparate: (id: string) => call<{ ok: true }>('POST', `/api/suppliers/${id}/keep-separate`),
   supplierMatch: (id: number, action: 'confirm' | 'split') => call<{ ok?: true; supplierId?: string; lines?: number }>('POST', `/api/suppliers/matches/${id}/${action}`),
-  dashboard: (q: { year?: number; node?: string; scope2?: 'location' | 'market' }) => call<Dashboard>('GET', `/api/dashboard?${new URLSearchParams(Object.entries(q).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)]))}`),
+  dashboard: (q: { year?: number; node?: string; scope2?: 'location' | 'market'; cmp?: number }) => call<Dashboard>('GET', `/api/dashboard?${new URLSearchParams(Object.entries(q).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)]))}`),
   addSupplier: (b: unknown) => call<{ id: string }>('POST', '/api/suppliers', b),
   patchSupplier: (id: string, b: unknown) => call<{ ok: true }>('PATCH', `/api/suppliers/${id}`, b),
   mergeSupplier: (id: string, intoId: string) => call<{ lines: number }>('POST', `/api/suppliers/${id}/merge`, { intoId }),
@@ -393,10 +410,13 @@ export interface MeterMonth {
   entry: { id: string; period_start: string; quantity: number; unit: string; status: string; data_type: string; co2e_direct: number; co2e_scope2: number; co2e_scope2_market: number; co2e_scope3: number; updated_at: string } | null;
 }
 export interface MeterDetail extends Meter { timezone: string; months: MeterMonth[]; issues: string[]; recent: { ts: string; from_ts: string | null; value: number; source: string; received_at: string }[] }
+export interface BillPreview extends Bill { issues: { level: 'block' | 'warn'; text: string }[]; ok: boolean; meterUnit: string; qty: number; co2e: number | null; days: number; months: { month: string; days: number; qty: number }[] }
+export interface ReadingBatch { id: string; source: string; client: string | null; status: 'review' | 'published' | 'discarded'; received: number; rejected: number | unknown[]; readings?: number; result: { inserted: number; updated: number; entries: { created: number; updated: number } } | null; created_at: string; decided_at: string | null; decided_by: string | null }
+export interface ReadingBatchMeter { meter_id: string; meter: string; facility: string; unit: string; reading_type: string; category: string; new: number; changed: number; same: number; conflict: number; first: string; last: string; total: number | null; months: { month: string; qty: number; n: number }[] | null; samples: { ts: string; value: number; old: number | null; state: string; note: string | null }[] | null }
 export interface SyncResult { created: number; updated: number; unchanged: number; locked: string[]; problems: string[] }
 export interface ApiKey { id: string; name: string; prefix: string; scopes: string[]; created_at: string; last_used_at: string | null; revoked_at: string | null }
 export interface Bill {
-  id: string; document_id: string; status: 'to_check' | 'confirmed' | 'rejected'; energy: string | null; supplier: string | null; account_no: string | null; bill_no: string | null;
+  id: string; document_id: string; status: 'to_check' | 'checked' | 'confirmed' | 'rejected'; category: string | null; energy: string | null; supplier: string | null; account_no: string | null; bill_no: string | null;
   period_from: string | null; period_to: string | null; issue_date: string | null; quantity: number | null; unit: string | null; amount: number | null; currency: string | null;
   found: { missing?: string[]; problem?: string | null; matchedBy?: string | null; candidates?: { energy: string; value: number; unit: string; line: string; score: number }[];
     supplier?: { value: string; line: string }; account?: { value: string; line: string }; periodFrom?: { value: string; line: string }; quantity?: { value: number; unit: string; line: string }; amount?: { value: number; line: string } };

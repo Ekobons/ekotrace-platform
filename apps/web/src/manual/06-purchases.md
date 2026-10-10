@@ -49,10 +49,19 @@ Checked in this order:
 
 1. **The account:** under the Accounts tab of a batch, each account (GL) gets a type, remembered for every upload — *Purchase* (default), *Capital* (Scope 3.2) or *Not a purchase* (VAT, salaries, depreciation, intercompany: left out).
 2. **A capital column in the file** (e.g. asset or capex flag) for single lines.
-3. **The capital-goods list:** products marked “Capital Goods” in the previous Ekotrace list (225 products — machinery, vehicles, computers…), and EPA categories whose products on that list are all capital goods.
+3. **The capital-goods list** (Add data → Purchases → **Capital goods list**): 168 products of the previous Ekotrace list — machinery, vehicles, IT and electrical equipment, buildings and construction — and EPA categories whose products on that list are all capital goods. The old list marked 225 products as capital goods; 57 of them are **parts, materials or consumables** (vehicle and aircraft parts, steel and other metals, valves and bearings, cable, medicines, gloves and dressings, tool accessories, keyboards and mice) and count as purchased goods (3.1), with the reason shown. Only the platform administrator changes the shared list.
 4. Otherwise standard goods and services (3.1).
 
 A person can always change it for a kind of purchase; the choice is remembered.
+
+## Viewing published lines
+
+A published batch becomes monthly entries (facility × month × spend category), but **every line stays stored** with its spend category, factor, exchange rate and result. Add data → Purchases → **Published lines** (or “open lines” on a batch, or “lines” next to a purchase entry) lists them across all batches:
+
+- filter by month or year, facility, Scope 3 category, spend category, average-factor lines, or search description, supplier, PO and account;
+- totals for the whole selection (lines, entries, tCO₂e, spend, suppliers);
+- sorted by largest emissions, largest spend or latest; 100 lines a page — the server pages, so 50,000 lines open in about two seconds;
+- **Download Excel** or **CSV**: every line of the selection with its factor, exchange rate, price-index ratio, file and row (50,000 lines in a few seconds).
 
 ## Other categories
 

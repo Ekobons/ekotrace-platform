@@ -51,7 +51,7 @@ export function FacilityEnergy({ node, onProfile }: { node: OrgNode; onProfile: 
             <tbody>{accounts.map((m) => <tr key={m.id}><td className="mono">{m.account_no}</td><td>{m.name}</td><td>{m.item}</td><td>{m.last ? new Date(m.last.ts).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : <span className="chip warn">none yet</span>}</td></tr>)}</tbody>
           </table></div>
         ) : <div className="sub">No utility account numbers yet. Add one to a meter (Meters tab → Settings) so uploaded bills find it automatically.</div>}
-        <div className="sub" style={{ marginTop: 8 }}>Upload bills under <Link to="/bills">Capture → Bills</Link>.</div>
+        <div className="sub" style={{ marginTop: 8 }}>Upload bills under <Link to="/data/purchased_electricity?via=bills">Add data → Electricity → Bills</Link> (fuel and waste bills under their own tabs).</div>
       </fieldset>
 
       <fieldset className="box"><legend>Certificates & contracts usable here · market-based Scope 2</legend>

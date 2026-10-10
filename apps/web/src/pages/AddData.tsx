@@ -7,7 +7,9 @@
  * calculation steps and any warnings. "Save entry" stores it.
  */
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { CategoryBills, ReadingBatches } from './CategoryBills';
+import { Icon } from '../components/Icon';
 import { useApp } from '../App';
 import { unitLabel, api, ApiError, BASIS_LABEL, num, tco2e, type Activity, type CalcResponse, type Category, type Facility } from '../lib/api';
 import { Result } from '../components/Result';
@@ -51,6 +53,11 @@ export function AddData() {
   const { category: catCode = 'stationary_combustion' } = useParams();
   const { tenant, toast } = useApp();
   const navigate = useNavigate();
+  const [sp, setSp] = useSearchParams();
+  const via = (sp.get('via') as 'bills' | 'readings' | null) ?? 'enter';
+  const setVia = (v: string | null) => { const n = new URLSearchParams(sp); if (v) n.set('via', v); else n.delete('via'); setSp(n, { replace: true }); };
+  /** Categories that take bills and meter readings (an account / meter per supply). */
+  const billCat = catCode === 'purchased_electricity' || catCode === 'stationary_combustion' ? catCode : catCode.startsWith('waste_') ? 'waste' : null;
   const [cat, setCat] = useState<Category | null>(null);
   const [cats, setCats] = useState<Category[]>([]);
   const [facilities, setFacilities] = useState<Facility[]>([]);
@@ -204,10 +211,21 @@ export function AddData() {
         {cats.filter((c) => c.code !== 'waste_generated' && (c.calc_method !== 'spend' || c.code === 'purchased_goods')).map((c) => {
           const waste = c.code === 'waste_treatment';
           const on = waste ? cat.code.startsWith('waste_') : c.code === cat.code;
-          return <button key={c.code} className={on ? 'on' : ''} onClick={() => navigate(`/data/${c.code}`)}>{waste ? 'Waste' : c.code === 'purchased_goods' ? 'Purchases' : c.name}</button>;
+          return <button key={c.code} className={on ? 'on' : ''} onClick={() => navigate(`/data/${c.code}${via !== 'enter' && (c.code === 'purchased_electricity' || c.code === 'stationary_combustion' || c.code.startsWith('waste_')) ? `?via=${via}` : ''}`)}>{waste ? 'Waste' : c.code === 'purchased_goods' ? 'Purchases' : c.name}</button>;
         })}
       </div>
 
+      {billCat && (
+        <div className="row" style={{ gap: 10 }}>
+          <div className="seg" role="group" aria-label="How to add data">
+            <button className={via === 'enter' ? 'on' : ''} onClick={() => setVia(null)}><Icon name="edit" /> Type in</button>
+            <button className={via === 'bills' ? 'on' : ''} onClick={() => setVia('bills')}><Icon name="doc" /> Bills</button>
+            <button className={via === 'readings' ? 'on' : ''} onClick={() => setVia('readings')}><Icon name="gauge" /> Meter readings</button>
+          </div>
+          <span className="sub">{via === 'bills' ? 'PDF bills: read, checked, previewed, then published.' : via === 'readings' ? 'Batches sent by connected meters, previewed before they count.' : 'Type quantities for a facility and month.'}</span>
+        </div>
+      )}
+      {billCat && via === 'bills' ? <CategoryBills category={billCat} /> : billCat && via === 'readings' ? <ReadingBatches category={billCat} /> : <>
       <div className="card" style={{ display: 'grid', gap: 12 }}>
         <div className="row" style={{ alignItems: 'flex-end' }}>
           <label className="field" style={{ minWidth: 260 }}>
@@ -388,12 +406,13 @@ export function AddData() {
                 <td>{a.period_start.slice(0, 7)}{a.period_end.slice(0, 7) !== a.period_start.slice(0, 7) ? ` – ${a.period_end.slice(0, 7)}` : ''}</td>
                 <td>{a.vehicle ? <><b>{a.vehicle}</b> · </> : null}{a.waste_site ? <><b>{a.waste_site}</b> · </> : null}{a.item}</td><td className="num">{num(a.quantity)} {unitLabel(a.unit)}{a.item === 'Landfill methane' ? ' CH₄' : ''}</td>
                 <td className="num">{tco2e(cat.calc_method === 'waste_disposal' || cat.calc_method === 'spend' ? Number(a.co2e_scope3 ?? 0) : a.co2e_direct)}</td>{(cat.calc_method === 'vehicle' || cat.calc_method === 'electricity') && <td className="num">{tco2e(Number(a.co2e_scope2 ?? 0))}</td>}{cat.calc_method === 'electricity' && <td className="num">{tco2e(Number(a.co2e_scope2_market ?? 0))}</td>}<td className="num">{tco2e(a.co2e_wtt)}</td><td className="num">{tco2e(a.co2_biogenic)}</td>
-                <td><span className="chip grey">{a.data_type}</span></td>
+                <td><span className="chip grey">{a.data_type}</span>{cat.calc_method === 'spend' && <> <Link className="small" to={`/purchases/published?activity=${a.id}`}>lines</Link></>}</td>
               </tr>))}
             </tbody>
           </table>
         ) : <div className="empty">Nothing saved yet for this facility.</div>}
       </div>
+      </>}
     </div>
   );
 }

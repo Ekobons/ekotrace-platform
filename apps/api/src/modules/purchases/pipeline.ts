@@ -220,7 +220,7 @@ interface SpendIndex { sig: string; index: ClassIndex; naics: Map<number, string
 let indexCache: SpendIndex | null = null;
 export async function spendIndex(c: Tx): Promise<SpendIndex> {
   const sig = (await c.query(
-    `SELECT count(*) || ':' || coalesce(max(i.id), 0) || ':' || coalesce((SELECT max(id) FROM factor WHERE basis = 'scope3'), 0) || ':' || coalesce(sum(cardinality(i.aliases)), 0) AS s
+    `SELECT count(*) || ':' || coalesce(max(i.id), 0) || ':' || coalesce((SELECT max(id) FROM factor WHERE basis = 'scope3'), 0) || ':' || coalesce(sum(cardinality(i.aliases)), 0) || ':' || count(*) FILTER (WHERE (i.attrs->>'capital')::boolean) AS s
        FROM item i JOIN subcategory s ON s.id = i.subcategory_id JOIN category c ON c.id = s.category_id WHERE c.code = 'purchased_goods' AND i.active`)).rows[0].s;
   if (indexCache && indexCache.sig === sig) return indexCache;
   const rows = (await c.query(

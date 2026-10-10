@@ -722,11 +722,24 @@ test('meters: register readings via the screen → monthly entries; API key inge
   assert.equal(bad.statusCode, 401);
   const send = (body: unknown, k = token) => app.inject({ method: 'POST', url: '/api/v1/meter-readings', payload: body as object, headers: { authorization: `Bearer ${k}`, 'content-type': 'application/json' } });
   const hours = Array.from({ length: 29 * 24 }, (_, h) => ({ meterId: 'BMS-GAS-01', timestamp: new Date(Date.UTC(2024, 1, 1, h + 1) - 4 * 3600_000).toISOString(), value: 10 }));
+  // readings wait for review: new / duplicates / rejected, nothing booked yet
   const r1 = await send({ readings: [...hours, { meterId: 'NOPE', timestamp: '2024-02-01T00:00:00Z', value: 1 }, { meterId: 'BMS-GAS-01', timestamp: 'yesterday', value: 1 }] });
   assert.equal(r1.statusCode, 200, r1.body);
   const j1 = r1.json();
-  assert.equal(j1.inserted, 696); assert.equal(j1.rejected.length, 2);
-  assert.equal(j1.meters[0].entries.created, 1);
+  assert.equal(j1.status, 'review'); assert.equal(j1.new, 696); assert.equal(j1.rejected.length, 2);
+  const j1b = (await send({ readings: hours })).json();
+  assert.equal(j1b.duplicates, 696, 'the same readings again while the first batch waits');
+  const pending = (await api('GET', '/api/reading-batches?status=review', undefined, tenantA)).body.batches;
+  assert.equal(pending.length, 2);
+  const prev = (await api('GET', `/api/reading-batches/${j1.batchId}`, undefined, tenantA)).body;
+  assert.equal(prev.meters[0].new, 696); assert.ok(Math.abs(prev.meters[0].total - 6960) < 1e-6);
+  assert.equal((await api('POST', `/api/reading-batches/${j1b.batchId}/discard`, {}, tenantA)).status, 200);
+  const pub = await api('POST', `/api/reading-batches/${j1.batchId}/publish`, {}, tenantA);
+  assert.equal(pub.status, 200, JSON.stringify(pub.body));
+  assert.equal(pub.body.inserted, 696); assert.equal(pub.body.entries.created, 1);
+  assert.equal((await api('POST', `/api/reading-batches/${j1.batchId}/publish`, {}, tenantA)).status, 400, 'published once');
+  // the company can switch review off: readings are then stored at once
+  assert.equal((await api('PATCH', '/api/tenant/review-readings', { review: false }, tenantA)).status, 200);
   const e2 = (await api('GET', `/api/activities?category=stationary_combustion&limit=1000`, undefined, tenantA)).body.activities.find((a: { meter: string }) => a.meter === 'Kitchen gas (BMS)');
   assert.ok(Math.abs(Number(e2.quantity) - 6960) < 1e-6);
   // same readings again: nothing changes
@@ -783,6 +796,45 @@ test('bills: upload a PDF, read, match the account to a meter, check, confirm �
   assert.equal(re.status, 200, JSON.stringify(re.body));
   assert.equal((await api('GET', `/api/bills/${bill.id}`, undefined, tenantA)).body.entries.length, 0);
   assert.equal((await api('GET', '/api/bills', undefined, tenantB)).body.bills.length, 0);
+});
+
+test('bills by category: checked bills previewed (months, emissions), duplicates and overlaps blocked, then published', async () => {
+  const { makePdf, SAMPLE_ELECTRICITY } = await import('./helpers/pdf.js');
+  const grid = await itemId('grid:electricity');
+  const m = await api('POST', '/api/meters', { facilityId: facA, name: 'SEWA annex', readingType: 'interval', frequency: 'month', unit: 'kWh_e', itemId: grid, template: {}, accountNo: '2001777001' }, tenantA);
+  assert.equal(m.status, 200, JSON.stringify(m.body));
+  const pdf = (period: string, billNo: string, extra = '') => makePdf(SAMPLE_ELECTRICITY.map((l) => (Array.isArray(l) ? (l[0] === 'Billing Period:' ? ['Billing Period:', period] : l[0] === 'Account No:' ? ['Account No:', '2001777001'] : l[0] === 'Bill No:' ? ['Bill No:', billNo] : l) as [string, string] : l)).concat(extra ? [extra] : []));
+  const up = async (b: Uint8Array, name: string) => (await app.inject({ method: 'POST', url: '/api/bills/upload', payload: Buffer.from(b), headers: { cookie: adminCookie, 'x-tenant-id': tenantA, 'content-type': 'application/octet-stream', 'x-filename': name, 'x-category': 'purchased_electricity' } })).json();
+  const a = await up(await pdf('01/05/2025 - 31/05/2025', 'INV-A-1'), 'may.pdf');
+  const b = await up(await pdf('01/06/2025 - 30/06/2025', 'INV-A-1', 'copy sent again'), 'may-copy.pdf');   // same bill number
+  const c = await up(await pdf('15/05/2025 - 14/06/2025', 'INV-A-3'), 'overlap.pdf');                        // overlaps May
+  assert.equal(a.category, 'purchased_electricity'); assert.equal(a.meter_id, m.body.id);
+  const listed = (await api('GET', '/api/bills?category=purchased_electricity&status=to_check', undefined, tenantA)).body.bills.map((x: { id: string }) => x.id);
+  assert.ok([a.id, b.id, c.id].every((id) => listed.includes(id)));
+  assert.equal((await api('GET', '/api/bills?category=waste', undefined, tenantA)).body.bills.length, 0);
+  for (const x of [a, b, c]) assert.equal((await api('POST', `/api/bills/${x.id}/check`, {}, tenantA)).status, 200);
+  const pv = (await api('GET', '/api/bills/preview?category=purchased_electricity', undefined, tenantA)).body.bills;
+  const pa = pv.find((x: { id: string }) => x.id === a.id), pb = pv.find((x: { id: string }) => x.id === b.id), pc = pv.find((x: { id: string }) => x.id === c.id);
+  assert.equal(pa.months.length, 1); assert.ok(pa.co2e > 0, 'emissions estimated');
+  assert.ok(pb.issues.some((i: { text: string }) => /Same bill number/.test(i.text)), JSON.stringify(pb.issues));
+  assert.ok(pc.issues.some((i: { text: string }) => /Also ready/.test(i.text)), JSON.stringify(pc.issues));
+  assert.equal(pc.months.length, 2, 'split over May and June');
+  const pub = (await api('POST', '/api/bills/publish', { ids: [a.id, b.id, c.id] }, tenantA)).body;
+  assert.equal(pub.booked, 1, JSON.stringify(pub)); assert.equal(pub.failed.length, 2);
+  // after publishing May, the overlapping bill is blocked as already booked
+  const again = (await api('GET', '/api/bills/preview?category=purchased_electricity', undefined, tenantA)).body.bills.find((x: { id: string }) => x.id === c.id);
+  assert.ok(again.issues.some((i: { text: string }) => /Already booked/.test(i.text)));
+  // editing a checked bill sends it back to check
+  assert.equal((await api('PATCH', `/api/bills/${c.id}`, { note: 'wrong period?' }, tenantA)).body.status, 'to_check');
+});
+
+test('capital goods list: parts, materials and consumables of the old list count as purchased goods', async () => {
+  const items = (await api('GET', '/api/purchases/capital-list', undefined, tenantA)).body.items as { name: string; capital: boolean; note: string | null }[];
+  if (!items.length) return; // the old product list is not loaded in this database
+  const by = (re: RegExp) => items.find((i) => re.test(i.name));
+  assert.equal(by(/Brake System/)?.capital, false); assert.equal(by(/Iron and Steel Mills/)?.capital, false); assert.equal(by(/Surgical gloves/)?.capital, false);
+  assert.equal(by(/Heavy Duty Truck/)?.capital, true); assert.equal(by(/Laptop/)?.capital, true);
+  assert.notEqual((await api('PATCH', `/api/purchases/capital-list/1`, { capital: true }, tenantA)).status, 200, 'only products of the old list can be switched');
 });
 
 // ------------------------------------------------------------ purchases --
@@ -1159,4 +1211,20 @@ test('purchases: 50,000 lines (CSV) read, mapped, calculated and published in th
   const entries = Number((await pq(`SELECT count(*) FROM activity WHERE purchase_batch_id = $1`, [up.batchId])).rows[0].count);
   console.log(`[perf] 50,000 lines: read+map+calculate ${((t1 - t0) / 1000).toFixed(1)} s, publish ${((t2 - t1) / 1000).toFixed(1)} s; ${d.groups.total} groups, ${pubLines} lines → ${entries} entries`);
   assert.ok(t2 - t0 < 60_000, `took ${t2 - t0} ms`);
+  // the published lines stay viewable: paged, totalled, opened from one entry, downloaded
+  let t3 = Date.now();
+  const pl = (await api('GET', `/api/purchases/published?batch=${up.batchId}&limit=100`, undefined, tenantA)).body;
+  const tq = Date.now() - t3;
+  assert.equal(pl.total.lines, pubLines); assert.equal(pl.lines.length, 100); assert.equal(pl.total.entries, entries);
+  assert.ok(pl.lines[0].co2e >= pl.lines[99].co2e, 'largest first');
+  const one = pl.lines[0].activity_id;
+  const inEntry = (await api('GET', `/api/purchases/published?activity=${one}`, undefined, tenantA)).body;
+  assert.ok(inEntry.total.lines >= 1 && inEntry.lines.every((l: { activity_id: string }) => l.activity_id === one));
+  t3 = Date.now();
+  const csv = await app.inject({ method: 'GET', url: `/api/purchases/published/export?batch=${up.batchId}&format=csv`, headers: { cookie: adminCookie, 'x-tenant-id': tenantA } });
+  assert.equal(csv.body.split('\r\n').length, pubLines + 1);
+  const xl = await app.inject({ method: 'GET', url: `/api/purchases/published/export?batch=${up.batchId}`, headers: { cookie: adminCookie, 'x-tenant-id': tenantA } });
+  assert.equal(xl.statusCode, 200); assert.ok(xl.rawPayload.length > 100_000);
+  console.log(`[perf] published lines: first page ${tq} ms; CSV + Excel of ${pubLines} lines ${Date.now() - t3} ms`);
+  assert.equal((await api('GET', `/api/purchases/published?batch=${up.batchId}`, undefined, tenantB)).body.total.lines, 0, 'other company sees none');
 });

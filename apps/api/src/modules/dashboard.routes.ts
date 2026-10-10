@@ -12,9 +12,36 @@
  */
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { tenantTx } from '../db/pool.js';
+import { tenantTx, type Tx } from '../db/pool.js';
 import { requireTenant } from '../lib/auth.js';
 import { scopeOf, subtreeFacilities } from '../lib/access.js';
+import { refdata } from './refdata.js';
+import { defaultCalorificValue } from './calc.service.js';
+
+/** kWh in a quantity: energy units directly; fuels by mass or volume with the calorific value their factors imply. */
+const ENERGY_DIMS = new Set(['energy_net', 'energy_gross', 'electricity', 'heat', 'cooling']);
+const cvCache = new Map<string, number | null>();
+/** A vehicle entered by litres or kg: the calorific value of the same fuel burned on site. */
+const SAME_FUEL: [RegExp, string][] = [[/diesel|gas ?oil/i, 'Diesel (100% mineral diesel)'], [/petrol|gasoline/i, 'Petrol (100% mineral petrol)'], [/lpg/i, 'LPG'], [/cng/i, 'CNG']];
+async function kwhOf(c: Tx, units: Map<string, { dimension: string; to_base: number }>, itemId: number, text: string, unit: string, qty: number, year: number, fuel: boolean) {
+  const u = units.get(unit);
+  if (!u || !qty) return null;
+  if (ENERGY_DIMS.has(u.dimension)) return qty * u.to_base;
+  if (!fuel || (u.dimension !== 'mass' && u.dimension !== 'volume')) return null;
+  const k = `${itemId}|${unit}|${year}`;
+  if (!cvCache.has(k)) {
+    const opts = { energyUnit: 'kWh', perUnit: unit, date: `${Math.min(year, new Date().getFullYear())}-06-30`, region: 'GLOBAL' };
+    let cv = (await defaultCalorificValue(itemId, opts))?.value ?? null;
+    const same = cv == null ? SAME_FUEL.find(([re]) => re.test(text))?.[1] : undefined;
+    if (same) {
+      const id = (await c.query(`SELECT i.id FROM item i JOIN subcategory s ON s.id = i.subcategory_id JOIN category k ON k.id = s.category_id WHERE k.code = 'stationary_combustion' AND i.name = $1 LIMIT 1`, [same])).rows[0]?.id;
+      if (id) cv = (await defaultCalorificValue(id, opts))?.value ?? null;
+    }
+    cvCache.set(k, cv);
+  }
+  const cv = cvCache.get(k);
+  return cv == null ? null : qty * cv;
+}
 
 /** GHG Protocol code of each category (Scope 1 and 2 numbered within the scope). */
 const CODE: Record<string, string> = {
@@ -29,7 +56,7 @@ const S3_NAME: Record<number, string> = {
 export async function dashboardRoutes(app: FastifyInstance) {
   app.get('/api/dashboard', async (req) => {
     const tenant = requireTenant(req);
-    const q = z.object({ year: z.coerce.number().int().min(2000).max(2100).optional(), node: z.string().uuid().optional(), scope2: z.enum(['location', 'market']).default('location') }).parse(req.query);
+    const q = z.object({ year: z.coerce.number().int().min(2000).max(2100).optional(), cmp: z.coerce.number().int().min(2000).max(2100).optional(), node: z.string().uuid().optional(), scope2: z.enum(['location', 'market']).default('location') }).parse(req.query);
     return tenantTx(tenant, async (c) => {
       const see = (await scopeOf(c, req.user)).see;
       const within = q.node ? await subtreeFacilities(c, q.node) : null;
@@ -44,14 +71,31 @@ export async function dashboardRoutes(app: FastifyInstance) {
       const FROM = `FROM activity a JOIN org_node f ON f.id = a.facility_id JOIN category cat ON cat.id = a.category_id JOIN item i ON i.id = a.item_id
                     WHERE a.facility_id = ANY($1) AND a.status <> 'rejected' AND extract(year FROM a.period_start) = $2`;
       const t1 = (v: string) => `round(sum(${v} * ${W})::numeric / 1000, 4)::float8`;   // tonnes
-      const rows = (await c.query(
-        `SELECT a.facility_id AS f, ${M} AS m, cat.code AS cat, i.name AS item, coalesce(i.attrs->>'group', '') AS grp,
+      const ROWS = `SELECT a.facility_id AS f, ${M} AS m, cat.code AS cat, i.id AS iid, i.name AS item, coalesce(i.attrs->>'group', '') AS grp, sc.name AS sub, a.unit,
                 ${t1('a.co2e_direct')} AS s1, ${t1(S2)} AS s2, ${t1('a.co2e_scope3')} AS s3, ${t1('(a.co2e_wtt + a.co2e_td)')} AS s33,
                 ${t1('a.co2_biogenic')} AS bio, ${t1('a.co2e_memo')} AS memo, count(*)::int AS n, count(*) FILTER (WHERE a.status = 'approved')::int AS approved,
-                count(*) FILTER (WHERE a.data_type <> 'actual')::int AS estimated
-           ${FROM} GROUP BY 1, 2, 3, 4, 5`, [facs, year])).rows;
+                count(*) FILTER (WHERE a.data_type <> 'actual')::int AS estimated,
+                CASE WHEN cat.calc_method = 'spend' THEN 0 ELSE sum(a.quantity * ${W})::float8 END AS qty,
+                coalesce(sum((SELECT sum(k.kwh) FROM certificate_claim k WHERE k.activity_id = a.id) * ${W}), 0)::float8 AS rec
+           ${FROM.replace('JOIN item i ON i.id = a.item_id', 'JOIN item i ON i.id = a.item_id JOIN subcategory sc ON sc.id = i.subcategory_id')} GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, cat.calc_method`;
+      const ref = await refdata();
+      const units = new Map(ref.unitList.map((u) => [u.code, { dimension: u.dimension, to_base: Number(u.toBase) }]));
+      const shape = async (y: number) => {
+        const out = [];
+        for (const r of (await c.query(ROWS, [facs, y])).rows) {
+          const fuel = r.cat === 'stationary_combustion' || r.cat === 'mobile_combustion';
+          const kind = fuel ? 'fuel' : r.cat === 'purchased_electricity' ? (units.get(r.unit)?.dimension === 'cooling' ? 'cooling' : units.get(r.unit)?.dimension === 'heat' ? 'heat' : 'electricity') : null;
+          const kwh = kind ? await kwhOf(c, units, r.iid, `${r.item} ${r.sub}`, r.unit, r.qty, y, fuel) : null;
+          const { iid: _i, ...rest } = r;
+          out.push({ ...rest, kind, kwh: kwh == null ? null : Math.round(kwh * 1000) / 1000 });
+        }
+        return out;
+      };
+      const rows = await shape(year);
+      const cmpYear = q.cmp ?? year - 1;
+      const prevRows = cmpYear !== year ? await shape(cmpYear) : [];
       const prevMonthly = (await c.query(
-        `SELECT ${M} AS m, ${t1('a.co2e_direct')} AS s1, ${t1(S2)} AS s2, ${t1('a.co2e_scope3 + a.co2e_wtt + a.co2e_td')} AS s3 ${FROM} GROUP BY 1`, [facs, year - 1])).rows;
+        `SELECT ${M} AS m, ${t1('a.co2e_direct')} AS s1, ${t1(S2)} AS s2, ${t1('a.co2e_scope3 + a.co2e_wtt + a.co2e_td')} AS s3 ${FROM} GROUP BY 1`, [facs, cmpYear])).rows;
       const base = t.base_year && t.base_year !== year
         ? (await c.query(`SELECT ${t1(`a.co2e_direct + ${S2} + a.co2e_scope3 + a.co2e_wtt + a.co2e_td`)} AS total ${FROM}`, [facs, t.base_year])).rows[0]?.total ?? null : null;
       const facilities = (await c.query(
@@ -74,7 +118,7 @@ export async function dashboardRoutes(app: FastifyInstance) {
       };
       return {
         year, years, consolidation: t.consolidation, scope2: q.scope2, baseYear: t.base_year && t.base_year !== year ? { year: t.base_year, total: base } : null,
-        rows, prevMonthly, facilities, categories, s3Names: S3_NAME, purchases,
+        rows, cmpYear, prevRows, prevMonthly, facilities, categories, s3Names: S3_NAME, purchases,
       };
     });
   });

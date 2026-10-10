@@ -46,9 +46,9 @@ A reading (or a bill) covering 15 February to 14 March is split by time: 14 of i
 
 ## Setting up a meter
 
-The easiest way: on the Add data tab, choose **Month by month**, fill in the inputs exactly as for a manual entry (fuel, supplier factor, grid region, waste process…), then **“Set up a meter with these inputs”**. Or **Add meter** for a fuel, electricity, heat or cooling — on the facility (Organisation → the facility → **Meters** tab, where the facility is already filled in) or under Capture → Meters.
+The easiest way: on the Add data tab, choose **Month by month**, fill in the inputs exactly as for a manual entry (fuel, supplier factor, grid region, waste process…), then **“Set up a meter with these inputs”**. Or **Add meter** for a fuel, electricity, heat or cooling — on the facility (Organisation → the facility → **Meters** tab, where the facility is already filled in).
 
-A facility's meters are listed on its Meters tab; Capture → Meters lists every meter in the company, with a facility filter, to follow how readings are arriving.
+A facility's meters are listed on its Meters tab. Readings sent through the API wait for review under Add data → the category → **Meter readings** (see **Bills and meter readings**).
 
 | Setting | Meaning |
 |---|---|

@@ -7,9 +7,9 @@ import { z } from 'zod';
 import { createHash } from 'node:crypto';
 import ExcelJS from 'exceljs';
 import { classify, normText, OVERLAP_LABEL } from '@ekotrace/calc';
-import { tenantTx, type Tx } from '../../db/pool.js';
+import { platformTx, tenantTx, type Tx } from '../../db/pool.js';
 import { config } from '../../config.js';
-import { audit, requireRole, requireTenant, type User } from '../../lib/auth.js';
+import { audit, requirePlatformAdmin, requireRole, requireTenant, type User } from '../../lib/auth.js';
 import { scopeOf } from '../../lib/access.js';
 import { AppError, notFound } from '../../lib/errors.js';
 import { enqueue, registerJob, type Job } from '../../lib/jobs.js';
@@ -117,6 +117,32 @@ export async function purchaseRoutes(app: FastifyInstance) {
         fields: FIELDS.map((f) => ({ field: f, label: FIELD_LABEL[f] })), fxMethod: t.fx_method, currency: t.currency, aiMapping: t.ai_mapping, reviewCoverage: t.review_coverage,
         aiAvailable: !!config.aiMap, aiName: config.aiMap?.name ?? null, overlap: OVERLAP_LABEL, categories: cats, factorSets: factorSet, maxLines: MAX_LINES,
       };
+    });
+  });
+
+  // The capital-goods list: products of the previous Ekotrace list that count as capital goods
+  // (Scope 3.2) when a purchase is matched to them; the others of that list are purchased goods.
+  app.get('/api/purchases/capital-list', async (req) => {
+    const tenant = requireTenant(req);
+    return tenantTx(tenant, async (c) => ({
+      items: (await c.query(
+        `SELECT i.id, i.name, i.attrs->>'naics' AS naics, i.attrs->>'group' AS "group", coalesce((i.attrs->>'capital')::boolean, false) AS capital,
+                i.attrs->>'capitalNote' AS note, f.co2e::float8 AS factor
+           FROM item i LEFT JOIN factor f ON f.item_id = i.id AND f.status = 'active'
+          WHERE i.code LIKE 'old:%' AND i.active AND (i.attrs->>'oldType' ILIKE '%capital%' OR (i.attrs->>'capital')::boolean)
+          ORDER BY i.attrs->>'group', i.name`)).rows,
+    }));
+  });
+  app.patch('/api/purchases/capital-list/:itemId', async (req) => {
+    requirePlatformAdmin(req);
+    const id = z.coerce.number().int().parse((req.params as { itemId: string }).itemId);
+    const b = z.object({ capital: z.boolean(), note: z.string().trim().max(200).optional() }).parse(req.body);
+    return platformTx(async (c) => {
+      const r = (await c.query(
+        `UPDATE item SET attrs = (attrs - 'capitalNote') || jsonb_build_object('capital', $2::boolean) || CASE WHEN $3::text IS NULL THEN '{}'::jsonb ELSE jsonb_build_object('capitalNote', $3::text) END
+          WHERE id = $1 AND code LIKE 'old:%' RETURNING id`, [id, b.capital, b.capital ? null : (b.note || 'Marked not capital by the platform administrator')])).rowCount;
+      if (!r) throw notFound('Product');
+      return { id, capital: b.capital };
     });
   });
 
