@@ -41,7 +41,7 @@ export function ItemPicker({ value, valueName, candidates, onPick, placeholder =
             {!q && cands.map((c) => <button type="button" key={c.itemId} onClick={() => pick(c.itemId, c.name!)}>{c.name}</button>)}
             {q && items.map((i) => (
               <button type="button" key={i.id} onClick={() => pick(i.id, i.name)}>
-                {i.name}<span className="muted small">{i.naics ? ` · NAICS ${i.naics}` : ''}{i.co2e != null ? ` · ${Number(i.co2e.toPrecision(3))} kg/${i.unit}${i.price_year ? ` ${i.price_year}` : ''}` : ''}{i.source === 'DEMO-SPEND' ? ' · DEMO' : ''}</span>
+                {i.name}<span className="muted small">{i.group ? ` · ${i.group}` : ''}{i.naics ? ` · NAICS ${i.naics}` : ''}{i.co2e != null ? ` · ${Number(i.co2e.toPrecision(3))} kg/${i.unit}${i.price_year ? ` ${i.price_year}` : ''}` : ''}{i.source === 'DEMO-SPEND' ? ' · DEMO' : ''}</span>
               </button>
             ))}
             {q.trim().length >= 2 && !items.length && <div className="ipick-h">Nothing found</div>}

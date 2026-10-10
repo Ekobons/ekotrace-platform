@@ -99,67 +99,92 @@ export async function importEpa(c: Tx, p: EpaParsed, opts: { createdBy?: string;
 }
 
 // ------------------------------------------------------- old Ekotrace list --
+/**
+ * The previous Ekotrace list (exported from its MySQL): purchase_goods_categories_ef with
+ * purchase_category / purchase_subcategory / typesofpurchase.
+ *
+ * What it holds: 1,645 products (e.g. "Cereal - Barley grain", "LPG", "Office Products")
+ * under 62 categories and 252 subcategories, each with a NAICS code. Its per-currency factor is
+ * the EPA per-USD factor converted at one rate per country and fiscal year (UAE ÷ 3.6725) with
+ * no inflation adjustment — Ekotrace now converts each purchase itself (month rate, CPI), so
+ * that column is not used. Its per-kg factors are not imported either: they vary by country
+ * and year for the same product and imply implausible prices.
+ *
+ * Imported: each product as a spend category of its own (old category › subcategory kept),
+ * with the EPA v1.3 factor of its NAICS code; capital goods and "other category" flags kept.
+ */
 export interface OldList {
-  /** purchase_goods_categories_ef rows */
-  factors: Record<string, string>[];
+  factors: Record<string, string>[];          // purchase_goods_categories_ef
   categories?: Record<string, string>[];      // dbo.purchase_category
   subcategories?: Record<string, string>[];   // dbo.purchase_subcategory
   types?: Record<string, string>[];           // dbo.typesofpurchase
 }
-export interface OldImport { linked: number; created: number; factors: number; skipped: number; notes: string[] }
+export interface OldProduct { product: string; naics: string; type: string; category: string; subcategory: string; otherCategory: boolean }
+export interface OldImport { products: number; created: number; updated: number; naicsMapped: { from: string; to: string }[]; notFound: string[] }
 
-/**
- * `currency` / `priceYear`: what EFkgC02e_ccy is per (the old tool used EPA factors in USD).
- * Only the newest fiscal year of each product is loaded.
- */
-export async function importOldList(c: Tx, l: OldList, opts: { currency: string; priceYear: number; createdBy?: string }): Promise<OldImport> {
-  const get = (r: Record<string, string>, ...names: string[]) => { for (const n of names) { const k = Object.keys(r).find((x) => x.toLowerCase() === n.toLowerCase()); if (k && r[k] !== '' && r[k] !== 'NULL') return r[k]!.trim(); } return ''; };
-  const catName = new Map((l.categories ?? []).map((r) => [get(r, 'id'), get(r, 'name')]));
-  const subName = new Map((l.subcategories ?? []).map((r) => [get(r, 'id'), get(r, 'name')]));
-  const typeName = new Map((l.types ?? []).map((r) => [get(r, 'id'), get(r, 'typesofpurchasename', 'name')]));
-  const notes: string[] = [];
-  // newest fiscal year per product
-  const newest = new Map<string, Record<string, string>>();
+const val = (r: Record<string, string>, ...names: string[]) => {
+  for (const n of names) { const k = Object.keys(r).find((x) => x.toLowerCase() === n.toLowerCase()); if (k && r[k] !== '' && r[k] !== 'NULL') return r[k]!.trim(); }
+  return '';
+};
+
+/** Distinct products of an export (product × NAICS × type of purchase). */
+export function oldProducts(l: OldList): OldProduct[] {
+  const cat = new Map((l.categories ?? []).map((r) => [val(r, 'id'), val(r, 'name')]));
+  const sub = new Map((l.subcategories ?? []).map((r) => [val(r, 'id'), val(r, 'name')]));
+  const typ = new Map((l.types ?? []).map((r) => [val(r, 'id'), val(r, 'typesofpurchasename', 'name')]));
+  const out = new Map<string, OldProduct>();
   for (const r of l.factors) {
-    const key = `${get(r, 'product').toLowerCase()}|${get(r, 'NAIC_code', 'naic_code')}`;
-    const fy = Number(get(r, 'Fiscal_Year').slice(-4)) || 0;
-    const cur = newest.get(key);
-    if (!cur || (Number(get(cur, 'Fiscal_Year').slice(-4)) || 0) < fy) newest.set(key, r);
+    const product = val(r, 'product').replace(/\s+/g, ' ');
+    const naics = val(r, 'NAIC_code', 'naics').replace(/\D/g, '');
+    if (!product) continue;
+    const t = val(r, 'typeofpurchase');
+    const p: OldProduct = {
+      product, naics, type: typ.get(t) ?? val(r, 'type') ?? t, category: cat.get(val(r, 'category')) ?? val(r, 'category'),
+      subcategory: sub.get(val(r, 'sub_category', 'subcategory')) ?? val(r, 'sub_category', 'subcategory'), otherCategory: ['1', 'true'].includes(val(r, 'other_category_flag', 'otherCategory')),
+    };
+    const key = `${product.toLowerCase()}|${naics}|${p.type}`;
+    const old = out.get(key);
+    out.set(key, old ? { ...old, otherCategory: old.otherCategory || p.otherCategory } : p);
   }
-  const src = (await c.query(
-    `INSERT INTO factor_source (code, publisher, title, year, version) VALUES ('EKOTRACE-OLD', 'Ekotrace (previous platform)', 'Purchased goods list of the previous Ekotrace platform', $1, '1')
-     ON CONFLICT (code) DO UPDATE SET imported_at = now() RETURNING id`, [opts.priceYear])).rows[0].id;
-  const other = (await c.query(`SELECT s.id FROM subcategory s JOIN category c ON c.id = s.category_id WHERE c.code = 'purchased_goods' AND s.code = 'other'`)).rows[0].id;
-  let linked = 0, created = 0, factors = 0, skipped = 0;
-  for (const r of newest.values()) {
-    const product = get(r, 'product'), naics = get(r, 'NAIC_code', 'naic_code').replace(/\D/g, '');
-    if (!product) { skipped++; continue; }
-    const group = [catName.get(get(r, 'category')) ?? get(r, 'category'), subName.get(get(r, 'sub_category')) ?? get(r, 'sub_category')].filter(Boolean).join(' › ');
-    const type = typeName.get(get(r, 'typeofpurchase')) ?? '';
-    const aliases = [product, ...group.split(' › ')].filter(Boolean);
-    const epa = naics ? (await c.query(`SELECT id FROM item WHERE code = $1`, [`epa:naics:${naics}`])).rows[0] : undefined;
-    if (epa) {
-      await c.query(`UPDATE item SET aliases = (SELECT array_agg(DISTINCT a) FROM unnest(aliases || $2::text[]) a), attrs = attrs || $3 WHERE id = $1`,
-        [epa.id, aliases, JSON.stringify({ oldGroup: group, oldType: type, oldId: get(r, 'id') })]);
-      linked++;
-      continue;
-    }
-    const it = (await c.query(
-      `INSERT INTO item (subcategory_id, code, name, aliases, default_unit, attrs) VALUES ($1, $2, $3, $4, 'USD', $5)
-       ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name, aliases = EXCLUDED.aliases, attrs = EXCLUDED.attrs RETURNING id`,
-      [other, `old:${get(r, 'id') || product.toLowerCase()}`, product, aliases.slice(1), JSON.stringify({ group, oldType: type, naics: naics || null, hsn: get(r, 'HSN_code') || null, isic: get(r, 'ISIC_code') || null, capital: /capital/i.test(type) })])).rows[0];
-    created++;
-    await c.query(`UPDATE factor SET status = 'superseded' WHERE item_id = $1 AND source_id = $2 AND status = 'active'`, [it.id, src]);
-    for (const [colName, unit, py] of [['EFkgC02e_ccy', opts.currency, opts.priceYear], ['EFkgC02e_kg', 'kg', null], ['EFkgC02e_tonnes', 't', null], ['EFkgC02e_litres', 'L', null]] as const) {
-      const v = Number(get(r, colName));
-      if (!get(r, colName) || !Number.isFinite(v) || v <= 0) continue;
-      await c.query(
-        `INSERT INTO factor (item_id, source_id, region, basis, unit, co2e, valid_from, valid_to, price_year, note, created_by)
-         VALUES ($1,$2,'GLOBAL','scope3',$3,$4,'2000-01-01','2100-12-31',$5,$6,$7)`,
-        [it.id, src, unit, v, py, `Previous Ekotrace list${get(r, 'reference') ? `: ${get(r, 'reference')}` : ''}`, opts.createdBy ?? 'importer']);
-      factors++;
-    }
+  return [...out.values()];
+}
+
+const slugOf = (s: string) => s.toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60);
+
+export async function importOldProducts(c: Tx, products: OldProduct[], opts: { createdBy?: string } = {}): Promise<OldImport> {
+  // EPA factor per NAICS code (active, the real file — not the demo placeholders)
+  const epa = new Map<string, { item: number; factor: number; co2e: number; source: number; price: number }>((await c.query(
+    `SELECT i.attrs->>'naics' AS naics, i.id AS item, f.id AS factor, f.co2e::float8 AS co2e, f.source_id AS source, f.price_year AS price
+       FROM item i JOIN factor f ON f.item_id = i.id AND f.status = 'active' JOIN factor_source s ON s.id = f.source_id
+      WHERE i.code LIKE 'epa:naics:%' AND s.code LIKE 'EPA-SC-%'`)).rows.map((r) => [r.naics, r]));
+  if (!epa.size) throw new Error('Load the EPA supply chain factor file first');
+  const codes = [...epa.keys()];
+  // 2012 NAICS codes merged in 2017 (327121 → 327120): same 5 digits; a few codes of the old list that
+  // are not NAICS codes → the closest EPA code. Government administration (92) has no EPA factor.
+  const CLOSEST: Record<string, string> = { 333291: '333249', 333293: '333249', 333220: '333249', 441330: '441310', 521120: '521110', 521130: '521110', 521140: '521110', 115120: '115116' };
+  const resolve = (n: string) => epa.has(n) ? n : (CLOSEST[n] && epa.has(CLOSEST[n]) ? CLOSEST[n]! : null) ?? codes.find((x) => x === `${n.slice(0, 5)}0`) ?? codes.find((x) => x.startsWith(n.slice(0, 5))) ?? null;
+  const subs = new Map<string, number>((await c.query(`SELECT s.code, s.id FROM subcategory s JOIN category c ON c.id = s.category_id WHERE c.code = 'purchased_goods'`)).rows.map((r) => [r.code, r.id]));
+  const naicsMapped: { from: string; to: string }[] = [], notFound: string[] = [];
+  let created = 0, updated = 0;
+  for (const p of products) {
+    const n = resolve(p.naics);
+    if (!n) { notFound.push(`${p.product} (NAICS ${p.naics || '—'})`); continue; }
+    if (n !== p.naics && !naicsMapped.some((m) => m.from === p.naics)) naicsMapped.push({ from: p.naics, to: n });
+    const e = epa.get(n)!;
+    const code = `old:${slugOf(p.type || 'x')}:${n}:${slugOf(p.product)}`;
+    const capital = /capital/i.test(p.type);
+    const attrs = { naics: n, group: [p.category, p.subcategory].filter(Boolean).join(' › '), oldType: p.type, capital, otherCategory: p.otherCategory, source: 'previous Ekotrace list' };
+    const r = (await c.query(
+      `INSERT INTO item (subcategory_id, code, name, default_unit, attrs, sort) VALUES ($1, $2, $3, 'USD', $4, 200)
+       ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name, attrs = EXCLUDED.attrs, active = true RETURNING id, (xmax = 0) AS inserted`,
+      [subs.get(sectorOf(n)) ?? subs.get('other'), code, p.product, JSON.stringify(attrs)])).rows[0];
+    r.inserted ? created++ : updated++;
+    await c.query(`UPDATE factor SET status = 'superseded' WHERE item_id = $1 AND status = 'active' AND (co2e <> $2 OR source_id <> $3)`, [r.id, e.co2e, e.source]);
+    await c.query(
+      `INSERT INTO factor (item_id, source_id, region, basis, unit, co2e, valid_from, valid_to, price_year, note, created_by)
+       SELECT $1, $2, 'US', 'scope3', 'USD', $3, '2000-01-01', '2100-12-31', $4, $5, $6
+        WHERE NOT EXISTS (SELECT 1 FROM factor WHERE item_id = $1 AND status = 'active')`,
+      [r.id, e.source, e.co2e, e.price, `EPA factor of NAICS ${n} (product of the previous Ekotrace list)`, opts.createdBy ?? 'importer']);
   }
-  if (!l.categories) notes.push('Category names not supplied (purchase_category): category ids used instead.');
-  return { linked, created, factors, skipped, notes };
+  return { products: products.length, created, updated, naicsMapped, notFound };
 }

@@ -1,0 +1,1646 @@
+product,naics,type,category,subcategory,otherCategory
+"Cereal - Barley grain",111199,"Standard Goods","Agriculture and animal husbandry","Non perennial crops",0
+"Cereal - Maize grain",111150,"Standard Goods","Agriculture and animal husbandry","Non perennial crops",0
+"Cereal - Millet",111199,"Standard Goods","Agriculture and animal husbandry","Non perennial crops",0
+"Cereal - Oat grain",111199,"Standard Goods","Agriculture and animal husbandry","Non perennial crops",0
+"Cereal - Rye grain",111199,"Standard Goods","Agriculture and animal husbandry","Non perennial crops",0
+"Cereal - Sorghum",111199,"Standard Goods","Agriculture and animal husbandry","Non perennial crops",0
+"Cereal - Sweet corn",111150,"Standard Goods","Agriculture and animal husbandry","Non perennial crops",0
+"Cereal - Wheat grain",111140,"Standard Goods","Agriculture and animal husbandry","Non perennial crops",0
+"Rice - Basmati",111160,"Standard Goods","Agriculture and animal husbandry","Non perennial crops",0
+"Rice - Non Basmati",111160,"Standard Goods","Agriculture and animal husbandry","Non perennial crops",0
+"Rice - Non Basmati straw",111160,"Standard Goods","Agriculture and animal husbandry","Non perennial crops",0
+"Leguminous crop - Chickpea",111199,"Standard Goods","Agriculture and animal husbandry","Non perennial crops",0
+"Leguminous crop - Fava bean",111199,"Standard Goods","Agriculture and animal husbandry","Non perennial crops",0
+"Leguminous crop - Lentil",111199,"Standard Goods","Agriculture and animal husbandry","Non perennial crops",0
+"Leguminous crop - Navy bean",111199,"Standard Goods","Agriculture and animal husbandry","Non perennial crops",0
+"Leguminous crop - Peanut",111120,"Standard Goods","Agriculture and animal husbandry","Non perennial crops",0
+"Leguminous crop - Pinto bean",111199,"Standard Goods","Agriculture and animal husbandry","Non perennial crops",0
+"Leguminous crop - Pea",111199,"Standard Goods","Agriculture and animal husbandry","Non perennial crops",0
+"Leguminous crop - Red kidney bean",111199,"Standard Goods","Agriculture and animal husbandry","Non perennial crops",0
+"Leguminous crop - Soybean",111110,"Standard Goods","Agriculture and animal husbandry","Non perennial crops",0
+"Oil seed - Castor bean",111120,"Standard Goods","Agriculture and animal husbandry","Non perennial crops",0
+"Oil seed - Jatropha",111120,"Standard Goods","Agriculture and animal husbandry","Non perennial crops",0
+"Oil seed - Linseed",111120,"Standard Goods","Agriculture and animal husbandry","Non perennial crops",0
+"Oil seed - Mustard",111120,"Standard Goods","Agriculture and animal husbandry","Non perennial crops",0
+"Oil seed - Rape seed",111120,"Standard Goods","Agriculture and animal husbandry","Non perennial crops",0
+"Oil seed - Sesame seed",111120,"Standard Goods","Agriculture and animal husbandry","Non perennial crops",0
+"Oil seed - Sunflower seed",111120,"Standard Goods","Agriculture and animal husbandry","Non perennial crops",0
+"All other grains",111199,"Standard Goods","Agriculture and animal husbandry","Non perennial crops",0
+"Vegetable - Aubergine",111219,"Standard Goods","Agriculture and animal husbandry","Non perennial crops",0
+"Vegetable - Broccoli",111219,"Standard Goods","Agriculture and animal husbandry","Non perennial crops",0
+"Vegetable - Cabbage",111219,"Standard Goods","Agriculture and animal husbandry","Non perennial crops",0
+"Vegetable - Cauliflower",111219,"Standard Goods","Agriculture and animal husbandry","Non perennial crops",0
+"Vegetable - Celery",111219,"Standard Goods","Agriculture and animal husbandry","Non perennial crops",0
+"Vegetable - Coriander",111219,"Standard Goods","Agriculture and animal husbandry","Non perennial crops",0
+"Vegetable - Cucumber",111219,"Standard Goods","Agriculture and animal husbandry","Non perennial crops",0
+"Vegetable - Fennel",111219,"Standard Goods","Agriculture and animal husbandry","Non perennial crops",0
+"Vegetable - Asparagus",111219,"Standard Goods","Agriculture and animal husbandry","Non perennial crops",0
+"Vegetable - Lettuce",111219,"Standard Goods","Agriculture and animal husbandry","Non perennial crops",0
+"Vegetable - Melons",111219,"Standard Goods","Agriculture and animal husbandry","Non perennial crops",0
+"Vegetable - Spinach",111219,"Standard Goods","Agriculture and animal husbandry","Non perennial crops",0
+"Vegetable - Tomato",111219,"Standard Goods","Agriculture and animal husbandry","Non perennial crops",0
+"Vegetable - Zucchini",111219,"Standard Goods","Agriculture and animal husbandry","Non perennial crops",0
+"Other Vegetables (except potato)",111219,"Standard Goods","Agriculture and animal husbandry","Non perennial crops",0
+"Root & tuber - Carrot",111211,"Standard Goods","Agriculture and animal husbandry","Non perennial crops",0
+"Root & tuber - Onion",111211,"Standard Goods","Agriculture and animal husbandry","Non perennial crops",0
+"Root & tuber - Potato",111211,"Standard Goods","Agriculture and animal husbandry","Non perennial crops",0
+"Root & tuber - Radish",111211,"Standard Goods","Agriculture and animal husbandry","Non perennial crops",0
+"Root & tuber - Sugar beet",111211,"Standard Goods","Agriculture and animal husbandry","Non perennial crops",0
+"Fibers - Flax",111199,"Standard Goods","Agriculture and animal husbandry","Non perennial crops",0
+"Fibers - Jute",111199,"Standard Goods","Agriculture and animal husbandry","Non perennial crops",0
+"Fibers - kenaf",111199,"Standard Goods","Agriculture and animal husbandry","Non perennial crops",0
+"Fibers - Cotton",111199,"Standard Goods","Agriculture and animal husbandry","Non perennial crops",0
+"Fibers - Sugarcane",111199,"Standard Goods","Agriculture and animal husbandry","Non perennial crops",0
+"Fibers - Sun hemp",111199,"Standard Goods","Agriculture and animal husbandry","Non perennial crops",0
+"Fodder crop - Alfaalfa grass",111940,"Standard Goods","Agriculture and animal husbandry","Non perennial crops",0
+"Fodder crop - Clover",111940,"Standard Goods","Agriculture and animal husbandry","Non perennial crops",0
+"Fodder crop - Coriander",111940,"Standard Goods","Agriculture and animal husbandry","Non perennial crops",0
+"Fodder crop - Fodder beet",111940,"Standard Goods","Agriculture and animal husbandry","Non perennial crops",0
+"Fodder crop - Grass",111940,"Standard Goods","Agriculture and animal husbandry","Non perennial crops",0
+"Fodder crop - Hay",111940,"Standard Goods","Agriculture and animal husbandry","Non perennial crops",0
+"Soft fruits - Apple",111310,"Standard Goods","Agriculture and animal husbandry","Perennial crops",0
+"Soft fruits - Apricot",111320,"Standard Goods","Agriculture and animal husbandry","Perennial crops",0
+"Soft fruits - Banana",111333,"Standard Goods","Agriculture and animal husbandry","Perennial crops",0
+"Soft fruits - Grapes",111332,"Standard Goods","Agriculture and animal husbandry","Perennial crops",0
+"Soft fruits - Kiwi",111339,"Standard Goods","Agriculture and animal husbandry","Perennial crops",0
+"Soft fruits - Lemon",111310,"Standard Goods","Agriculture and animal husbandry","Perennial crops",0
+"Soft fruits - Mandarins",111310,"Standard Goods","Agriculture and animal husbandry","Perennial crops",0
+"Soft fruits - Mango",111331,"Standard Goods","Agriculture and animal husbandry","Perennial crops",0
+"Soft fruits - Olive",111335,"Standard Goods","Agriculture and animal husbandry","Perennial crops",0
+"Soft fruits - Orange",111310,"Standard Goods","Agriculture and animal husbandry","Perennial crops",0
+"Soft fruits - Papaya",111339,"Standard Goods","Agriculture and animal husbandry","Perennial crops",0
+"Soft fruits - Peach",111332,"Standard Goods","Agriculture and animal husbandry","Perennial crops",0
+"Soft fruits - Pear",111332,"Standard Goods","Agriculture and animal husbandry","Perennial crops",0
+"Soft fruits - Pomegranate",111339,"Standard Goods","Agriculture and animal husbandry","Perennial crops",0
+"Soft fruits - Pineapple",111339,"Standard Goods","Agriculture and animal husbandry","Perennial crops",0
+"Soft fruits - Strawberry",111339,"Standard Goods","Agriculture and animal husbandry","Perennial crops",0
+"Soft fruits - Berry (except strawberry)",111339,"Standard Goods","Agriculture and animal husbandry","Perennial crops",0
+"Hard fruit - Almond",111421,"Standard Goods","Agriculture and animal husbandry","Perennial crops",0
+"Hard fruit - Cashew",111422,"Standard Goods","Agriculture and animal husbandry","Perennial crops",0
+"Hard fruit - Coconut",111422,"Standard Goods","Agriculture and animal husbandry","Perennial crops",0
+"Hard fruit - Avocado",111339,"Standard Goods","Agriculture and animal husbandry","Perennial crops",0
+"Hard fruit - Palm date",111339,"Standard Goods","Agriculture and animal husbandry","Perennial crops",0
+"Hard fruit - Palm fruit",111339,"Standard Goods","Agriculture and animal husbandry","Perennial crops",0
+"Other Noncitrus Fruits",111339,"Standard Goods","Agriculture and animal husbandry","Perennial crops",0
+"Beverage crop - Cocoa bean",111411,"Standard Goods","Agriculture and animal husbandry","Perennial crops",0
+"Beverage crop - Coffee",111411,"Standard Goods","Agriculture and animal husbandry","Perennial crops",0
+"Beverage crop - Mulberry",111411,"Standard Goods","Agriculture and animal husbandry","Perennial crops",0
+"Beverage crop - Tea",111411,"Standard Goods","Agriculture and animal husbandry","Perennial crops",0
+"Spice, aroma or drug crop - Bell pepper",111419,"Standard Goods","Agriculture and animal husbandry","Perennial crops",0
+"Spice, aroma or drug crop - Chilli",111419,"Standard Goods","Agriculture and animal husbandry","Perennial crops",0
+"Spice, aroma or drug crop - Vanilla",111419,"Standard Goods","Agriculture and animal husbandry","Perennial crops",0
+"Spice, aroma or drug crop - Mint",111419,"Standard Goods","Agriculture and animal husbandry","Perennial crops",0
+"All Other Miscellaneous Crops",111998,"Standard Goods","Agriculture and animal husbandry","Perennial crops",0
+"Seedling - Asparagus",113210,"Standard Goods","Agriculture and animal husbandry","Plant propagules",0
+"Seedling - Eucalyptus",113110,"Standard Goods","Agriculture and animal husbandry","Plant propagules",0
+"Seedling - Fruit tree",113210,"Standard Goods","Agriculture and animal husbandry","Plant propagules",0
+"Seedling - Mango",113210,"Standard Goods","Agriculture and animal husbandry","Plant propagules",0
+"Seedling - Mint",113210,"Standard Goods","Agriculture and animal husbandry","Plant propagules",0
+"Seedling - Onion",113210,"Standard Goods","Agriculture and animal husbandry","Plant propagules",0
+"Seedling - Strawberry",113210,"Standard Goods","Agriculture and animal husbandry","Plant propagules",0
+"Seedling - Tomato",111219,"Standard Goods","Agriculture and animal husbandry","Plant propagules",0
+"Seedling - Tree",113210,"Standard Goods","Agriculture and animal husbandry","Plant propagules",0
+"Seedling - Vanilla",111419,"Standard Goods","Agriculture and animal husbandry","Plant propagules",0
+"Miscanthus Rhizome",111199,"Standard Goods","Agriculture and animal husbandry","Plant propagules",0
+"Willow stem cutting",111421,"Standard Goods","Agriculture and animal husbandry","Plant propagules",0
+"Mushroom (cultivated)",111411,"Standard Goods","Agriculture and animal husbandry","Plant propagules",0
+"Other Food Crops Grown Under Cover",111998,"Standard Goods","Agriculture and animal husbandry","Plant propagules",0
+"Beef",112111,"Standard Goods","Agriculture and animal husbandry","Animal products",0
+"Pork",112210,"Standard Goods","Agriculture and animal husbandry","Animal products",0
+"Lamb/Mutton",112410,"Standard Goods","Agriculture and animal husbandry","Animal products",0
+"Goat Farming",112420,"Standard Goods","Agriculture and animal husbandry","Animal products",0
+"Sheep Farming",112410,"Standard Goods","Agriculture and animal husbandry","Animal products",0
+"Broilers and Other Meat-Type Chicken",112320,"Standard Goods","Agriculture and animal husbandry","Animal products",0
+"Turkey",112330,"Standard Goods","Agriculture and animal husbandry","Animal products",0
+"Other Poultry (e.g., ducks, geese)",112390,"Standard Goods","Agriculture and animal husbandry","Animal products",0
+"Game meat (Venison, Rabbit)",112990,"Standard Goods","Agriculture and animal husbandry","Animal products",0
+"Dual-Purpose Cattle Ranching and Farming",112130,"Standard Goods","Agriculture and animal husbandry","Animal products",0
+"Chicken Eggs",112310,"Standard Goods","Agriculture and animal husbandry","Animal products",0
+"Milk",112120,"Standard Goods","Agriculture and animal husbandry","Animal products",0
+"Cheese",311513,"Standard Goods","Agriculture and animal husbandry","Animal products",0
+"Butter",311512,"Standard Goods","Agriculture and animal husbandry","Animal products",0
+"Yogurt",311514,"Standard Goods","Agriculture and animal husbandry","Animal products",0
+"Cream",311514,"Standard Goods","Agriculture and animal husbandry","Animal products",0
+"Ghee",311512,"Standard Goods","Agriculture and animal husbandry","Animal products",0
+"Hides/Leather",316110,"Standard Goods","Agriculture and animal husbandry","Animal products",0
+"Wool",112111,"Standard Goods","Agriculture and animal husbandry","Animal products",0
+"Silk",112920,"Standard Goods","Agriculture and animal husbandry","Animal products",0
+"Bones",311119,"Standard Goods","Agriculture and animal husbandry","Animal products",0
+"Horns/Antlers",311119,"Standard Goods","Agriculture and animal husbandry","Animal products",0
+"Feathers",311119,"Standard Goods","Agriculture and animal husbandry","Animal products",0
+"Lanolin (from sheep wool)",325998,"Standard Goods","Agriculture and animal husbandry","Animal products",0
+"Honey",112910,"Standard Goods","Agriculture and animal husbandry","Animal products",0
+"Beeswax",115310,"Standard Goods","Agriculture and animal husbandry","Animal products",0
+"Royal jelly",115310,"Standard Goods","Agriculture and animal husbandry","Animal products",0
+"Propolis",115310,"Standard Goods","Agriculture and animal husbandry","Animal products",0
+"Agarwood",113210,"Standard Goods","Forestry and logging","Silviculture",0
+"Eucalyptus",113210,"Standard Goods","Forestry and logging","Silviculture",0
+"Mahogany",113210,"Standard Goods","Forestry and logging","Silviculture",0
+"Pine",113210,"Standard Goods","Forestry and logging","Silviculture",0
+"Polar",113210,"Standard Goods","Forestry and logging","Silviculture",0
+"Red Sanders",113210,"Standard Goods","Forestry and logging","Silviculture",0
+"Rubber",113210,"Standard Goods","Forestry and logging","Silviculture",0
+"Sal",113210,"Standard Goods","Forestry and logging","Silviculture",0
+"Sandalwood",113210,"Standard Goods","Forestry and logging","Silviculture",0
+"Teak",113210,"Standard Goods","Forestry and logging","Silviculture",0
+"Willow",113210,"Standard Goods","Forestry and logging","Silviculture",0
+"Charcoal",113310,"Standard Goods","Forestry and logging","Wood products",0
+"Clefting/splitting of energy wood",113310,"Standard Goods","Forestry and logging","Wood products",0
+"Sawlog and veneer log",113310,"Standard Goods","Forestry and logging","Wood products",0
+"Bark chips",113310,"Standard Goods","Forestry and logging","Wood products",0
+"Delimbing/sorting",113310,"Standard Goods","Forestry and logging","Wood products",0
+"Forwarding",113310,"Standard Goods","Forestry and logging","Wood products",0
+"Cleft timber",113310,"Standard Goods","Forestry and logging","Wood products",0
+"Pulpwood",113310,"Standard Goods","Forestry and logging","Wood products",0
+"Wood chips",113310,"Standard Goods","Forestry and logging","Wood products",0
+"Bundle, energy wood",113310,"Standard Goods","Forestry and logging","Wood products",0
+"Skidding",113310,"Standard Goods","Forestry and logging","Wood products",0
+"Wood chipping",113310,"Standard Goods","Forestry and logging","Wood products",0
+"Cable yarding",113310,"Standard Goods","Forestry and logging","Wood products",0
+"Bamboo culm",113210,"Standard Goods","Forestry and logging","Non-Wood products",0
+"Cork, raw",113210,"Standard Goods","Forestry and logging","Non-Wood products",0
+"Cork slab",113210,"Standard Goods","Forestry and logging","Non-Wood products",0
+"Fish - Anchovy",114111,"Standard Goods","Fishing & Aquaculture","Marine",0
+"Fish - Hake",114111,"Standard Goods","Fishing & Aquaculture","Marine",0
+"Fish - Tuna",114111,"Standard Goods","Fishing & Aquaculture","Marine",0
+"Fish - Small pelagic fish",114111,"Standard Goods","Fishing & Aquaculture","Marine",0
+"Fish - Mackerel",114111,"Standard Goods","Fishing & Aquaculture","Marine",0
+"Fish - Sardines",114111,"Standard Goods","Fishing & Aquaculture","Marine",0
+"Fish - Cod",114111,"Standard Goods","Fishing & Aquaculture","Marine",0
+"Fish - Herring",114111,"Standard Goods","Fishing & Aquaculture","Marine",0
+"Shellfish and Mollusks - Shrimp",114112,"Standard Goods","Fishing & Aquaculture","Marine",0
+"Shellfish and Mollusks -Prawns",114112,"Standard Goods","Fishing & Aquaculture","Marine",0
+"Shellfish and Mollusks -Lobsters",114112,"Standard Goods","Fishing & Aquaculture","Marine",0
+"Shellfish and Mollusks -Oysters",114112,"Standard Goods","Fishing & Aquaculture","Marine",0
+"Shellfish and Mollusks -Mussels",114112,"Standard Goods","Fishing & Aquaculture","Marine",0
+"Shellfish and Mollusks -Scallops",114112,"Standard Goods","Fishing & Aquaculture","Marine",0
+"Seaweed and Algae - Nori",114119,"Standard Goods","Fishing & Aquaculture","Marine",0
+"Seaweed and Algae - Kelp",114119,"Standard Goods","Fishing & Aquaculture","Marine",0
+"Seaweed and Algae - Spirulina",114119,"Standard Goods","Fishing & Aquaculture","Marine",0
+"Seaweed and Algae - Agar",114119,"Standard Goods","Fishing & Aquaculture","Marine",0
+"Seaweed and Algae - Carrageenan",114119,"Standard Goods","Fishing & Aquaculture","Marine",0
+"Industrial goods - Fish Oil",311710,"Standard Goods","Fishing & Aquaculture","Marine",0
+"Industrial goods - Fishmeal",311710,"Standard Goods","Fishing & Aquaculture","Marine",0
+"Industrial goods - Sea Salt",212393,"Standard Goods","Fishing & Aquaculture","Marine",0
+"Industrial goods - Chitosan",325199,"Standard Goods","Fishing & Aquaculture","Marine",0
+"Ornamental - Coral Fragments",114119,"Standard Goods","Fishing & Aquaculture","Marine",0
+"Ornamental - Decorative Marine Fish",114119,"Standard Goods","Fishing & Aquaculture","Marine",0
+"Ornamental - Marine Plants",114119,"Standard Goods","Fishing & Aquaculture","Marine",0
+"Fish - Tilapia",112511,"Standard Goods","Fishing & Aquaculture","Aquaculture",0
+"Fish - Catfish",112512,"Standard Goods","Fishing & Aquaculture","Aquaculture",0
+"Fish - Rohu",112519,"Standard Goods","Fishing & Aquaculture","Aquaculture",0
+"Fish - Pangasius",112519,"Standard Goods","Fishing & Aquaculture","Aquaculture",0
+"Fish - Trout",112519,"Standard Goods","Fishing & Aquaculture","Aquaculture",0
+"Fish - Koi Fish",112519,"Standard Goods","Fishing & Aquaculture","Aquaculture",0
+"Fish - Guppies",112519,"Standard Goods","Fishing & Aquaculture","Aquaculture",0
+"Fish - Angelfish",112519,"Standard Goods","Fishing & Aquaculture","Aquaculture",0
+"Fish - Tetras",112519,"Standard Goods","Fishing & Aquaculture","Aquaculture",0
+"Freshwater Prawns",112519,"Standard Goods","Fishing & Aquaculture","Aquaculture",0
+"Crayfish",112519,"Standard Goods","Fishing & Aquaculture","Aquaculture",0
+"Water Hyacinth",112519,"Standard Goods","Fishing & Aquaculture","Aquaculture",0
+"Duckweed",112519,"Standard Goods","Fishing & Aquaculture","Aquaculture",0
+"Fish Feed",311119,"Standard Goods","Fishing & Aquaculture","Aquaculture",0
+"Aerators",333415,"Standard Goods","Fishing & Aquaculture","Aquaculture",0
+"Fish Nets and Cages",314994,"Standard Goods","Fishing & Aquaculture","Aquaculture",0
+"Water Testing Kits",334516,"Standard Goods","Fishing & Aquaculture","Aquaculture",0
+"Hard coal",212112,"Standard Goods","Mining, Quarrying, Oil and Gas","Fuel",1
+"Lignite",212111,"Standard Goods","Mining, Quarrying, Oil and Gas","Fuel",1
+"Bituminous",212112,"Standard Goods","Mining, Quarrying, Oil and Gas","Fuel",1
+"Petroleum",211120,"Standard Goods","Mining, Quarrying, Oil and Gas","Fuel",1
+"Natural gas",211130,"Standard Goods","Mining, Quarrying, Oil and Gas","Fuel",1
+"Barite",212399,"Standard Goods","Mining, Quarrying, Oil and Gas","Non-ferrous metal ores",0
+"Bauxite",212322,"Standard Goods","Mining, Quarrying, Oil and Gas","Non-ferrous metal ores",0
+"Lead",331410,"Standard Goods","Mining, Quarrying, Oil and Gas","Non-ferrous metal ores",0
+"Zinc",331410,"Standard Goods","Mining, Quarrying, Oil and Gas","Non-ferrous metal ores",0
+"Mischmetal",212299,"Standard Goods","Mining, Quarrying, Oil and Gas","Non-ferrous metal ores",0
+"Chromite ore",212221,"Standard Goods","Mining, Quarrying, Oil and Gas","Non-ferrous metal ores",0
+"Copper",331410,"Standard Goods","Mining, Quarrying, Oil and Gas","Non-ferrous metal ores",0
+"Molybdenite",212299,"Standard Goods","Mining, Quarrying, Oil and Gas","Non-ferrous metal ores",0
+"Gold",212221,"Standard Goods","Mining, Quarrying, Oil and Gas","Non-ferrous metal ores",0
+"Silver",212222,"Standard Goods","Mining, Quarrying, Oil and Gas","Non-ferrous metal ores",0
+"Pig iron",331110,"Standard Goods","Mining, Quarrying, Oil and Gas","Non-ferrous metal ores",0
+"Rutile",212399,"Standard Goods","Mining, Quarrying, Oil and Gas","Non-ferrous metal ores",0
+"Titania slag",331491,"Standard Goods","Mining, Quarrying, Oil and Gas","Non-ferrous metal ores",0
+"Zircon",212399,"Standard Goods","Mining, Quarrying, Oil and Gas","Non-ferrous metal ores",0
+"Ilmenite",212299,"Standard Goods","Mining, Quarrying, Oil and Gas","Non-ferrous metal ores",0
+"Magnetite",212210,"Standard Goods","Mining, Quarrying, Oil and Gas","Non-ferrous metal ores",0
+"Magnesium oxide",212399,"Standard Goods","Mining, Quarrying, Oil and Gas","Non-ferrous metal ores",0
+"Manganese",212299,"Standard Goods","Mining, Quarrying, Oil and Gas","Non-ferrous metal ores",0
+"Pyrochlore",212399,"Standard Goods","Mining, Quarrying, Oil and Gas","Non-ferrous metal ores",0
+"Nickel",331410,"Standard Goods","Mining, Quarrying, Oil and Gas","Non-ferrous metal ores",0
+"Palladium",212299,"Standard Goods","Mining, Quarrying, Oil and Gas","Non-ferrous metal ores",0
+"Platinum",212299,"Standard Goods","Mining, Quarrying, Oil and Gas","Non-ferrous metal ores",0
+"Rhodium",212299,"Standard Goods","Mining, Quarrying, Oil and Gas","Non-ferrous metal ores",0
+"Cerium Oxide",212299,"Standard Goods","Mining, Quarrying, Oil and Gas","Non-ferrous metal ores",0
+"Dysprodium Oxide",212299,"Standard Goods","Mining, Quarrying, Oil and Gas","Non-ferrous metal ores",0
+"Erbium Oxide",212299,"Standard Goods","Mining, Quarrying, Oil and Gas","Non-ferrous metal ores",0
+"Europium Oxide",212299,"Standard Goods","Mining, Quarrying, Oil and Gas","Non-ferrous metal ores",0
+"Gadolinium Oxide",212299,"Standard Goods","Mining, Quarrying, Oil and Gas","Non-ferrous metal ores",0
+"Holmium Oxide",212299,"Standard Goods","Mining, Quarrying, Oil and Gas","Non-ferrous metal ores",0
+"Lanthanum Oxide",212299,"Standard Goods","Mining, Quarrying, Oil and Gas","Non-ferrous metal ores",0
+"Neodynium Oxide",212299,"Standard Goods","Mining, Quarrying, Oil and Gas","Non-ferrous metal ores",0
+"Praseodymium Oxide",212299,"Standard Goods","Mining, Quarrying, Oil and Gas","Non-ferrous metal ores",0
+"Samarium Oxide",212299,"Standard Goods","Mining, Quarrying, Oil and Gas","Non-ferrous metal ores",0
+"Terbium Oxide",212299,"Standard Goods","Mining, Quarrying, Oil and Gas","Non-ferrous metal ores",0
+"Thulium Oxide",212299,"Standard Goods","Mining, Quarrying, Oil and Gas","Non-ferrous metal ores",0
+"Ytterbium Oxide",212299,"Standard Goods","Mining, Quarrying, Oil and Gas","Non-ferrous metal ores",0
+"Hydrogen Fluoride",325180,"Standard Goods","Mining, Quarrying, Oil and Gas","Non-ferrous metal ores",0
+"Mangnesium sulphate",325180,"Standard Goods","Mining, Quarrying, Oil and Gas","Non-ferrous metal ores",0
+"Coal Tar",324199,"Standard Goods","Mining, Quarrying, Oil and Gas","Non-ferrous metal ores",1
+"Sulfur",212391,"Standard Goods","Mining, Quarrying, Oil and Gas","Non-ferrous metal ores",0
+"Uranium-Radium-Vanadium Ore",212291,"Standard Goods","Mining, Quarrying, Oil and Gas","Non-ferrous metal ores",0
+"All Other Metal Ore",212299,"Standard Goods","Mining, Quarrying, Oil and Gas","Non-ferrous metal ores",0
+"Dimension Stone Mining and Quarrying",212311,"Standard Goods","Mining, Quarrying, Oil and Gas","Nonmetallic Mineral Mining and Quarrying",0
+"Crushed and Broken Limestone Mining and Quarrying",212312,"Standard Goods","Mining, Quarrying, Oil and Gas","Nonmetallic Mineral Mining and Quarrying",0
+"Crushed and Broken Granite Mining and Quarrying",212313,"Standard Goods","Mining, Quarrying, Oil and Gas","Nonmetallic Mineral Mining and Quarrying",0
+"Other Crushed and Broken Stone Mining and Quarrying",212319,"Standard Goods","Mining, Quarrying, Oil and Gas","Nonmetallic Mineral Mining and Quarrying",0
+"Construction Sand and Gravel",212321,"Standard Goods","Mining, Quarrying, Oil and Gas","Nonmetallic Mineral Mining and Quarrying",0
+"Industrial Sand Mining",212322,"Standard Goods","Mining, Quarrying, Oil and Gas","Nonmetallic Mineral Mining and Quarrying",0
+"Kaolin and Ball Clay Mining",212324,"Standard Goods","Mining, Quarrying, Oil and Gas","Nonmetallic Mineral Mining and Quarrying",0
+"Clay and Ceramic/Refractory Minerals",212325,"Standard Goods","Mining, Quarrying, Oil and Gas","Nonmetallic Mineral Mining and Quarrying",0
+"Potash, Soda, and Borate Mineral Mining",212391,"Standard Goods","Mining, Quarrying, Oil and Gas","Nonmetallic Mineral Mining and Quarrying",0
+"Phosphate Rock Mining",212392,"Standard Goods","Mining, Quarrying, Oil and Gas","Nonmetallic Mineral Mining and Quarrying",0
+"Other Chemical and Fertilizer Mineral Mining",212393,"Standard Goods","Mining, Quarrying, Oil and Gas","Nonmetallic Mineral Mining and Quarrying",0
+"All Other Nonmetallic Mineral Mining",212399,"Standard Goods","Mining, Quarrying, Oil and Gas","Nonmetallic Mineral Mining and Quarrying",0
+"Autoclaved aerated concrete block",327331,"Standard Goods","Construction","Concrete, cement and plaster",0
+"Hard coal ash",212112,"Standard Goods","Construction","Concrete, cement and plaster",0
+"Cement mortar",327320,"Standard Goods","Construction","Concrete, cement and plaster",0
+"Cement plaster",327320,"Standard Goods","Construction","Concrete, cement and plaster",0
+"Concrete, 25-30MPa",327320,"Standard Goods","Construction","Concrete, cement and plaster",0
+"Concrete slab",327320,"Standard Goods","Construction","Concrete, cement and plaster",0
+"Concrete, normal strength",327320,"Standard Goods","Construction","Concrete, cement and plaster",0
+"Flyash brick",327331,"Standard Goods","Construction","Concrete, cement and plaster",0
+"Cement, Portland",327310,"Standard Goods","Construction","Concrete, cement and plaster",0
+"Cement, Portland Slag",327310,"Standard Goods","Construction","Concrete, cement and plaster",0
+"Cement, Pozzolana Portland",327310,"Standard Goods","Construction","Concrete, cement and plaster",0
+"Cement, unspecified",327310,"Standard Goods","Construction","Concrete, cement and plaster",0
+"Clinker",327310,"Standard Goods","Construction","Concrete, cement and plaster",0
+"Dog and Cat Food",311111,"Standard Goods","Food Products","Pet Food",0
+"Other Animal Food",311119,"Standard Goods","Food Products","Pet Food",0
+"Milled Flour",311211,"Standard Goods","Food Products","Processed Grains and Oilseeds",0
+"Milled Rice",311212,"Standard Goods","Food Products","Processed Grains and Oilseeds",0
+"Malt Manufacturing",311213,"Standard Goods","Food Products","Processed Grains and Oilseeds",0
+"Milled Wet Corn",311221,"Standard Goods","Food Products","Processed Grains and Oilseeds",0
+"Maize Starch",311221,"Standard Goods","Food Products","Processed Grains and Oilseeds",0
+"Maize grain processed",311221,"Standard Goods","Food Products","Processed Grains and Oilseeds",0
+"Maize chop",311221,"Standard Goods","Food Products","Processed Grains and Oilseeds",0
+"Processed Soybean and Other Oilseed",311224,"Standard Goods","Food Products","Processed Grains and Oilseeds",0
+"Refined and Blended Fats and Oils",311225,"Standard Goods","Food Products","Processed Grains and Oilseeds",0
+"Breakfast Cereal",311230,"Standard Goods","Food Products","Processed Grains and Oilseeds",0
+"Coconut Oil",311613,"Standard Goods","Food Products","Edible Oil",0
+"Cotton seed oil",311613,"Standard Goods","Food Products","Edible Oil",0
+"Palm kernel oil",311613,"Standard Goods","Food Products","Edible Oil",0
+"Soyabean oil",311613,"Standard Goods","Food Products","Edible Oil",0
+"Rape Oil",311613,"Standard Goods","Food Products","Edible Oil",0
+"Vegetable Oil",311613,"Standard Goods","Food Products","Edible Oil",0
+"Beet Sugar",311313,"Standard Goods","Food Products","Sugar and Confectionery Products",0
+"Sugar byproduct - Molasses from sugar beet",311314,"Standard Goods","Food Products","Sugar and Confectionery Products",0
+"Sugar byproduct - Sugar beet pulp",311314,"Standard Goods","Food Products","Sugar and Confectionery Products",0
+"Processed sugar - sugar from sugar beet",311313,"Standard Goods","Food Products","Sugar and Confectionery Products",0
+"Sugar byproduct - Bagasse from sugarcane",311314,"Standard Goods","Food Products","Sugar and Confectionery Products",0
+"Cane Sugar",311314,"Standard Goods","Food Products","Sugar and Confectionery Products",0
+"Nonchocolate Confectionery",311340,"Standard Goods","Food Products","Sugar and Confectionery Products",0
+"Chocolate and Confectionery made from Cacao Beans",311351,"Standard Goods","Food Products","Sugar and Confectionery Products",0
+"Confectionery Mfg from Purchased Chocolate",311352,"Standard Goods","Food Products","Sugar and Confectionery Products",0
+"Frozen Fruit, Juice, and Vegetables",311411,"Standard Goods","Food Products","Preserved Fruits and Vegetables and Specialty Food",0
+"Frozen Specialty Foods",311412,"Standard Goods","Food Products","Preserved Fruits and Vegetables and Specialty Food",0
+"Canned Fruits and Vegetables",311421,"Standard Goods","Food Products","Preserved Fruits and Vegetables and Specialty Food",0
+"Specialty Canning",311422,"Standard Goods","Food Products","Preserved Fruits and Vegetables and Specialty Food",0
+"Palm date - conditioned and dried",311423,"Standard Goods","Food Products","Preserved Fruits and Vegetables and Specialty Food",0
+"Dried and Dehydrated Food",311423,"Standard Goods","Food Products","Preserved Fruits and Vegetables and Specialty Food",0
+"Fluid Milk",311511,"Standard Goods","Food Products","Dairy Products",0
+"Creamery Butter",311512,"Standard Goods","Food Products","Dairy Products",0
+"Dry, Condensed, and Evaporated Dairy Products",311514,"Standard Goods","Food Products","Dairy Products",0
+"Buttermilk",311514,"Standard Goods","Food Products","Dairy Products",0
+"Skimmed milk",311514,"Standard Goods","Food Products","Dairy Products",0
+"Whey",311514,"Standard Goods","Food Products","Dairy Products",0
+"Tofu",311514,"Standard Goods","Food Products","Dairy Products",0
+"Soyabean Beverage",311514,"Standard Goods","Food Products","Dairy Products",0
+"Ice Cream / Frozen Dessert",311520,"Standard Goods","Food Products","Dairy Products",0
+"Slaughtered Meat (except Poultry)",311611,"Standard Goods","Food Products","Slaughtered and Processed Meat and Sea Food",0
+"Meat Processed from Carcasses",311612,"Standard Goods","Food Products","Slaughtered and Processed Meat and Sea Food",0
+"Rendered and Processed Meat Byproducts",311613,"Standard Goods","Food Products","Slaughtered and Processed Meat and Sea Food",0
+"Processed Poultry",311615,"Standard Goods","Food Products","Slaughtered and Processed Meat and Sea Food",0
+"Prepared and Packaged Seafood Product",311710,"Standard Goods","Food Products","Slaughtered and Processed Meat and Sea Food",0
+"Canned Fish, Fish meal",311710,"Standard Goods","Food Products","Slaughtered and Processed Meat and Sea Food",0
+"Retail Bakeries",311811,"Standard Goods","Food Products","Bakeries and Tortilla",0
+"Commercial Bakeries",311812,"Standard Goods","Food Products","Bakeries and Tortilla",0
+"Frozen Cakes, Pies, and Other Pastries",311813,"Standard Goods","Food Products","Bakeries and Tortilla",0
+"Cookie and Cracker",311821,"Standard Goods","Food Products","Bakeries and Tortilla",0
+"Dry Pasta, Dough, and Flour Mixes Mfg from Purchased Flour",311824,"Standard Goods","Food Products","Bakeries and Tortilla",0
+"Batter wheat mix",311824,"Standard Goods","Food Products","Bakeries and Tortilla",0
+"Breadcrumbs production",311812,"Standard Goods","Food Products","Bakeries and Tortilla",0
+"Tortilla",311830,"Standard Goods","Food Products","Bakeries and Tortilla",0
+"Roasted Nuts and Peanut Butter",311911,"Standard Goods","Food Products","Other Food Products",0
+"Other Snack Food",311919,"Standard Goods","Food Products","Other Food Products",0
+"Coffee and Tea",311920,"Standard Goods","Food Products","Other Food Products",0
+"Flavoring Syrup and Concentrate",311930,"Standard Goods","Food Products","Other Food Products",0
+"Mayonnaise, Dressing, and Other Prepared Sauce",311941,"Standard Goods","Food Products","Other Food Products",0
+"Spice and Extract",311942,"Standard Goods","Food Products","Other Food Products",0
+"Perishable Prepared Food",311991,"Standard Goods","Food Products","Other Food Products",0
+"All Other Miscellaneous Food",311999,"Standard Goods","Food Products","Other Food Products",0
+"Soft Drinks",312111,"Standard Goods","Beverage and Tobacco Products","Beverage Products",0
+"Bottled Water",312112,"Standard Goods","Beverage and Tobacco Products","Beverage Products",0
+"Ice",312113,"Standard Goods","Beverage and Tobacco Products","Beverage Products",0
+"Breweries, Manufacture of beer, ale, and malt beverages",312120,"Standard Goods","Beverage and Tobacco Products","Beverage Products",0
+"Wines from grapes and other fruits",312130,"Standard Goods","Beverage and Tobacco Products","Beverage Products",0
+"Distilled and Blended spirits",312140,"Standard Goods","Beverage and Tobacco Products","Beverage Products",0
+"Tobacco",312230,"Standard Goods","Beverage and Tobacco Products","Tobacco Products",0
+"Fiber (Flax Fiber, Jute Fiber, Kenaf Fiber), Reeled Raw Silk hank",313110,"Standard Goods","Textile and Apparels","Fiber, Yarn, and Thread",0
+"Broadwoven Fabric",313210,"Standard Goods","Textile and Apparels","Fiber, Yarn, and Thread",0
+"Finished polyster fiber, Synthetic Fiber",313220,"Standard Goods","Textile and Apparels","Fiber, Yarn, and Thread",0
+"Yarn, cotton (open end spinning)",313230,"Standard Goods","Textile and Apparels","Fiber, Yarn, and Thread",0
+"Yarn, cotton (ring spinning)",313230,"Standard Goods","Textile and Apparels","Fiber, Yarn, and Thread",0
+"Yarn, jute",313240,"Standard Goods","Textile and Apparels","Fiber, Yarn, and Thread",0
+"Yarn, kenaf",313240,"Standard Goods","Textile and Apparels","Fiber, Yarn, and Thread",0
+"Yarn, silk (long fibre)",313110,"Standard Goods","Textile and Apparels","Fiber, Yarn, and Thread",0
+"Yarn, silk (short fibre)",313110,"Standard Goods","Textile and Apparels","Fiber, Yarn, and Thread",0
+"Broadwoven Fabric (eg wooven cotton, jute, kenaf, silk)",313210,"Standard Goods","Textile and Apparels","Fabric",0
+"Narrow Fabric Mills and Schiffli Machine Embroidery",313220,"Standard Goods","Textile and Apparels","Fabric",0
+"Nonwoven Fabric",313230,"Standard Goods","Textile and Apparels","Fabric",0
+"Nonwoven Fabric polyester",313230,"Standard Goods","Textile and Apparels","Fabric",0
+"Nonwoven Fabric polypropylene",313230,"Standard Goods","Textile and Apparels","Fabric",0
+"Knitted Fabric",313240,"Standard Goods","Textile and Apparels","Fabric",0
+"Carpets and Rugs",314110,"Standard Goods","Textile and Apparels","Textile Mills Products",0
+"Curtains and Linens",314120,"Standard Goods","Textile and Apparels","Textile Mills Products",0
+"Textile Bags, Canvas",314910,"Standard Goods","Textile and Apparels","Other Textile Mills Products",0
+"Rope, Cordage, Twine, Tire Cord, and Tire Fabric",314994,"Standard Goods","Textile and Apparels","Other Textile Mills Products",0
+"All Other Miscellaneous Textile Products",314999,"Standard Goods","Textile and Apparels","Other Textile Mills Products",0
+"Hosiery and Socks",315110,"Standard Goods","Textile and Apparels","Apparels",0
+"Other Apparel Knitting",315190,"Standard Goods","Textile and Apparels","Apparels",0
+"Cut and Sew Apparel Contractors",315210,"Standard Goods","Textile and Apparels","Cut and Sew Apparels",0
+"Men's and Boys Cut and Sew Apparel",315220,"Standard Goods","Textile and Apparels","Cut and Sew Apparels",0
+"Women's, Girls, and Infants Cut and Sew Apparel",315240,"Standard Goods","Textile and Apparels","Cut and Sew Apparels",0
+"Other Cut and Sew Apparel",315280,"Standard Goods","Textile and Apparels","Cut and Sew Apparels",0
+"Apparel Accessories and Other Apparel",315990,"Standard Goods","Textile and Apparels","Apparel Accessories and Other Apparel",0
+"Leather and Hide Tanning and Finishing",316110,"Standard Goods","Leather Products","Leather and Allied Products",0
+"Footwears",316210,"Standard Goods","Leather Products","Leather and Allied Products",0
+"Women's Handbags and Purses",316992,"Standard Goods","Leather Products","Leather and Allied Products",0
+"All Other Leather Good and Allied Products",316998,"Standard Goods","Leather Products","Leather and Allied Products",0
+"Sawmills",321113,"Standard Goods","Wood Products","Sawmill and Wood Processing",0
+"Wood residue, Bark chips - hardwood, Woodchips",321113,"Standard Goods","Wood Products","Sawmill and Wood Processing",0
+"Suctions, savings - hardwood",321113,"Standard Goods","Wood Products","Sawmill and Wood Processing",0
+"Suctions savings - softwood",321113,"Standard Goods","Wood Products","Sawmill and Wood Processing",0
+"Solid wood - beam (hardwood)",321113,"Standard Goods","Wood Products","Sawmill and Wood Processing",0
+"Solid wood - beam (softwood)",321113,"Standard Goods","Wood Products","Sawmill and Wood Processing",0
+"Solid wood - board (hardwood)",321113,"Standard Goods","Wood Products","Sawmill and Wood Processing",0
+"Solid wood - board (softwood)",321113,"Standard Goods","Wood Products","Sawmill and Wood Processing",0
+"Treated Wood",321114,"Standard Goods","Wood Products","Sawmill and Wood Processing",0
+"Wood preservation - dipping/immersion",321114,"Standard Goods","Wood Products","Sawmill and Wood Processing",0
+"Wood preservation - hot/cold dipping",321114,"Standard Goods","Wood Products","Sawmill and Wood Processing",0
+"Hardwood Veneer and Plywood,, Fibreboard",321211,"Standard Goods","Wood Products","Plywood and Enginnered Wood",0
+"Softwood Veneer and Plywood",321212,"Standard Goods","Wood Products","Plywood and Enginnered Wood",0
+"Engineered Wood Member (except Truss)",321213,"Standard Goods","Wood Products","Plywood and Enginnered Wood",0
+"Truss",321214,"Standard Goods","Wood Products","Plywood and Enginnered Wood",0
+"Reconstituted Wood Products",321219,"Standard Goods","Wood Products","Plywood and Enginnered Wood",0
+"Engineered wood joist",321213,"Standard Goods","Wood Products","Plywood and Enginnered Wood",0
+"Cross laminated timber",321219,"Standard Goods","Wood Products","Plywood and Enginnered Wood",0
+"Particleboard",321211,"Standard Goods","Wood Products","Plywood and Enginnered Wood",0
+"Wood Window and Doors",321911,"Standard Goods","Wood Products","Millwork and Wood Fixtures",0
+"Cut Stock, Resawing Lumber, and Planing",321912,"Standard Goods","Wood Products","Millwork and Wood Fixtures",0
+"Lath - hardwood, Lath - softwood",321912,"Standard Goods","Wood Products","Millwork and Wood Fixtures",0
+"Lath - softwood",321912,"Standard Goods","Wood Products","Millwork and Wood Fixtures",0
+"Wood cladding - softwood",321912,"Standard Goods","Wood Products","Millwork and Wood Fixtures",0
+"Other Millwork (including Flooring)",321918,"Standard Goods","Wood Products","Millwork and Wood Fixtures",0
+"Wood Container and Pallet Mfg",321920,"Standard Goods","Wood Products","Wood Containers and Structures",0
+"Manufactured Home (Mobile Home)",321991,"Standard Goods","Wood Products","Wood Containers and Structures",0
+"Prefabricated Wood Building",321992,"Standard Goods","Wood Products","Wood Containers and Structures",0
+"Bamboo pole",321219,"Standard Goods","Wood Products","Bamboo products",0
+"Flattened bamboo",321219,"Standard Goods","Wood Products","Bamboo products",0
+"Woven bamboo mat",321219,"Standard Goods","Wood Products","Bamboo products",0
+"All Other Miscellaneous Wood Product",321999,"Standard Goods","Wood Products","Miscellaneous Wood Products",0
+"Chemi-thermomechanical Pulp, Sulphate Pulp",322110,"Standard Goods","Pulp, Paper and Paper products","Pulp and Paper Mills",0
+"Cellulose fiber",322110,"Standard Goods","Pulp, Paper and Paper products","Pulp and Paper Mills",0
+"Paper (except Newsprint)",322121,"Standard Goods","Pulp, Paper and Paper products","Pulp and Paper Mills",0
+"Paper - woodfree, coated",322121,"Standard Goods","Pulp, Paper and Paper products","Pulp and Paper Mills",0
+"Paper - woodfree, uncoated",322121,"Standard Goods","Pulp, Paper and Paper products","Pulp and Paper Mills",0
+"Newsprint, Printing paper",322122,"Standard Goods","Pulp, Paper and Paper products","Pulp and Paper Mills",0
+"Paperboard, Core board, Container board",322130,"Standard Goods","Pulp, Paper and Paper products","Pulp and Paper Mills",0
+"Liquid packaging board",322130,"Standard Goods","Pulp, Paper and Paper products","Pulp and Paper Mills",0
+"Kraft paper, Packaging paper",322130,"Standard Goods","Pulp, Paper and Paper products","Pulp and Paper Mills",0
+"Corrugated and Solid Fiber Box",322211,"Standard Goods","Pulp, Paper and Paper products","Converted Paper Products",0
+"Folding Paperboard Box",322212,"Standard Goods","Pulp, Paper and Paper products","Converted Paper Products",0
+"Beverage carton, Composite Packaging",322212,"Standard Goods","Pulp, Paper and Paper products","Converted Paper Products",0
+"Other Paperboard Container",322219,"Standard Goods","Pulp, Paper and Paper products","Converted Paper Products",0
+"Paper Bag and Coated and Treated Paper",322220,"Standard Goods","Pulp, Paper and Paper products","Converted Paper Products",0
+"Stationery Products",322230,"Standard Goods","Pulp, Paper and Paper products","Converted Paper Products",0
+"Sanitary Paper Products",322291,"Standard Goods","Pulp, Paper and Paper products","Converted Paper Products",0
+"Tissue & Hygiene Paper",322299,"Standard Goods","Pulp, Paper and Paper products","Converted Paper Products",0
+"All Other Converted Paper Products",322299,"Standard Goods","Pulp, Paper and Paper products","Converted Paper Products",0
+"Petrochemical",325110,"Standard Goods","Chemical and Chemical Products","Basic Chemicals",0
+"Industrial Gas",325120,"Standard Goods","Chemical and Chemical Products","Basic Chemicals",0
+"Synthetic Dye and Pigment",325130,"Standard Goods","Chemical and Chemical Products","Basic Chemicals",0
+"Other Basic Inorganic Chemical",325180,"Standard Goods","Chemical and Chemical Products","Basic Chemicals",0
+"Ethyl Alcohol",325193,"Standard Goods","Chemical and Chemical Products","Basic Chemicals",1
+"Cyclic Crude, Intermediate, Gum and Wood Chemical",325194,"Standard Goods","Chemical and Chemical Products","Basic Chemicals",0
+"All Other Basic Organic Chemical",325199,"Standard Goods","Chemical and Chemical Products","Basic Chemicals",0
+"Plastics Material and Resin",325211,"Standard Goods","Chemical and Chemical Products","Polymers and Fibers",0
+"Synthetic Rubber",325212,"Standard Goods","Chemical and Chemical Products","Polymers and Fibers",0
+"Artificial and Synthetic Fibers and Filaments",325220,"Standard Goods","Chemical and Chemical Products","Polymers and Fibers",0
+"Nitrogenous Fertilizers",325311,"Standard Goods","Chemical and Chemical Products","Fertilizers and Agrochemicals",0
+"Ammonia",325311,"Standard Goods","Chemical and Chemical Products","Fertilizers and Agrochemicals",0
+"Ammonium Nitrate",325311,"Standard Goods","Chemical and Chemical Products","Fertilizers and Agrochemicals",0
+"Ammonium Sulfate",325311,"Standard Goods","Chemical and Chemical Products","Fertilizers and Agrochemicals",0
+"Calcium Ammonium Nitrate",325311,"Standard Goods","Chemical and Chemical Products","Fertilizers and Agrochemicals",0
+"Calcium Nitrate",325311,"Standard Goods","Chemical and Chemical Products","Fertilizers and Agrochemicals",0
+"Nitric Acid",325311,"Standard Goods","Chemical and Chemical Products","Fertilizers and Agrochemicals",0
+"Sodium Nitrate",325311,"Standard Goods","Chemical and Chemical Products","Fertilizers and Agrochemicals",0
+"Urea",325311,"Standard Goods","Chemical and Chemical Products","Fertilizers and Agrochemicals",0
+"Phosphatic Fertilizers",325312,"Standard Goods","Chemical and Chemical Products","Fertilizers and Agrochemicals",0
+"Diammonium Phosphate",325312,"Standard Goods","Chemical and Chemical Products","Fertilizers and Agrochemicals",0
+"Monoammonium Phosphate",325312,"Standard Goods","Chemical and Chemical Products","Fertilizers and Agrochemicals",0
+"Phosphoric Acid",325312,"Standard Goods","Chemical and Chemical Products","Fertilizers and Agrochemicals",0
+"Fertilizer (Mixing Only)",325314,"Standard Goods","Chemical and Chemical Products","Fertilizers and Agrochemicals",0
+"NPK Fertilizer",325314,"Standard Goods","Chemical and Chemical Products","Fertilizers and Agrochemicals",0
+"Potassium Chloride",325314,"Standard Goods","Chemical and Chemical Products","Fertilizers and Agrochemicals",0
+"Potassium Nitrate",325314,"Standard Goods","Chemical and Chemical Products","Fertilizers and Agrochemicals",0
+"Pesticide and Other Agricultural Chemicals",325320,"Standard Goods","Chemical and Chemical Products","Fertilizers and Agrochemicals",0
+"Medicinal and Botanical Mfg",325411,"Standard Goods","Chemical and Chemical Products","Pharmaceuticals and Diagnostics",0
+"Pharmaceutical Preparation Mfg",325412,"Standard Goods","Chemical and Chemical Products","Pharmaceuticals and Diagnostics",0
+"In-Vitro Diagnostic Substance",325413,"Standard Goods","Chemical and Chemical Products","Pharmaceuticals and Diagnostics",0
+"Biological Product (except Diagnostic)",325414,"Standard Goods","Chemical and Chemical Products","Pharmaceuticals and Diagnostics",0
+"Paint and Coating",325510,"Standard Goods","Chemical and Chemical Products","Paints, Adhesives and Surfactants",0
+"Adhesives",325520,"Standard Goods","Chemical and Chemical Products","Paints, Adhesives and Surfactants",0
+"Surface Active Agent",325613,"Standard Goods","Chemical and Chemical Products","Paints, Adhesives and Surfactants",0
+"Soap and Other Detergent",325611,"Standard Goods","Chemical and Chemical Products","Soap and Toiletries",0
+"Polish and Other Sanitation Goods",325612,"Standard Goods","Chemical and Chemical Products","Soap and Toiletries",0
+"Toilet Preparation",325620,"Standard Goods","Chemical and Chemical Products","Soap and Toiletries",0
+"Printing Ink",325910,"Standard Goods","Chemical and Chemical Products","Other Chemical Products",0
+"Explosives",325920,"Standard Goods","Chemical and Chemical Products","Other Chemical Products",0
+"Custom Compounding of Purchased Resins",325991,"Standard Goods","Chemical and Chemical Products","Other Chemical Products",0
+"Photographic Film, Paper, Plate, and Chemicals",325992,"Standard Goods","Chemical and Chemical Products","Other Chemical Products",0
+"All Other Miscellaneous Chemical Products and Preparation",325998,"Standard Goods","Chemical and Chemical Products","Other Chemical Products",0
+"Petroleum Refineries",324110,"Standard Goods","Petroleum and Coal Products","Petroleum and Coal Products",1
+"Refined OIl Products, Base Oil",324110,"Standard Goods","Petroleum and Coal Products","Petroleum and Coal Products",1
+"Diesel",324110,"Standard Goods","Petroleum and Coal Products","Petroleum and Coal Products",1
+"Heavy Fuel Oil",324110,"Standard Goods","Petroleum and Coal Products","Petroleum and Coal Products",1
+"Kerosene",324110,"Standard Goods","Petroleum and Coal Products","Petroleum and Coal Products",1
+"Light Fuel Oil",324110,"Standard Goods","Petroleum and Coal Products","Petroleum and Coal Products",1
+"LPG",324110,"Standard Goods","Petroleum and Coal Products","Petroleum and Coal Products",1
+"Petrol Unleaded",324110,"Standard Goods","Petroleum and Coal Products","Petroleum and Coal Products",1
+"Refinery Gas",324110,"Standard Goods","Petroleum and Coal Products","Petroleum and Coal Products",1
+"Asphalt Paving Mixture and Blocks",324121,"Standard Goods","Petroleum and Coal Products","Petroleum and Coal Products",0
+"Asphalt Shingle and Coating Materials",324122,"Standard Goods","Petroleum and Coal Products","Petroleum and Coal Products",0
+"Petroleum Lubricating Oil and Grease",324191,"Standard Goods","Petroleum and Coal Products","Petroleum and Coal Products",0
+"All Other Petroleum and Coal Products",324199,"Standard Goods","Petroleum and Coal Products","Petroleum and Coal Products",0
+"Coal Gas",324199,"Standard Goods","Petroleum and Coal Products","Petroleum and Coal Products",1
+"Coke",324199,"Standard Goods","Petroleum and Coal Products","Petroleum and Coal Products",1
+"Hard Coal Briquettes",324199,"Standard Goods","Petroleum and Coal Products","Petroleum and Coal Products",1
+"Petroleum Slack Wax",324199,"Standard Goods","Petroleum and Coal Products","Petroleum and Coal Products",0
+"Plastics Bag and Pouch",326111,"Standard Goods","Plastics and Rubber Products","Plastic Products",0
+"Plastics Packaging Film and Sheet (including Laminated)",326112,"Standard Goods","Plastics and Rubber Products","Plastic Products",0
+"Unlaminated Plastics Film and Sheet (except Packaging)",326113,"Standard Goods","Plastics and Rubber Products","Plastic Products",0
+"Calendering, rigid sheets",326199,"Standard Goods","Plastics and Rubber Products","Plastic Products",0
+"Unlaminated Plastics Profile Shape",326121,"Standard Goods","Plastics and Rubber Products","Plastic Products",0
+"Plastics Pipe and Pipe Fitting",326122,"Standard Goods","Plastics and Rubber Products","Plastic Products",0
+"Laminated Plastics Plate, Sheet (except Packaging), and Shape",326130,"Standard Goods","Plastics and Rubber Products","Plastic Products",0
+"Polystyrene Foam Product",326140,"Standard Goods","Plastics and Rubber Products","Plastic Products",0
+"Urethane and Other Foam Product (except Polystyrene)",326150,"Standard Goods","Plastics and Rubber Products","Plastic Products",0
+"Tube insulation - elastomere",326220,"Standard Goods","Plastics and Rubber Products","Plastic Products",0
+"Plastics Bottles",326160,"Standard Goods","Plastics and Rubber Products","Plastic Products",0
+"Plastics Plumbing Fixtures",326191,"Standard Goods","Plastics and Rubber Products","Plastic Products",0
+"Plastics Containers",326199,"Standard Goods","Plastics and Rubber Products","Plastic Products",0
+"All Other Plastics Products",326199,"Standard Goods","Plastics and Rubber Products","Plastic Products",0
+"Tire Mfg (except Retreading)",326211,"Standard Goods","Plastics and Rubber Products","Rubber Products",0
+"Tire Retreading",326212,"Standard Goods","Plastics and Rubber Products","Rubber Products",0
+"Rubber and Plastics Hoses and Belting",326220,"Standard Goods","Plastics and Rubber Products","Rubber Products",0
+"Rubber Products for Mechanical Use",326291,"Standard Goods","Plastics and Rubber Products","Rubber Products",0
+"Sealing tape",326299,"Standard Goods","Plastics and Rubber Products","Rubber Products",0
+"All Other Rubber Products",326299,"Standard Goods","Plastics and Rubber Products","Rubber Products",0
+"Flat Glass",327211,"Standard Goods","Nonmetallic Mineral Products","Glass and its products",0
+"Solar Glass",327211,"Standard Goods","Nonmetallic Mineral Products","Glass and its products",0
+"Funnel Glass",327211,"Standard Goods","Nonmetallic Mineral Products","Glass and its products",0
+"Heat resistant glass - Borosilicate",327211,"Standard Goods","Nonmetallic Mineral Products","Glass and its products",0
+"Other Pressed and Blown Glass and Glassware",327212,"Standard Goods","Nonmetallic Mineral Products","Glass and its products",0
+"Glass Container",327213,"Standard Goods","Nonmetallic Mineral Products","Glass and its products",0
+"Glass - Laminated/Safety",327215,"Standard Goods","Nonmetallic Mineral Products","Glass and its products",0
+"Glass Product made of Purchased Glass",327213,"Standard Goods","Nonmetallic Mineral Products","Glass and its products",0
+"Cement",327310,"Standard Goods","Nonmetallic Mineral Products","Cement and Concrete",0
+"Ready-Mix Concrete",327320,"Standard Goods","Nonmetallic Mineral Products","Cement and Concrete",0
+"Concrete Block and Bricks",327331,"Standard Goods","Nonmetallic Mineral Products","Cement and Concrete",0
+"Concrete Pipe",327332,"Standard Goods","Nonmetallic Mineral Products","Cement and Concrete",0
+"Other Concrete Product",327390,"Standard Goods","Nonmetallic Mineral Products","Cement and Concrete",0
+"Aluminium Oxide",327991,"Standard Goods","Nonmetallic Mineral Products","Refractory Products",0
+"Kaolin",327992,"Standard Goods","Nonmetallic Mineral Products","Refractory Products",0
+"Fireclay",327993,"Standard Goods","Nonmetallic Mineral Products","Refractory Products",0
+"Other Refractory Products",327999,"Standard Goods","Nonmetallic Mineral Products","Refractory Products",0
+"Adobe Brick",327120,"Standard Goods","Nonmetallic Mineral Products","Clay Building Material",0
+"Ceramic Tile",327120,"Standard Goods","Nonmetallic Mineral Products","Clay Building Material",0
+"Clay Brick",327121,"Standard Goods","Nonmetallic Mineral Products","Clay Building Material",0
+"Clay Plaster",327123,"Standard Goods","Nonmetallic Mineral Products","Clay Building Material",0
+"Clay Roof Tile",327122,"Standard Goods","Nonmetallic Mineral Products","Clay Building Material",0
+"Cobwork",327124,"Standard Goods","Nonmetallic Mineral Products","Clay Building Material",0
+"Light Clay Brick",327121,"Standard Goods","Nonmetallic Mineral Products","Clay Building Material",0
+"Pottery",327112,"Standard Goods","Nonmetallic Mineral Products","Clay Building Material",0
+"Shale Brick",327121,"Standard Goods","Nonmetallic Mineral Products","Clay Building Material",0
+"Other Clay Building Material",327129,"Standard Goods","Nonmetallic Mineral Products","Clay Building Material",0
+"Lime",327410,"Standard Goods","Nonmetallic Mineral Products","Other Mineral Products",0
+"Gypsum Product",327420,"Standard Goods","Nonmetallic Mineral Products","Other Mineral Products",0
+"Abrasive Product eg Silicon Carbide",327910,"Standard Goods","Nonmetallic Mineral Products","Other Mineral Products",0
+"Cut Stone and Stone Product",327991,"Standard Goods","Nonmetallic Mineral Products","Other Mineral Products",0
+"Ground or Treated Mineral and Earth Mfg",327992,"Standard Goods","Nonmetallic Mineral Products","Other Mineral Products",0
+"Mineral Wool",327993,"Standard Goods","Nonmetallic Mineral Products","Other Mineral Products",0
+"All Other Misc. Nonmetallic Mineral Product",327999,"Standard Goods","Nonmetallic Mineral Products","Other Mineral Products",0
+"Steel Wire Drawing",331222,"Standard Goods","Primary Metal and Foundry Products","Iron and Steel Production",0
+"Aluminum Sheet, Plate, and Foil Mfg",331315,"Standard Goods","Primary Metal and Foundry Products","Aluminium Production",0
+"Metal Crown, Closure, and Other Metal Stamping Goods (except Automotive)",332119,"Standard Goods","Fabricated Metal Products","Metal Components and Stamping",0
+"Metal Kitchen Cookware, Utensil, Cutlery, and Flatware",332215,"Standard Goods","Fabricated Metal Products","Metal Components and Stamping",0
+"Saw Blade and Handtool",332216,"Standard Goods","Fabricated Metal Products","Metal Components and Stamping",0
+"Plate Work Mfg",332313,"Standard Goods","Fabricated Metal Products","Fabricated Metal Structures",0
+"Metal Window and Door",332321,"Standard Goods","Fabricated Metal Products","Fabricated Metal Structures",1
+"Sheet Metal Work Mfg",332322,"Standard Goods","Fabricated Metal Products","Fabricated Metal Structures",1
+"Ornamental and Architectural Metal Work Mfg",332323,"Standard Goods","Fabricated Metal Products","Fabricated Metal Structures",1
+"Metal Can Mfg",332431,"Standard Goods","Fabricated Metal Products","Heavy Guage Metal Products",1
+"Other Metal Container Mfg",332439,"Standard Goods","Fabricated Metal Products","Heavy Guage Metal Products",0
+"Hardware Mfg",332510,"Standard Goods","Fabricated Metal Products","Small Metal Products",0
+"Spring Mfg",332613,"Standard Goods","Fabricated Metal Products","Small Metal Products",0
+"Other Fabricated Wire Products",332618,"Standard Goods","Fabricated Metal Products","Small Metal Products",0
+"Machine Shops",332710,"Standard Goods","Fabricated Metal Products","Machining and Surface Treatment",0
+"Bolt, Nut, Screw, Rivet, and Washer",332722,"Standard Goods","Fabricated Metal Products","Machining and Surface Treatment",0
+"Plumbing Fixture Fitting and Trim",332996,"Standard Goods","Fabricated Metal Products","Valves, Bearing & Fittings",1
+"Small Arms Ammunition",332992,"Standard Goods","Fabricated Metal Products","Ammunition and Defense",1
+"Ammunition (except Small Arms) Mfg",332993,"Standard Goods","Fabricated Metal Products","Ammunition and Defense",0
+"Bare Printed Circuit Board",334412,"Standard Goods","Computer and Electronic Products","Electronic Components",1
+"Semiconductor and Related Devices (Diode, Transistor, Integrated Circuit, LED)",334413,"Standard Goods","Computer and Electronic Products","Electronic Components",1
+"Silicon Wafers, Solar Photovoltaic Cells / Modules",334413,"Standard Goods","Computer and Electronic Products","Electronic Components",1
+"Capacitor, Resistor, Coil, Transformer and Other Inductors, Potentiometer",334416,"Standard Goods","Computer and Electronic Products","Electronic Components",1
+"Electronic Connector",334417,"Standard Goods","Computer and Electronic Products","Electronic Components",1
+"Printed Circuit Assembly (Electronic Assembly)",334418,"Standard Goods","Computer and Electronic Products","Electronic Components",1
+"Other Electronic Component",334419,"Standard Goods","Computer and Electronic Products","Electronic Components",0
+"Blank Magnetic and Optical Recording Media",334613,"Standard Goods","Computer and Electronic Products","Magnetic, Optical Media & Software",0
+"Software and Other Prerecorded Compact Disc, Tape, and Record Reproducing",334614,"Standard Goods","Computer and Electronic Products","Magnetic, Optical Media & Software",0
+"Electric Lamp Bulb and Parts",335110,"Standard Goods","Electrical Equipment, Appliance, and Components","Lightening Equipment",0
+"Residential Electric Lighting Fixtures",335121,"Standard Goods","Electrical Equipment, Appliance, and Components","Lightening Equipment",0
+"Other Lighting Equipments - LED Panels, Decorative Lighing",335129,"Standard Goods","Electrical Equipment, Appliance, and Components","Lightening Equipment",0
+"Small Electrical Appliances (eg Fans, Mixers, Toasters, Coffee Maker, Electric Kettle, Mircowave Oven )",335210,"Standard Goods","Electrical Equipment, Appliance, and Components","Household Appliances",0
+"Small Kitchen Appliances eg Coffee Maker, Toaster, Electric Kettle, Mixers",335221,"Standard Goods","Electrical Equipment, Appliance, and Components","Household Appliances",0
+"Cooking Appliances eg Cookstove, Microwave Owen",335220,"Standard Goods","Electrical Equipment, Appliance, and Components","Household Appliances",0
+"Storage Battery (eg Lead-Acid, Li-ion battery), Accumulators",335911,"Standard Goods","Electrical Equipment, Appliance, and Components","Energy Storage and Components",0
+"Primary Battery (AA, AAA, Coin cells)",335912,"Standard Goods","Electrical Equipment, Appliance, and Components","Energy Storage and Components",0
+"Anode, Cathode",335911,"Standard Goods","Electrical Equipment, Appliance, and Components","Energy Storage and Components",0
+"Other Communication and Energy Wire (Copper, Insulated)",335921,"Standard Goods","Electrical Equipment, Appliance, and Components","Cable and Wiring Devices",0
+"Current-Carrying Wiring Device - Plugs, Sockets, Switches",335931,"Standard Goods","Electrical Equipment, Appliance, and Components","Cable and Wiring Devices",0
+"Noncurrent-Carrying Wiring Device - Boxes, Terminals, Connectors",335932,"Standard Goods","Electrical Equipment, Appliance, and Components","Cable and Wiring Devices",0
+"Carbon and Graphite Product",335991,"Standard Goods","Electrical Equipment, Appliance, and Components","Specialised Components and Others",0
+"All Other Miscellaneous Electrical Equipment and Components",335999,"Standard Goods","Electrical Equipment, Appliance, and Components","Specialised Components and Others",0
+"Wood Kitchen Cabinet and Countertop Mfg",337110,"Standard Goods","Furniture and Related Products","Household Furniture - Wood Based",0
+"Nonupholstered Wood Household Furniture Mfg",337122,"Standard Goods","Furniture and Related Products","Household Furniture - Wood Based",0
+"Upholstered Household Furniture Mfg",337121,"Standard Goods","Furniture and Related Products","Household Upholstered Furniture",0
+"Mattress Mfg",337910,"Standard Goods","Furniture and Related Products","Household Upholstered Furniture",0
+"Metal Household Furniture Mfg",337124,"Standard Goods","Furniture and Related Products","Household Furniture - Metal/Mixed Material",0
+"Household Furniture (except Wood and Metal) Mfg",337127,"Standard Goods","Furniture and Related Products","Household Furniture - Metal/Mixed Material",0
+"Wood Office Furniture Mfg",337211,"Standard Goods","Furniture and Related Products","Office & Institutional Furniture - Wood Based",0
+"Custom Architectural Woodwork and Millwork Mfg",337212,"Standard Goods","Furniture and Related Products","Office & Institutional Furniture - Wood Based",0
+"Office Furniture (except Wood) Mfg",337214,"Standard Goods","Furniture and Related Products","Office & Institutional Furniture - Metal/Mixed Material",0
+"Institutional Furniture Mfg",337215,"Standard Goods","Furniture and Related Products","Office & Institutional Furniture - Metal/Mixed Material",0
+"Showcase, Partition, Shelving, and Locker Mfg",337215,"Standard Goods","Furniture and Related Products","Furniture - Display, Storage & Interior Fittings",0
+"Blinds and Shade Mfg",337920,"Standard Goods","Furniture and Related Products","Furniture - Display, Storage & Interior Fittings",0
+"Surgical Appliance and Supplies",339113,"Standard Goods","Medical and Dental Devices","Surgical and Medical",0
+"Dental Dentures, Crowns",339116,"Standard Goods","Medical and Dental Devices","Dental Laboratories",0
+"Spectacles and Goggles",339115,"Standard Goods","Ophthalmic Goods","Ophthalmic Goods",0
+"Eye Frames",339115,"Standard Goods","Ophthalmic Goods","Ophthalmic Goods",0
+"Eye Lenses",339115,"Standard Goods","Ophthalmic Goods","Ophthalmic Goods",0
+"Jewelry and Silverware",339910,"Standard Goods","Personal Adornment / Recreational Goods","Personal Adornment",0
+"Sporting and Athletic Goods",339920,"Standard Goods","Personal Adornment / Recreational Goods","Recretional Goods",0
+"Doll, Toy, and Games",339930,"Standard Goods","Personal Adornment / Recreational Goods","Recretional Goods",0
+"Musical Instrument Mfg",339992,"Standard Goods","Personal Adornment / Recreational Goods","Recretional Goods",0
+"Office Supplies (except Paper) - Pens",339940,"Standard Goods","Office and Signage Products","Office Products",0
+"Office Supplies (except Paper) - Pencil/Crayons, Filing",339940,"Standard Goods","Office and Signage Products","Office Products",0
+"Office Supplies (except Paper) - Others",339940,"Standard Goods","Office and Signage Products","Office Products",0
+"Name Plates & Illuminated Signs",339950,"Standard Goods","Office and Signage Products","Signage Products",0
+"LED Signs",339950,"Standard Goods","Office and Signage Products","Signage Products",0
+"Printed Signs",339950,"Standard Goods","Office and Signage Products","Signage Products",0
+"Rubber Gaskets, Mutil-material Gaskets",339991,"Standard Goods","Industrial Fastening & Sealing","Gasket, Packing, and Sealing Devices",0
+"Industrial Packing and Sealing Devices",339991,"Standard Goods","Industrial Fastening & Sealing","Gasket, Packing, and Sealing Devices",0
+"Fastener - Metals Screws and Bolts",332722,"Standard Goods","Industrial Fastening & Sealing","Fastener, Button, Needle & Pin",0
+"Buttons, Sewing Needles",339993,"Standard Goods","Industrial Fastening & Sealing","Fastener, Button, Needle & Pin",0
+"Broom, Brush, and Mops",339994,"Standard Goods","Miscellaneous Mfg","Cleaning Implements",0
+"Burial Caskets",339995,"Standard Goods","Miscellaneous Mfg","Funeral Products",0
+"All Other Miscellaneous Mfg",339999,"Standard Goods","Miscellaneous Mfg","All other Miscellaneous Mfg",0
+"Small Car",336111,"Capital Goods","Transportation Equipments","Motor Vehicle and Parts",0
+"Sedan (mid-size)",336111,"Capital Goods","Transportation Equipments","Motor Vehicle and Parts",0
+"SUV/Pick-up Truck",336112,"Capital Goods","Transportation Equipments","Motor Vehicle and Parts",0
+"Electric Vehicle (BEV)",336111,"Capital Goods","Transportation Equipments","Motor Vehicle and Parts",0
+"Light Truck and Utility Vehicle",336112,"Capital Goods","Transportation Equipments","Motor Vehicle and Parts",0
+"Heavy Duty Truck",336120,"Capital Goods","Transportation Equipments","Motor Vehicle and Parts",0
+"Motor Vehicle Body Mfg",336211,"Capital Goods","Transportation Equipments","Motor Vehicle and Parts",0
+"Truck Trailer",336212,"Capital Goods","Transportation Equipments","Motor Vehicle and Parts",0
+"Motor Home Mfg",336213,"Capital Goods","Transportation Equipments","Motor Vehicle and Parts",0
+"Travel Trailer and Camper",336214,"Capital Goods","Transportation Equipments","Motor Vehicle and Parts",0
+"Motor Vehicle Gasoline Engine and Engine Parts",336310,"Capital Goods","Transportation Equipments","Engines, Electrical & Chassis Components",0
+"Motor Vehicle Electrical and Electronic Equipments",336320,"Capital Goods","Transportation Equipments","Engines, Electrical & Chassis Components",0
+"Motor Vehicle Steering and Suspension Components (except Spring)",336330,"Capital Goods","Transportation Equipments","Engines, Electrical & Chassis Components",0
+"Motor Vehicle Brake System Mfg",336340,"Capital Goods","Transportation Equipments","Engines, Electrical & Chassis Components",0
+"Motor Vehicle Transmission and Power Train Parts Mfg",336350,"Capital Goods","Transportation Equipments","Engines, Electrical & Chassis Components",0
+"Motor Vehicle Seating and Interior Trim Mfg",336360,"Capital Goods","Transportation Equipments","Engines, Electrical & Chassis Components",0
+"Motor Vehicle Metal Stamping",336370,"Capital Goods","Transportation Equipments","Engines, Electrical & Chassis Components",0
+"Other Motor Vehicle Parts",336390,"Capital Goods","Transportation Equipments","Engines, Electrical & Chassis Components",0
+"Aircraft Mfg",336411,"Capital Goods","Transportation Equipments","Aircraft, Aerospace, and Military",0
+"Aircraft Engine and Engine Parts",336412,"Capital Goods","Transportation Equipments","Aircraft, Aerospace, and Military",0
+"Other Aircraft Parts and Auxiliary Equipment",336413,"Capital Goods","Transportation Equipments","Aircraft, Aerospace, and Military",0
+"Guided Missile and Space Vehice",336414,"Capital Goods","Transportation Equipments","Aircraft, Aerospace, and Military",0
+"Guided Missile and Space Vehicle Propulsion Unit and Propulsion Unit Parts Mfg",336415,"Capital Goods","Transportation Equipments","Aircraft, Aerospace, and Military",0
+"Other Guided Missile and Space Vehicle Parts and Auxiliary Equipment Mfg",336419,"Capital Goods","Transportation Equipments","Aircraft, Aerospace, and Military",0
+"Railroad Rolling Stock",336510,"Capital Goods","Transportation Equipments","Railroad, Ship & Boat",0
+"Ship Building & Repair",336611,"Capital Goods","Transportation Equipments","Railroad, Ship & Boat",0
+"Boat Building",336612,"Capital Goods","Transportation Equipments","Railroad, Ship & Boat",0
+"Motorcycle, Bicycle, and Parts Mfg",336991,"Capital Goods","Transportation Equipments","Railroad, Ship & Boat",0
+"Military Armored Vehicle, Tank, and Tank Components",336992,"Capital Goods","Transportation Equipments","Railroad, Ship & Boat",0
+"Railways, Metro, and Tramways",336510,"Capital Goods","Transportation Equipments","Railroad, Ship & Boat",0
+"All Other Transportation Equipment",336999,"Capital Goods","Transportation Equipments","Other Transportation Equipment",0
+"Medicaments incl. vaccines",325412,"Capital Goods","Medical and Dental Products & Devices","Pharmaceuticals & Medical Supplies",0
+"Pharmaceutical intermediates",325412,"Capital Goods","Medical and Dental Products & Devices","Pharmaceuticals & Medical Supplies",0
+"Antibiotics and antibacterial drugs",325413,"Capital Goods","Medical and Dental Products & Devices","Pharmaceuticals & Medical Supplies",0
+"Ascorbic acid (Vit C)",325411,"Capital Goods","Medical and Dental Products & Devices","Pharmaceuticals & Medical Supplies",0
+"Hormones and Derivatives",325414,"Capital Goods","Medical and Dental Products & Devices","Pharmaceuticals & Medical Supplies",0
+"Vitamin and Nutritional Supplements",325411,"Capital Goods","Medical and Dental Products & Devices","Pharmaceuticals & Medical Supplies",0
+"Veterinary Medicinal Products",325412,"Capital Goods","Medical and Dental Products & Devices","Pharmaceuticals & Medical Supplies",0
+"Diagnostic Reagents",325413,"Capital Goods","Medical and Dental Products & Devices","Diagnostics & Reagants",0
+"Surgical and Medical Instruments",339112,"Capital Goods","Medical and Dental Products & Devices","Surgical and Medical",0
+"Bandages & Dressings",339113,"Capital Goods","Medical and Dental Products & Devices","Surgical and Medical",0
+"Surgical gloves, Masks, Apparel and Surgical supplies",339113,"Capital Goods","Medical and Dental Products & Devices","Surgical and Medical",0
+"Dental X-Rays",339114,"Capital Goods","Medical and Dental Products & Devices","Dental Equipment and Supplies",0
+"Dental Drills",339114,"Capital Goods","Medical and Dental Products & Devices","Dental Equipment and Supplies",0
+"Dental Dentures, Crowns",339116,"Capital Goods","Medical and Dental Products & Devices","Dental Laboratories",0
+"Electronic Computers / Desktops",334111,"Capital Goods","Computer and Electronic Products","Computer & Peripheral Equipment",0
+"LCD & Cathode Ray Display",334111,"Capital Goods","Computer and Electronic Products","Computer & Peripheral Equipment",0
+"Laptop and Tablets",334111,"Capital Goods","Computer and Electronic Products","Computer & Peripheral Equipment",0
+"Computer Storage Device, Disk Drives",334112,"Capital Goods","Computer and Electronic Products","Computer & Peripheral Equipment",0
+"Computer Terminals",334118,"Capital Goods","Computer and Electronic Products","Computer & Peripheral Equipment",0
+"Other Computer Peripherals (Keyboard, Mouse)",334118,"Capital Goods","Computer and Electronic Products","Computer & Peripheral Equipment",0
+"Telephone Apparatus",334210,"Capital Goods","Computer and Electronic Products","Communication Equipment",0
+"Smartphones / Mobiles",334220,"Capital Goods","Computer and Electronic Products","Communication Equipment",0
+"Radio, Television and Wireless Communications Equipment",334220,"Capital Goods","Computer and Electronic Products","Communication Equipment",0
+"Modems / Routers",334210,"Capital Goods","Computer and Electronic Products","Communication Equipment",0
+"Other Communications Equipment",334290,"Capital Goods","Computer and Electronic Products","Communication Equipment",0
+"Consumer Audio and Video Equipments",334310,"Capital Goods","Computer and Electronic Products","Consumer Electronics",0
+"Electromedical and Electrotherapeutic Apparatus",334510,"Capital Goods","Computer and Electronic Products","Medical & Electromedical Equipment",0
+"Irradiation Apparatus",334517,"Capital Goods","Computer and Electronic Products","Medical & Electromedical Equipment",1
+"Search, Detection, Navigation, Guidance Instrument",334511,"Capital Goods","Computer and Electronic Products","Scientific, Measuring & Control Instruments",0
+"Aeronautical, and Nautical System and Instrument",334511,"Capital Goods","Computer and Electronic Products","Scientific, Measuring & Control Instruments",0
+"Automatic Environmental Control Mfg for Residential and Appliance Use",334512,"Capital Goods","Computer and Electronic Products","Scientific, Measuring & Control Instruments",0
+"Automatic Environmental Control Mfg for Commercial Use",334513,"Capital Goods","Computer and Electronic Products","Scientific, Measuring & Control Instruments",0
+"Instruments for Measuring & Displaying Industrial Process Variables",334513,"Capital Goods","Computer and Electronic Products","Scientific, Measuring & Control Instruments",0
+"Instruments for Controlling Industrial Process Variables",334513,"Capital Goods","Computer and Electronic Products","Scientific, Measuring & Control Instruments",0
+"Totalizing Fluid Meter and Counting Device",334514,"Capital Goods","Computer and Electronic Products","Scientific, Measuring & Control Instruments",0
+"Instrument for Measuring and Testing Electricity and Electrical Signals",334515,"Capital Goods","Computer and Electronic Products","Scientific, Measuring & Control Instruments",0
+"Analytical Laboratory Instruments",334516,"Capital Goods","Computer and Electronic Products","Scientific, Measuring & Control Instruments",0
+"Other Measuring and Controlling Devices",334519,"Capital Goods","Computer and Electronic Products","Scientific, Measuring & Control Instruments",0
+"Commercial, Industrial, and Institutional Electric Lighting Fixtures",335122,"Capital Goods","Electrical Equipment, Appliance, and Components","Lightening Equipment",0
+"Major Household Appliances (eg Refrigerator, Air conditioner)",335220,"Capital Goods","Electrical Equipment, Appliance, and Components","Household Appliances",0
+"Household Laundry Appliances eg Dryer, Washing Machine, Dish Washer",335224,"Capital Goods","Electrical Equipment, Appliance, and Components","Household Appliances",0
+"Household Cleaning Appliances eg Vaccum Cleaner, Dishwasher",335223,"Capital Goods","Electrical Equipment, Appliance, and Components","Household Appliances",0
+"Power, Distribution, and Specialty Transformer",335311,"Capital Goods","Electrical Equipment, Appliance, and Components","Power and Distribution Equipments",0
+"Motor and Generator",335312,"Capital Goods","Electrical Equipment, Appliance, and Components","Power and Distribution Equipments",0
+"Switchgear and Switchboard Apparatus",335313,"Capital Goods","Electrical Equipment, Appliance, and Components","Power and Distribution Equipments",0
+"Relay and Industrial Control",335314,"Capital Goods","Electrical Equipment, Appliance, and Components","Power and Distribution Equipments",0
+"Fiber Optic Cable",335921,"Capital Goods","Electrical Equipment, Appliance, and Components","Cable and Wiring Devices",0
+"Farm Machinery and Equipment eg Tractors",333111,"Capital Goods","Machinery Manufacturing","Agricultural Machinery and Equipment",0
+"Poultry-Keeping Machinery",333111,"Capital Goods","Machinery Manufacturing","Agricultural Machinery and Equipment",0
+"Soil Preparation Equip. (Plows, Harrows, Seeders)",333111,"Capital Goods","Machinery Manufacturing","Agricultural Machinery and Equipment",0
+"Harvesting / Threshing Machines (e.g., Balers, Mowers)",333112,"Capital Goods","Machinery Manufacturing","Agricultural Machinery and Equipment",0
+"Fertilizer Spreaders",333111,"Capital Goods","Machinery Manufacturing","Agricultural Machinery and Equipment",0
+"Pesticide Sprayers",333111,"Capital Goods","Machinery Manufacturing","Agricultural Machinery and Equipment",0
+"Lawn & Garden Tractors / Home Lawn and Garden Equipment",333112,"Capital Goods","Machinery Manufacturing","Agricultural Machinery and Equipment",0
+"Dairy Equipments (Milking Machines)",333112,"Capital Goods","Machinery Manufacturing","Agricultural Machinery and Equipment",0
+"Construction Machinery",333120,"Capital Goods","Machinery Manufacturing","Construction Machinery and Equipment",0
+"Bulldozers, Earthmoving Equipment",333120,"Capital Goods","Machinery Manufacturing","Construction Machinery and Equipment",0
+"Excavating / Grading Machinery",333120,"Capital Goods","Machinery Manufacturing","Construction Machinery and Equipment",0
+"Road Building Equipment",333120,"Capital Goods","Machinery Manufacturing","Construction Machinery and Equipment",0
+"Concrete / Paving Equipment",333120,"Capital Goods","Machinery Manufacturing","Construction Machinery and Equipment",0
+"Forestry Machines (Log Splitters, etc.)",333120,"Capital Goods","Machinery Manufacturing","Forestry Machinery and Equipment",0
+"Tree Planting Machines",333120,"Capital Goods","Machinery Manufacturing","Forestry Machinery and Equipment",0
+"Mining Machinery (Crushers, Loaders)",333131,"Capital Goods","Machinery Manufacturing","Mining Machinery and Equipment",0
+"Rock Cutters / Drilling Rigs",333132,"Capital Goods","Machinery Manufacturing","Mining Machinery and Equipment",0
+"Conveyor / Screening Machines",333922,"Capital Goods","Machinery Manufacturing","Mining Machinery and Equipment",0
+"Oil & Gas Field Equipment",333132,"Capital Goods","Machinery Manufacturing","Oil and Gas Field Machinery and Equipment",0
+"Drilling Platforms / Equipment",333132,"Capital Goods","Machinery Manufacturing","Oil and Gas Field Machinery and Equipment",0
+"Pumping Units / Gas Compressors",333132,"Capital Goods","Machinery Manufacturing","Oil and Gas Field Machinery and Equipment",0
+"Food Product Machinery (General)",333241,"Capital Goods","Machinery Manufacturing","Food Processing & Packaging Machinery",0
+"Industrial Juicers / Nut Processors",333241,"Capital Goods","Machinery Manufacturing","Food Processing & Packaging Machinery",0
+"Dough Kneaders / Mixers",333241,"Capital Goods","Machinery Manufacturing","Food Processing & Packaging Machinery",0
+"Meat Processing Equipment",333241,"Capital Goods","Machinery Manufacturing","Food Processing & Packaging Machinery",0
+"Industrial Mixers / Blenders",333241,"Capital Goods","Machinery Manufacturing","Food Processing & Packaging Machinery",0
+"Cleaning / Sorting Machines (Food)",333241,"Capital Goods","Machinery Manufacturing","Food Processing & Packaging Machinery",0
+"Industrial Pressure Cookers",333241,"Capital Goods","Machinery Manufacturing","Food Processing & Packaging Machinery",0
+"Weighing Machines (Food Grade)",333997,"Capital Goods","Machinery Manufacturing","Food Processing & Packaging Machinery",0
+"Beverage Bottling and Canning equipment",333241,"Capital Goods","Machinery Manufacturing","Food Processing & Packaging Machinery",0
+"Pasteurization Equipment",333241,"Capital Goods","Machinery Manufacturing","Food Processing & Packaging Machinery",0
+"Fermentation Tanks and Vessels",333241,"Capital Goods","Machinery Manufacturing","Food Processing & Packaging Machinery",0
+"Textile Machinery (General)",333249,"Capital Goods","Machinery Manufacturing","Textile, Garment & Fabric Machinery",0
+"Spinning Machines",333249,"Capital Goods","Machinery Manufacturing","Textile, Garment & Fabric Machinery",0
+"Weaving Machines (Looms)",333249,"Capital Goods","Machinery Manufacturing","Textile, Garment & Fabric Machinery",0
+"Knitting / Embroidery Machines",333249,"Capital Goods","Machinery Manufacturing","Textile, Garment & Fabric Machinery",0
+"Dyeing Machines",333249,"Capital Goods","Machinery Manufacturing","Textile, Garment & Fabric Machinery",0
+"Sewing Machines (Industrial & Domestic)",333249,"Capital Goods","Machinery Manufacturing","Textile, Garment & Fabric Machinery",0
+"Textile Testing Equipment",334519,"Capital Goods","Machinery Manufacturing","Textile, Garment & Fabric Machinery",0
+"Packaging Machinery (Filling, Wrapping, Sealing)",333993,"Capital Goods","Machinery Manufacturing","Packaging / Printing / Paper Machinery",0
+"Labeling Machines",333993,"Capital Goods","Machinery Manufacturing","Packaging / Printing / Paper Machinery",0
+"Paper Making Machines",333291,"Capital Goods","Machinery Manufacturing","Packaging / Printing / Paper Machinery",0
+"Paper Cutting / Finishing Machines",333293,"Capital Goods","Machinery Manufacturing","Packaging / Printing / Paper Machinery",0
+"Printing Machinery (Offset, Flexo, Digital)",333244,"Capital Goods","Machinery Manufacturing","Packaging / Printing / Paper Machinery",0
+"Bookbinding Machines",333244,"Capital Goods","Machinery Manufacturing","Packaging / Printing / Paper Machinery",0
+"Inkjet / Laser Printers (Industrial)",333244,"Capital Goods","Machinery Manufacturing","Packaging / Printing / Paper Machinery",0
+"Semiconductor Manufacturing Equipment",333242,"Capital Goods","Machinery Manufacturing","Semiconductor & Electronics Machinery",0
+"Photolithography Equipment",333242,"Capital Goods","Machinery Manufacturing","Semiconductor & Electronics Machinery",0
+"Wafer Handling Robots",333242,"Capital Goods","Machinery Manufacturing","Semiconductor & Electronics Machinery",0
+"Printed Circuit Board (PCB) Equipment",333242,"Capital Goods","Machinery Manufacturing","Semiconductor & Electronics Machinery",0
+"Industrial Robots",333249,"Capital Goods","Machinery Manufacturing","Robotics & Automation",0
+"Robotic Arms for Assembly",333249,"Capital Goods","Machinery Manufacturing","Robotics & Automation",0
+"Automated Guided Vehicles (AGV)",333924,"Capital Goods","Machinery Manufacturing","Robotics & Automation",0
+"Machine Vision Systems",334511,"Capital Goods","Machinery Manufacturing","Robotics & Automation",0
+"Metalworking Machinery (CNC, Lathes, Milling)",333517,"Capital Goods","Machinery Manufacturing","Heavy Engineering Machinery",0
+"Welding Equipment",333992,"Capital Goods","Machinery Manufacturing","Heavy Engineering Machinery",0
+"Industrial Furnaces and Ovens",333994,"Capital Goods","Machinery Manufacturing","Heavy Engineering Machinery",0
+"Rolling Mill Machinery",333519,"Capital Goods","Machinery Manufacturing","Heavy Engineering Machinery",0
+"Forging and Stamping Machinery",333511,"Capital Goods","Machinery Manufacturing","Heavy Engineering Machinery",0
+"Vulcanization Equip., Cutters, Extrusion, Moulding",333220,"Capital Goods","Machinery Manufacturing","Rubber/Plastic Machinery",0
+"Hydraulic Presses for Rubber",333220,"Capital Goods","Machinery Manufacturing","Rubber/Plastic Machinery",0
+"Calendaring or Rolling Machines",333220,"Capital Goods","Machinery Manufacturing","Rubber/Plastic Machinery",0
+"Semiconductor Machinery",333242,"Capital Goods","Machinery Manufacturing","Specialized Manufacturing Machinery",0
+"Sawmill, Woodworking, Paper Machinery",333243,"Capital Goods","Machinery Manufacturing","Specialized Manufacturing Machinery",0
+"Printing / Laminating Machines",333244,"Capital Goods","Machinery Manufacturing","Specialized Manufacturing Machinery",0
+"Aquaculture Equipments eg Feeding systems, Aerators",333249,"Capital Goods","Machinery Manufacturing","Specialized Manufacturing Machinery",0
+"Other Industrial Machinery",333249,"Capital Goods","Machinery Manufacturing","Specialized Manufacturing Machinery",0
+"Optical Instrument and Lens",333314,"Capital Goods","Machinery Manufacturing","Optical, Imaging & Commercial Equipment",0
+"Photographic Equipments",333316,"Capital Goods","Machinery Manufacturing","Optical, Imaging & Commercial Equipment",0
+"Other Commercial and Service Industry Machinery",333318,"Capital Goods","Machinery Manufacturing","Optical, Imaging & Commercial Equipment",0
+"Water Purifier",333319,"Capital Goods","Machinery Manufacturing","Water & Environmental Equipment",0
+"Industrial and Commercial Fan and Blower",333413,"Capital Goods","Machinery Manufacturing","Water & Environmental Equipment",0
+"Industrial and Commercial Air Purification Equipment",333413,"Capital Goods","Machinery Manufacturing","Water & Environmental Equipment",0
+"Heating Equipment (except Warm Air Furnaces)",333414,"Capital Goods","Machinery Manufacturing","Water & Environmental Equipment",0
+"Air-Conditioning and Warm Air Heating Equipment",333415,"Capital Goods","Machinery Manufacturing","Water & Environmental Equipment",0
+"AC chiller / AC split unit",333415,"Capital Goods","Machinery Manufacturing","Water & Environmental Equipment",0
+"Commercial and Industrial Refrigeration Equipment",333415,"Capital Goods","Machinery Manufacturing","Water & Environmental Equipment",0
+"Industrial Molds",333511,"Capital Goods","Machinery Manufacturing","Tools, Dies and Molds",0
+"Special Die and Tool, Die Set, Jig, and Fixtures",333514,"Capital Goods","Machinery Manufacturing","Tools, Dies and Molds",0
+"Cutting Tool / Machine Tool Accessory",333515,"Capital Goods","Machinery Manufacturing","Tools, Dies and Molds",0
+"Machine Tools, Chainsaws and Pruning tools",333517,"Capital Goods","Machinery Manufacturing","Tools, Dies and Molds",0
+"Rolling Mill / Other Metalworking Machinerys",333519,"Capital Goods","Machinery Manufacturing","Tools, Dies and Molds",0
+"Turbine and Turbine Generator Sets",333611,"Capital Goods","Machinery Manufacturing","Power Generation & Transmission Equipment",0
+"Speed Changer, Industrial High-Speed Drive, and Gears",333612,"Capital Goods","Machinery Manufacturing","Power Generation & Transmission Equipment",0
+"Mechanical Power Transmission Equipments",333613,"Capital Goods","Machinery Manufacturing","Power Generation & Transmission Equipment",0
+"Other Engine Equipments",333618,"Capital Goods","Machinery Manufacturing","Power Generation & Transmission Equipment",0
+"Air and Gas Compressors, Ventilators",333912,"Capital Goods","Machinery Manufacturing","Pumps, Compressors & Lifting Equipment",0
+"Dispensing, and Other Pumping Equipment, Water Pumps",333914,"Capital Goods","Machinery Manufacturing","Pumps, Compressors & Lifting Equipment",0
+"Elevator and Moving Stairway, Escalator",333921,"Capital Goods","Machinery Manufacturing","Pumps, Compressors & Lifting Equipment",0
+"Conveyor and Handling Equipments",333922,"Capital Goods","Machinery Manufacturing","Pumps, Compressors & Lifting Equipment",0
+"Mining conveyors and loaders",333131,"Capital Goods","Machinery Manufacturing","Pumps, Compressors & Lifting Equipment",0
+"Overhead Traveling Crane, Hoist, and Monorail System",333923,"Capital Goods","Machinery Manufacturing","Pumps, Compressors & Lifting Equipment",0
+"Industrial Truck, Tractor, Trailer, and Stacker Machinery",333924,"Capital Goods","Machinery Manufacturing","Pumps, Compressors & Lifting Equipment",0
+"Power-Driven Handtools",333991,"Capital Goods","Machinery Manufacturing","Hand Tools, Welding & Packaging",0
+"Welding and Soldering Equipment",333992,"Capital Goods","Machinery Manufacturing","Hand Tools, Welding & Packaging",0
+"Packaging Machinery",333993,"Capital Goods","Machinery Manufacturing","Hand Tools, Welding & Packaging",0
+"Industrial Process Furnace and Oven",333994,"Capital Goods","Machinery Manufacturing","Thermal & Fluid Power Equipment",0
+"Fluid Power Cylinder and Actuator",333995,"Capital Goods","Machinery Manufacturing","Thermal & Fluid Power Equipment",0
+"Fluid Power Pump and Motor",333996,"Capital Goods","Machinery Manufacturing","Thermal & Fluid Power Equipment",0
+"Scale and Balance",333997,"Capital Goods","Machinery Manufacturing","Measuring & Miscellaneous Equipment",0
+"Other General Purpose Machinery",333999,"Capital Goods","Machinery Manufacturing","Measuring & Miscellaneous Equipment",0
+"New Single-Family Housing Construction (except For-Sale Builders)",236115,"Capital Goods","Construction","Residential Building Construction",0
+"New Multifamily Housing Construction (except For-Sale Builders)",236116,"Capital Goods","Construction","Residential Building Construction",0
+"New Housing For-Sale Builders",236117,"Capital Goods","Construction","Residential Building Construction",0
+"Residential Remodelers",236118,"Capital Goods","Construction","Residential Building Construction",0
+"Industrial Building Construction - Factories, Warehouses",236210,"Capital Goods","Construction","Nonresidential Building Construction",0
+"Commercial and Institutional Building Construction - Offices, Malls",236220,"Capital Goods","Construction","Nonresidential Building Construction",0
+"Water and Sewer Line and Related Structures Construction",237110,"Capital Goods","Construction","Utility System Construction",0
+"Oil and Gas Pipeline and Related Structures Construction",237120,"Capital Goods","Construction","Utility System Construction",0
+"Power and Communication Line and Related Structures Construction",237130,"Capital Goods","Construction","Utility System Construction",0
+"Land Subdivision",237210,"Capital Goods","Construction","Land Subdivision",0
+"Highway, Street, and Bridge Construction",237310,"Capital Goods","Construction","Highway, Street, and Bridge Construction",0
+"Other Heavy and Civil Engineering Construction",237990,"Capital Goods","Construction","Other Heavy and Civil Engineering Construction",0
+"Dams, waterways, harbors, and other water projects",237990,"Capital Goods","Construction","Other Heavy and Civil Engineering Construction",0
+"Manufactured Home (Mobile Home)",321991,"Capital Goods","Wood Products","Wood Containers and Structures",0
+"Prefabricated Wood Building",321992,"Capital Goods","Wood Products","Wood Containers and Structures",0
+"Iron and Steel Mills and Ferroalloy Mfg",331110,"Capital Goods","Primary Metal and Foundry Products","Iron and Steel Production",0
+"Iron and Steel Pipe and Tube Mfg from Purchased Steel",331210,"Capital Goods","Primary Metal and Foundry Products","Iron and Steel Production",0
+"Rolled Steel Shape Mfg",331221,"Capital Goods","Primary Metal and Foundry Products","Iron and Steel Production",0
+"Alumina Refining and Primary Aluminum Production",331313,"Capital Goods","Primary Metal and Foundry Products","Aluminium Production",0
+"Other Aluminum Rolling, Drawing, and Extruding",331318,"Capital Goods","Primary Metal and Foundry Products","Aluminium Production",0
+"Nonferrous Metal (except Aluminum) Smelting and Refining",331410,"Capital Goods","Primary Metal and Foundry Products","Nonferrous Metals (except Al)",0
+"Copper Rolling, Drawing, Extruding, and Alloying",331420,"Capital Goods","Primary Metal and Foundry Products","Nonferrous Metals (except Al)",0
+"Nonferrous Metal (except Copper and Aluminum) Rolling, Drawing, and Extruding",331491,"Capital Goods","Primary Metal and Foundry Products","Nonferrous Metals (except Al)",0
+"Secondary Smelting, Refining, and Alloying of Nonferrous Metal (except Copper and Aluminum)",331492,"Capital Goods","Primary Metal and Foundry Products","Nonferrous Metals (except Al)",0
+"Iron Foundries",331511,"Capital Goods","Primary Metal and Foundry Products","Foundries",1
+"Steel Investment Foundries",331512,"Capital Goods","Primary Metal and Foundry Products","Foundries",1
+"Steel Foundries (except Investment)",331513,"Capital Goods","Primary Metal and Foundry Products","Foundries",1
+"Nonferrous Metal Die-Casting Foundries",331523,"Capital Goods","Primary Metal and Foundry Products","Foundries",1
+"Aluminum Foundries (except Die-Casting)",331524,"Capital Goods","Primary Metal and Foundry Products","Foundries",1
+"Other Nonferrous Metal Foundries (except Die-Casting)",331529,"Capital Goods","Primary Metal and Foundry Products","Foundries",1
+"Iron and Steel Forged Goods",332111,"Capital Goods","Fabricated Metal Products","Forging and Forming",0
+"Nonferrous Forged Goods",332112,"Capital Goods","Fabricated Metal Products","Forging and Forming",0
+"Custom Roll Forming Goods",332114,"Capital Goods","Fabricated Metal Products","Forging and Forming",0
+"Powder Metallurgy Parts",332117,"Capital Goods","Fabricated Metal Products","Forging and Forming",0
+"Prefabricated Metal Building and Components",332311,"Capital Goods","Fabricated Metal Products","Fabricated Metal Structures",0
+"Fabricated Structural Metal Mfg",332312,"Capital Goods","Fabricated Metal Products","Fabricated Metal Structures",0
+"Power Boiler and Heat Exchanger",332410,"Capital Goods","Fabricated Metal Products","Heavy Guage Metal Products",0
+"Metal Tank (Heavy Gauge)",332420,"Capital Goods","Fabricated Metal Products","Heavy Guage Metal Products",0
+"Precision Turned Product",332721,"Capital Goods","Fabricated Metal Products","Machining and Surface Treatment",0
+"Industrial Valve",332911,"Capital Goods","Fabricated Metal Products","Valves, Bearing & Fittings",0
+"Fluid Power Valve and Hose Fitting",332912,"Capital Goods","Fabricated Metal Products","Valves, Bearing & Fittings",0
+"Other Metal Valve and Pipe Fitting",332919,"Capital Goods","Fabricated Metal Products","Valves, Bearing & Fittings",0
+"Ball and Roller Bearing",332991,"Capital Goods","Fabricated Metal Products","Valves, Bearing & Fittings",0
+"Small Arms, Ordnance, and Ordnance Accessories Mfg",332994,"Capital Goods","Fabricated Metal Products","Ammunition and Defense",0
+"Fabricated Pipe and Pipe Fitting",332996,"Capital Goods","Fabricated Metal Products","Miscellaneous Metal Products",0
+"All Other Miscellaneous Fabricated Metal Product",332999,"Capital Goods","Fabricated Metal Products","Miscellaneous Metal Products",0
+"Automobile and Other Motor Vehicle Merchant Wholesalers",423110,"Standard Services","Wholesale Trade","Merchant Wholesalers, Durable Goods",0
+"Motor Vehicle Supplies and New Parts Merchant Wholesalers",423120,"Standard Services","Wholesale Trade","Merchant Wholesalers, Durable Goods",0
+"Tire and Tube Merchant Wholesalers",423130,"Standard Services","Wholesale Trade","Merchant Wholesalers, Durable Goods",0
+"Motor Vehicle Parts (Used) Merchant Wholesalers",423140,"Standard Services","Wholesale Trade","Merchant Wholesalers, Durable Goods",0
+"Furniture Merchant Wholesalers",423210,"Standard Services","Wholesale Trade","Merchant Wholesalers, Durable Goods",0
+"Home Furnishing Merchant Wholesalers",423220,"Standard Services","Wholesale Trade","Merchant Wholesalers, Durable Goods",0
+"Lumber, Plywood, Millwork, and Wood Panel Merchant Wholesalers",423310,"Standard Services","Wholesale Trade","Merchant Wholesalers, Durable Goods",0
+"Brick, Stone, and Related Construction Material Merchant Wholesalers",423320,"Standard Services","Wholesale Trade","Merchant Wholesalers, Durable Goods",0
+"Roofing, Siding, and Insulation Material Merchant Wholesalers",423330,"Standard Services","Wholesale Trade","Merchant Wholesalers, Durable Goods",0
+"Other Construction Material Merchant Wholesalers",423390,"Standard Services","Wholesale Trade","Merchant Wholesalers, Durable Goods",0
+"Photographic Equipment and Supplies Merchant Wholesalers",423410,"Standard Services","Wholesale Trade","Merchant Wholesalers, Durable Goods",0
+"Office Equipment Merchant Wholesalers",423420,"Standard Services","Wholesale Trade","Merchant Wholesalers, Durable Goods",0
+"Computer and Computer Peripheral Equipment and Software Merchant Wholesalers",423430,"Standard Services","Wholesale Trade","Merchant Wholesalers, Durable Goods",0
+"Other Commercial Equipment Merchant Wholesalers",423440,"Standard Services","Wholesale Trade","Merchant Wholesalers, Durable Goods",0
+"Medical, Dental, and Hospital Equipment and Supplies Merchant Wholesalers",423450,"Standard Services","Wholesale Trade","Merchant Wholesalers, Durable Goods",0
+"Ophthalmic Goods Merchant Wholesalers",423460,"Standard Services","Wholesale Trade","Merchant Wholesalers, Durable Goods",0
+"Other Professional Equipment and Supplies Merchant Wholesalers",423490,"Standard Services","Wholesale Trade","Merchant Wholesalers, Durable Goods",0
+"Metal Service Centers and Other Metal Merchant Wholesalers",423510,"Standard Services","Wholesale Trade","Merchant Wholesalers, Durable Goods",0
+"Coal and Other Mineral and Ore Merchant Wholesalers",423520,"Standard Services","Wholesale Trade","Merchant Wholesalers, Durable Goods",0
+"Electrical Apparatus and Equipment, Wiring Supplies, and Related Equipment Merchant Wholesalers",423610,"Standard Services","Wholesale Trade","Merchant Wholesalers, Durable Goods",0
+"Household Appliances, Electric Housewares, and Consumer Electronics Merchant Wholesalers",423620,"Standard Services","Wholesale Trade","Merchant Wholesalers, Durable Goods",0
+"Other Electronic Parts and Equipment Merchant Wholesalers",423690,"Standard Services","Wholesale Trade","Merchant Wholesalers, Durable Goods",0
+"Hardware Merchant Wholesalers",423710,"Standard Services","Wholesale Trade","Merchant Wholesalers, Durable Goods",0
+"Plumbing and Heating Equipment and Supplies (Hydronics) Merchant Wholesalers",423720,"Standard Services","Wholesale Trade","Merchant Wholesalers, Durable Goods",0
+"Warm Air Heating and Air-Conditioning Equipment and Supplies Merchant Wholesalers",423730,"Standard Services","Wholesale Trade","Merchant Wholesalers, Durable Goods",0
+"Refrigeration Equipment and Supplies Merchant Wholesalers",423740,"Standard Services","Wholesale Trade","Merchant Wholesalers, Durable Goods",0
+"Construction and Mining (except Oil Well) Machinery and Equipment Merchant Wholesalers",423810,"Standard Services","Wholesale Trade","Merchant Wholesalers, Durable Goods",0
+"Farm and Garden Machinery and Equipment Merchant Wholesalers",423820,"Standard Services","Wholesale Trade","Merchant Wholesalers, Durable Goods",0
+"Industrial Machinery and Equipment Merchant Wholesalers",423830,"Standard Services","Wholesale Trade","Merchant Wholesalers, Durable Goods",0
+"Industrial Supplies Merchant Wholesalers",423840,"Standard Services","Wholesale Trade","Merchant Wholesalers, Durable Goods",0
+"Service Establishment Equipment and Supplies Merchant Wholesalers",423850,"Standard Services","Wholesale Trade","Merchant Wholesalers, Durable Goods",0
+"Transportation Equipment and Supplies (except Motor Vehicle) Merchant Wholesalers",423860,"Standard Services","Wholesale Trade","Merchant Wholesalers, Durable Goods",0
+"Sporting and Recreational Goods and Supplies Merchant Wholesalers",423910,"Standard Services","Wholesale Trade","Merchant Wholesalers, Durable Goods",0
+"Toy and Hobby Goods and Supplies Merchant Wholesalers",423920,"Standard Services","Wholesale Trade","Merchant Wholesalers, Durable Goods",0
+"Recyclable Material Merchant Wholesalers",423930,"Standard Services","Wholesale Trade","Merchant Wholesalers, Durable Goods",0
+"Jewelry, Watch, Precious Stone, and Precious Metal Merchant Wholesalers",423940,"Standard Services","Wholesale Trade","Merchant Wholesalers, Durable Goods",0
+"Other Miscellaneous Durable Goods Merchant Wholesalers",423990,"Standard Services","Wholesale Trade","Merchant Wholesalers, Durable Goods",0
+"Printing and Writing Paper Merchant Wholesalers",424110,"Standard Services","Wholesale Trade","Merchant Wholesalers, Nondurable Goods",0
+"Stationery and Office Supplies Merchant Wholesalers",424120,"Standard Services","Wholesale Trade","Merchant Wholesalers, Nondurable Goods",0
+"Industrial and Personal Service Paper Merchant Wholesalers",424130,"Standard Services","Wholesale Trade","Merchant Wholesalers, Nondurable Goods",0
+"Drugs and Druggists' Sundries Merchant Wholesalers",424210,"Standard Services","Wholesale Trade","Merchant Wholesalers, Nondurable Goods",0
+"Piece Goods, Notions, and Other Dry Goods Merchant Wholesalers",424310,"Standard Services","Wholesale Trade","Merchant Wholesalers, Nondurable Goods",0
+"Men's and Boys' Clothing and Furnishings Merchant Wholesalers",424320,"Standard Services","Wholesale Trade","Merchant Wholesalers, Nondurable Goods",0
+"Women's, Children's, and Infants' Clothing and Accessories Merchant Wholesalers",424330,"Standard Services","Wholesale Trade","Merchant Wholesalers, Nondurable Goods",0
+"Footwear Merchant Wholesalers",424340,"Standard Services","Wholesale Trade","Merchant Wholesalers, Nondurable Goods",0
+"General Line Grocery Merchant Wholesalers",424410,"Standard Services","Wholesale Trade","Merchant Wholesalers, Nondurable Goods",0
+"Packaged Frozen Food Merchant Wholesalers",424420,"Standard Services","Wholesale Trade","Merchant Wholesalers, Nondurable Goods",0
+"Dairy Product (except Dried or Canned) Merchant Wholesalers",424430,"Standard Services","Wholesale Trade","Merchant Wholesalers, Nondurable Goods",0
+"Poultry and Poultry Product Merchant Wholesalers",424440,"Standard Services","Wholesale Trade","Merchant Wholesalers, Nondurable Goods",0
+"Confectionery Merchant Wholesalers",424450,"Standard Services","Wholesale Trade","Merchant Wholesalers, Nondurable Goods",0
+"Fish and Seafood Merchant Wholesalers",424460,"Standard Services","Wholesale Trade","Merchant Wholesalers, Nondurable Goods",0
+"Meat and Meat Product Merchant Wholesalers",424470,"Standard Services","Wholesale Trade","Merchant Wholesalers, Nondurable Goods",0
+"Fresh Fruit and Vegetable Merchant Wholesalers",424480,"Standard Services","Wholesale Trade","Merchant Wholesalers, Nondurable Goods",0
+"Other Grocery and Related Products Merchant Wholesalers",424490,"Standard Services","Wholesale Trade","Merchant Wholesalers, Nondurable Goods",0
+"Grain and Field Bean Merchant Wholesalers",424510,"Standard Services","Wholesale Trade","Merchant Wholesalers, Nondurable Goods",0
+"Livestock Merchant Wholesalers",424520,"Standard Services","Wholesale Trade","Merchant Wholesalers, Nondurable Goods",0
+"Other Farm Product Raw Material Merchant Wholesalers",424590,"Standard Services","Wholesale Trade","Merchant Wholesalers, Nondurable Goods",0
+"Plastics Materials and Basic Forms and Shapes Merchant Wholesalers",424610,"Standard Services","Wholesale Trade","Merchant Wholesalers, Nondurable Goods",0
+"Other Chemical and Allied Products Merchant Wholesalers",424690,"Standard Services","Wholesale Trade","Merchant Wholesalers, Nondurable Goods",0
+"Petroleum Bulk Stations and Terminals",424710,"Standard Services","Wholesale Trade","Merchant Wholesalers, Nondurable Goods",0
+"Petroleum and Petroleum Products Merchant Wholesalers (except Bulk Stations and Terminals)",424720,"Standard Services","Wholesale Trade","Merchant Wholesalers, Nondurable Goods",0
+"Beer and Ale Merchant Wholesalers",424810,"Standard Services","Wholesale Trade","Merchant Wholesalers, Nondurable Goods",0
+"Wine and Distilled Alcoholic Beverage Merchant Wholesalers",424820,"Standard Services","Wholesale Trade","Merchant Wholesalers, Nondurable Goods",0
+"Farm Supplies Merchant Wholesalers",424910,"Standard Services","Wholesale Trade","Merchant Wholesalers, Nondurable Goods",0
+"Book, Periodical, and Newspaper Merchant Wholesalers",424920,"Standard Services","Wholesale Trade","Merchant Wholesalers, Nondurable Goods",0
+"Flower, Nursery Stock, and Florists' Supplies Merchant Wholesalers",424930,"Standard Services","Wholesale Trade","Merchant Wholesalers, Nondurable Goods",0
+"Tobacco and Tobacco Product Merchant Wholesalers",424940,"Standard Services","Wholesale Trade","Merchant Wholesalers, Nondurable Goods",0
+"Paint, Varnish, and Supplies Merchant Wholesalers",424950,"Standard Services","Wholesale Trade","Merchant Wholesalers, Nondurable Goods",0
+"Other Miscellaneous Nondurable Goods Merchant Wholesalers",424990,"Standard Services","Wholesale Trade","Merchant Wholesalers, Nondurable Goods",0
+"Business to Business Electronic Markets",425110,"Standard Services","Wholesale Trade","Wholesale Trade Agents and Brokers",0
+"Wholesale Trade Agents and Brokers",425120,"Standard Services","Wholesale Trade","Wholesale Trade Agents and Brokers",0
+"New Car Dealers",441110,"Standard Services","Retail Trade","Motor Vehicle and Parts Dealers",0
+"Used Car Dealers",441120,"Standard Services","Retail Trade","Motor Vehicle and Parts Dealers",0
+"Boat Dealers",441222,"Standard Services","Retail Trade","Motor Vehicle and Parts Dealers",0
+"Motorcycle, ATV, and All Other Motor Vehicle Dealers",441228,"Standard Services","Retail Trade","Motor Vehicle and Parts Dealers",0
+"Automotive Parts and Accessories Stores",441310,"Standard Services","Retail Trade","Motor Vehicle and Parts Dealers",0
+"Tire Dealers",441320,"Standard Services","Retail Trade","Motor Vehicle and Parts Dealers",0
+"Automotive Battery Stores",441330,"Standard Services","Retail Trade","Motor Vehicle and Parts Dealers",0
+"Vehicle Emissions Testing Centers",811198,"Standard Services","Retail Trade","Motor Vehicle and Parts Dealers",0
+"Vehicle Inspection Stations",811198,"Standard Services","Retail Trade","Motor Vehicle and Parts Dealers",0
+"Auto Upholstery Shops",811121,"Standard Services","Retail Trade","Motor Vehicle and Parts Dealers",0
+"Car Audio and Electronics Installation Services",811211,"Standard Services","Retail Trade","Motor Vehicle and Parts Dealers",0
+"Recreational Vehicle Parts and Supplies Stores",441210,"Standard Services","Retail Trade","Motor Vehicle and Parts Dealers",0
+"Truck Cap and Accessory Dealers",441310,"Standard Services","Retail Trade","Motor Vehicle and Parts Dealers",0
+"Mobile Auto Parts Vendors",441310,"Standard Services","Retail Trade","Motor Vehicle and Parts Dealers",0
+"Online Auto Parts Retailers",441310,"Standard Services","Retail Trade","Motor Vehicle and Parts Dealers",0
+"Floor Covering Stores",442210,"Standard Services","Retail Trade","Furniture and Home Furnishings Stores",0
+"Window Treatment Stores",442291,"Standard Services","Retail Trade","Furniture and Home Furnishings Stores",0
+"Home Office Furniture Stores",442110,"Standard Services","Retail Trade","Furniture and Home Furnishings Stores",0
+"Outdoor and Patio Furniture Stores",442110,"Standard Services","Retail Trade","Furniture and Home Furnishings Stores",0
+"Recliner and Lounge Chair Stores",442110,"Standard Services","Retail Trade","Furniture and Home Furnishings Stores",0
+"Sofa and Sectional Retailers",442110,"Standard Services","Retail Trade","Furniture and Home Furnishings Stores",0
+"Wall Units and Entertainment Centers Stores",442110,"Standard Services","Retail Trade","Furniture and Home Furnishings Stores",0
+"Shelving and Storage Furniture Stores",442110,"Standard Services","Retail Trade","Furniture and Home Furnishings Stores",0
+"Upholstered Furniture Stores",442110,"Standard Services","Retail Trade","Furniture and Home Furnishings Stores",0
+"Rustic and Country Furniture Stores",442110,"Standard Services","Retail Trade","Furniture and Home Furnishings Stores",0
+"Contemporary Furniture Retailers",442110,"Standard Services","Retail Trade","Furniture and Home Furnishings Stores",0
+"Luxury and Designer Furniture Stores",442110,"Standard Services","Retail Trade","Furniture and Home Furnishings Stores",0
+"All Other Home Furnishings Stores",442299,"Standard Services","Retail Trade","Furniture and Home Furnishings Stores",0
+"Household Appliance Stores",443141,"Standard Services","Retail Trade","Electronics and Appliance Stores",0
+"Consumer Electronics Stores",443142,"Standard Services","Retail Trade","Electronics and Appliance Stores",0
+"Computer and Peripheral Stores",443142,"Standard Services","Retail Trade","Electronics and Appliance Stores",0
+"Mobile Phone and Accessories Stores",443142,"Standard Services","Retail Trade","Electronics and Appliance Stores",0
+"Television and Home Theater Stores",443142,"Standard Services","Retail Trade","Electronics and Appliance Stores",0
+"Audio Equipment Stores",443142,"Standard Services","Retail Trade","Electronics and Appliance Stores",1
+"Smart Home Device Retailers",443142,"Standard Services","Retail Trade","Electronics and Appliance Stores",1
+"Gaming Console and Video Game Stores",443142,"Standard Services","Retail Trade","Electronics and Appliance Stores",1
+"Camera and Photography Equipment Stores",443142,"Standard Services","Retail Trade","Electronics and Appliance Stores",1
+"Wearable Technology Retailers",443142,"Standard Services","Retail Trade","Electronics and Appliance Stores",1
+"Appliance Parts and Repair Shops",811412,"Standard Services","Retail Trade","Electronics and Appliance Stores",1
+"Home Centers",444110,"Standard Services","Retail Trade","Building Material and Garden Equipment and Supplies Dealers",1
+"Paint and Wallpaper Stores",444120,"Standard Services","Retail Trade","Building Material and Garden Equipment and Supplies Dealers",1
+"Hardware Stores",444130,"Standard Services","Retail Trade","Building Material and Garden Equipment and Supplies Dealers",1
+"Other Building Material Dealers",444190,"Standard Services","Retail Trade","Building Material and Garden Equipment and Supplies Dealers",0
+"Outdoor Power Equipment Stores",444210,"Standard Services","Retail Trade","Building Material and Garden Equipment and Supplies Dealers",0
+"Nursery, Garden Center, and Farm Supply Stores",444220,"Standard Services","Retail Trade","Building Material and Garden Equipment and Supplies Dealers",0
+"Lumber and Wood Materials Dealers",423310,"Standard Services","Retail Trade","Building Material and Garden Equipment and Supplies Dealers",0
+"Plumbing and Electrical Supply Stores",423720,"Standard Services","Retail Trade","Building Material and Garden Equipment and Supplies Dealers",0
+"Roofing Materials Dealers",444190,"Standard Services","Retail Trade","Building Material and Garden Equipment and Supplies Dealers",0
+"Masonry and Stone Material Dealers",444190,"Standard Services","Retail Trade","Building Material and Garden Equipment and Supplies Dealers",0
+"Fencing and Decking Material Retailers",444190,"Standard Services","Retail Trade","Building Material and Garden Equipment and Supplies Dealers",0
+"Landscaping Supply Stores",444220,"Standard Services","Retail Trade","Building Material and Garden Equipment and Supplies Dealers",0
+"Tool and Equipment Rental Centers",532310,"Standard Services","Retail Trade","Building Material and Garden Equipment and Supplies Dealers",0
+"Window and Door Retailers",444190,"Standard Services","Retail Trade","Building Material and Garden Equipment and Supplies Dealers",0
+"Supermarkets and Other Grocery (except Convenience) Stores",445110,"Standard Services","Retail Trade","Food and Beverage Retailers",0
+"Convenience Stores",445120,"Standard Services","Retail Trade","Food and Beverage Retailers",0
+"Meat Markets",445210,"Standard Services","Retail Trade","Food and Beverage Retailers",0
+"Fish and Seafood Markets",445220,"Standard Services","Retail Trade","Food and Beverage Retailers",0
+"Fruit and Vegetable Markets",445230,"Standard Services","Retail Trade","Food and Beverage Retailers",0
+"Baked Goods Stores",445291,"Standard Services","Retail Trade","Food and Beverage Retailers",0
+"Confectionery and Nut Stores",445292,"Standard Services","Retail Trade","Food and Beverage Retailers",0
+"All Other Specialty Food Stores",445299,"Standard Services","Retail Trade","Food and Beverage Retailers",0
+"Beer, Wine, and Liquor Stores",445310,"Standard Services","Retail Trade","Food and Beverage Retailers",0
+"Organic and Natural Food Stores",445299,"Standard Services","Retail Trade","Food and Beverage Retailers",0
+"Ethnic Grocery Stores",445299,"Standard Services","Retail Trade","Food and Beverage Retailers",0
+"Gourmet and Specialty Cheese Shops",445299,"Standard Services","Retail Trade","Food and Beverage Retailers",0
+"Health and Dietetic Food Stores",445299,"Standard Services","Retail Trade","Food and Beverage Retailers",0
+"Bulk and Wholesale Food Outlets",445299,"Standard Services","Retail Trade","Food and Beverage Retailers",0
+"Pharmacies and Drug Stores",446110,"Standard Services","Retail Trade","Health and Personal Care Stores",0
+"Cosmetics, Beauty Supplies, and Perfume Stores",446120,"Standard Services","Retail Trade","Health and Personal Care Stores",0
+"Optical Goods Stores",446130,"Standard Services","Retail Trade","Health and Personal Care Stores",0
+"Food (Health) Supplement Stores",446191,"Standard Services","Retail Trade","Health and Personal Care Stores",0
+"All Other Health and Personal Care Stores",446199,"Standard Services","Retail Trade","Health and Personal Care Stores",0
+"Medical Supply Stores",446199,"Standard Services","Retail Trade","Health and Personal Care Stores",0
+"Hearing Aid Stores",446199,"Standard Services","Retail Trade","Health and Personal Care Stores",0
+"Homeopathic and Alternative Medicine Stores",446199,"Standard Services","Retail Trade","Health and Personal Care Stores",0
+"Aromatherapy Product Retailers",446199,"Standard Services","Retail Trade","Health and Personal Care Stores",0
+"Personal Hygiene Product Stores",446199,"Standard Services","Retail Trade","Health and Personal Care Stores",0
+"Mobility and Rehabilitation Equipment Stores",446199,"Standard Services","Retail Trade","Health and Personal Care Stores",0
+"Gasoline Stations with Convenience Stores",447110,"Standard Services","Retail Trade","Gasoline Stations",0
+"Other Gasoline Stations",447190,"Standard Services","Retail Trade","Gasoline Stations",0
+"Electric Vehicle Charging Stations",447190,"Standard Services","Retail Trade","Gasoline Stations",0
+"Propane Fuel Dealers",454310,"Standard Services","Retail Trade","Gasoline Stations",0
+"Alternative Fuel Stations (e.g., Hydrogen)",447190,"Standard Services","Retail Trade","Gasoline Stations",0
+"Men's Clothing Stores",448110,"Standard Services","Retail Trade","Clothing and Clothing Accessories Stores",0
+"Women's Clothing Stores",448120,"Standard Services","Retail Trade","Clothing and Clothing Accessories Stores",0
+"Children's and Infants' Clothing Stores",448130,"Standard Services","Retail Trade","Clothing and Clothing Accessories Stores",0
+"Family Clothing Stores",448140,"Standard Services","Retail Trade","Clothing and Clothing Accessories Stores",0
+"Clothing Accessories Stores",448150,"Standard Services","Retail Trade","Clothing and Clothing Accessories Stores",0
+"Other Clothing Stores",448190,"Standard Services","Retail Trade","Clothing and Clothing Accessories Stores",0
+"Shoe Stores",448210,"Standard Services","Retail Trade","Clothing and Clothing Accessories Stores",0
+"Bridal Shops",448190,"Standard Services","Retail Trade","Clothing and Clothing Accessories Stores",0
+"Uniform and Work Clothing Stores",448190,"Standard Services","Retail Trade","Clothing and Clothing Accessories Stores",0
+"Leather Clothing Stores",448190,"Standard Services","Retail Trade","Clothing and Clothing Accessories Stores",0
+"Jewelry Stores",448310,"Standard Services","Retail Trade","Jewelry, Luggage, and Leather Goods Stores",0
+"Luggage and Leather Goods Stores",448320,"Standard Services","Retail Trade","Jewelry, Luggage, and Leather Goods Stores",0
+"Watch and Clock Stores",448310,"Standard Services","Retail Trade","Jewelry, Luggage, and Leather Goods Stores",0
+"Handbag Specialty Stores",448320,"Standard Services","Retail Trade","Jewelry, Luggage, and Leather Goods Stores",0
+"Costume Jewelry Stores",448310,"Standard Services","Retail Trade","Jewelry, Luggage, and Leather Goods Stores",0
+"Sporting Goods Stores",451110,"Standard Services","Retail Trade","Sporting Goods, Hobby, Musical Instrument, and Book Stores",0
+"Hobby, Toy, and Game Stores",451120,"Standard Services","Retail Trade","Sporting Goods, Hobby, Musical Instrument, and Book Stores",0
+"Sewing, Needlework, and Piece Goods Stores",451130,"Standard Services","Retail Trade","Sporting Goods, Hobby, Musical Instrument, and Book Stores",0
+"Musical Instrument and Supplies Stores",451140,"Standard Services","Retail Trade","Sporting Goods, Hobby, Musical Instrument, and Book Stores",0
+"Book Stores",451211,"Standard Services","Retail Trade","Sporting Goods, Hobby, Musical Instrument, and Book Stores",0
+"News Dealers and Newsstands",451212,"Standard Services","Retail Trade","Sporting Goods, Hobby, Musical Instrument, and Book Stores",0
+"Comic Book Stores",451211,"Standard Services","Retail Trade","Sporting Goods, Hobby, Musical Instrument, and Book Stores",0
+"Puzzle and Board Game Stores",451120,"Standard Services","Retail Trade","Sporting Goods, Hobby, Musical Instrument, and Book Stores",0
+"Department Stores",452210,"Standard Services","Retail Trade","General Merchandise Stores",0
+"Warehouse Clubs and Supercenters",452311,"Standard Services","Retail Trade","General Merchandise Stores",0
+"All Other General Merchandise Stores",452319,"Standard Services","Retail Trade","General Merchandise Stores",0
+"Discount Stores",452319,"Standard Services","Retail Trade","General Merchandise Stores",0
+"Variety Stores",452319,"Standard Services","Retail Trade","General Merchandise Stores",0
+"Dollar Stores",452319,"Standard Services","Retail Trade","General Merchandise Stores",0
+"Commercial Printing (except Screen and Books)",323111,"Standard Services","Retail Trade","Printing and Related Support Activities",0
+"Commercial Screen Printing",323113,"Standard Services","Retail Trade","Printing and Related Support Activities",0
+"Books Printing",323117,"Standard Services","Retail Trade","Printing and Related Support Activities",0
+"Support Activites for Printing",323120,"Standard Services","Retail Trade","Printing and Related Support Activities",0
+"Florists",453110,"Standard Services","Retail Trade","Miscellaneous Store Retailers",0
+"Office Supplies and Stationery Stores",453210,"Standard Services","Retail Trade","Miscellaneous Store Retailers",0
+"Gift, Novelty, and Souvenir Stores",453220,"Standard Services","Retail Trade","Miscellaneous Store Retailers",0
+"Used Merchandise Stores",453310,"Standard Services","Retail Trade","Miscellaneous Store Retailers",0
+"Pet and Pet Supplies Stores",453910,"Standard Services","Retail Trade","Miscellaneous Store Retailers",0
+"Art Dealers",453920,"Standard Services","Retail Trade","Miscellaneous Store Retailers",0
+"Manufactured (Mobile) Home Dealers",453930,"Standard Services","Retail Trade","Miscellaneous Store Retailers",0
+"Tobacco Stores",453991,"Standard Services","Retail Trade","Miscellaneous Store Retailers",0
+"Party Supplies Stores",453998,"Standard Services","Retail Trade","Miscellaneous Store Retailers",0
+"Souvenir and Tourist Shops",453998,"Standard Services","Retail Trade","Miscellaneous Store Retailers",0
+"Antique Shops",453310,"Standard Services","Retail Trade","Miscellaneous Store Retailers",0
+"All Other Miscellaneous Store Retailers (except Tobacco Stores)",453998,"Standard Services","Retail Trade","Miscellaneous Store Retailers",0
+"Electronic Shopping and Mail-Order Houses",454110,"Standard Services","Retail Trade","Nonstore Retailers",0
+"Vending Machine Operators",454210,"Standard Services","Retail Trade","Nonstore Retailers",0
+"Fuel Dealers",454310,"Standard Services","Retail Trade","Nonstore Retailers",0
+"Other Direct Selling Establishments",454390,"Standard Services","Retail Trade","Nonstore Retailers",0
+"Door-to-Door Sales",454390,"Standard Services","Retail Trade","Nonstore Retailers",0
+"Catalog Retailers",454110,"Standard Services","Retail Trade","Nonstore Retailers",0
+"Telemarketing Sales",454110,"Standard Services","Retail Trade","Nonstore Retailers",0
+"Scheduled Passenger Air Transportation",481111,"Standard Services","Transportation Services","Air Transportation",1
+"Scheduled Freight Air Transportation",481112,"Standard Services","Transportation Services","Air Transportation",1
+"Nonscheduled Chartered Passenger Air Transportation",481211,"Standard Services","Transportation Services","Air Transportation",1
+"Nonscheduled Chartered Freight Air Transportation",481212,"Standard Services","Transportation Services","Air Transportation",1
+"Other Nonscheduled Air Transportation",481219,"Standard Services","Transportation Services","Air Transportation",1
+"Line-Haul Railroads",482111,"Standard Services","Transportation Services","Rail Transportation",1
+"Short Line Railroads",482112,"Standard Services","Transportation Services","Rail Transportation",1
+"Rail Freight Transport Services",482112,"Standard Services","Transportation Services","Rail Transportation",1
+"Deep Sea Freight Transportation",483111,"Standard Services","Transportation Services","Water Transportation",1
+"Deep Sea Passenger Transportation",483112,"Standard Services","Transportation Services","Water Transportation",1
+"Coastal and Great Lakes Freight Transportation",483113,"Standard Services","Transportation Services","Water Transportation",1
+"Coastal and Great Lakes Passenger Transportation",483114,"Standard Services","Transportation Services","Water Transportation",1
+"Inland Water Freight Transportation",483211,"Standard Services","Transportation Services","Water Transportation",1
+"Inland Water Passenger Transportation",483212,"Standard Services","Transportation Services","Water Transportation",1
+"Port and Harbor Operations",488310,"Standard Services","Transportation Services","Water Transportation",0
+"Marine Cargo Handling",488320,"Standard Services","Transportation Services","Water Transportation",0
+"Navigational Services to Shipping",488330,"Standard Services","Transportation Services","Water Transportation",0
+"Vessel Pilot Services",488390,"Standard Services","Transportation Services","Water Transportation",0
+"Ship and Boat Repair Services",336611,"Standard Services","Transportation Services","Water Transportation",0
+"Ferry Services",483114,"Standard Services","Transportation Services","Water Transportation",0
+"Tugboat and Towboat Operations",488330,"Standard Services","Transportation Services","Water Transportation",0
+"Other water transport services not classified elsewhere",488390,"Standard Services","Transportation Services","Water Transportation",0
+"General Freight Trucking, Local",484110,"Standard Services","Transportation Services","Truck Transportation",0
+"General Freight Trucking, Long-Distance, Truckload",484121,"Standard Services","Transportation Services","Truck Transportation",0
+"General Freight Trucking, Long-Distance, Less Than Truckload",484122,"Standard Services","Transportation Services","Truck Transportation",0
+"Used Household and Office Goods Moving",484210,"Standard Services","Transportation Services","Truck Transportation",0
+"Specialized Freight (except Used Goods) Trucking, Local",484220,"Standard Services","Transportation Services","Truck Transportation",0
+"Specialized Freight (except Used Goods) Trucking, Long-Distance",484230,"Standard Services","Transportation Services","Truck Transportation",0
+"Truck Rental and Leasing with Driver",484110,"Standard Services","Transportation Services","Truck Transportation",0
+"Mixed Mode Transit Systems",485111,"Standard Services","Transportation Services","Transit and Ground Passenger Transportation",0
+"Commuter Rail Systems",485112,"Standard Services","Transportation Services","Transit and Ground Passenger Transportation",0
+"Bus and Other Motor Vehicle Transit Systems",485113,"Standard Services","Transportation Services","Transit and Ground Passenger Transportation",0
+"Other Urban Transit Systems",485119,"Standard Services","Transportation Services","Transit and Ground Passenger Transportation",0
+"Interurban and Rural Bus Transportation",485210,"Standard Services","Transportation Services","Transit and Ground Passenger Transportation",0
+"Taxi Service",485310,"Standard Services","Transportation Services","Transit and Ground Passenger Transportation",0
+"Limousine Service",485320,"Standard Services","Transportation Services","Transit and Ground Passenger Transportation",0
+"School and Employee Bus Transportation",485410,"Standard Services","Transportation Services","Transit and Ground Passenger Transportation",0
+"Charter Bus Industry",485510,"Standard Services","Transportation Services","Transit and Ground Passenger Transportation",0
+"Special Needs Transportation",485991,"Standard Services","Transportation Services","Transit and Ground Passenger Transportation",0
+"All Other Transit and Ground Passenger Transportation",485999,"Standard Services","Transportation Services","Transit and Ground Passenger Transportation",0
+"Pipeline Transportation of Crude Oil",486110,"Standard Services","Transportation Services","Pipeline Transportation",1
+"Pipeline Transportation of Natural Gas",486210,"Standard Services","Transportation Services","Pipeline Transportation",1
+"Pipeline Transportation of Refined Petroleum Products",486910,"Standard Services","Transportation Services","Pipeline Transportation",1
+"All Other Pipeline Transportation",486990,"Standard Services","Transportation Services","Pipeline Transportation",1
+"Scenic and Sightseeing Transportation, Land",487110,"Standard Services","Transportation Services","Scenic and Sightseeing Transportation",0
+"Scenic and Sightseeing Transportation, Water",487210,"Standard Services","Transportation Services","Scenic and Sightseeing Transportation",0
+"Scenic and Sightseeing Transportation, Other",487990,"Standard Services","Transportation Services","Scenic and Sightseeing Transportation",0
+"Air Traffic Control",488111,"Standard Services","Transportation Services","Air Transportation Support",0
+"Other Airport Operations",488119,"Standard Services","Transportation Services","Air Transportation Support",0
+"Other Support Activities for Air Transportation",488190,"Standard Services","Transportation Services","Air Transportation Support",0
+"Cargo handling services - loading, unloading, port operations",488320,"Standard Services","Transportation Services","Water Transportation Support",0
+"Other Support Activities for Water Transportation",488390,"Standard Services","Transportation Services","Water Transportation Support",0
+"Motor Vehicle Towing",488410,"Standard Services","Transportation Services","Road Transportation Support",0
+"Roadside Assistance Services",488490,"Standard Services","Transportation Services","Road Transportation Support",0
+"Vehicle Inspection Services",811198,"Standard Services","Transportation Services","Road Transportation Support",0
+"Driver Training Services",611692,"Standard Services","Transportation Services","Road Transportation Support",0
+"Track Maintenance and Repair",488210,"Standard Services","Transportation Services","Rail Transportation Support",0
+"Rail Yard Operations",488210,"Standard Services","Transportation Services","Rail Transportation Support",0
+"Rail Signaling and Communications Services",488210,"Standard Services","Transportation Services","Rail Transportation Support",0
+"Rail Switching and Terminal Operations",488210,"Standard Services","Transportation Services","Rail Transportation Support",0
+"Other Support Activities for Rail Transportation",488210,"Standard Services","Transportation Services","Rail Transportation Support",0
+"Freight Transportation Arrangement",488510,"Standard Services","Transportation Services","Freight & Logistics Support",0
+"Packing and Crating",488991,"Standard Services","Transportation Services","Freight & Logistics Support",0
+"Storage and warehousing services related to transport",493110,"Standard Services","Transportation Services","Freight & Logistics Support",0
+"Customs Brokerage",488510,"Standard Services","Transportation Services","Freight & Logistics Support",0
+"Inventory Management Services",541614,"Standard Services","Transportation Services","Freight & Logistics Support",0
+"Other Support Activities for Road Transportation",488490,"Standard Services","Transportation Services","All Other Support Activities for Transportation",0
+"All Other Support Activities for Transportation",488999,"Standard Services","Transportation Services","All Other Support Activities for Transportation",0
+"Postal Service",491110,"Standard Services","Postal & Courier Services","Postal Service",0
+"Couriers and Express Delivery Services",492110,"Standard Services","Postal & Courier Services","Couriers and Messengers",0
+"Local Messengers and Local Delivery",492210,"Standard Services","Postal & Courier Services","Couriers and Messengers",0
+"Mail Sorting and Handling Services",561439,"Standard Services","Postal & Courier Services","Couriers and Messengers",0
+"General Warehousing and Storage",493110,"Standard Services","Warehousing and Storage","Warehousing and Storage",0
+"Refrigerated Warehousing and Storage",493120,"Standard Services","Warehousing and Storage","Warehousing and Storage",0
+"Storage of bulk liquids and gases - petroleum, chemicals, LNG",493190,"Standard Services","Warehousing and Storage","Warehousing and Storage",0
+"Farm Product Warehousing and Storage",493130,"Standard Services","Warehousing and Storage","Warehousing and Storage",0
+"Hazardous Materials Warehousing",493130,"Standard Services","Warehousing and Storage","Warehousing and Storage",0
+"Automated Storage and Retrieval Systems",333922,"Standard Services","Warehousing and Storage","Warehousing and Storage",0
+"Other Warehousing and Storage",493190,"Standard Services","Warehousing and Storage","Warehousing and Storage",0
+"Newspaper Publishers",511110,"Standard Services","Information Services","Publishing Industries (except Internet)",0
+"Periodical Publishers",511120,"Standard Services","Information Services","Publishing Industries (except Internet)",0
+"Book Publishers",511130,"Standard Services","Information Services","Publishing Industries (except Internet)",0
+"Directory and Mailing List Publishers",511140,"Standard Services","Information Services","Publishing Industries (except Internet)",0
+"Greeting Card Publishers",511191,"Standard Services","Information Services","Publishing Industries (except Internet)",0
+"All Other Publishers",511199,"Standard Services","Information Services","Publishing Industries (except Internet)",0
+"Software Publishers",511210,"Standard Services","Information Services","Publishing Industries (except Internet)",0
+"Motion Picture and Video Production",512110,"Standard Services","Information Services","Motion Picture and Sound Recording Industries",0
+"Motion Picture Theaters (except Drive-Ins)",512131,"Standard Services","Information Services","Motion Picture and Sound Recording Industries",0
+"Drive-In Motion Picture Theaters",512132,"Standard Services","Information Services","Motion Picture and Sound Recording Industries",0
+"Teleproduction and Other Postproduction Services",512191,"Standard Services","Information Services","Motion Picture and Sound Recording Industries",0
+"Other Motion Picture and Video Industries",512199,"Standard Services","Information Services","Motion Picture and Sound Recording Industries",0
+"Music Publishers",512230,"Standard Services","Information Services","Motion Picture and Sound Recording Industries",0
+"Sound Recording Studios",512240,"Standard Services","Information Services","Motion Picture and Sound Recording Industries",0
+"Record Production and Distribution",512250,"Standard Services","Information Services","Motion Picture and Sound Recording Industries",0
+"Other Sound Recording Industries",512290,"Standard Services","Information Services","Motion Picture and Sound Recording Industries",0
+"Radio Networks",515111,"Standard Services","Information Services","Broadcasting (except Internet)",0
+"Radio Stations",515112,"Standard Services","Information Services","Broadcasting (except Internet)",0
+"Television Broadcasting",515120,"Standard Services","Information Services","Broadcasting (except Internet)",0
+"Cable Television Programming",515210,"Standard Services","Information Services","Broadcasting (except Internet)",0
+"Satellite Broadcasting",515210,"Standard Services","Information Services","Broadcasting (except Internet)",0
+"Broadcast Equipment Maintenance",811213,"Standard Services","Information Services","Broadcasting (except Internet)",0
+"Cable and Other Subscription Programming",515210,"Standard Services","Information Services","Subscription Media",0
+"Streaming Video Services",519130,"Standard Services","Information Services","Subscription Media",0
+"Subscription Audio Services",519130,"Standard Services","Information Services","Subscription Media",0
+"Digital Magazine Subscriptions",519130,"Standard Services","Information Services","Subscription Media",0
+"Online News Subscription Services",519130,"Standard Services","Information Services","Subscription Media",0
+"Wired Telecommunications Carriers",517311,"Standard Services","Information Services","Telecommunications – Wired",0
+"Local Exchange Carriers",517311,"Standard Services","Information Services","Telecommunications – Wired",0
+"Long-Distance Wired Carriers",517311,"Standard Services","Information Services","Telecommunications – Wired",0
+"Internet Service Providers (Wired)",517311,"Standard Services","Information Services","Telecommunications – Wired",0
+"Fiber Optic Network Services",517311,"Standard Services","Information Services","Telecommunications – Wired",0
+"Wireless Telecommunications Carriers (except Satellite)",517312,"Standard Services","Information Services","Telecommunications – Wireless",0
+"Mobile Virtual Network Operators (MVNOs)",517312,"Standard Services","Information Services","Telecommunications – Wireless",0
+"Cellular Phone Service Providers",517312,"Standard Services","Information Services","Telecommunications – Wireless",0
+"Wireless Internet Service Providers",517312,"Standard Services","Information Services","Telecommunications – Wireless",0
+"Wireless Equipment Installation and Maintenance",811213,"Standard Services","Information Services","Telecommunications – Wireless",0
+"Satellite Telecommunications",517410,"Standard Services","Information Services","Telecommunications – Satellite",0
+"Satellite Internet Service Providers",517410,"Standard Services","Information Services","Telecommunications – Satellite",0
+"Satellite TV Broadcasting",517410,"Standard Services","Information Services","Telecommunications – Satellite",0
+"Satellite Ground Station Operations",517919,"Standard Services","Information Services","Telecommunications – Satellite",0
+"Satellite Equipment Manufacturing",334220,"Standard Services","Information Services","Telecommunications – Satellite",0
+"Telecommunications Resellers",517911,"Standard Services","Information Services","Telecommunications – Other",0
+"Telecommunications Consulting Services",541618,"Standard Services","Information Services","Telecommunications – Other",0
+"Telecommunication Equipment Wholesale",423690,"Standard Services","Information Services","Telecommunications – Other",0
+"Other Telecommunications Services",517919,"Standard Services","Information Services","Telecommunications – Other",0
+"Data Transmission Services",517919,"Standard Services","Information Services","Telecommunications – Other",0
+"Data Processing, Hosting, and Related Services",518210,"Standard Services","Information Services","Computing Infrastructure Providers, Data Processing, Web Hosting, and Related Services",0
+"News Syndicates",519110,"Standard Services","Information Services","Web Search Portals, Libraries, Archives, and Other Information Services",0
+"Libraries and Archives",519120,"Standard Services","Information Services","Web Search Portals, Libraries, Archives, and Other Information Services",0
+"Internet Publishing and Broadcasting and Web Search Portals",519130,"Standard Services","Information Services","Web Search Portals, Libraries, Archives, and Other Information Services",0
+"All Other Information Services",519190,"Standard Services","Information Services","Web Search Portals, Libraries, Archives, and Other Information Services",0
+"Monetary Authoritiesâ€“Central Bank",521110,"Standard Services","Finance and Insurance Services","Central Banking & Finance",0
+"Currency Issuance",521120,"Standard Services","Finance and Insurance Services","Central Banking & Finance",0
+"Reserve Management",521130,"Standard Services","Finance and Insurance Services","Central Banking & Finance",0
+"Financial Stability Oversight",521140,"Standard Services","Finance and Insurance Services","Central Banking & Finance",0
+"Payment Systems Management",522320,"Standard Services","Finance and Insurance Services","Central Banking & Finance",0
+"Commercial Banking",522110,"Standard Services","Finance and Insurance Services","Credit Intermediation and Related Activities",0
+"Savings Institutions",522120,"Standard Services","Finance and Insurance Services","Credit Intermediation and Related Activities",0
+"Credit Unions",522130,"Standard Services","Finance and Insurance Services","Credit Intermediation and Related Activities",0
+"Other Depository Credit Intermediation",522190,"Standard Services","Finance and Insurance Services","Credit Intermediation and Related Activities",0
+"Credit Card Issuing",522210,"Standard Services","Finance and Insurance Services","Credit Intermediation and Related Activities",0
+"Sales Financing",522220,"Standard Services","Finance and Insurance Services","Credit Intermediation and Related Activities",0
+"Consumer Lending",522291,"Standard Services","Finance and Insurance Services","Credit Intermediation and Related Activities",0
+"Real Estate Credit",522292,"Standard Services","Finance and Insurance Services","Credit Intermediation and Related Activities",0
+"International Trade Financing",522293,"Standard Services","Finance and Insurance Services","Credit Intermediation and Related Activities",0
+"Secondary Market Financing",522294,"Standard Services","Finance and Insurance Services","Credit Intermediation and Related Activities",0
+"All Other Nondepository Credit Intermediation",522298,"Standard Services","Finance and Insurance Services","Credit Intermediation and Related Activities",0
+"Mortgage and Nonmortgage Loan Brokers",522310,"Standard Services","Finance and Insurance Services","Credit Intermediation and Related Activities",0
+"Financial Transactions Processing, Reserve, and Clearinghouse Activities",522320,"Standard Services","Finance and Insurance Services","Credit Intermediation and Related Activities",0
+"Other Activities Related to Credit Intermediation",522390,"Standard Services","Finance and Insurance Services","Credit Intermediation and Related Activities",0
+"Investment Banking and Securities Dealing",523110,"Standard Services","Finance and Insurance Services","Securities, Commodity Contracts, and Other Financial Investments and Related Activities",0
+"Securities Brokerage",523120,"Standard Services","Finance and Insurance Services","Securities, Commodity Contracts, and Other Financial Investments and Related Activities",0
+"Commodity Contracts Dealing",523130,"Standard Services","Finance and Insurance Services","Securities, Commodity Contracts, and Other Financial Investments and Related Activities",0
+"Commodity Contracts Brokerage",523140,"Standard Services","Finance and Insurance Services","Securities, Commodity Contracts, and Other Financial Investments and Related Activities",0
+"Securities and Commodity Exchanges",523210,"Standard Services","Finance and Insurance Services","Securities, Commodity Contracts, and Other Financial Investments and Related Activities",0
+"Miscellaneous Intermediation",523910,"Standard Services","Finance and Insurance Services","Securities, Commodity Contracts, and Other Financial Investments and Related Activities",0
+"Portfolio Management",523920,"Standard Services","Finance and Insurance Services","Securities, Commodity Contracts, and Other Financial Investments and Related Activities",0
+"Investment Advice",523930,"Standard Services","Finance and Insurance Services","Securities, Commodity Contracts, and Other Financial Investments and Related Activities",0
+"Trust, Fiduciary, and Custody Activities",523991,"Standard Services","Finance and Insurance Services","Securities, Commodity Contracts, and Other Financial Investments and Related Activities",0
+"Miscellaneous Financial Investment Activities",523999,"Standard Services","Finance and Insurance Services","Securities, Commodity Contracts, and Other Financial Investments and Related Activities",0
+"Direct Life Insurance Carriers",524113,"Standard Services","Finance and Insurance Services","Insurance Carriers and Related Activities",0
+"Direct Health and Medical Insurance Carriers",524114,"Standard Services","Finance and Insurance Services","Insurance Carriers and Related Activities",0
+"Direct Property and Casualty Insurance Carriers",524126,"Standard Services","Finance and Insurance Services","Insurance Carriers and Related Activities",0
+"Direct Title Insurance Carriers",524127,"Standard Services","Finance and Insurance Services","Insurance Carriers and Related Activities",0
+"Other Direct Insurance (except Life, Health, and Medical) Carriers",524128,"Standard Services","Finance and Insurance Services","Insurance Carriers and Related Activities",0
+"Reinsurance Carriers",524130,"Standard Services","Finance and Insurance Services","Insurance Carriers and Related Activities",0
+"Insurance Agencies and Brokerages",524210,"Standard Services","Finance and Insurance Services","Insurance Carriers and Related Activities",0
+"Claims Adjusting",524291,"Standard Services","Finance and Insurance Services","Insurance Carriers and Related Activities",0
+"Third Party Administration of Insurance and Pension Funds",524292,"Standard Services","Finance and Insurance Services","Insurance Carriers and Related Activities",0
+"All Other Insurance Related Activities",524298,"Standard Services","Finance and Insurance Services","Insurance Carriers and Related Activities",0
+"Pension Funds",525110,"Standard Services","Finance and Insurance Services","Funds, Trusts, and Other Financial Vehicles",0
+"Health and Welfare Funds",525120,"Standard Services","Finance and Insurance Services","Funds, Trusts, and Other Financial Vehicles",0
+"Other Insurance Funds",525190,"Standard Services","Finance and Insurance Services","Funds, Trusts, and Other Financial Vehicles",0
+"Open-End Investment Funds",525910,"Standard Services","Finance and Insurance Services","Funds, Trusts, and Other Financial Vehicles",0
+"Trusts, Estates, and Agency Accounts",525920,"Standard Services","Finance and Insurance Services","Funds, Trusts, and Other Financial Vehicles",0
+"Other Financial Vehicles",525990,"Standard Services","Finance and Insurance Services","Funds, Trusts, and Other Financial Vehicles",0
+"Debt Counseling Services",541613,"Standard Services","Finance and Insurance Services","Financial Support Services",0
+"Fraud Investigation Services",541612,"Standard Services","Finance and Insurance Services","Financial Support Services",0
+"Loan Processing Services",541612,"Standard Services","Finance and Insurance Services","Financial Support Services",0
+"Lessors of Residential Buildings and Dwellings",531110,"Standard Services","Real Estate and Rental and Leasing","Real Estate",0
+"Lessors of Nonresidential Buildings (excpet Miniwarehouses)",531120,"Standard Services","Real Estate and Rental and Leasing","Real Estate",0
+"Lessors of Miniwarehouses and Self-Storage Units",531130,"Standard Services","Real Estate and Rental and Leasing","Real Estate",0
+"Lessors of Other Real Estate Property",531190,"Standard Services","Real Estate and Rental and Leasing","Real Estate",0
+"Offices of Real Estate Agents and Brokers",531210,"Standard Services","Real Estate and Rental and Leasing","Real Estate",0
+"Residential Property Managers",531311,"Standard Services","Real Estate and Rental and Leasing","Real Estate",0
+"Nonresidential Property Managers",531312,"Standard Services","Real Estate and Rental and Leasing","Real Estate",0
+"Offices of Real Estate Appraisers",531320,"Standard Services","Real Estate and Rental and Leasing","Real Estate",0
+"Other Activities Related to Real Estate",531390,"Standard Services","Real Estate and Rental and Leasing","Real Estate",0
+"Passenger Car Rental",532111,"Standard Services","Real Estate and Rental and Leasing","Rental and Leasing Services",0
+"Passenger Car Leasing",532112,"Standard Services","Real Estate and Rental and Leasing","Rental and Leasing Services",0
+"Truck, Utility Trailer, and RV (Recreational Vehicle) Rental and Leasing",532120,"Standard Services","Real Estate and Rental and Leasing","Rental and Leasing Services",0
+"Consumer Electronics and Appliances Rental",532210,"Standard Services","Real Estate and Rental and Leasing","Rental and Leasing Services",0
+"Formal Wear and Costume Rental",532281,"Standard Services","Real Estate and Rental and Leasing","Rental and Leasing Services",0
+"Video Tape and Disc Rental",532282,"Standard Services","Real Estate and Rental and Leasing","Rental and Leasing Services",0
+"Home Health Equipment Rental",532283,"Standard Services","Real Estate and Rental and Leasing","Rental and Leasing Services",0
+"Recreational Goods Rental",532284,"Standard Services","Real Estate and Rental and Leasing","Rental and Leasing Services",0
+"All Other Consumer Goods Rental",532289,"Standard Services","Real Estate and Rental and Leasing","Rental and Leasing Services",0
+"General Rental Centers",532310,"Standard Services","Real Estate and Rental and Leasing","Rental and Leasing Services",0
+"Commercial Air, Rail, and Water Transportation Equipment Rental and Leasing",532411,"Standard Services","Real Estate and Rental and Leasing","Rental and Leasing Services",0
+"Construction, Mining, and Forestry Machinery and Equipment Rental and Leasing",532412,"Standard Services","Real Estate and Rental and Leasing","Rental and Leasing Services",0
+"Office Machinery and Equipment Rental and Leasing",532420,"Standard Services","Real Estate and Rental and Leasing","Rental and Leasing Services",0
+"Other Commercial and Industrial Machinery and Equipment Rental and Leasing",532490,"Standard Services","Real Estate and Rental and Leasing","Rental and Leasing Services",0
+"Lessors of Nonfinancial Intangible Assets (except Copyrighted Works)",533110,"Standard Services","Real Estate and Rental and Leasing","Lessors of Nonfinancial Intangible Assets (except Copyrighted Works)",0
+"Legal advisory and representation",541110,"Standard Services","Professional, Scientific & Technical Activities","Legal & Title Services",0
+"Notary services",541120,"Standard Services","Professional, Scientific & Technical Activities","Legal & Title Services",0
+"Title Abstract and Settlement Offices",541191,"Standard Services","Professional, Scientific & Technical Activities","Legal & Title Services",0
+"All Other Legal Services",541199,"Standard Services","Professional, Scientific & Technical Activities","Legal & Title Services",0
+"Offices of Certified Public Accountants",541211,"Standard Services","Professional, Scientific & Technical Activities","Accounting & Payroll",0
+"Auditing services",541211,"Standard Services","Professional, Scientific & Technical Activities","Accounting & Payroll",0
+"Tax Preparation Services",541213,"Standard Services","Professional, Scientific & Technical Activities","Accounting & Payroll",0
+"Payroll Services",541214,"Standard Services","Professional, Scientific & Technical Activities","Accounting & Payroll",0
+"Patent, trademark, and copyright services",541213,"Standard Services","Professional, Scientific & Technical Activities","Accounting & Payroll",0
+"Other Accounting Services",541219,"Standard Services","Professional, Scientific & Technical Activities","Accounting & Payroll",0
+"Architectural services - design, planning & consulting",541310,"Standard Services","Professional, Scientific & Technical Activities","Design & Engineering",0
+"Landscape Architectural Services",541320,"Standard Services","Professional, Scientific & Technical Activities","Design & Engineering",0
+"Engineering consultancy services",541330,"Standard Services","Professional, Scientific & Technical Activities","Design & Engineering",0
+"Urban planning services",541320,"Standard Services","Professional, Scientific & Technical Activities","Design & Engineering",0
+"Drafting Services",541340,"Standard Services","Professional, Scientific & Technical Activities","Design & Engineering",0
+"Building Inspection Services",541350,"Standard Services","Professional, Scientific & Technical Activities","Design & Engineering",0
+"Geophysical Surveying & Mapping Services",541360,"Standard Services","Professional, Scientific & Technical Activities","Survey & Testing",0
+"Surveying and Mapping (except Geophysical)",541370,"Standard Services","Professional, Scientific & Technical Activities","Survey & Testing",0
+"Laboratory services - testing, analysis & experiment",541380,"Standard Services","Professional, Scientific & Technical Activities","Survey & Testing",0
+"Interior Design Services",541410,"Standard Services","Professional, Scientific & Technical Activities","Design Services",0
+"Industrial Design Services",541420,"Standard Services","Professional, Scientific & Technical Activities","Design Services",0
+"Graphic Design Services",541430,"Standard Services","Professional, Scientific & Technical Activities","Design Services",0
+"Other Specialized Design Services",541490,"Standard Services","Professional, Scientific & Technical Activities","Design Services",0
+"Admin & General Management Consulting",541611,"Standard Services","Professional, Scientific & Technical Activities","Consulting & Advisory",0
+"Administrative/Professional Fees",541611,"Standard Services","Professional, Scientific & Technical Activities","Consulting & Advisory",0
+"Human Resources Consulting Services",541612,"Standard Services","Professional, Scientific & Technical Activities","Consulting & Advisory",0
+"Marketing Consulting Services",541613,"Standard Services","Professional, Scientific & Technical Activities","Consulting & Advisory",0
+"Process, Physical Distribution & Logistics Consulting",541614,"Standard Services","Professional, Scientific & Technical Activities","Consulting & Advisory",0
+"Other Management Consulting Services",541618,"Standard Services","Professional, Scientific & Technical Activities","Consulting & Advisory",0
+"Environmental Consulting Services",541620,"Standard Services","Professional, Scientific & Technical Activities","Consulting & Advisory",0
+"Other Scientific & Technical Consulting Services",541690,"Standard Services","Professional, Scientific & Technical Activities","Consulting & Advisory",0
+"Research and Development in Nanotechnology",541713,"Standard Services","Professional, Scientific & Technical Activities","R&D",0
+"R&D in Biotechnology (except Nanobiotech)",541714,"Standard Services","Professional, Scientific & Technical Activities","R&D",0
+"R&D in Physical, Engineering & Life Sciences (excl nano/biotech)",541715,"Standard Services","Professional, Scientific & Technical Activities","R&D",0
+"R&D in Social Sciences & Humanities",541720,"Standard Services","Professional, Scientific & Technical Activities","R&D",0
+"Advertising Agencies",541810,"Standard Services","Professional, Scientific & Technical Activities","Advertising & Media",0
+"Public Relations Agencies",541820,"Standard Services","Professional, Scientific & Technical Activities","Advertising & Media",0
+"Media Buying Agencies",541830,"Standard Services","Professional, Scientific & Technical Activities","Advertising & Media",0
+"Media Representatives",541840,"Standard Services","Professional, Scientific & Technical Activities","Advertising & Media",0
+"Outdoor Advertising",541850,"Standard Services","Professional, Scientific & Technical Activities","Advertising & Media",0
+"Direct Mail Advertising",541860,"Standard Services","Professional, Scientific & Technical Activities","Advertising & Media",0
+"Advertising Material Distribution Services",541870,"Standard Services","Professional, Scientific & Technical Activities","Advertising & Media",0
+"Other Services Related to Advertising",541890,"Standard Services","Professional, Scientific & Technical Activities","Advertising & Media",0
+"Marketing Research & Public Opinion Polling",541910,"Standard Services","Professional, Scientific & Technical Activities","Market Research",0
+"Survey Design Services",541910,"Standard Services","Professional, Scientific & Technical Activities","Market Research",0
+"Data Analysis and Reporting",541910,"Standard Services","Professional, Scientific & Technical Activities","Market Research",0
+"Consumer Behavior Analytics",541910,"Standard Services","Professional, Scientific & Technical Activities","Market Research",0
+"Photography Studios, Portrait",541921,"Standard Services","Professional, Scientific & Technical Activities","Creative Services",0
+"Commercial Photography",541922,"Standard Services","Professional, Scientific & Technical Activities","Creative Services",0
+"Translation & Interpretation Services",541930,"Standard Services","Professional, Scientific & Technical Activities","Translation & Interpretation",0
+"Language Localization Services",541930,"Standard Services","Professional, Scientific & Technical Activities","Translation & Interpretation",0
+"Sign Language Interpretation",541930,"Standard Services","Professional, Scientific & Technical Activities","Translation & Interpretation",0
+"Veterinary Services",541940,"Standard Services","Professional, Scientific & Technical Activities","Veterinary & Animal Care",0
+"Animal Hospitals",541940,"Standard Services","Professional, Scientific & Technical Activities","Veterinary & Animal Care",0
+"Pet Grooming Services",812910,"Standard Services","Professional, Scientific & Technical Activities","Veterinary & Animal Care",0
+"Wildlife Rehabilitation Services",541940,"Standard Services","Professional, Scientific & Technical Activities","Veterinary & Animal Care",0
+"All Other Professional, Scientific & Technical Services",541990,"Standard Services","Professional, Scientific & Technical Activities","Other PSTS",0
+"Corporate, Subsidiary, and Regional Managing Offices",551114,"Standard Services","Management of Companies and Enterprises","Management of Companies and Enterprises",0
+"Offices of Bank Holding Companies",551111,"Standard Services","Management of Companies and Enterprises","Management of Companies and Enterprises",0
+"Offices of Other Holding Companies",551112,"Standard Services","Management of Companies and Enterprises","Management of Companies and Enterprises",0
+"Investment Holding Companies",551112,"Standard Services","Management of Companies and Enterprises","Management of Companies and Enterprises",0
+"Real Estate Holding Companies",551112,"Standard Services","Management of Companies and Enterprises","Management of Companies and Enterprises",0
+"Strategic Planning Services",551114,"Standard Services","Management of Companies and Enterprises","Management of Companies and Enterprises",1
+"Business Process Management",551114,"Standard Services","Management of Companies and Enterprises","Management of Companies and Enterprises",0
+"Office Administrative Services",561110,"Standard Services","Administrative and Support","Office Support",0
+"Facilities Support Services",561210,"Standard Services","Administrative and Support","Facilities",0
+"Employment Placement Agencies",561311,"Standard Services","Employment Services","Employment Services",0
+"Executive Search Services",561312,"Standard Services","Employment Services","Employment Services",0
+"Temporary Help Services",561320,"Standard Services","Employment Services","Employment Services",0
+"Professional Employer Organizations (PEO)",561330,"Standard Services","Employment Services","Employment Services",0
+"Document Preparation Services",561410,"Standard Services","Administrative and Support","Business Services",0
+"Telephone Answering Services",561421,"Standard Services","Administrative and Support","Business Services",0
+"Telemarketing Bureaus & Contact Centers",561422,"Standard Services","Administrative and Support","Business Services",0
+"Private Mail Centers",561422,"Standard Services","Administrative and Support","Business Services",0
+"Other Business Service Centers (e.g., Copy Shops)",561439,"Standard Services","Administrative and Support","Business Services",0
+"Collection Agencies",561440,"Standard Services","Administrative and Support","Collections & Credit",0
+"Credit Bureaus",561450,"Standard Services","Administrative and Support","Collections & Credit",0
+"Repossession Services",561491,"Standard Services","Administrative and Support","Collections & Credit",0
+"Court Reporting & Stenotype Services",561492,"Standard Services","Administrative and Support","Collections & Credit",0
+"All Other Business Support Services",561499,"Standard Services","Administrative and Support","Collections & Credit",0
+"Travel Agencies",561510,"Standard Services","Administrative and Support","Travel Services",0
+"Tour Operators",561520,"Standard Services","Administrative and Support","Travel Services",0
+"Convention & Visitors Bureaus",561591,"Standard Services","Administrative and Support","Travel Services",0
+"Other Travel Arrangement & Reservation Services",561591,"Standard Services","Administrative and Support","Travel Services",0
+"Investigation Services",561611,"Standard Services","Administrative and Support","Investigation & Security",0
+"Security Guards & Patrol Services",561612,"Standard Services","Administrative and Support","Investigation & Security",0
+"Armored Car Services",561613,"Standard Services","Administrative and Support","Investigation & Security",0
+"Security Systems Services (except Locksmiths)",561621,"Standard Services","Administrative and Support","Investigation & Security",0
+"Locksmiths",561622,"Standard Services","Administrative and Support","Investigation & Security",0
+"Exterminating & Pest Control Services",561710,"Standard Services","Administrative and Support","Building Services",0
+"Janitorial Services",561720,"Standard Services","Administrative and Support","Building Services",0
+"Landscaping Services",561730,"Standard Services","Administrative and Support","Landscaping & Cleaning",0
+"Carpet & Upholstery Cleaning Services",561740,"Standard Services","Administrative and Support","Landscaping & Cleaning",0
+"Other Services to Buildings & Dwellings",561790,"Standard Services","Administrative and Support","Landscaping & Cleaning",0
+"Packaging & Labeling Services",561910,"Standard Services","Administrative and Support","Marketing & Events",0
+"Convention & Trade Show Organizers",561920,"Standard Services","Administrative and Support","Marketing & Events",0
+"All Other Support Services",561990,"Standard Services","Administrative and Support","Marketing & Events",0
+"Natural Gas Distribution",221210,"Standard Services","Utilities and Waste Management","Natural Gas Distribution",0
+"Collection, purification, and distribution services of water for domestic and industrial purposes",221310,"Standard Services","Utilities and Waste Management","Water and Sewerage Services",0
+"Desalination, demineralization, and water treatment services",221320,"Standard Services","Utilities and Waste Management","Water and Sewerage Services",0
+"Installation, repair, and maintenance of water supply infrastructure",237110,"Standard Services","Utilities and Waste Management","Water and Sewerage Services",0
+"Sewerage and sewage treatment services",221320,"Standard Services","Utilities and Waste Management","Water and Sewerage Services",0
+"Maintenance and operation of sewer systems",221320,"Standard Services","Utilities and Waste Management","Water and Sewerage Services",0
+"Septic tank emptying and cleaning services",562991,"Standard Services","Utilities and Waste Management","Water and Sewerage Services",0
+"Wastewater recycling and reuse services",221320,"Standard Services","Utilities and Waste Management","Water and Sewerage Services",0
+"Non metal waste recycling",562920,"Standard Services","Utilities and Waste Management","Recycling",0
+"Organic waste - composting, biodegradable material treatment",562920,"Standard Services","Utilities and Waste Management","Recycling",0
+"Recycling of glass",562920,"Standard Services","Utilities and Waste Management","Recycling",0
+"Recycling of plastics",562920,"Standard Services","Utilities and Waste Management","Recycling",0
+"Textile recycling",562920,"Standard Services","Utilities and Waste Management","Recycling",0
+"Collection and transportation of non-hazardous waste",562111,"Standard Services","Utilities and Waste Management","Waste Management and Remediation Services",1
+"Collection and transportation of hazardous waste",562112,"Standard Services","Utilities and Waste Management","Waste Management and Remediation Services",1
+"Other Waste Collection",562119,"Standard Services","Utilities and Waste Management","Waste Management and Remediation Services",1
+"Hazardous Waste Treatment and Disposal",562211,"Standard Services","Utilities and Waste Management","Waste Management and Remediation Services",1
+"Solid Waste Landfill",562212,"Standard Services","Utilities and Waste Management","Waste Management and Remediation Services",1
+"Solid Waste Combustors and Incinerators",562213,"Standard Services","Utilities and Waste Management","Waste Management and Remediation Services",1
+"Other Nonhazardous Waste Treatment and Disposal",562219,"Standard Services","Utilities and Waste Management","Waste Management and Remediation Services",1
+"Incineration services",562213,"Standard Services","Utilities and Waste Management","Waste Management and Remediation Services",1
+"Composting and organic waste management services",562920,"Standard Services","Utilities and Waste Management","Waste Management and Remediation Services",1
+"Waste and scrap materials",562920,"Standard Services","Utilities and Waste Management","Waste Management and Remediation Services",1
+"Waste to enrgy",562213,"Standard Services","Utilities and Waste Management","Waste Management and Remediation Services",0
+"Cleaning and maintenance of public spaces",561730,"Standard Services","Utilities and Waste Management","Waste Management and Remediation Services",0
+"Pest control and fumigation services",561710,"Standard Services","Utilities and Waste Management","Waste Management and Remediation Services",0
+"Cleaning of industrial sites and hazardous sites",562910,"Standard Services","Utilities and Waste Management","Waste Management and Remediation Services",0
+"Other environmental remediation services",562910,"Standard Services","Utilities and Waste Management","Waste Management and Remediation Services",0
+"Remediation Services",562910,"Standard Services","Utilities and Waste Management","Waste Management and Remediation Services",0
+"Materials Recovery Facilities",562920,"Standard Services","Utilities and Waste Management","Waste Management and Remediation Services",0
+"All Other Miscellaneous Waste Management Services",562998,"Standard Services","Utilities and Waste Management","Waste Management and Remediation Services",0
+"Elementary and Secondary Schools",611110,"Standard Services","Educational Services","Educational Services",0
+"Junior Colleges",611210,"Standard Services","Educational Services","Educational Services",0
+"Colleges, Universities, and Professional Schools",611310,"Standard Services","Educational Services","Educational Services",0
+"Business and Secretarial Schools",611410,"Standard Services","Educational Services","Educational Services",0
+"Computer Training",611420,"Standard Services","Educational Services","Educational Services",0
+"Professional and Management Development Training, Online Workshops",611430,"Standard Services","Educational Services","Educational Services",0
+"Cosmetology and Barber Schools",611511,"Standard Services","Educational Services","Educational Services",0
+"Flight Training",611512,"Standard Services","Educational Services","Educational Services",0
+"Apprenticeship Training",611513,"Standard Services","Educational Services","Educational Services",0
+"Other Technical and Trade Schools",611519,"Standard Services","Educational Services","Educational Services",0
+"Fine Arts Schools",611610,"Standard Services","Educational Services","Educational Services",0
+"Sports and Recreation Instruction",611620,"Standard Services","Educational Services","Educational Services",0
+"Language Schools",611630,"Standard Services","Educational Services","Educational Services",0
+"Exam Preparation and Tutoring",611691,"Standard Services","Educational Services","Educational Services",0
+"Automobile Driving Schools",611692,"Standard Services","Educational Services","Educational Services",0
+"All Other Miscellaneous Schools and Instruction",611699,"Standard Services","Educational Services","Educational Services",0
+"Students Workshops",611699,"Standard Services","Educational Services","Educational Services",0
+"Educational Support Services",611710,"Standard Services","Educational Services","Educational Services",0
+"Offices of Physicians (except Mental Health Specialists)",621111,"Standard Services","Health Care and Social Assistance","Ambulatory Health Care Services",0
+"Offices of Physicians, Mental Health Specialists",621112,"Standard Services","Health Care and Social Assistance","Ambulatory Health Care Services",0
+"Offices of Dentists",621210,"Standard Services","Health Care and Social Assistance","Ambulatory Health Care Services",0
+"Offices of Chiropractors",621310,"Standard Services","Health Care and Social Assistance","Ambulatory Health Care Services",0
+"Offices of Optometrists",621320,"Standard Services","Health Care and Social Assistance","Ambulatory Health Care Services",0
+"Offices of Mental Health Practitioners (except Physicians)",621330,"Standard Services","Health Care and Social Assistance","Ambulatory Health Care Services",0
+"Offices of Physical, Occupational and Speech Therapists, and Audiologists",621340,"Standard Services","Health Care and Social Assistance","Ambulatory Health Care Services",0
+"Offices of Podiatrists",621391,"Standard Services","Health Care and Social Assistance","Ambulatory Health Care Services",0
+"Offices of All Other Miscellaneous Health Practitioners",621399,"Standard Services","Health Care and Social Assistance","Ambulatory Health Care Services",0
+"Family Planning Centers",621410,"Standard Services","Health Care and Social Assistance","Ambulatory Health Care Services",0
+"Outpatient Mental Health and Substance Abuse Centers",621420,"Standard Services","Health Care and Social Assistance","Ambulatory Health Care Services",0
+"HMO Medical Centers",621491,"Standard Services","Health Care and Social Assistance","Ambulatory Health Care Services",0
+"Kidney Dialysis Centers",621492,"Standard Services","Health Care and Social Assistance","Ambulatory Health Care Services",0
+"Freestanding Ambulatory Surgical and Emergency Centers",621493,"Standard Services","Health Care and Social Assistance","Ambulatory Health Care Services",0
+"All Other Outpatient Care Centers",621498,"Standard Services","Health Care and Social Assistance","Ambulatory Health Care Services",0
+"Medical Laboratories",621511,"Standard Services","Health Care and Social Assistance","Ambulatory Health Care Services",0
+"Diagnostic Imaging Centers",621512,"Standard Services","Health Care and Social Assistance","Ambulatory Health Care Services",0
+"Home Health Care Services",621610,"Standard Services","Health Care and Social Assistance","Ambulatory Health Care Services",0
+"Ambulance Services",621910,"Standard Services","Health Care and Social Assistance","Ambulatory Health Care Services",0
+"Blood and Organ Banks",621991,"Standard Services","Health Care and Social Assistance","Ambulatory Health Care Services",0
+"All Other Miscellaneous Ambulatory Health Care Services",621999,"Standard Services","Health Care and Social Assistance","Ambulatory Health Care Services",0
+"General Medical and Surgical Hospitals",622110,"Standard Services","Health Care and Social Assistance","Hospitals",0
+"Psychiatric and Substance Abuse Hospitals",622210,"Standard Services","Health Care and Social Assistance","Hospitals",0
+"Specialty (except Psychiatric and Substance Abuse) Hospitals",622310,"Standard Services","Health Care and Social Assistance","Hospitals",0
+"Nursing Care Facilities (Skilled Nursing Facilities)",623110,"Standard Services","Health Care and Social Assistance","Nursing and Residential Care Facilities",0
+"Residential Intellectual and Developmental Disability Facilities",623210,"Standard Services","Health Care and Social Assistance","Nursing and Residential Care Facilities",0
+"Residential Mental Health and Substance Abuse Facilities",623220,"Standard Services","Health Care and Social Assistance","Nursing and Residential Care Facilities",0
+"Continuing Care Retirement Communities",623311,"Standard Services","Health Care and Social Assistance","Nursing and Residential Care Facilities",0
+"Assisted Living Facilities for the Elderly",623312,"Standard Services","Health Care and Social Assistance","Nursing and Residential Care Facilities",0
+"Other Residential Care Facilities",623990,"Standard Services","Health Care and Social Assistance","Nursing and Residential Care Facilities",0
+"Child and Youth Services",624110,"Standard Services","Health Care and Social Assistance","Social Assistance",0
+"Services for the Elderly and Persons with Disabilities",624120,"Standard Services","Health Care and Social Assistance","Social Assistance",0
+"Other Individual and Family Services",624190,"Standard Services","Health Care and Social Assistance","Social Assistance",0
+"Community Food Services",624210,"Standard Services","Health Care and Social Assistance","Social Assistance",0
+"Local / System-wide Happiness program, Iftar Gathering",624210,"Standard Services","Health Care and Social Assistance","Social Assistance",0
+"Temporary Shelters",624221,"Standard Services","Health Care and Social Assistance","Social Assistance",0
+"Other Community Housing Services",624229,"Standard Services","Health Care and Social Assistance","Social Assistance",0
+"Emergency and Other Relief Services",624230,"Standard Services","Health Care and Social Assistance","Social Assistance",0
+"Vocational Rehabilitation Services",624310,"Standard Services","Health Care and Social Assistance","Social Assistance",0
+"Child Day Care Services",624410,"Standard Services","Health Care and Social Assistance","Social Assistance",0
+"Theater Companies and Dinner Theaters",711110,"Standard Services","Arts, Entertainment, and Recreation","Performing Arts, Spectator Sports, and Related Industries",0
+"Dance Companies",711120,"Standard Services","Arts, Entertainment, and Recreation","Performing Arts, Spectator Sports, and Related Industries",0
+"Musical Groups and Artists",711130,"Standard Services","Arts, Entertainment, and Recreation","Performing Arts, Spectator Sports, and Related Industries",0
+"Other Performing Arts Companies",711190,"Standard Services","Arts, Entertainment, and Recreation","Performing Arts, Spectator Sports, and Related Industries",0
+"Sports Teams and Clubs",711211,"Standard Services","Arts, Entertainment, and Recreation","Performing Arts, Spectator Sports, and Related Industries",0
+"Racetracks",711212,"Standard Services","Arts, Entertainment, and Recreation","Performing Arts, Spectator Sports, and Related Industries",0
+"Other Spectator Sports",711219,"Standard Services","Arts, Entertainment, and Recreation","Performing Arts, Spectator Sports, and Related Industries",0
+"Promoters of Performing Arts, Sports, and Similar Events with Facilities",711310,"Standard Services","Arts, Entertainment, and Recreation","Performing Arts, Spectator Sports, and Related Industries",0
+"Promoters of Performing Arts, Sports, and Similar Events without Facilities",711320,"Standard Services","Arts, Entertainment, and Recreation","Performing Arts, Spectator Sports, and Related Industries",0
+"Agents and Managers for Artists, Athletes, Entertainers, and Other Public Figures",711410,"Standard Services","Arts, Entertainment, and Recreation","Performing Arts, Spectator Sports, and Related Industries",0
+"Independent Artists, Writers, and Performers",711510,"Standard Services","Arts, Entertainment, and Recreation","Performing Arts, Spectator Sports, and Related Industries",0
+"Museums",712110,"Standard Services","Arts, Entertainment, and Recreation","Museums, Historical Sites, and Similar Institutions",0
+"Historical Sites",712120,"Standard Services","Arts, Entertainment, and Recreation","Museums, Historical Sites, and Similar Institutions",0
+"Zoos and Botanical Gardens",712130,"Standard Services","Arts, Entertainment, and Recreation","Museums, Historical Sites, and Similar Institutions",0
+"Nature Parks and Other Similar Institutions",712190,"Standard Services","Arts, Entertainment, and Recreation","Museums, Historical Sites, and Similar Institutions",0
+"Amusement and Theme Parks",713110,"Standard Services","Arts, Entertainment, and Recreation","Amusement, Gambling, and Recreation Industries",0
+"Amusement Arcades",713120,"Standard Services","Arts, Entertainment, and Recreation","Amusement, Gambling, and Recreation Industries",0
+"Casinos (except Casino Hotels)",713210,"Standard Services","Arts, Entertainment, and Recreation","Amusement, Gambling, and Recreation Industries",0
+"Other Gambling Industries",713290,"Standard Services","Arts, Entertainment, and Recreation","Amusement, Gambling, and Recreation Industries",0
+"Golf Courses and Country Clubs",713910,"Standard Services","Arts, Entertainment, and Recreation","Amusement, Gambling, and Recreation Industries",0
+"Skiing Facilities",713920,"Standard Services","Arts, Entertainment, and Recreation","Amusement, Gambling, and Recreation Industries",0
+"Marinas",713930,"Standard Services","Arts, Entertainment, and Recreation","Amusement, Gambling, and Recreation Industries",0
+"Fitness and Recreational Sports Centers",713940,"Standard Services","Arts, Entertainment, and Recreation","Amusement, Gambling, and Recreation Industries",0
+"Bowling Centers",713950,"Standard Services","Arts, Entertainment, and Recreation","Amusement, Gambling, and Recreation Industries",0
+"All Other Amusement and Recreation Industries",713990,"Standard Services","Arts, Entertainment, and Recreation","Amusement, Gambling, and Recreation Industries",0
+"Hotel - Luxury hotels, boutique hotels",721110,"Standard Services","Accommodation and Food Services","Accommodation",0
+"Lodging services for travelers - bed, breakfast, motels",721191,"Standard Services","Accommodation and Food Services","Accommodation",0
+"Hostel services - Dormitories, Rooming and Boarding Houses and Workers' Camps",721310,"Standard Services","Accommodation and Food Services","Accommodation",0
+"Campground and caravan park service",721211,"Standard Services","Accommodation and Food Services","Accommodation",0
+"Resort & other leisure accommodations",721120,"Standard Services","Accommodation and Food Services","Accommodation",0
+"Casino Hotels",721120,"Standard Services","Accommodation and Food Services","Accommodation",0
+"Other serviced apartments, guest house",721199,"Standard Services","Accommodation and Food Services","Accommodation",0
+"Short-term rental of private homes - Airbnb, short term vacation rentals",721199,"Standard Services","Accommodation and Food Services","Accommodation",0
+"Rental services for vacation cottages, holiday homes, and apartments",721199,"Standard Services","Accommodation and Food Services","Accommodation",0
+"Bed-and-Breakfast Inns",721191,"Standard Services","Accommodation and Food Services","Accommodation",0
+"All Other Traveler Accommodation",721199,"Standard Services","Accommodation and Food Services","Accommodation",0
+"Restaurants, bars, and other food services within accommodations",722511,"Standard Services","Accommodation and Food Services","Accommodation",0
+"Catering services at accommodations",722320,"Standard Services","Accommodation and Food Services","Accommodation",0
+"Other food services within accommodations not classified elsewhere",722320,"Standard Services","Accommodation and Food Services","Accommodation",0
+"Reservation services including online booking platforms",561599,"Standard Services","Accommodation and Food Services","Accommodation",0
+"Concierge services, guest assistance",721199,"Standard Services","Accommodation and Food Services","Accommodation",0
+"Others - laundry, cleaning, housekeeping",812990,"Standard Services","Accommodation and Food Services","Accommodation",0
+"RV (Recreational Vehicle) Parks and Campgrounds",721211,"Standard Services","Accommodation and Food Services","Accommodation",0
+"Recreational and Vacation Camps (except Campgrounds)",721214,"Standard Services","Accommodation and Food Services","Accommodation",0
+"Food Service Contractors",722310,"Standard Services","Accommodation and Food Services","Food Services and Drinking Places",0
+"Caterers",722320,"Standard Services","Accommodation and Food Services","Food Services and Drinking Places",0
+"Mobile Food Services",722330,"Standard Services","Accommodation and Food Services","Food Services and Drinking Places",0
+"Drinking Places (Alcoholic Beverages)",722410,"Standard Services","Accommodation and Food Services","Food Services and Drinking Places",0
+"Full-Service Restaurants",722511,"Standard Services","Accommodation and Food Services","Food Services and Drinking Places",0
+"Limited-Service Restaurants",722513,"Standard Services","Accommodation and Food Services","Food Services and Drinking Places",0
+"Cafeterias, Grill Buffets, and Buffets",722514,"Standard Services","Accommodation and Food Services","Food Services and Drinking Places",0
+"Snack and Nonalcoholic Beverage Bars",722515,"Standard Services","Accommodation and Food Services","Food Services and Drinking Places",0
+"General Automotive Repair",811111,"Standard Services","Other Services (except Public Administration)","Repair and Maintenance",0
+"Automotive Exhaust System Repair",811112,"Standard Services","Other Services (except Public Administration)","Repair and Maintenance",0
+"Automotive Transmission Repair",811113,"Standard Services","Other Services (except Public Administration)","Repair and Maintenance",0
+"Other Automotive Mechanical and Electrical Repair and Maintenance",811118,"Standard Services","Other Services (except Public Administration)","Repair and Maintenance",0
+"Automotive Body, Paint, and Interior Repair and Maintenance",811121,"Standard Services","Other Services (except Public Administration)","Repair and Maintenance",0
+"Automotive Glass Replacement Shops",811122,"Standard Services","Other Services (except Public Administration)","Repair and Maintenance",0
+"Automotive Oil Change and Lubrication Shops",811191,"Standard Services","Other Services (except Public Administration)","Repair and Maintenance",0
+"Car Washes",811192,"Standard Services","Other Services (except Public Administration)","Repair and Maintenance",0
+"All Other Automotive Repair and Maintenance",811198,"Standard Services","Other Services (except Public Administration)","Repair and Maintenance",0
+"Consumer Electronics Repair and Maintenance",811211,"Standard Services","Other Services (except Public Administration)","Repair and Maintenance",0
+"Computer and Office Machine Repair and Maintenance",811212,"Standard Services","Other Services (except Public Administration)","Repair and Maintenance",0
+"Communication Equipment Repair and Maintenance",811213,"Standard Services","Other Services (except Public Administration)","Repair and Maintenance",0
+"Other Electronic and Precision Equipment Repair and Maintenance",811219,"Standard Services","Other Services (except Public Administration)","Repair and Maintenance",0
+"Commercial and Industrial Machinery and Equipment (except Automotive and Electronic) Repair and Maintenance",811310,"Standard Services","Other Services (except Public Administration)","Repair and Maintenance",0
+"Home and Garden Equipment Repair and Maintenance",811411,"Standard Services","Other Services (except Public Administration)","Repair and Maintenance",0
+"Appliance Repair and Maintenance",811412,"Standard Services","Other Services (except Public Administration)","Repair and Maintenance",0
+"Reupholstery and Furniture Repair",811420,"Standard Services","Other Services (except Public Administration)","Repair and Maintenance",0
+"Footwear and Leather Goods Repair",811430,"Standard Services","Other Services (except Public Administration)","Repair and Maintenance",0
+"Other Personal and Household Goods Repair and Maintenance",811490,"Standard Services","Other Services (except Public Administration)","Repair and Maintenance",0
+"Barber Shops",812111,"Standard Services","Other Services (except Public Administration)","Personal and Laundry Services",0
+"Beauty Salons",812112,"Standard Services","Other Services (except Public Administration)","Personal and Laundry Services",0
+"Nail Salons",812113,"Standard Services","Other Services (except Public Administration)","Personal and Laundry Services",0
+"Diet and Weight Reducing Centers",812191,"Standard Services","Other Services (except Public Administration)","Personal and Laundry Services",0
+"Other Personal Care Services",812199,"Standard Services","Other Services (except Public Administration)","Personal and Laundry Services",0
+"Funeral Homes and Funeral Services",812210,"Standard Services","Other Services (except Public Administration)","Personal and Laundry Services",0
+"Cemeteries and Crematories",812220,"Standard Services","Other Services (except Public Administration)","Personal and Laundry Services",0
+"Coin-Operated Laundries and Drycleaners",812310,"Standard Services","Other Services (except Public Administration)","Personal and Laundry Services",0
+"Drycleaning and Laundry Services (except Coin-Operated)",812320,"Standard Services","Other Services (except Public Administration)","Personal and Laundry Services",0
+"Linen Supply",812331,"Standard Services","Other Services (except Public Administration)","Personal and Laundry Services",0
+"Industrial Launderers",812332,"Standard Services","Other Services (except Public Administration)","Personal and Laundry Services",0
+"Pet Care (except Veterinary) Services",812910,"Standard Services","Other Services (except Public Administration)","Personal and Laundry Services",0
+"Photofinishing Laboratories (except One-Hour)",812921,"Standard Services","Other Services (except Public Administration)","Personal and Laundry Services",0
+"One-Hour Photofinishing",812922,"Standard Services","Other Services (except Public Administration)","Personal and Laundry Services",0
+"Parking Lots and Garages",812930,"Standard Services","Other Services (except Public Administration)","Personal and Laundry Services",0
+"All Other Personal Services",812990,"Standard Services","Other Services (except Public Administration)","Personal and Laundry Services",0
+"Religious Organizations",813110,"Standard Services","Other Services (except Public Administration)","Religious, Grantmaking, Civic, Professional, and Similar Organizations",0
+"Grantmaking Foundations",813211,"Standard Services","Other Services (except Public Administration)","Religious, Grantmaking, Civic, Professional, and Similar Organizations",0
+"Voluntary Health Organizations",813212,"Standard Services","Other Services (except Public Administration)","Religious, Grantmaking, Civic, Professional, and Similar Organizations",0
+"Other Grantmaking and Giving Services",813219,"Standard Services","Other Services (except Public Administration)","Religious, Grantmaking, Civic, Professional, and Similar Organizations",0
+"Human Rights Organizations",813311,"Standard Services","Other Services (except Public Administration)","Religious, Grantmaking, Civic, Professional, and Similar Organizations",0
+"Environment, Conservation and Wildlife Organizations",813312,"Standard Services","Other Services (except Public Administration)","Religious, Grantmaking, Civic, Professional, and Similar Organizations",0
+"Other Social Advocacy Organizations",813319,"Standard Services","Other Services (except Public Administration)","Religious, Grantmaking, Civic, Professional, and Similar Organizations",0
+"Civic and Social Organizations",813410,"Standard Services","Other Services (except Public Administration)","Religious, Grantmaking, Civic, Professional, and Similar Organizations",0
+"Business Associations",813910,"Standard Services","Other Services (except Public Administration)","Religious, Grantmaking, Civic, Professional, and Similar Organizations",0
+"Professional Organizations",813920,"Standard Services","Other Services (except Public Administration)","Religious, Grantmaking, Civic, Professional, and Similar Organizations",0
+"Labor Unions and Similar Labor Organizations",813930,"Standard Services","Other Services (except Public Administration)","Religious, Grantmaking, Civic, Professional, and Similar Organizations",0
+"Political Organizations",813940,"Standard Services","Other Services (except Public Administration)","Religious, Grantmaking, Civic, Professional, and Similar Organizations",0
+"Other Similar Organizations (except Business, Professional, Labor, and Political Organizations)",813990,"Standard Services","Other Services (except Public Administration)","Religious, Grantmaking, Civic, Professional, and Similar Organizations",0
+"Geological and geophysical consulting services",213112,"Standard Services","Mining, Quarrying, and Oil and Gas Extraction","Mining, Quarrying, and Oil and Gas Extraction",0
+"Mineral exploration and evaluation services",213117,"Standard Services","Mining, Quarrying, and Oil and Gas Extraction","Mining, Quarrying, and Oil and Gas Extraction",0
+"Derrick erection",213115,"Standard Services","Mining, Quarrying, and Oil and Gas Extraction","Mining, Quarrying, and Oil and Gas Extraction",0
+"Well casing",213115,"Standard Services","Mining, Quarrying, and Oil and Gas Extraction","Mining, Quarrying, and Oil and Gas Extraction",0
+"Cementing",213115,"Standard Services","Mining, Quarrying, and Oil and Gas Extraction","Mining, Quarrying, and Oil and Gas Extraction",0
+"Pumping and plugging",213115,"Standard Services","Mining, Quarrying, and Oil and Gas Extraction","Mining, Quarrying, and Oil and Gas Extraction",0
+"Draining and pumping of mines",213115,"Standard Services","Mining, Quarrying, and Oil and Gas Extraction","Mining, Quarrying, and Oil and Gas Extraction",0
+"Overburden removal",213115,"Standard Services","Mining, Quarrying, and Oil and Gas Extraction","Mining, Quarrying, and Oil and Gas Extraction",0
+"Tunneling operations",213115,"Standard Services","Mining, Quarrying, and Oil and Gas Extraction","Mining, Quarrying, and Oil and Gas Extraction",0
+"Drilling Oil and Gas Wells",213111,"Standard Services","Mining, Quarrying, and Oil and Gas Extraction","Mining, Quarrying, and Oil and Gas Extraction",0
+"Support Activities for Oil and Gas Operations",213112,"Standard Services","Mining, Quarrying, and Oil and Gas Extraction","Mining, Quarrying, and Oil and Gas Extraction",0
+"Support Activities for Coal Mining",213113,"Standard Services","Mining, Quarrying, and Oil and Gas Extraction","Mining, Quarrying, and Oil and Gas Extraction",0
+"Support Activities for Metal Mining",213114,"Standard Services","Mining, Quarrying, and Oil and Gas Extraction","Mining, Quarrying, and Oil and Gas Extraction",0
+"Support Activities for Nonmetallic Minerals (except Fuels) Mining",213115,"Standard Services","Mining, Quarrying, and Oil and Gas Extraction","Mining, Quarrying, and Oil and Gas Extraction",0
+"Remote Sensing",115116,"Standard Services","Agriculture and animal husbandry","Support Activities for Agriculture and Forestry",0
+"Land Preparation (Plowing, Tilling)",115112,"Standard Services","Agriculture and animal husbandry","Support Activities for Agriculture and Forestry",0
+"Seed Supply and Planting Services",115112,"Standard Services","Agriculture and animal husbandry","Support Activities for Agriculture and Forestry",0
+"Crop spraying and related activities",115112,"Standard Services","Agriculture and animal husbandry","Support Activities for Agriculture and Forestry",0
+"Mechanical Harvesting Services",115113,"Standard Services","Agriculture and animal husbandry","Support Activities for Agriculture and Forestry",0
+"Crop Drying and Storage Solutions",493130,"Standard Services","Agriculture and animal husbandry","Support Activities for Agriculture and Forestry",0
+"Soil Testing and Conditioning",115116,"Standard Services","Agriculture and animal husbandry","Support Activities for Agriculture and Forestry",0
+"Composting Services",115118,"Standard Services","Agriculture and animal husbandry","Support Activities for Agriculture and Forestry",0
+"Sorting, Grading, and Packaging",115119,"Standard Services","Agriculture and animal husbandry","Support Activities for Agriculture and Forestry",0
+"Crop Rotation Planning",115120,"Standard Services","Agriculture and animal husbandry","Support Activities for Agriculture and Forestry",0
+"Pest and Disease Monitoring",115114,"Standard Services","Agriculture and animal husbandry","Support Activities for Agriculture and Forestry",0
+"Sustainable Farming Practices Training",115116,"Standard Services","Agriculture and animal husbandry","Support Activities for Agriculture and Forestry",0
+"Water Harvesting and Distribution",221310,"Standard Services","Agriculture and animal husbandry","Support Activities for Agriculture and Forestry",0
+"Irrigation System Installation and Maintenance",237110,"Standard Services","Agriculture and animal husbandry","Support Activities for Agriculture and Forestry",0
+"Breeding and Reproduction Services",115210,"Standard Services","Agriculture and animal husbandry","Support Activities for Agriculture and Forestry",0
+"Veterinary and Healthcare Services",541940,"Standard Services","Agriculture and animal husbandry","Support Activities for Agriculture and Forestry",0
+"Animal Feeding Services",115210,"Standard Services","Agriculture and animal husbandry","Support Activities for Agriculture and Forestry",0
+"Fodder Production and Supply",115210,"Standard Services","Agriculture and animal husbandry","Support Activities for Agriculture and Forestry",0
+"Livestock Management Services",115210,"Standard Services","Agriculture and animal husbandry","Support Activities for Agriculture and Forestry",0
+"Tree planting, afforestation, and reforestation services",115310,"Standard Services","Agriculture and animal husbandry","Support Activities for Agriculture and Forestry",0
+"Cotton Ginning",115111,"Standard Services","Agriculture and animal husbandry","Support Activities for Agriculture and Forestry",0
+"Soil Preparation, Planting, and Cultivating",115112,"Standard Services","Agriculture and animal husbandry","Support Activities for Agriculture and Forestry",0
+"Crop Harvesting, Primarily by Machine",115113,"Standard Services","Agriculture and animal husbandry","Support Activities for Agriculture and Forestry",0
+"Postharvest Crop Activities (except Cotton Ginning)",115114,"Standard Services","Agriculture and animal husbandry","Support Activities for Agriculture and Forestry",0
+"Farm Labor Contractors and Crew Leaders",115115,"Standard Services","Agriculture and animal husbandry","Support Activities for Agriculture and Forestry",0
+"Farm Management Services",115116,"Standard Services","Agriculture and animal husbandry","Support Activities for Agriculture and Forestry",0
+"Animal Care and Boarding Services",812910,"Standard Services","Agriculture and animal husbandry","Support Activities for Animal Production",0
+"Support Activities for Animal Production",115210,"Standard Services","Agriculture and animal husbandry","Support Activities for Animal Production",0
+"Logging services, including felling, cutting, and transporting of timber",113310,"Standard Services","Forestry and logging","Forestry and logging",0
+"Forest management services",115310,"Standard Services","Forestry and logging","Forestry and logging",0
+"Support services to forestry - pest control, forest firefighting",115310,"Standard Services","Forestry and logging","Forestry and logging",0
+"Services related to fish breeding and hatcheries",112511,"Standard Services","Fishing & Aquaculture","Fishing & Aquaculture",0
+"Fish farm management, feeding, and maintenance",112511,"Standard Services","Fishing & Aquaculture","Fishing & Aquaculture",0
+"Harvesting services for aquaculture",112512,"Standard Services","Fishing & Aquaculture","Fishing & Aquaculture",0
+"Maintenance and operation of aquaculture tanks, cages, and ponds",112512,"Standard Services","Fishing & Aquaculture","Fishing & Aquaculture",0
+"Aquaculture water quality testing and monitoring services",541380,"Standard Services","Fishing & Aquaculture","Fishing & Aquaculture",0
+"Poured Concrete Foundation and Structure Contractors",238110,"Standard Services","Construction","Foundation, Structure, and Building Exterior Contractors",0
+"Structural Steel and Precast Concrete Contractors",238120,"Standard Services","Construction","Foundation, Structure, and Building Exterior Contractors",0
+"Framing Contractors",238130,"Standard Services","Construction","Foundation, Structure, and Building Exterior Contractors",0
+"Masonry Contractors",238140,"Standard Services","Construction","Foundation, Structure, and Building Exterior Contractors",0
+"Glass and Glazing Services",238150,"Standard Services","Construction","Foundation, Structure, and Building Exterior Contractors",0
+"Roofing Services",238160,"Standard Services","Construction","Foundation, Structure, and Building Exterior Contractors",0
+"Siding Contractors",238170,"Standard Services","Construction","Foundation, Structure, and Building Exterior Contractors",0
+"Other Foundation, Structure, and Building Exterior Services",238190,"Standard Services","Construction","Foundation, Structure, and Building Exterior Contractors",0
+"Test drilling and boring services",237110,"Standard Services","Construction","Building Equipment Contractors",1
+"Electrical Contractors and Other Wiring Installation Services",238210,"Standard Services","Construction","Building Equipment Contractors",1
+"Plumbing, Heating, and Air-Conditioning Services",238220,"Standard Services","Construction","Building Equipment Contractors",1
+"MEP (Mechanical, Electrical & Plumbing) Service Contracts",238220,"Standard Services","Construction","Building Equipment Contractors",1
+"Other building installation services - fire protection, security systems",238210,"Standard Services","Construction","Building Equipment Contractors",0
+"Drywall and Insulation Contractors",238310,"Standard Services","Construction","Building Equipment Contractors",0
+"Painting and Wall Covering Services",238320,"Standard Services","Construction","Building Equipment Contractors",0
+"Flooring and wall tiling services",238330,"Standard Services","Construction","Building Equipment Contractors",0
+"Acoustic work, insulation, and waterproofing services",238390,"Standard Services","Construction","Building Equipment Contractors",0
+"Tile and Terrazzo Contractors",238340,"Standard Services","Construction","Building Equipment Contractors",0
+"Finish Carpentry Services",238350,"Standard Services","Construction","Building Equipment Contractors",1
+"Other Building Finishing services",238390,"Standard Services","Construction","Building Equipment Contractors",1
+"Site preparation services - demolition, land clearing",238910,"Standard Services","Construction","Other Specialty Trade Contractors",0
+"Renting of construction machinery with operator",238910,"Standard Services","Construction","Other Specialty Trade Contractors",1
+"All Other Specialty Trade Contractors",238990,"Standard Services","Construction","Other Specialty Trade Contractors",1
+"Custom Computer Programming Services",541511,"Standard Services","IT & communications","IT & communications",1
+"Computer Systems Design Services",541512,"Standard Services","IT & communications","IT & communications",1
+"Software consultancy",541513,"Standard Services","IT & communications","IT & communications",1
+"Software maintenance service",541519,"Standard Services","IT & communications","IT & communications",1
+"Software support service",541519,"Standard Services","IT & communications","IT & communications",0
+"Cloud computing service",518210,"Standard Services","IT & communications","IT & communications",0
+"Data processing & hosting service",518210,"Standard Services","IT & communications","IT & communications",0
+"Mobile, broadband, and fixed-line services",517311,"Standard Services","IT & communications","IT & communications",0
+"Internet services",517911,"Standard Services","IT & communications","IT & communications",0
+"Network infrastructure services",517919,"Standard Services","IT & communications","IT & communications",0
+"System design and integration services",541512,"Standard Services","IT & communications","IT & communications",0
+"IT Consulting and Systems Integration",541618,"Standard Services","IT & communications","IT & communications",0
+"Web hosting services - website space & infrastructure",518210,"Standard Services","IT & communications","IT & communications",0
+"Web development services - website design, development",541511,"Standard Services","IT & communications","IT & communications",0
+"Digital marketing services",541860,"Standard Services","IT & communications","IT & communications",0
+"IT training and education services",611420,"Standard Services","IT & communications","IT & communications",0
+"Computer and IT equipment repair services",811212,"Standard Services","IT & communications","IT & communications",0
+"Cybersecurity Services",541519,"Standard Services","IT & communications","IT & communications",0
+"Career Counseling Services",624310,"Standard Services","Employment Services","Employment Services",0
+"Workforce Training Services",611430,"Standard Services","Employment Services","Employment Services",0
+"Translation Services for Business Documents",541930,"Standard Services","Business Support Services","Business Support Services",0
+"Document Scanning and Digitization",561410,"Standard Services","Business Support Services","Business Support Services",0
+"Mail and Package Delivery Services",492210,"Standard Services","Business Support Services","Business Support Services",0
+"Executive, Legislative, and Other General Government Support",921110,"Standard Services","Public Administration","Public Administration",0
+"Justice, Public Order, and Safety Activities",922110,"Standard Services","Public Administration","Public Administration",0
+"Administration of Human Resource Programs",923110,"Standard Services","Public Administration","Public Administration",0
+"Administration of Environmental Quality Programs",924110,"Standard Services","Public Administration","Public Administration",0
+"Administration of Housing, Urban Planning, Community Development",925110,"Standard Services","Public Administration","Public Administration",0
+"Administration of Economic Programs",926110,"Standard Services","Public Administration","Public Administration",0
+"Metal Heat Treating",332811,"Standard Services","Fabricated Metal Product Mfg","Machining and Surface Treatment",0
+"Metal Coating, Engraving (except Jewelry and Silverware), and Allied Services",332812,"Standard Services","Fabricated Metal Product Mfg","Machining and Surface Treatment",0
+"Electroplating, Plating, Polishing, Anodizing, and Coloring",332813,"Standard Services","Fabricated Metal Product Mfg","Machining and Surface Treatment",0
+"Monetary Authorities–Central Bank",521110,"Standard Services","Finance and Insurance Services","Central Banking & Finance",0

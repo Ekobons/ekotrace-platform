@@ -11,15 +11,17 @@
  *     each reproducing the DESNZ AR4 and AR5 blend GWP within 1 %).
  *  3. DESNZ flat files in data/defra/ (one edition per year).
  *  4. IPCC 2006 defaults for coal types DESNZ does not cover.
- *  5. US EPA supply chain factors in data/epa/ (purchased goods & services), when the file is there.
+ *  5. US EPA supply chain factors in data/epa/ (purchased goods & services), when the file is there,
+ *     then the products of the previous Ekotrace list (data/ekotrace-old/products.csv) on top.
  */
-import { readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { pool, platformTx, type Tx } from './pool.js';
 import { parseDesnz } from '../import/desnz.js';
 import { importDesnz } from '../import/desnzWrite.js';
-import { importEpa, parseEpa } from '../import/epa.js';
+import { importEpa, importOldProducts, parseEpa, type OldProduct } from '../import/epa.js';
+import { csvObjects } from '../lib/csv.js';
 
 const DATA = join(dirname(fileURLToPath(import.meta.url)), '../../../../data');
 
@@ -153,6 +155,13 @@ export async function seed(log = console.log) {
     const parsed = parseEpa(readFileSync(join(DATA, 'epa', f), 'utf8'), f);
     const s = await platformTx((c) => importEpa(c, parsed, { createdBy: 'seed' }));
     log(`[seed] ${s.source}: ${s.skipped ? 'already imported' : `${s.factors} spend factors (${parsed.priceYear} USD)`}`);
+  }
+  // products of the previous Ekotrace list, on top of the EPA codes
+  const old = join(DATA, 'ekotrace-old', 'products.csv');
+  if (existsSync(old) && (await platformTx((c) => c.query(`SELECT 1 FROM factor_source WHERE code LIKE 'EPA-SC-%'`))).rowCount) {
+    const products: OldProduct[] = csvObjects(readFileSync(old, 'utf8')).map((r) => ({ product: r.product!, naics: r.naics!, type: r.type!, category: r.category!, subcategory: r.subcategory!, otherCategory: r.otherCategory === '1' }));
+    const r = await platformTx((c) => importOldProducts(c, products, { createdBy: 'seed' }));
+    log(`[seed] previous Ekotrace products: ${r.created} new, ${r.updated} updated${r.notFound.length ? `, ${r.notFound.length} without an EPA code` : ''}`);
   }
 }
 

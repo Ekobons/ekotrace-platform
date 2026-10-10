@@ -91,8 +91,8 @@ test('descriptions match spend categories, with synonyms and a confidence', () =
     assert.equal(c.candidates[0]?.itemId, want, `${text} → ${JSON.stringify(c)}`);
   }
   const vague = classify(ix, 'Misc items XYZ-123');
-  assert.equal(vague.itemId, null); assert.ok(vague.confidence < 0.4);
-  assert.ok(classify(ix, 'Cement').confidence >= 0.4);
+  assert.equal(vague.itemId, null); assert.ok(vague.confidence < 0.3);
+  assert.ok(classify(ix, 'Cement').confidence >= 0.5);
 });
 
 test('normalised text groups the same purchase with different PO numbers and dates', () => {

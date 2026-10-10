@@ -799,14 +799,20 @@ const pq = async (sql: string, params: unknown[] = []) => {
 
 test('purchases: EPA factor file import; ERP export in its own layout → groups, mapping, overlap, facilities, FX, supplier factor, publish, reopen, duplicates', async () => {
   const { readFileSync } = await import('node:fs');
-  const csv = readFileSync(new URL('../../../data/epa/DEMO_placeholder_factors_USD2022.csv', import.meta.url));
+  // the seed loaded the real EPA file and the previous Ekotrace products
+  const csv = readFileSync(new URL('../../../data/epa/SupplyChainGHGEmissionFactors_v1.3.0_NAICS_CO2e_USD2022.csv', import.meta.url));
   const pre = await raw('/api/admin/import/epa?preview=1', csv, tenantA, { 'x-filename': 'SupplyChainGHGEmissionFactors_v1.3.0_NAICS_CO2e_USD2022.csv' });
   assert.equal(pre.statusCode, 200, pre.body);
-  assert.deepEqual([pre.json().priceYear, pre.json().version, pre.json().rows], [2022, '1.3.0', 56]);
-  const imp = await raw('/api/admin/import/epa', csv, tenantA, { 'x-filename': 'SupplyChainGHGEmissionFactors_v1.3.0_NAICS_CO2e_USD2022.csv' });
-  assert.equal(imp.json().factors, 56);
+  assert.deepEqual([pre.json().priceYear, pre.json().version, pre.json().rows], [2022, '1.3.0', 1016]);
   assert.equal((await raw('/api/admin/import/epa', csv, tenantA, { 'x-filename': 'SupplyChainGHGEmissionFactors_v1.3.0_NAICS_CO2e_USD2022.csv' })).json().skipped, true);
-  const paperMills = await itemId('epa:naics:322121'); // copier paper: paper mills (stationery is envelopes, notebooks…)
+  const epaPaper = Number((await pq(`SELECT f.co2e FROM factor f JOIN item i ON i.id = f.item_id WHERE i.code = 'epa:naics:322230' AND f.status = 'active'`)).rows[0].co2e);
+  assert.equal(epaPaper, 0.296); // EPA v1.3, stationery product manufacturing, with margins (0.265 + 0.031)
+  const oldProducts = Number((await pq(`SELECT count(*) FROM item WHERE code LIKE 'old:%'`)).rows[0].count);
+  assert.ok(oldProducts > 1600, String(oldProducts));
+  // an export of the old tables (two rows) → products with the EPA factor of their NAICS code
+  const oldPre = await api('POST', '/api/admin/import/old-purchases', { preview: true, factors: 'id,typeofpurchase,category,sub_category,product,NAIC_code,EFkgC02e_ccy\n1,1,24,83,"Office Products",339940,0.1\n2,1,24,83,"Office Products",339940,0.1' }, tenantA);
+  assert.deepEqual([oldPre.body.rows, oldPre.body.products], [2, 1]);
+  const usdFactor = async (item: number) => Number((await pq(`SELECT co2e FROM factor WHERE item_id = $1 AND status = 'active' AND unit = 'USD'`, [item])).rows[0].co2e);
 
   // An ERP export: two title rows, then the header; several descriptive columns.
   const wb = new ExcelJS.Workbook();
@@ -848,18 +854,18 @@ test('purchases: EPA factor file import; ERP export in its own layout → groups
   // suppliers: two spellings of Gulf Stationery are one supplier
   assert.equal(Number((await pq(`SELECT count(*) FROM supplier WHERE tenant_id = $1 AND norm = 'gulf stationery'`, [tenantA])).rows[0].count), 1);
 
-  const groups = (await api('GET', `/api/purchases/batches/${u.batchId}/groups?limit=50`, undefined, tenantA)).body.groups as { key: string; description: string; item_id: number; lines: number; overlap: string; map_method: string; confidence: number }[];
+  const groups = (await api('GET', `/api/purchases/batches/${u.batchId}/groups?limit=50`, undefined, tenantA)).body.groups as { key: string; description: string; item_id: number; naics: string; lines: number; overlap: string; map_method: string; confidence: number }[];
   const g = (d0: string) => groups.find((x) => x.description.startsWith(d0))!;
   assert.equal(g('A4 paper').lines, 2); // same description, different PO numbers and dates → one group
-  assert.equal(g('A4 paper').item_id, paperMills);
-  assert.equal(g('OPC cement').item_id, await itemId('epa:naics:327310'));
+  assert.equal(g('A4 paper').naics, '322230');
+  assert.equal(g('OPC cement').naics, '327310');
   assert.equal(g('Airfare').overlap, 'business_travel');
   assert.equal(g('Diesel').overlap, 'fuel');
-  assert.equal(g('Dell').item_id, await itemId('epa:naics:334111'));
-  // the paper line: AED 3,672.50 at the peg = USD 1,000 of 2024 → 2022 dollars × 0.7 (placeholder factor)
+  assert.equal(g('Dell').naics, '334111');
+  // the paper line: AED 3,672.50 at the peg = USD 1,000 of 2024 → 2022 dollars × the EPA factor
   const lines = (await api('GET', `/api/purchases/batches/${u.batchId}/lines?limit=100`, undefined, tenantA)).body.lines as { id: string; row_no: number; co2e: number; status: string; method: string; amount: number }[];
   const paper = lines.find((l) => l.row_no === 1)!;
-  assert.ok(Math.abs(paper.co2e - 1000 * CPI_24_22 * 0.7) < 1e-6, String(paper.co2e));
+  assert.ok(Math.abs(paper.co2e - 1000 * CPI_24_22 * await usdFactor(g('A4 paper').item_id)) < 1e-6, String(paper.co2e));
   const credit = lines.find((l) => l.row_no === 8)!;
   assert.ok(Math.abs(credit.amount + 367.25) < 1e-9 && credit.co2e < 0);
   const steps = (await api('GET', `/api/purchases/lines/${paper.id}`, undefined, tenantA)).body;
@@ -886,7 +892,7 @@ test('purchases: EPA factor file import; ERP export in its own layout → groups
   const l2 = (await api('GET', `/api/purchases/batches/${u.batchId}/lines?limit=100`, undefined, tenantA)).body.lines as { row_no: number; co2e: number; method: string; fx: number }[];
   assert.deepEqual([l2.find((l) => l.row_no === 6)!.method, l2.find((l) => l.row_no === 6)!.co2e], ['supplier', 6500]);
   const eur = l2.find((l) => l.row_no === 9)!;
-  assert.ok(Math.abs(eur.co2e - (920 / 0.92) * CPI_24_22 * 0.06) < 1e-6 && eur.fx === 0.92);
+  assert.ok(Math.abs(eur.co2e - (920 / 0.92) * CPI_24_22 * await usdFactor(g('Microsoft').item_id)) < 1e-6 && eur.fx === 0.92);
 
   // publish → entries per facility × month × category × spend category × method
   const pub = await api('POST', `/api/purchases/batches/${u.batchId}/publish`, {}, tenantA);
@@ -932,7 +938,7 @@ test('purchases: manual entry (check, then save) and ERP API (several calls, the
   const check = await api('POST', '/api/purchases/manual', { facilityId: facA, dryRun: true, lines }, tenantA);
   assert.equal(check.status, 200, JSON.stringify(check.body));
   assert.equal(check.body.saved, false);
-  assert.ok(Math.abs(check.body.lines[0].co2e - 2000 * CPI_24_22 * 0.15) < 1e-6);
+  assert.ok(Math.abs(check.body.lines[0].co2e - 2000 * CPI_24_22 * Number((await pq(`SELECT co2e FROM factor WHERE item_id = $1 AND status = 'active'`, [laptop])).rows[0].co2e)) < 1e-6);
   assert.equal(Number((await pq(`SELECT count(*) FROM purchase_batch WHERE source = 'manual'`)).rows[0].count), 0); // nothing kept
   const save = await api('POST', '/api/purchases/manual', { facilityId: facA, lines }, tenantA);
   assert.equal(save.body.saved, true, JSON.stringify(save.body));

@@ -85,9 +85,8 @@ function SpendImports({ onDone }: { onDone: () => void }) {
   const [epa, setEpa] = useState<{ file: File; p: Awaited<ReturnType<typeof api.importEpa>> } | null>(null);
   const [old, setOld] = useState<Record<string, File>>({});
   const [oldPrev, setOldPrev] = useState<Awaited<ReturnType<typeof api.importOldPurchases>> | null>(null);
-  const [cur, setCur] = useState('USD'); const [py, setPy] = useState('2022');
   const [err, setErr] = useState<string | null>(null);
-  const oldBody = async (preview: boolean) => ({ factors: await old.factors!.text(), categories: await old.categories?.text(), subcategories: await old.subcategories?.text(), types: await old.types?.text(), currency: cur, priceYear: Number(py), preview });
+  const oldBody = async (preview: boolean) => ({ factors: await old.factors!.text(), categories: await old.categories?.text(), subcategories: await old.subcategories?.text(), types: await old.types?.text(), preview });
   return (
     <div className="card" style={{ display: 'grid', gap: 10 }}>
       <h2>Spend-based factors (purchased goods &amp; services)</h2>
@@ -99,11 +98,10 @@ function SpendImports({ onDone }: { onDone: () => void }) {
         <div className="grid3" style={{ marginTop: 8 }}>
           {[['factors', 'purchase_goods_categories_ef *'], ['categories', 'dbo.purchase_category'], ['subcategories', 'dbo.purchase_subcategory'], ['types', 'dbo.typesofpurchase']].map(([k, l]) => (
             <label key={k} className="field"><span>{l}</span><input type="file" accept=".csv" onChange={(e) => { const f = e.target.files?.[0]; setOld((o) => { const n = { ...o }; if (f) n[k!] = f; else delete n[k!]; return n; }); setOldPrev(null); }} /></label>))}
-          <label className="field"><span>EFkgC02e_ccy is per</span><span className="row" style={{ gap: 6 }}><input className="input sm" value={cur} maxLength={3} onChange={(e) => setCur(e.target.value.toUpperCase())} style={{ width: 70 }} /><input className="input sm" value={py} onChange={(e) => setPy(e.target.value)} style={{ width: 80 }} /></span></label>
         </div>
-        <p className="sub">Products with a NAICS code are linked to the EPA commodity (their old names become search names); the others are added as the company list with their factors. Only the newest fiscal year of each product is loaded.</p>
+        <p className="sub">Each product (e.g. “Cereal - Barley grain”, “LPG”) becomes a spend category with the EPA factor of its NAICS code; the old category › subcategory and the capital goods type are kept. The old per-currency and per-kg values are not used (Ekotrace converts each purchase itself). Load the EPA file first.</p>
         <div className="row"><button className="btn" disabled={!old.factors} onClick={async () => { setErr(null); try { setOldPrev(await api.importOldPurchases(await oldBody(true))); } catch (x) { setErr((x as Error).message); } }}>Check</button>
-          {oldPrev?.preview && <><span className="sub">{oldPrev.rows} rows, {oldPrev.withNaics} with a NAICS code.</span><button className="btn p" onClick={async () => { try { const r = await api.importOldPurchases(await oldBody(false)); toast(`Linked ${r.linked}, added ${r.created} (${r.factors} factors)`); setOldPrev(null); onDone(); } catch (x) { setErr((x as Error).message); } }}>Import</button></>}</div>
+          {oldPrev?.preview && <><span className="sub">{oldPrev.rows} rows → {oldPrev.products} products.</span><button className="btn p" onClick={async () => { try { const r = await api.importOldPurchases(await oldBody(false)); toast(`${r.created} products added, ${r.updated} updated${r.notFound?.length ? `, ${r.notFound.length} without an EPA code` : ''}`); setOldPrev(null); onDone(); } catch (x) { setErr((x as Error).message); } }}>Import</button></>}</div>
       </details>
       {err && <div className="note bad">{err}</div>}
     </div>

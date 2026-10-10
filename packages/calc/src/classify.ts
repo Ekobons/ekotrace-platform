@@ -10,10 +10,12 @@
  * clearly it beats the runner-up. Below MIN_AUTO the group stays unmapped, with candidates.
  */
 
-export interface ClassItem { id: number; name: string; aliases?: string[]; group?: string; code?: string }
+/** `key`: items with the same key share a factor (e.g. the NAICS code) — the runner-up for confidence is the next other key.
+ *  `boost`: score multiplier (retail / wholesale codes slightly lower: purchaser-price factors already include those margins). */
+export interface ClassItem { id: number; name: string; aliases?: string[]; group?: string; code?: string; key?: string; boost?: number }
 export interface Candidate { itemId: number; score: number }
 export interface Classification { itemId: number | null; confidence: number; candidates: Candidate[] }
-export const MIN_AUTO = 0.4;
+export const MIN_AUTO = 0.3;
 
 const STOP = new Set(('a an and or of the for to in on at by with from as per via other others except n.e.c nec misc miscellaneous ' +
   'item items service services product products supply supplies general various charge charges fee fees cost costs expense expenses ' +
@@ -22,7 +24,9 @@ const STOP = new Set(('a an and or of the for to in on at by with from as per vi
   // packaging and pack sizes say nothing about what was bought
   'bag bags box boxes pack packs packet packets carton cartons ctn pkt roll rolls drum drums pallet pallets bundle bundles ' +
   // accounting words
-  'credit debit note refund reversal adjustment accrual advance balance payment').split(' '));
+  'credit debit note refund reversal adjustment accrual advance balance payment ' +
+  // contract words
+  'contract contracts agreement agreements annual quarterly renewal retainer charge charges').split(' '));
 
 /** Procurement words → words used in category names. */
 export const SYNONYMS: Record<string, string> = {
@@ -30,9 +34,9 @@ export const SYNONYMS: Record<string, string> = {
   ticket: 'passenger air transportation', tickets: 'passenger air transportation', air: 'air transportation',
   hotel: 'hotels motels accommodation', accommodation: 'hotels motels accommodation', lodging: 'hotels motels', stay: 'hotels motels',
   taxi: 'taxi limousine ground passenger', cab: 'taxi limousine', uber: 'taxi limousine', careem: 'taxi limousine', limo: 'limousine',
-  diesel: 'petroleum refineries fuel', petrol: 'petroleum refineries fuel', gasoline: 'petroleum refineries fuel', fuel: 'petroleum refineries fuel',
+  diesel: 'diesel petroleum refineries fuel', petrol: 'petroleum refineries fuel', gasoline: 'petroleum refineries fuel', fuel: 'petroleum refineries fuel',
   lpg: 'petroleum gas fuel', kerosene: 'petroleum refineries', lubricant: 'petroleum lubricating oil grease', lubricants: 'petroleum lubricating oil grease', oil: 'petroleum lubricating oil',
-  electricity: 'electric power generation transmission distribution', power: 'electric power', dewa: 'electric power water', sewa: 'electric power water',
+  electricity: 'electric power distribution', power: 'electric power', dewa: 'electric power water', sewa: 'electric power water',
   addc: 'electric power water', water: 'water supply', gas: 'natural gas distribution',
   internet: 'telecommunications', telephone: 'telecommunications', phone: 'telecommunications', mobile: 'wireless telecommunications', telecom: 'telecommunications',
   etisalat: 'telecommunications', du: 'telecommunications', sim: 'wireless telecommunications',
@@ -46,7 +50,7 @@ export const SYNONYMS: Record<string, string> = {
   cleaning: 'janitorial', janitorial: 'janitorial', housekeeping: 'janitorial', pest: 'exterminating pest control', landscaping: 'landscaping',
   security: 'security guards patrol', guard: 'security guards patrol', guards: 'security guards patrol',
   catering: 'food service contractors', meals: 'restaurants food service', food: 'food', restaurant: 'restaurants', coffee: 'coffee tea', snacks: 'snack food',
-  cement: 'cement', concrete: 'ready mix concrete', steel: 'iron steel mills', rebar: 'iron steel mills', asphalt: 'asphalt paving', bitumen: 'asphalt',
+  cement: 'cement', opc: 'portland cement', portland: 'portland cement', concrete: 'ready mix concrete', steel: 'iron steel mills', rebar: 'iron steel mills', asphalt: 'asphalt paving', bitumen: 'asphalt',
   timber: 'sawmills wood', wood: 'wood', glass: 'glass', aluminium: 'aluminum', aluminum: 'aluminum', copper: 'copper', cable: 'wire cable', cables: 'wire cable',
   pipe: 'pipe', pipes: 'pipe', paint: 'paint coating', paints: 'paint coating', chemical: 'chemical', chemicals: 'chemical',
   furniture: 'office furniture', chair: 'office furniture', chairs: 'office furniture', desk: 'office furniture', desks: 'office furniture',
@@ -63,7 +67,7 @@ export const SYNONYMS: Record<string, string> = {
   medical: 'medical surgical supplies', aid: 'surgical medical supplies', medicine: 'pharmaceutical preparation', pharma: 'pharmaceutical', uniform: 'apparel', uniforms: 'apparel', ppe: 'apparel safety',
   gloves: 'apparel safety', helmet: 'safety', waste: 'waste collection treatment disposal', skip: 'waste collection', disposal: 'waste disposal',
   construction: 'construction', civil: 'construction', building: 'building construction', hvac: 'heating ventilation air conditioning', ac: 'air conditioning',
-  machinery: 'machinery manufacturing', equipment: 'equipment', generator: 'turbine generator', pump: 'pump', pumps: 'pump', compressor: 'compressor',
+  machinery: 'machinery manufacturing', equipment: 'equipment', pump: 'pump', pumps: 'pump', compressor: 'compressor',
   fertilizer: 'fertilizer', fertiliser: 'fertilizer', pesticide: 'pesticide', seeds: 'seed', plants: 'nursery', irrigation: 'irrigation',
 };
 
@@ -81,13 +85,17 @@ export function stem(w: string): string {
   return w;
 }
 /** Description words plus their synonym expansions (expansions count a little less). Words explained by a synonym are not "unknown". */
-function queryTerms(s: string): { terms: Map<string, number>; covered: Set<string> } {
+function queryTerms(s: string, vocab?: Map<string, number>): { terms: Map<string, number>; covered: Set<string> } {
   const out = new Map<string, number>(), covered = new Set<string>();
   const raw = s.toLowerCase().match(/[a-z][a-z0-9]+/g) ?? [];
   for (const w of tokens(s)) out.set(w, Math.max(out.get(w) ?? 0, 1));
   for (const r of raw) {
     const syn = SYNONYMS[r] ?? SYNONYMS[stem(r)];
-    if (syn) { covered.add(stem(r)); for (const w of tokens(syn)) out.set(w, Math.max(out.get(w) ?? 0, 0.8)); }
+    if (!syn) continue;
+    covered.add(stem(r));
+    // a word the category names do not use ("tyres") is translated: its synonym counts in full
+    const w = vocab && !vocab.has(stem(r)) ? 1 : 0.8;
+    for (const t of tokens(syn)) out.set(t, Math.max(out.get(t) ?? 0, w));
   }
   return { terms: out, covered };
 }
@@ -116,7 +124,7 @@ export function buildIndex(items: ClassItem[]): ClassIndex {
   return { items, docs, len, avg: len.reduce((s, v) => s + v, 0) / Math.max(1, len.length), df, n: items.length };
 }
 
-const K1 = 1.2, B = 0.5;
+const K1 = 0.9, B = 0.5;
 const idf = (ix: ClassIndex, t: string) => { const d = ix.df.get(t) ?? 0; return Math.log(1 + (ix.n - d + 0.5) / (d + 0.5)); };
 
 /**
@@ -124,8 +132,8 @@ const idf = (ix: ClassIndex, t: string) => { const d = ix.df.get(t) ?? 0; return
  * it) helps rank but counts half, and its unknown words never lower the confidence.
  */
 export function classify(ix: ClassIndex, text: string, k = 5, context = ''): Classification {
-  const { terms: q, covered } = queryTerms(text);
-  const ctx = context ? queryTerms(context) : null;
+  const { terms: q, covered } = queryTerms(text, ix.df);
+  const ctx = context ? queryTerms(context, ix.df) : null;
   if (ctx) for (const [t, w] of ctx.terms) if (!q.has(t)) q.set(t, w * 0.5);
   if (!q.size || !ix.n) return { itemId: null, confidence: 0, candidates: [] };
   const scores = new Float64Array(ix.n);
@@ -145,12 +153,16 @@ export function classify(ix: ClassIndex, text: string, k = 5, context = ''): Cla
       const f = doc.get(t);
       if (f) s += w * i * (f * (K1 + 1)) / (f + K1 * (1 - B + B * ix.len[d]! / ix.avg));
     }
-    scores[d] = s;
+    scores[d] = s * (ix.items[d]!.boost ?? 1);
   }
   const order = [...scores.keys()].filter((i) => scores[i]! > 0).sort((a, b) => scores[b]! - scores[a]! || ix.len[a]! - ix.len[b]!).slice(0, k);
   const candidates = order.map((i) => ({ itemId: ix.items[i]!.id, score: Math.round(scores[i]! * 1000) / 1000 }));
   if (!order.length) return { itemId: null, confidence: 0, candidates };
-  const best = order[0]!, s1 = scores[best]!, s2 = order[1] !== undefined ? scores[order[1]]! : 0;
+  const best = order[0]!, s1 = scores[best]!;
+  // runner-up: the best item with another key (same NAICS code = same factor, not a competitor)
+  const bk = ix.items[best]!.key;
+  let s2 = 0;
+  for (let i = 0; i < ix.n; i++) if (i !== best && scores[i]! > s2 && (bk == null || ix.items[i]!.key !== bk)) s2 = scores[i]!;
   // share of the description's (original) words the best category explains
   let explained = 0;
   for (const [t, w, i] of known) if (ix.docs[best]!.has(t)) explained += w >= 0.8 ? i * w : 0;

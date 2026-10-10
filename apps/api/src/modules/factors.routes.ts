@@ -16,7 +16,7 @@ import { requirePlatformAdmin } from '../lib/auth.js';
 import { AppError, notFound } from '../lib/errors.js';
 import { parseDesnz } from '../import/desnz.js';
 import { importDesnz } from '../import/desnzWrite.js';
-import { importEpa, importOldList, parseEpa } from '../import/epa.js';
+import { importEpa, importOldProducts, oldProducts, parseEpa } from '../import/epa.js';
 import { csvObjects } from '../lib/csv.js';
 
 export async function factorRoutes(app: FastifyInstance) {
@@ -119,14 +119,13 @@ export async function factorRoutes(app: FastifyInstance) {
    */
   app.post('/api/admin/import/old-purchases', { bodyLimit: 30 * 1024 * 1024 }, async (req) => {
     requirePlatformAdmin(req);
-    const b = z.object({
-      factors: z.string().min(10), categories: z.string().optional(), subcategories: z.string().optional(), types: z.string().optional(),
-      currency: z.string().regex(/^[A-Z]{3}$/).default('USD'), priceYear: z.number().int().min(1990).max(2100).default(2022), preview: z.boolean().optional(),
-    }).parse(req.body);
+    const b = z.object({ factors: z.string().min(10), categories: z.string().optional(), subcategories: z.string().optional(), types: z.string().optional(), preview: z.boolean().optional() }).parse(req.body);
     const list = { factors: csvObjects(b.factors), categories: b.categories ? csvObjects(b.categories) : undefined, subcategories: b.subcategories ? csvObjects(b.subcategories) : undefined, types: b.types ? csvObjects(b.types) : undefined };
-    if (!list.factors.length || !Object.keys(list.factors[0]!).some((k) => /^product$/i.test(k))) throw new AppError('purchase_goods_categories_ef export expected (columns id, product, NAIC_code, EFkgC02e_ccy…)');
-    if (b.preview) return { preview: true, rows: list.factors.length, withNaics: list.factors.filter((r) => Object.entries(r).some(([k, v]) => /^naic_code$/i.test(k) && /\d/.test(v))).length, columns: Object.keys(list.factors[0]!) };
-    return { preview: false, ...(await platformTx((c) => importOldList(c, list, { currency: b.currency, priceYear: b.priceYear, createdBy: req.user.id }))) };
+    if (!list.factors.length || !Object.keys(list.factors[0]!).some((k) => /^product$/i.test(k))) throw new AppError('purchase_goods_categories_ef export expected (columns product, NAIC_code, typeofpurchase…)');
+    const products = oldProducts(list);
+    if (b.preview) return { preview: true, rows: list.factors.length, products: products.length, withNames: !!list.categories && !!list.subcategories };
+    try { return { preview: false, ...(await platformTx((c) => importOldProducts(c, products, { createdBy: req.user.id }))) }; }
+    catch (e) { throw new AppError((e as Error).message); }
   });
 
   app.get('/api/admin/import-issues', async (req) => {

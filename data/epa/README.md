@@ -1,12 +1,11 @@
 # Spend-based factors (purchased goods & services)
 
-Put the US EPA file here and run `npm run db:seed`:
+`SupplyChainGHGEmissionFactors_v1.3.0_NAICS_CO2e_USD2022.csv` — US EPA, "Supply Chain Greenhouse Gas Emission
+Factors for US Industries and Commodities" v1.3, by 2017 NAICS-6 (1,016 commodities): kg CO2e per 2022 USD,
+purchaser price. US Government work (public domain). Loaded by `npm run db:seed` (the factors *with margins*).
 
-    SupplyChainGHGEmissionFactors_v1.3.0_NAICS_CO2e_USD2022.csv
+`DEMO_placeholder_factors_USD2022.csv` holds **made-up values** (real NAICS codes and titles). It is only used by
+the demo when no EPA file is loaded, as source "DEMO-SPEND", and is retired automatically when the EPA file is loaded.
 
-from "Supply Chain Greenhouse Gas Emission Factors v1.3 by NAICS-6" (US EPA, public domain).
-Or upload it under Library → Factors → Import (platform admin).
-
-`DEMO_placeholder_factors_USD2022.csv` holds **made-up values** for the demo company only
-(real NAICS codes and titles, numbers NOT from EPA). It is loaded as source "DEMO-SPEND" only
-while no EPA file is loaded, and its factors are retired automatically when the EPA file is imported.
+The products of the previous Ekotrace list (`../ekotrace-old/products.csv`) are loaded on top, each with the EPA
+factor of its NAICS code.

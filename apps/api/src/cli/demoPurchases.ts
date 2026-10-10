@@ -141,7 +141,9 @@ export async function demoPurchases(t: string, superAdmin: User) {
                                     item_id = coalesce($7, item_id), map_method = CASE WHEN $7::int IS NULL THEN map_method ELSE 'manual' END, confidence = CASE WHEN $7::int IS NULL THEN confidence ELSE 1 END
                               WHERE batch_id = $1 AND description ILIKE $2 RETURNING description`,
       [batch, like, d.decision ?? null, d.target ?? null, d.capital ?? null, superAdmin.id, item]);
-    for (const r of g.rows) await c.query(`INSERT INTO purchase_rule (tenant_id, field, pattern, item_id, decision, target, capital, created_by) VALUES ($1, 'text', $2, $3, $4, $5, $6, $7) ON CONFLICT (tenant_id, field, pattern) DO NOTHING`,
+    for (const r of g.rows) await c.query(`INSERT INTO purchase_rule (tenant_id, field, pattern, item_id, decision, target, capital, created_by) VALUES ($1, 'text', $2, $3, $4, $5, $6, $7)
+       ON CONFLICT (tenant_id, field, pattern) DO UPDATE SET item_id = coalesce(EXCLUDED.item_id, purchase_rule.item_id), decision = coalesce(EXCLUDED.decision, purchase_rule.decision),
+              target = coalesce(EXCLUDED.target, purchase_rule.target), capital = coalesce(EXCLUDED.capital, purchase_rule.capital)`,
       [t, normText(r.description), item, d.decision ?? null, d.target ?? null, d.capital ?? null, superAdmin.id]);
   });
 
@@ -154,11 +156,13 @@ export async function demoPurchases(t: string, superAdmin: User) {
   for (const like of ['Engine oil%', 'Bottled%']) await decide(h1, like, { decision: 'keep' });
   for (const like of ['Excavator%']) await decide(h1, like, { decision: 'keep', capital: true });
   for (const like of ['Laptop%', 'Office chairs%', 'HVAC%']) await decide(h1, like, { decision: 'keep' });
-  // categories a reviewer chose by hand (the placeholder list is short; the EPA list has closer ones, e.g. 336390 motor vehicle parts)
+  // categories a reviewer chose by hand
   await decide(h1, 'Truck tyres%', { item: 'epa:naics:326211' });
   await decide(h1, 'Landscaping%', { item: 'epa:naics:561730' });
-  await decide(h1, 'Vehicle spare parts%', { item: 'epa:naics:811111' });
+  await decide(h1, 'Vehicle spare parts%', { item: 'epa:naics:336390' });
   await decide(h1, 'Excavator%', { item: 'epa:naics:333120' });
+  await decide(h1, 'Mobile and data%', { item: 'epa:naics:517312' });
+  await decide(h1, 'Office rent%', { item: 'epa:naics:531120' });
   const r1 = await tenantTx(t, async (c) => { await calcLines(c, h1); return publishBatch(c, t, h1, superAdmin); });
   const h2 = await upload('ERP purchase orders Jul–Dec 2025', await exportFile([6, 7, 8, 9, 10, 11], NEW_H2, 2));
   await drainJobs();

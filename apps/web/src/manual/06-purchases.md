@@ -56,6 +56,8 @@ Moved lines are spend-based in their category until activity data (distances, ni
 > 3. Spend-based | US EPA Supply Chain GHG Emission Factors v1.3: kg CO₂e per 2022 US dollar, purchaser price (with margins)
 ```
 
+Spend categories: the 1,016 EPA commodities (NAICS codes) and the 1,639 products of the previous Ekotrace list (e.g. “Cereal - Barley grain”, “LPG”, “Office Products”) with their old category › subcategory — each product uses the EPA factor of its NAICS code. Products listed as capital goods in the old list show the capital-goods hint. Government administration (NAICS 92) has no EPA factor.
+
 A factor written in the file (vendor-specific EF and its unit) counts as a supplier factor for that line. Suppliers' factors are kept under Value chain → Suppliers, for everything bought from them or for one spend category; adding one recalculates their open lines.
 
 ## Currencies and inflation

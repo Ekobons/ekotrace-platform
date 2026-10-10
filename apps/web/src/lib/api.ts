@@ -142,8 +142,8 @@ export const api = {
   issues: () => call<{ issues: { id: number; source: string; severity: string; message: string; resolved: boolean }[] }>('GET', '/api/admin/import-issues'),
   resolveIssue: (id: number, resolved: boolean) => call('PATCH', `/api/admin/import-issues/${id}`, { resolved }),
   importEpa: (file: File, preview: boolean) => call<{ version: string; priceYear: number; rows: number; skipped?: boolean | number; factors?: number; items?: number; sample: { naics: string; title: string; withMargins: number }[] }>('POST', `/api/admin/import/epa${preview ? '?preview=1' : ''}`, undefined, file, { 'x-filename': encodeURIComponent(file.name) }),
-  importOldPurchases: (b: { factors: string; categories?: string; subcategories?: string; types?: string; currency: string; priceYear: number; preview?: boolean }) =>
-    call<{ preview: boolean; rows?: number; withNaics?: number; columns?: string[]; linked?: number; created?: number; factors?: number; skipped?: number; notes?: string[] }>('POST', '/api/admin/import/old-purchases', b),
+  importOldPurchases: (b: { factors: string; categories?: string; subcategories?: string; types?: string; preview?: boolean }) =>
+    call<{ preview: boolean; rows?: number; products?: number; withNames?: boolean; created?: number; updated?: number; naicsMapped?: { from: string; to: string }[]; notFound?: string[] }>('POST', '/api/admin/import/old-purchases', b),
   importDesnz: (file: Blob, preview: boolean) => call<{ year: number; version: string; gwpSet: string; fuelRows: number; gasRows: number; skipped?: boolean; factors?: number; items?: number; issues?: number }>('POST', `/api/admin/import/desnz${preview ? '?preview=1' : ''}`, undefined, file),
   addFactor: (b: unknown) => call<{ factor: Factor; replaced: number | null }>('POST', '/api/admin/factors', b),
   // auth

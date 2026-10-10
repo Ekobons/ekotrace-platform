@@ -2,6 +2,14 @@
 
 Newest first.
 
+## 2026-10-10 (10) — Real spend factors: EPA v1.3 and the previous Ekotrace products
+
+- `data/epa/SupplyChainGHGEmissionFactors_v1.3.0_NAICS_CO2e_USD2022.csv` (1,016 NAICS commodities, with margins) loaded by the seed; demo placeholders no longer used.
+- `data/ekotrace-old/products.csv`: the 1,645 products of the old platform (from `purchase_goods_categories_ef`, `purchase_category`, `purchase_subcategory`, `typesofpurchase`), each a spend category with its old category › subcategory and the EPA factor of its NAICS code (1,639 loaded; 8 old non-NAICS codes mapped to the closest EPA code; 6 public administration products have no EPA factor). Capital goods type → capital-goods hint.
+- Not taken over, on purpose: the old per-currency factors (EPA per USD × one rate per country and fiscal year, no inflation adjustment) and per-kg factors (up to 16 different values for the same product across countries / years; implied prices implausible).
+- Matcher: runner-up taken from another NAICS code (same code = same factor); words without a known category name translated in full by synonyms; retail / wholesale codes weighted down (factors already at purchaser price); filler words (contract, charges…) ignored; auto-mapping from confidence 0.30 (below 0.60 still "Check"). On the demo descriptions 36 of 43 map automatically.
+- Old-list import route takes the raw exports (product, NAIC_code, typeofpurchase, category ids + names).
+
 ## 2026-10-10 (9) — Purchased goods & services (Scope 3.1), suppliers, currencies
 
 **Ways in:** upload any CSV / Excel layout (up to 200,000 lines, 60 MB; header row and columns guessed, layout remembered per header signature); ERP API `POST /api/v1/purchases` (OAuth client with the new `purchases` permission, ≤10,000 lines per call, batches by reference, then complete); Add data → Purchases (rows typed by hand, check then save).

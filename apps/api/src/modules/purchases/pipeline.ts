@@ -195,7 +195,7 @@ export async function prepareBatch(c: Tx, tenant: string, batchId: string, origi
 }
 
 // -------------------------------------------------------------------- map --
-interface SpendIndex { sig: string; index: ClassIndex; naics: Map<number, string | null>; names: Map<number, string> }
+interface SpendIndex { sig: string; index: ClassIndex; naics: Map<number, string | null>; names: Map<number, string>; capital: Set<number> }
 let indexCache: SpendIndex | null = null;
 export async function spendIndex(c: Tx): Promise<SpendIndex> {
   const sig = (await c.query(
@@ -203,13 +203,14 @@ export async function spendIndex(c: Tx): Promise<SpendIndex> {
        FROM item i JOIN subcategory s ON s.id = i.subcategory_id JOIN category c ON c.id = s.category_id WHERE c.code = 'purchased_goods' AND i.active`)).rows[0].s;
   if (indexCache && indexCache.sig === sig) return indexCache;
   const rows = (await c.query(
-    `SELECT i.id, i.name, i.aliases, i.attrs->>'naics' AS naics, coalesce(i.attrs->>'group', s.name) AS grp
+    `SELECT i.id, i.name, i.aliases, i.attrs->>'naics' AS naics, coalesce(i.attrs->>'group', s.name) AS grp, coalesce((i.attrs->>'capital')::boolean, false) AS capital
        FROM item i JOIN subcategory s ON s.id = i.subcategory_id JOIN category c ON c.id = s.category_id
       WHERE c.code = 'purchased_goods' AND i.active AND i.code <> 'purchase:supplier-specific'
         AND EXISTS (SELECT 1 FROM factor f WHERE f.item_id = i.id AND f.status = 'active')`)).rows;
   const fresh = {
-    sig, index: buildIndex(rows.map((r) => ({ id: r.id, name: r.name, aliases: r.aliases, group: r.grp }))),
+    sig, index: buildIndex(rows.map((r) => ({ id: r.id, name: r.name, aliases: r.aliases, group: r.grp, key: r.naics ?? undefined, boost: /^(42|44|45)/.test(r.naics ?? '') ? 0.85 : 1 }))),
     naics: new Map<number, string | null>(rows.map((r) => [r.id, r.naics])), names: new Map<number, string>(rows.map((r) => [r.id, r.name])),
+    capital: new Set<number>(rows.filter((r) => r.capital).map((r) => r.id)),
   };
   indexCache = fresh;
   return fresh;
@@ -276,6 +277,7 @@ export async function mapGroups(c: Tx, tenant: string, batchId: string, opts: { 
     const g = groups.find((x) => x.key === u.key)!;
     const o = detectOverlap([g.description, g.category_text, g.gl_account].filter(Boolean).join(' '), u.item ? ix.naics.get(u.item) : null);
     u.overlap = o?.target ?? null; u.why = o?.why ?? null;
+    if (!u.overlap && u.item && ix.capital.has(u.item)) { u.overlap = 'capital_goods'; u.why = 'capital goods in the category list'; }
     if (u.overlap && u.overlap !== 'capital_goods' && u.decision === 'move' && !u.target) u.target = ['fuel', 'energy', 'waste'].includes(u.overlap) ? null : u.overlap;
   }
   for (let i = 0; i < upd.length; i += 5000) {
