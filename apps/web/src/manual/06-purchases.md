@@ -16,9 +16,10 @@ All three go through the same steps; an upload or API batch is reviewed before p
 
 ```flow
 * Upload the file | Excel (.xlsx) or CSV — any column names, title rows above the header are fine
-* Say which column is which | best guess shown; the layout is remembered for the next file with the same columns
+* Say which column is which | best guess shown (including vendor number and supplier country); the layout is remembered for the next file with the same columns
 ! Same file twice | recognised; it can be uploaded again only on purpose, and its lines are then marked as duplicates
 > Read in the background | 50,000 lines take well under a minute; you can leave the page
+> Suppliers linked | each supplier name is linked to the supplier list, new suppliers added (see Suppliers)
 > Grouped | lines with the same description (PO numbers, dates and pack sizes ignored) form one group — you map groups, not lines
 > Mapped | 1. your remembered choices → 2. a NAICS code in the file → 3. text matching against the spend categories → 4. an approved AI service (only if switched on)
 ! Overlap checked | travel, freight, rent, fuel, electricity, waste and capital goods flagged for a decision
@@ -26,6 +27,10 @@ All three go through the same steps; an upload or API batch is reviewed before p
 * Review | fix problems, choose categories for unclear groups, decide on flagged groups
 ? Publish | ready lines become entries | the rest wait in the batch
 ```
+
+## How fast
+
+A test export of 10,000 lines (Jan–Sep, about 450 different supplier spellings, six currencies) is read, linked to suppliers, mapped and calculated in about 8 seconds; 50,000 lines take about 20 seconds, publishing another 10.
 
 ## Reviewing a batch
 

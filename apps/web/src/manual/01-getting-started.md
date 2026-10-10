@@ -11,7 +11,7 @@ The three scopes follow the GHG Protocol:
 
 - **Scope 1** — emissions from sources the company owns or controls: its boilers and generators, its vehicles, refrigerant leaks from its equipment, the landfills and plants it operates.
 - **Scope 2** — emissions from the electricity, heat, steam and cooling the company buys. Reported twice: **location-based** (average of the grid) and **market-based** (what the company actually buys: certificates, contracts, the supplier's own factor).
-- **Scope 3** — other emissions in the value chain. So far: upstream emissions of fuels and energy, and transmission losses (3.3), and waste sent to other companies for treatment (3.5).
+- **Scope 3** — other emissions in the value chain. So far: purchased goods and services (3.1), capital goods (3.2), upstream emissions of fuels and energy and transmission losses (3.3), upstream transport (3.4), waste sent to other companies for treatment (3.5), business travel (3.6) and upstream leased assets (3.8) from purchases.
 
 Biogenic CO₂ (from burning biomass, biogas, or the organic part of waste) is reported separately, **outside the scopes**, as the GHG Protocol requires.
 

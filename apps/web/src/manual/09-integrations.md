@@ -47,7 +47,7 @@ The client needs the **Purchase lines** permission (tick it when creating the cl
     POST /api/v1/purchases
     { "reference": "SAP-2026-03", "currency": "AED", "facility": "BEEAH Headquarters",
       "lines": [ { "date": "2026-03-10", "description": "Copier paper A4", "amount": 4250,
-                   "supplier": "Gulf Stationery LLC", "category": "Office supplies", "glAccount": "Office expenses",
+                   "supplier": "Gulf Stationery LLC", "supplierRef": "V100231", "supplierCountry": "AE", "category": "Office supplies", "glAccount": "Office expenses",
                    "poNumber": "4500123", "quantity": 50, "unit": "box" } ] }
 
     POST /api/v1/purchases/SAP-2026-03/complete      (or "complete": true on the last call)
@@ -61,6 +61,7 @@ The client needs the **Purchase lines** permission (tick it when creating the cl
 | currency | no | 3 letters; default the call's, else the company currency |
 | facility | per line or per call | facility name |
 | supplier, category, glAccount, poNumber | no | help mapping and checking |
+| supplierRef, supplierCountry | no | the ERP vendor number and the supplier's country (2 letters or name): link lines to the right supplier and fill its profile |
 | quantity, unit, supplierEf, supplierEfUnit | no | for a supplier's own factor (kg CO₂e per unit) |
 | capital | no | true for capitalised purchases (Scope 3.2) |
 

@@ -15,6 +15,7 @@ import { Methodology } from './pages/Methodology';
 import { EnergyRegister } from './pages/EnergyRegister';
 import { PurchaseBatchPage, Purchases } from './pages/Purchases';
 import { Suppliers } from './pages/Suppliers';
+import { Dashboards } from './pages/Dashboards';
 import { Currencies } from './pages/Currencies';
 import { AuditLog } from './pages/AuditLog';
 import { Meters } from './pages/Meters';
@@ -37,7 +38,7 @@ export const useApp = () => useContext(AppCtx);
 type NavItem = { to?: string; label: string; icon: string; roles?: Role[]; stage?: number };
 const NAV: { group?: string; items: NavItem[] }[] = [
   { items: [
-    { label: 'Home', icon: 'home', stage: 3 }, { label: 'Dashboards', icon: 'chart', stage: 3 }, { label: 'KPI dashboard', icon: 'gauge', stage: 3 },
+    { label: 'Home', icon: 'home', stage: 3 }, { to: '/dashboards', label: 'Dashboards', icon: 'chart' }, { label: 'KPI dashboard', icon: 'gauge', stage: 3 },
   ] },
   { group: 'Capture', items: [
     { to: '/data/stationary_combustion', label: 'Add data', icon: 'plus', roles: ['super_admin', 'admin', 'manager', 'preparer'] },
@@ -152,6 +153,7 @@ function Shell() {
           <Route path="/account" element={<div className="page"><ChangePassword onDone={() => nav('/')} /></div>} />
           <Route path="/library/*" element={<Gate ok={role === 'platform_admin'}><Library /></Gate>} />
           <Route path="/data/:category" element={<NeedCo><AddData /></NeedCo>} />
+          <Route path="/dashboards" element={<NeedCo><Dashboards /></NeedCo>} />
           <Route path="/entries" element={<NeedCo><Entries /></NeedCo>} />
           <Route path="/organisation" element={<NeedCo><Organisation /></NeedCo>} />
           <Route path="/people" element={<NeedCo><People /></NeedCo>} />

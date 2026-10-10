@@ -98,7 +98,7 @@ Content-Type: application/json
 { "reference": "SAP-2026-03", "currency": "AED", "facility": "BEEAH Headquarters", "complete": false,
   "lines": [
     { "date": "2026-03-10", "description": "Copier paper A4 80gsm", "amount": 4250, "supplier": "Gulf Stationery LLC",
-      "category": "Office supplies", "glAccount": "Office expenses", "poNumber": "4500123", "quantity": 50, "unit": "box" },
+      "supplierRef": "V100231", "supplierCountry": "AE", "category": "Office supplies", "glAccount": "Office expenses", "poNumber": "4500123", "quantity": 50, "unit": "box" },
     { "date": "2026-03-12", "description": "Ready mix concrete C40", "amount": 182000, "facility": "Al Saja'a Recycling Complex",
       "supplierEf": 210, "supplierEfUnit": "m3", "quantity": 400, "unit": "m3", "capital": true }
 ] }
@@ -107,6 +107,7 @@ POST ${origin}/api/v1/purchases/SAP-2026-03/complete     (or "complete": true on
 GET  ${origin}/api/v1/purchases/SAP-2026-03              status and counts`}</pre>
         <ul className="sub" style={{ margin: 0, paddingLeft: 18 }}>
           <li><b>description</b> and <b>amount</b> (or a quantity with a supplier factor) are required; <b>date</b> as yyyy-mm-dd; <b>facility</b> by name, per line or for the whole call.</li>
+          <li><b>supplierRef</b> (the ERP vendor number) and <b>supplierCountry</b> link each line to the right supplier and fill its profile; without them the name is matched (spellings and typos recognised).</li>
           <li>Each line is checked on its own: lines with problems are listed in the answer (index and reason) and kept for review; the others continue.</li>
           <li>A completed reference is closed: send corrections under a new reference. The same line sent twice (same date, amount, supplier, description, PO) is marked as a duplicate.</li>
         </ul>

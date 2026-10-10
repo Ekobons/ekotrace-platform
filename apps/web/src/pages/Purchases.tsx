@@ -152,7 +152,7 @@ function ColumnSetup({ meta, up, onCancel, onStarted }: { meta: PurchaseMeta; up
       onStarted(r.batchId);
     } catch (e) { setErr((e as Error).message); setBusy(false); }
   };
-  const FIELD_ORDER: PurchaseField[] = ['date', 'amount', 'currency', 'supplier', 'category', 'gl', 'facility', 'quantity', 'unit', 'po', 'supplierEf', 'supplierEfUnit', 'capital'];
+  const FIELD_ORDER: PurchaseField[] = ['date', 'amount', 'currency', 'supplier', 'supplierRef', 'supplierCountry', 'category', 'gl', 'facility', 'quantity', 'unit', 'po', 'supplierEf', 'supplierEfUnit', 'capital'];
   const labelOf = (f: PurchaseField) => meta.fields.find((x) => x.field === f)?.label ?? f;
   const colSelect = (f: PurchaseField) => (
     <label className="field" key={f}><span>{labelOf(f)}{['amount'].includes(f) ? ' *' : ''}</span>

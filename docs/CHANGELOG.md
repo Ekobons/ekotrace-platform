@@ -2,6 +2,25 @@
 
 Newest first.
 
+## 2026-10-10 (11) — Suppliers without duplicates, supplier analytics, Dashboards, 10k test files
+
+**Suppliers registered from every purchase (upload, ERP API, by hand), one record however written** (migration 012, `supplierMatch.ts`):
+- Order: remembered spelling → ERP vendor number → same normalised name / known spelling (legal forms incl. dotted F.Z.E. / L.L.C. / W.L.L. ignored) → near-identical name (linked automatically, listed for checking) → possible duplicate (new supplier, marked for a person) → new supplier. Country and vendor number from the file fill blank profile fields.
+- Names compared word by word: generic words (also mistyped: "Indutsrial") dropped, "Al Noor" = "AlNoor", one typo allowed in words of 5+ letters, "Big Four" = "Bigfour". A word only one name has → different suppliers ("Pearl Steel" ≠ "Horizon Steel", "Desert Rose Steel" ≠ "Desert Rose IT Solutions"). Different numbers never auto-link; different vendor numbers go to a person. Most-used spelling names the supplier; names with a vendor number and many lines are linked first.
+- Upload columns and API fields **supplierRef** (vendor number) and **supplierCountry** (code or name → ISO 2).
+- Suppliers page: tabs **Suppliers** (filters: possible duplicates, incomplete profile, own factor, country; sort), **Check names** (possible duplicates: merge / different; linked automatically: right / split, confirm all), **Analytics**. Profile: name, vendor number, country, TRN, industry, size, contact, website, reports emissions, climate target, note; completeness; emissions by month; names seen and how each was linked.
+- API: `GET /api/suppliers` (filters, sort, counts), `/review`, `/analytics?year=`, `/:id` (names, months, duplicate of), `PATCH /:id` (profile; vendor number unique), `POST /:id/merge`, `/:id/keep-separate`, `/matches/:id/confirm|split`.
+
+**Supplier analytics:** suppliers, spend, emissions, share from suppliers' own factors, concentration (suppliers making 50 % / 80 %); by country (click → list), product group / spend category, Scope 3 category, industry sector, month; 25 largest suppliers; profile completeness and climate targets. Emissions or USD.
+
+**Dashboards** (`GET /api/dashboard?year&node&scope2`, Dashboards in the menu): totals vs previous and base year, Scope 1 / 2 (location or market, never added) / 3, biogenic and memo apart; by month (stacked by scope; annual entries noted), category, facility (click to filter), Scope 3 categories, ten largest sources, data coverage per facility × month, purchases data quality. Consolidation approach applied (equity share × ownership %). Shared SVG charts (`components/Charts.tsx`).
+
+**Spend matching:** ~60 procurement synonyms (brake pads, filters, hoses, breakers, HDPE liners, PPE items, pavers, MPLS, Wi-Fi, gasoil, generators…); fuel overlap no longer flags fuel filters, pumps, generators or lubricants (NAICS 324191); "flue gas" is not natural gas; UPS = power supply. On the 10k test file unmapped lines fell from 21 % to 8 %.
+
+**Test files** (`npm run testfiles -w apps/api`, made up, marked DEMO): `purchases-10k-2026.xlsx` (10,000 lines Jan–Sep 2026, SAP-like layout, ~210 invented suppliers written ~450 ways, 10 created twice in the vendor master, vendor numbers on 70 % of lines, supplier countries, AED/USD/EUR/GBP/INR/SAR, credit notes, repeated lines, cost centres written differently or unknown, capital items, travel / freight / fuel) and 55 DEMO bills (SEWA ×4 accounts + HQ Aug–Sep, DEWA annex account, Empower district cooling) — all read correctly by the bill reader. Demo company gets meters for these accounts.
+- 10,000 lines: read, suppliers linked, mapped and calculated in ~8 s → 208 new suppliers, 68 spellings linked automatically, 17 possible duplicates; 7,669 ready, 1,043 flagged for another category, 768 unmapped (suggestions shown), 458 problems (EUR / GBP / INR rates not yet entered for 2026; two unknown cost centres).
+- Manual: new chapters Suppliers and Dashboards; Purchases, Integrations, Getting started and glossary updated. Tests: supplier matching, merge / split / keep apart, profile, analytics, dashboard.
+
 ## 2026-10-10 (10) — Real spend factors: EPA v1.3 and the previous Ekotrace products
 
 - `data/epa/SupplyChainGHGEmissionFactors_v1.3.0_NAICS_CO2e_USD2022.csv` (1,016 NAICS commodities, with margins) loaded by the seed; demo placeholders no longer used.

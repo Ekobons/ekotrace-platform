@@ -32,7 +32,7 @@ export interface Factor { id: number; item_id: number; item: string; subcategory
 export interface Activity { id: string; period_start: string; period_end: string; facility: string; category: string; item: string; quantity: number; unit: string; data_type: string; gwp_set: string; co2e_direct: number; co2e_wtt: number; co2_biogenic: number; co2e_memo: number; co2e_scope2?: number; co2e_scope2_market?: number; co2e_td?: number; co2e_scope3?: number; scope?: number; ghg_category?: number | null; waste_site?: string | null; meter?: string | null; meter_id?: string | null; status: string; created_at: string; vehicle?: string | null; vehicle_id?: string | null }
 
 // ------------------------------------------------------------- purchases --
-export type PurchaseField = 'date' | 'description' | 'amount' | 'currency' | 'quantity' | 'unit' | 'supplier' | 'category' | 'gl' | 'po' | 'facility' | 'supplierEf' | 'supplierEfUnit' | 'capital';
+export type PurchaseField = 'date' | 'description' | 'amount' | 'currency' | 'quantity' | 'unit' | 'supplier' | 'category' | 'gl' | 'po' | 'facility' | 'supplierEf' | 'supplierEfUnit' | 'capital' | 'supplierRef' | 'supplierCountry';
 export type Columns = Partial<Record<PurchaseField, string | string[]>>;
 export interface PurchaseMeta {
   fields: { field: PurchaseField; label: string }[]; fxMethod: 'month' | 'year' | 'fixed'; currency: string; aiMapping: boolean; aiAvailable: boolean; aiName: string | null;
@@ -66,7 +66,37 @@ export interface PurchaseLine {
   problems: string[]; warnings: string[]; calc_error: string | null; dup_of: string | null; activity_id: string | null;
 }
 export interface SpendItem { id: number; name: string; naics: string | null; group: string; co2e: number | null; unit: string | null; price_year: number | null; source: string | null }
-export interface Supplier { id: string; name: string; aliases: string[]; country: string | null; reference: string | null; contact_email: string | null; origin: string; active: boolean; lines: number; usd: number; co2e: number; supplier_lines: number; factors: number }
+export interface Supplier { id: string; name: string; aliases: string[]; country: string | null; reference: string | null; contact_email: string | null; industry?: string | null; origin: string; active: boolean; lines: number; usd: number; co2e: number; supplier_lines: number; factors: number;
+  review?: 'ok' | 'possible_duplicate'; duplicate_of?: string | null; duplicate_of_name?: string | null; duplicate_score?: number | null; completeness?: number }
+export interface SupplierProfile extends Supplier { note: string | null; norm: string; trn: string | null; website: string | null; size: string | null; contact_name: string | null; reports_emissions: string | null; climate_target: string | null; created_at: string }
+export interface SupplierName { id: number; name_seen: string; method: string; score: number | null; confirmed: boolean; lines: number }
+export interface SupplierReview {
+  duplicates: { id: string; name: string; country: string | null; reference: string | null; score: number | null; other_id: string; other_name: string; other_country: string | null; other_reference: string | null; lines: number; other_lines: number }[];
+  autoLinked: { id: number; name_seen: string; similar_to: string | null; score: number | null; created_at: string; supplier_id: string; supplier: string; lines: number }[];
+}
+type Amt = { usd: number | null; co2e: number | null };
+export interface SupplierAnalytics {
+  year: number; years: number[];
+  totals: { suppliers: number; lines: number; usd: number; co2e: number; co2e_supplier: number; no_supplier: number };
+  byCountry: ({ country: string; suppliers: number } & Amt)[]; byItem: ({ group: string; item: string | null; suppliers: number } & Amt)[]; bySector: ({ sector: string } & Amt)[];
+  byScope3: ({ category: string } & Amt)[]; byMonth: ({ month: string; co2e_supplier: number | null } & Amt)[];
+  top: { id: string; name: string; country: string | null; industry: string | null; usd: number; co2e: number; lines: number; own_factor: boolean; completeness: number; main_item: string | null }[];
+  concentration: { suppliers: number; n50: number; n80: number };
+  profiles: { suppliers: number; country: number; reference: number; industry: number; contact: number; reports: number; target: number; own_factor: number; review: number };
+  targets: { target: string; suppliers: number; co2e: number | null }[];
+}
+type S3 = { s1: number | null; s2: number | null; s3: number | null };
+export interface Dashboard {
+  year: number; years: number[]; consolidation: string; baseYearValue: number | null; scope2: 'location' | 'market';
+  totals: S3 & { biogenic: number | null; memo: number | null; s2_location: number | null; s2_market: number | null; entries: number; approved: number; estimated: number; total: number };
+  previous: { year: number; total: number }; baseYear: { year: number; total: number } | null;
+  monthly: ({ m: number } & S3)[]; annualOnly: number;
+  byCategory: (S3 & { code: string; name: string; scope: number; ghg_category: number | null; co2e: number })[];
+  byFacility: (S3 & { id: string; name: string; parent: string | null; facility_type: string | null; co2e: number })[];
+  scope3: { cat: number; name: string; co2e: number }[]; top: { item: string; category: string; scope: number; co2e: number }[];
+  coverage: { id: string; name: string; months: number[] }[];
+  quality: { supplier_lines: number; spend_lines: number; supplier_co2e: number; spend_co2e: number };
+}
 export interface SupplierFactor2 { id: string; item_id: number | null; item: string | null; co2e: number; unit: string; price_year: number | null; valid_from: string; valid_to: string; source: string; boundary: string | null }
 export interface FxRow { id: number; currency: string; kind: 'month' | 'year' | 'fixed' | 'peg'; period: string; per_usd: number; source: string; own: boolean }
 export interface ManualLine { date: string; description: string; itemId: number | null; target: string; amount: number | null; currency: string; quantity?: number | null; unit?: string | null; supplier?: string | null; supplierEf?: number | null; supplierEfUnit?: string | null }
@@ -268,7 +298,13 @@ export const api = {
   deleteRule: (id: string) => call<{ ok: true }>('DELETE', `/api/purchases/rules/${id}`),
   manualPurchases: (b: { facilityId: string; dryRun?: boolean; name?: string; lines: ManualLine[] }) => call<ManualResult>('POST', '/api/purchases/manual', b),
   suppliers: (q: Record<string, string | number | undefined>) => call<{ total: number; suppliers: Supplier[] }>('GET', `/api/suppliers?${new URLSearchParams(Object.entries(q).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)]))}`),
-  supplier: (id: string) => call<{ supplier: Supplier & { note: string | null; norm: string }; factors: SupplierFactor2[]; categories: { item: string | null; lines: number; usd: number; co2e: number }[] }>('GET', `/api/suppliers/${id}`),
+  supplier: (id: string) => call<{ supplier: SupplierProfile; factors: SupplierFactor2[]; categories: { item: string | null; lines: number; usd: number; co2e: number }[]; names: SupplierName[]; months: { month: string; usd: number; co2e: number | null }[]; duplicateOf: { id: string; name: string } | null }>('GET', `/api/suppliers/${id}`),
+  supplierCounts: () => call<{ total: number; counts: { all: number; review: number; incomplete: number; autoLinked: number } }>('GET', '/api/suppliers?limit=1'),
+  supplierReview: () => call<SupplierReview>('GET', '/api/suppliers/review'),
+  supplierAnalytics: (year?: number) => call<SupplierAnalytics>('GET', `/api/suppliers/analytics${year ? `?year=${year}` : ''}`),
+  keepSupplierSeparate: (id: string) => call<{ ok: true }>('POST', `/api/suppliers/${id}/keep-separate`),
+  supplierMatch: (id: number, action: 'confirm' | 'split') => call<{ ok?: true; supplierId?: string; lines?: number }>('POST', `/api/suppliers/matches/${id}/${action}`),
+  dashboard: (q: { year?: number; node?: string; scope2?: 'location' | 'market' }) => call<Dashboard>('GET', `/api/dashboard?${new URLSearchParams(Object.entries(q).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)]))}`),
   addSupplier: (b: unknown) => call<{ id: string }>('POST', '/api/suppliers', b),
   patchSupplier: (id: string, b: unknown) => call<{ ok: true }>('PATCH', `/api/suppliers/${id}`, b),
   mergeSupplier: (id: string, intoId: string) => call<{ lines: number }>('POST', `/api/suppliers/${id}/merge`, { intoId }),

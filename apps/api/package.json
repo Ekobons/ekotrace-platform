@@ -13,7 +13,8 @@
     "test": "node --import tsx --test test/*.test.ts",
     "serve": "tsx src/server.ts",
     "admin:create": "tsx src/cli/create-admin.ts",
-    "demo": "tsx src/cli/demo.ts"
+    "demo": "tsx src/cli/demo.ts",
+    "testfiles": "tsx src/cli/makeTestFiles.ts"
   },
   "dependencies": {
     "@ekotrace/calc": "*",

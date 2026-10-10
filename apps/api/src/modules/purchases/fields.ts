@@ -5,12 +5,12 @@
 import { createHash } from 'node:crypto';
 import { cellText, type Cell } from '../../lib/sheet.js';
 
-export const FIELDS = ['date', 'description', 'amount', 'currency', 'quantity', 'unit', 'supplier', 'category', 'gl', 'po', 'facility', 'supplierEf', 'supplierEfUnit', 'capital'] as const;
+export const FIELDS = ['date', 'description', 'amount', 'currency', 'quantity', 'unit', 'supplier', 'category', 'gl', 'po', 'facility', 'supplierEf', 'supplierEfUnit', 'capital', 'supplierRef', 'supplierCountry'] as const;
 export type Field = typeof FIELDS[number];
 export const FIELD_LABEL: Record<Field, string> = {
   date: 'Date (purchase / invoice / posting)', description: 'Description', amount: 'Amount (spend)', currency: 'Currency', quantity: 'Quantity', unit: 'Unit of quantity',
   supplier: 'Supplier / vendor', category: 'Category (as in your system)', gl: 'GL account / account name', po: 'PO / invoice number', facility: 'Facility / site / cost centre',
-  supplierEf: 'Supplier emission factor', supplierEfUnit: 'Unit of supplier factor', capital: 'Capital goods (yes / no)',
+  supplierEf: 'Supplier emission factor', supplierEfUnit: 'Unit of supplier factor', capital: 'Capital goods (yes / no)', supplierRef: 'Vendor number (ERP)', supplierCountry: 'Supplier country',
 };
 /** Header words for each field, best first. */
 const HINTS: Record<Field, string[]> = {
@@ -27,6 +27,8 @@ const HINTS: Record<Field, string[]> = {
   facility: ['facility', 'site', 'cost centre', 'cost center', 'location', 'plant', 'branch', 'business unit'],
   supplierEf: ['vendor specific ef', 'supplier specific ef', 'supplier ef', 'supplier emission factor', 'emission factor'],
   supplierEfUnit: ['vendor specific unit', 'supplier ef unit', 'ef unit'],
+  supplierRef: ['vendor number', 'vendor no', 'vendor code', 'vendor id', 'vendor #', 'supplier number', 'supplier no', 'supplier code', 'supplier id', 'vendor account'],
+  supplierCountry: ['supplier country', 'vendor country', 'country of supplier', 'country of origin', 'origin country'],
   capital: ['capital', 'capex', 'type of purchase', 'asset'],
 };
 const norm = (s: string) => s.toLowerCase().replace(/[_\s]+/g, ' ').replace(/[^a-z0-9#/ ]/g, '').trim();
@@ -38,7 +40,7 @@ export function guessColumns(headers: string[]): Columns {
   const H = headers.map((h) => ({ h, n: norm(h) })).filter((x) => x.n);
   const used = new Set<string>();
   const out: Columns = {};
-  const order: Field[] = ['amount', 'date', 'currency', 'quantity', 'unit', 'supplierEf', 'supplierEfUnit', 'supplier', 'category', 'gl', 'po', 'facility', 'capital', 'description'];
+  const order: Field[] = ['amount', 'date', 'currency', 'quantity', 'unit', 'supplierEf', 'supplierEfUnit', 'supplierRef', 'supplierCountry', 'supplier', 'category', 'gl', 'po', 'facility', 'capital', 'description'];
   for (const f of order) {
     let best: { h: string; score: number } | undefined;
     for (const [rank, hint] of HINTS[f].entries()) {
@@ -122,5 +124,7 @@ export function readBool(c: Cell): boolean | null {
 }
 
 export const normSupplier = (s: string) => s.toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g, '')
+  .replace(/\b(?:[a-z]\.\s?){2,}[a-z]?\.?/g, (m) => `${m.replace(/[.\s]/g, '')} `)       // F.Z.E. / L.L.C / W.L.L → fze / llc / wll
+  .replace(/\b(wll|spc|psc|pjsc|saoc|saog|bsc)\b/g, ' ')
   .replace(/\b(llc|l\.l\.c|ltd|limited|co|company|fze|fzco|fz|est|establishment|trading|inc|plc|pvt|private|group|the|and|&)\b/g, ' ')
   .replace(/[^a-z0-9]+/g, ' ').trim();

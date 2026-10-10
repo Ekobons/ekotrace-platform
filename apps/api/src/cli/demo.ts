@@ -311,6 +311,12 @@ async function main() {
     for (const m of [dc, gm, cm]) ns += (await syncMeter(c, tset, m, actor)).created;
     // 4. HQ electricity: SEWA bills 15th to 14th (PDFs made here, in a SEWA-like layout); Jan–Jul booked, August to check.
     await addMeter('BEEAH Headquarters', { name: 'SEWA account 2001458876', ext: 'SEWA-2001458876', type: 'interval', freq: 'month', unit: 'kWh_e', item: await item('grid:electricity'), account: '2001458876' });
+    // utility accounts with no readings yet: the DEMO bills from `makeTestFiles` (test-files/bills) are for these
+    for (const [fac, acc] of [["Al Saja'a Recycling Complex", '2003317745'], ["Al Saja'a Landfill", '2003318102'], ['Fleet Depot Sharjah', '2003320088'], ['Al Zahia Community', '2003324417']] as const)
+      await addMeter(fac, { name: `SEWA account ${acc}`, ext: `SEWA-${acc}`, type: 'interval', freq: 'month', unit: 'kWh_e', item: await item('grid:electricity'), account: acc });
+    await addMeter('Data Centre Dubai', { name: 'DEWA account 2045118763 (annex supply)', ext: 'DEWA-2045118763', type: 'interval', freq: 'month', unit: 'kWh_e', item: await item('grid:electricity'), account: '2045118763' });
+    await addMeter('Data Centre Dubai', { name: 'Empower premise EMP-DC-77310', ext: 'EMP-DC-77310', type: 'interval', freq: 'month', unit: 'TRh', item: await item('cooling:district'), account: 'EMP-DC-77310',
+      template: { energy: { supplier: { name: 'Demo district cooling (replace)', co2e: 0.6, unit: 'TRh', source: DEMO }, cooling: { method: 'supplier' } } } });
     const pdf = async (lines: (string | [string, string])[]) => {
       const doc = await PDFDocument.create(); const page = doc.addPage([595, 842]); const font = await doc.embedFont(StandardFonts.Helvetica);
       let yy = 800;

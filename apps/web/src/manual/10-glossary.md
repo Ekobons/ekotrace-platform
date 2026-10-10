@@ -28,3 +28,6 @@
 | CPI | consumer price index; brings money of one year to the prices of another |
 | Supplier-specific factor | a supplier's own emission factor for what it sells (EPD, product footprint, its inventory divided by its revenue) |
 | EPD | Environmental Product Declaration: a verified product footprint (ISO 14025) |
+| Vendor number | the number the ERP gives a supplier; the surest way to link purchase lines to a supplier |
+| Possible duplicate | a new supplier name that may be an existing supplier; a person merges it or keeps it apart |
+| Supplier concentration | how many suppliers make up 50 % or 80 % of purchased emissions |

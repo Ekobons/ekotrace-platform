@@ -962,6 +962,83 @@ test('purchases: manual entry (check, then save) and ERP API (several calls, the
   assert.deepEqual([st.json().status, st.json().lines.ready], ['review', 1000], st.body);
 });
 
+test('suppliers: one record however written (vendor number, spellings, typos), possible duplicates, merge / split / keep apart, profile, analytics; dashboard', async () => {
+  const { similarity } = await import('../src/modules/purchases/supplierMatch.js');
+  // the word-by-word comparison
+  assert.equal(similarity('Gulf Stationary L.L.C.', 'Gulf Stationery LLC').auto, true);
+  assert.equal(similarity('Big Four Audit LLP', 'Bigfour Audit').auto, true);
+  assert.equal(similarity('Palm Plastic Industries F.Z.E.', 'PALM PLASTIC INDUSTRIES FZE').auto, true);
+  assert.equal(similarity('Dammam Indutsrial Chemicals Co', 'Dammam Industrial Chemicals Co').auto, true);   // typo in a generic word
+  assert.ok(similarity('Pearl Management Consultancy Co.', 'Marina Management Consultancy LLC').score < 0.88); // different brand
+  assert.ok(similarity('Desert Rose Steel LLC', 'Desert Rose IT Solutions LLC').score < 0.88);
+  assert.ok(similarity('Pearl Cement Products', 'Emirates Cement LLC').score < 0.88);
+  assert.equal(similarity('Masafi Water Co', 'Masafi').auto, false);
+  assert.ok(similarity('Masafi Water Co', 'Masafi').score >= 0.88);                                           // a person decides
+
+  const lines = ['Date;Description;Amount;Vendor No;Vendor Name;Vendor Country;Site'];
+  const add = (n: number, desc: string, amt: number, ref: string, name: string, country: string) => { for (let i = 0; i < n; i++) lines.push(`${String(1 + i).padStart(2, '0')}/0${1 + (i % 6)}/2024;${desc};${amt};${ref};${name};${country};Sharjah plant`); };
+  add(6, 'Hydraulic hoses', 3672.5, 'V900', 'Falcon Hydraulics LLC', 'UAE');
+  add(3, 'Hydraulic hoses', 3672.5, '', 'FALCON HYDRAULICS L.L.C.', '');
+  add(2, 'Hydraulic hoses', 3672.5, '', 'Falcon Hydarulics LLC', '');          // typo → linked automatically
+  add(2, 'Hydraulic hoses', 3672.5, 'V950', 'Pearl Hydraulics LLC', 'AE');     // another supplier
+  add(4, 'Bottled drinking water', 367.25, 'V960', 'Masafi', 'United Arab Emirates');
+  add(2, 'Bottled drinking water', 367.25, '', 'Masafi Pure Water Co', '');    // possible duplicate
+  add(3, 'HDPE bags and liners', 7345, 'V970', 'Deccan Polymers Pvt Ltd', 'India');
+  const up = (await raw('/api/purchases/upload', Buffer.from(lines.join('\n')), tenantA, { 'x-filename': 'suppliers.csv' })).json();
+  const sh = up.sheets[0];
+  assert.deepEqual([sh.guess.supplierRef, sh.guess.supplier, sh.guess.supplierCountry], ['Vendor No', 'Vendor Name', 'Vendor Country']);
+  await api('POST', `/api/purchases/batches/${up.batchId}/setup`, { headerRow: sh.headerRow, columns: sh.guess, dateFormat: 'dmy', currency: 'AED', headers: sh.headers }, tenantA);
+  await drain();
+  const find = async (q: string) => (await api('GET', `/api/suppliers?q=${encodeURIComponent(q)}`, undefined, tenantA)).body.suppliers as { id: string; name: string; lines: number; country: string | null; reference: string | null; review: string; completeness: number }[];
+  const falcon = await find('falcon');
+  assert.equal(falcon.length, 1, JSON.stringify(falcon));
+  assert.deepEqual([falcon[0]!.lines, falcon[0]!.country, falcon[0]!.reference], [11, 'AE', 'V900']);
+  assert.equal((await find('pearl hydraulics'))[0]!.review, 'ok');
+  assert.equal((await find('deccan'))[0]!.country, 'IN');
+  const review = (await api('GET', '/api/suppliers/review', undefined, tenantA)).body;
+  const dup = review.duplicates.find((x: { name: string }) => /masafi/i.test(x.name));
+  assert.ok(dup && /masafi/i.test(dup.other_name), JSON.stringify(review.duplicates));
+  const typo = review.autoLinked.find((x: { name_seen: string }) => x.name_seen === 'Falcon Hydarulics LLC');
+  assert.ok(typo, JSON.stringify(review.autoLinked));
+  // the profile shows every spelling and how it was linked
+  const det = (await api('GET', `/api/suppliers/${falcon[0]!.id}`, undefined, tenantA)).body;
+  assert.deepEqual(det.names.map((n: { method: string }) => n.method).sort(), ['new', 'similar']);   // L.L.C. spelling has the same normalised name
+  // split the automatic link: its lines become a supplier of their own
+  const split = await api('POST', `/api/suppliers/matches/${typo.id}/split`, {}, tenantA);
+  assert.equal(split.body.lines, 2);
+  assert.equal((await find('falcon')).length, 2);
+  // merge the possible duplicate; the name is then known and cannot be added again
+  const merged = await api('POST', `/api/suppliers/${dup.id}/merge`, { intoId: dup.other_id }, tenantA);
+  assert.equal(merged.body.lines, 2);
+  const masafi = await find('masafi');
+  assert.deepEqual([masafi.length, masafi[0]!.lines, masafi[0]!.review], [1, 6, 'ok']);
+  assert.equal((await api('POST', '/api/suppliers', { name: 'Masafi Pure Water Co' }, tenantA)).status, 409);
+  // keep apart: a person decides two similar names are different suppliers
+  const apart = await api('POST', `/api/suppliers/${(await find('falcon hydarulics'))[0]!.id}/keep-separate`, {}, tenantA);
+  assert.equal(apart.status, 200);
+  // profile: completeness rises; a vendor number already used elsewhere is refused
+  const before = falcon[0]!.completeness;
+  assert.equal((await api('PATCH', `/api/suppliers/${falcon[0]!.id}`, { industry: 'Hydraulic components', climateTarget: 'own', reportsEmissions: 'yes', contactEmail: 'esg@falcon.example' }, tenantA)).status, 200);
+  assert.ok((await find('falcon hydraulics'))[0]!.completeness > before);
+  assert.equal((await api('PATCH', `/api/suppliers/${falcon[0]!.id}`, { reference: 'V970' }, tenantA)).status, 409);
+  // analytics: by country (UAE, India), by product, top suppliers, concentration
+  const an = (await api('GET', '/api/suppliers/analytics?year=2024', undefined, tenantA)).body;
+  const countries = an.byCountry.map((r: { country: string }) => r.country);
+  assert.ok(countries.includes('AE') && countries.includes('IN'), JSON.stringify(an.byCountry));
+  assert.ok(an.totals.lines > 0 && an.top.length > 0 && an.concentration.n80 >= 1);
+  assert.ok(an.profiles.target >= 1);
+
+  // dashboard: the scopes add up; Scope 2 location / market never both in the total
+  const loc = (await api('GET', '/api/dashboard?year=2024', undefined, tenantA)).body;
+  const mkt = (await api('GET', '/api/dashboard?year=2024&scope2=market', undefined, tenantA)).body;
+  for (const d of [loc, mkt]) assert.ok(Math.abs(d.totals.total - ((d.totals.s1 ?? 0) + (d.totals.s2 ?? 0) + (d.totals.s3 ?? 0))) < 1e-6);
+  assert.equal(loc.totals.s2 ?? 0, loc.totals.s2_location ?? 0);
+  assert.equal(mkt.totals.s2 ?? 0, mkt.totals.s2_market ?? 0);
+  assert.equal(loc.totals.s3, mkt.totals.s3);
+  assert.ok(Array.isArray(loc.monthly) && Array.isArray(loc.coverage) && loc.years.includes(2024));
+  assert.equal((await api('GET', '/api/dashboard?year=2024', undefined, tenantB)).body.totals.entries, 0 + (await pq(`SELECT count(*)::int AS n FROM activity WHERE tenant_id = $1 AND extract(year FROM period_start) = 2024 AND status <> 'rejected'`, [tenantB])).rows[0].n);
+});
+
 test('purchases: 50,000 lines (CSV) read, mapped, calculated and published in the background within a minute', async () => {
   const descs = ['A4 paper', 'Laptop', 'Office cleaning', 'Consultancy fees', 'Ready mix concrete', 'Security guards', 'Hotel stay Riyadh', 'Courier DHL', 'Software licence', 'Catering'];
   const lines = ['Date;Description;Amount;Supplier;Site'];

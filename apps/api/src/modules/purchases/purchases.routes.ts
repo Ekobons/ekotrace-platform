@@ -90,11 +90,13 @@ const lineSchema = z.object({
   supplier: z.string().max(300).optional().nullable(), category: z.string().max(300).optional().nullable(), glAccount: z.string().max(300).optional().nullable(),
   poNumber: z.string().max(120).optional().nullable(), facility: z.string().max(200).optional().nullable(), supplierEf: z.number().min(0).optional().nullable(),
   supplierEfUnit: z.string().max(30).optional().nullable(), capital: z.boolean().optional().nullable(),
+  supplierRef: z.string().max(80).optional().nullable(), supplierCountry: z.string().max(80).optional().nullable(),
 });
 const toRaw = (l: z.infer<typeof lineSchema>): RawLine => ({
   date: l.date ?? null, description: l.description, amount: l.amount ?? null, currency: l.currency ?? null, quantity: l.quantity ?? null, unit: l.unit ?? null,
   supplier: l.supplier ?? null, category: l.category ?? null, gl: l.glAccount ?? null, po: l.poNumber ?? null, facility: l.facility ?? null,
   supplierEf: l.supplierEf ?? null, supplierEfUnit: l.supplierEfUnit ?? null, capital: l.capital == null ? null : l.capital ? 'yes' : 'no',
+  supplierRef: l.supplierRef ?? null, supplierCountry: l.supplierCountry ?? null,
 });
 
 // ----------------------------------------------------------------- routes --

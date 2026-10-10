@@ -57,7 +57,7 @@ export const SYNONYMS: Record<string, string> = {
   car: 'automobile manufacturing', cars: 'automobile manufacturing', vehicle: 'motor vehicle', vehicles: 'motor vehicle', truck: 'truck', trucks: 'truck', excavator: 'construction machinery', excavators: 'construction machinery', loader: 'construction machinery', crane: 'construction machinery',
   tyre: 'tire', tyres: 'tire', tire: 'tire', tires: 'tire', battery: 'battery', batteries: 'battery',
   repair: 'repair', maintenance: 'maintenance', spare: 'parts machinery', spares: 'parts machinery', parts: 'parts',
-  courier: 'couriers express delivery', dhl: 'couriers express delivery', aramex: 'couriers express delivery', fedex: 'couriers express delivery', ups: 'couriers express delivery',
+  courier: 'couriers express delivery', dhl: 'couriers express delivery', aramex: 'couriers express delivery', fedex: 'couriers express delivery', ups: 'uninterruptible power supply electrical equipment',
   freight: 'freight trucking', shipping: 'freight transportation', logistics: 'freight transportation warehousing', haulage: 'freight trucking', trucking: 'freight trucking',
   warehouse: 'warehousing storage', storage: 'warehousing storage',
   rent: 'lessors real estate', rental: 'rental leasing', lease: 'lessors leasing', leasing: 'leasing',
@@ -68,6 +68,20 @@ export const SYNONYMS: Record<string, string> = {
   gloves: 'apparel safety', helmet: 'safety', waste: 'waste collection treatment disposal', skip: 'waste collection', disposal: 'waste disposal',
   construction: 'construction', civil: 'construction', building: 'building construction', hvac: 'heating ventilation air conditioning', ac: 'air conditioning',
   machinery: 'machinery manufacturing', equipment: 'equipment', pump: 'pump', pumps: 'pump', compressor: 'compressor',
+  brake: 'motor vehicle brake system parts', brakes: 'motor vehicle brake system parts', filter: 'motor vehicle parts filters', filters: 'motor vehicle parts filters',
+  hose: 'rubber plastics hoses', hoses: 'rubber plastics hoses', hydraulic: 'fluid power', grease: 'petroleum lubricating oil grease',
+  bottled: 'bottled water', drinking: 'bottled water', mineral: 'bottled water', gallon: 'bottled water', gallons: 'bottled water',
+  breaker: 'switchgear switchboard apparatus', breakers: 'switchgear switchboard apparatus', switchgear: 'switchgear switchboard apparatus', circuit: 'switchgear electrical',
+  hdpe: 'plastics bag', liner: 'plastics bag', liners: 'plastics bag', bin: 'plastics', bins: 'plastics', film: 'plastics film',
+  hat: 'apparel safety', hats: 'apparel safety', vest: 'apparel safety', vests: 'apparel safety', coverall: 'apparel', coveralls: 'apparel', shoes: 'footwear',
+  diary: 'stationery paper', diaries: 'stationery paper', folder: 'stationery office', folders: 'stationery office', file: 'stationery office',
+  degreaser: 'chemical cleaning compound', solvent: 'chemical solvent', solvents: 'chemical solvent', lime: 'lime gypsum', activated: 'chemical',
+  pantry: 'grocery food', conveyor: 'conveyor machinery', belt: 'conveyor', blade: 'machinery parts', blades: 'machinery parts', shredder: 'machinery',
+  letterhead: 'printing', letterheads: 'printing', brochure: 'printing', brochures: 'printing', signage: 'sign manufacturing', ms: 'iron steel', angles: 'iron steel', channels: 'iron steel',
+  mpls: 'telecommunications', leased: 'telecommunications', switch: 'communications equipment', wifi: 'communications equipment', cabling: 'wire cable communication', cat6: 'wire cable communication',
+  paver: 'concrete block brick', pavers: 'concrete block brick', interlock: 'concrete block brick', blocks: 'concrete block brick',
+  analytics: 'software publishers', virtual: 'data processing hosting', campaign: 'advertising', social: 'advertising', assurance: 'accountants auditing',
+  gasoil: 'diesel petroleum refineries fuel', generator: 'engine turbine power generator', generators: 'engine turbine power generator', genset: 'engine turbine power generator',
   fertilizer: 'fertilizer', fertiliser: 'fertilizer', pesticide: 'pesticide', seeds: 'seed', plants: 'nursery', irrigation: 'irrigation',
 };
 
@@ -87,6 +101,7 @@ export function stem(w: string): string {
 /** Description words plus their synonym expansions (expansions count a little less). Words explained by a synonym are not "unknown". */
 function queryTerms(s: string, vocab?: Map<string, number>): { terms: Map<string, number>; covered: Set<string> } {
   const out = new Map<string, number>(), covered = new Set<string>();
+  s = s.replace(/\bflue gas(es)?\b/gi, 'flue');                    // flue gas treatment is not natural gas
   const raw = s.toLowerCase().match(/[a-z][a-z0-9]+/g) ?? [];
   for (const w of tokens(s)) out.set(w, Math.max(out.get(w) ?? 0, 1));
   for (const r of raw) {
@@ -192,7 +207,7 @@ const NAICS_RULES: [string, string][] = [
   ['482', 'upstream_transport'], ['483', 'upstream_transport'], ['484', 'upstream_transport'], ['486', 'upstream_transport'], ['488', 'upstream_transport'],
   ['492', 'upstream_transport'], ['493', 'upstream_transport'],
   ['5311', 'upstream_leased'], ['5321', 'upstream_leased'], ['5324', 'upstream_leased'],
-  ['211', 'fuel'], ['3241', 'fuel'], ['2212', 'fuel'], ['4247', 'fuel'], ['4571', 'fuel'], ['2211', 'energy'], ['2213', 'energy'],
+  ['211', 'fuel'], ['324191', ''], ['3241', 'fuel'], ['2212', 'fuel'], ['4247', 'fuel'], ['4571', 'fuel'], ['2211', 'energy'], ['2213', 'energy'],
   ['562', 'waste'],
   ['23', 'capital_goods'], ['333', 'capital_goods'], ['3361', 'capital_goods'], ['3362', 'capital_goods'], ['3364', 'capital_goods'], ['3365', 'capital_goods'], ['3366', 'capital_goods'],
   ['334111', 'capital_goods'], ['3353', 'capital_goods'],
@@ -203,17 +218,18 @@ const WORD_RULES: [RegExp, string][] = [
   [/\b(hotels?|accommodation|lodging|per ?diem|travel allowance|visa fees?|taxi|careem|uber|limo(usine)?|car hire|car rental)\b/i, 'business_travel'],
   [/\b(freight|shipping|courier|dhl|aramex|fedex|haulage|logistics|cargo|trucking|transportation charges?|delivery charges?)\b/i, 'upstream_transport'],
   [/\b(office rent|rent(al)? of|lease rent|tenancy|warehouse rent)\b/i, 'upstream_leased'],
-  [/\b(diesel|petrol|gasoline|fuel|lpg|lng|cng|kerosene|jet a-?1|adnoc|enoc|emarat)\b/i, 'fuel'],
+  // fuel itself, not fuel filters, pumps or a diesel generator ("diesel for generators" is fuel)
+  [/^(?!.*\b(diesel|petrol|fuel|gasoil)\s*(filters?|pumps?|injectors?|tanks?|nozzles?|lines?|generators?|gensets?|engines?)\b)(?!.*\b(filters?|spare|spares|parts|lubricants?|grease)\b).*\b(diesel|petrol|gasoline|gasoil|fuel|lpg|lng|cng|kerosene|jet a-?1|adnoc|enoc|emarat)\b/i, 'fuel'],
   [/\b(electricity|dewa|sewa|addc|aadc|fewa|etihad water|district cooling|chilled water|empower|tabreed)\b/i, 'energy'],
   [/\b(waste (collection|disposal)|skip hire|garbage|sewage|tipping fee)\b/i, 'waste'],
 ];
 
 export function detectOverlap(text: string, naics?: string | null): Overlap | null {
   let target: string | undefined, why = '';
-  for (const [re, t] of WORD_RULES) { const m = re.exec(text); if (m) { target = t; why = `“${m[0]}” in the description`; break; } }
+  for (const [re, t] of WORD_RULES) { const m = re.exec(text); if (m) { target = t; why = `“${m.slice(1).find(Boolean) ?? m[0]}” in the description`; break; } }
   if (!target && naics) {
     const r = [...NAICS_RULES].sort((a, b) => b[0].length - a[0].length).find(([p]) => naics.startsWith(p));
-    if (r) { target = r[1]; why = `category (NAICS ${naics})`; }
+    if (r?.[1]) { target = r[1]; why = `category (NAICS ${naics})`; }   // '' = no overlap (lubricants are not fuel)
   }
   if (!target) return null;
   return { target, label: OVERLAP_LABEL[target] ?? target, why, actions: ['fuel', 'energy', 'waste'].includes(target) ? EXCL : MOVE };

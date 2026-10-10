@@ -26,42 +26,76 @@ async function recalcSupplier(c: Parameters<Parameters<typeof tenantTx>[1]>[0], 
 }
 
 export async function supplierRoutes(app: FastifyInstance) {
+  /** Share of the profile filled in (country, vendor number, industry, contact, reports emissions, climate target). */
+  const COMPLETE = `((s.country IS NOT NULL)::int + (s.reference IS NOT NULL)::int + (s.industry IS NOT NULL)::int + (s.contact_email IS NOT NULL)::int
+                     + (coalesce(s.reports_emissions, 'unknown') <> 'unknown')::int + (coalesce(s.climate_target, 'unknown') <> 'unknown')::int) / 6.0`;
+
   app.get('/api/suppliers', async (req) => {
     const tenant = requireTenant(req);
     const q = z.object({ q: z.string().max(200).optional(), offset: z.coerce.number().int().min(0).default(0), limit: z.coerce.number().int().min(1).max(200).default(50),
-      filter: z.enum(['all', 'with_factor', 'without_factor']).default('all') }).parse(req.query);
+      filter: z.enum(['all', 'with_factor', 'without_factor', 'review', 'incomplete']).default('all'), country: z.string().max(10).optional(),
+      sort: z.enum(['co2e', 'spend', 'name', 'lines']).default('co2e') }).parse(req.query);
     return tenantTx(tenant, async (c) => {
       const params: unknown[] = [q.limit, q.offset];
       const conds = ['true'];
-      if (q.q) { params.push(`%${q.q.toLowerCase()}%`); conds.push(`(lower(s.name) LIKE $${params.length} OR s.norm LIKE $${params.length} OR lower(coalesce(s.reference,'')) LIKE $${params.length})`); }
+      if (q.q) { params.push(`%${q.q.toLowerCase()}%`); conds.push(`(lower(s.name) LIKE $${params.length} OR s.norm LIKE $${params.length} OR lower(coalesce(s.reference,'')) LIKE $${params.length} OR EXISTS (SELECT 1 FROM unnest(s.aliases) a WHERE a LIKE $${params.length}))`); }
       if (q.filter === 'with_factor') conds.push('EXISTS (SELECT 1 FROM supplier_ef e WHERE e.supplier_id = s.id)');
       if (q.filter === 'without_factor') conds.push('NOT EXISTS (SELECT 1 FROM supplier_ef e WHERE e.supplier_id = s.id)');
+      if (q.filter === 'review') conds.push(`s.review = 'possible_duplicate'`);
+      if (q.filter === 'incomplete') conds.push(`${COMPLETE} < 1`);
+      if (q.country) { params.push(q.country === 'none' ? null : q.country); conds.push(q.country === 'none' ? `s.country IS NULL AND $${params.length}::text IS NULL` : `s.country = $${params.length}`); }
+      const order = { co2e: 'coalesce(x.co2e, 0) DESC', spend: 'coalesce(x.usd, 0) DESC', name: 's.name', lines: 'coalesce(x.lines, 0) DESC' }[q.sort];
       const rows = (await c.query(
-        `SELECT s.id, s.name, s.aliases, s.country, s.reference, s.contact_email, s.origin, s.active, s.created_at,
+        `SELECT s.id, s.name, s.aliases, s.country, s.reference, s.contact_email, s.industry, s.origin, s.active, s.review, s.duplicate_score, s.created_at,
+                d.name AS duplicate_of_name, d.id AS duplicate_of, round(${COMPLETE}, 2)::float8 AS completeness,
                 coalesce(x.lines, 0) AS lines, coalesce(x.usd, 0)::float8 AS usd, coalesce(x.co2e, 0)::float8 AS co2e, coalesce(x.supplier_lines, 0) AS supplier_lines,
                 (SELECT count(*)::int FROM supplier_ef e WHERE e.supplier_id = s.id) AS factors, count(*) OVER () AS total
-           FROM supplier s
+           FROM supplier s LEFT JOIN supplier d ON d.id = s.duplicate_of
            LEFT JOIN LATERAL (SELECT count(*)::int AS lines, sum(usd) AS usd, sum(co2e) FILTER (WHERE status IN ('ready','published')) AS co2e,
                                      count(*) FILTER (WHERE method = 'supplier')::int AS supplier_lines FROM purchase_line l WHERE l.supplier_id = s.id) x ON true
           WHERE ${conds.join(' AND ')}
-          ORDER BY coalesce(x.usd, 0) DESC, s.name LIMIT $1 OFFSET $2`, params)).rows;
-      return { total: Number(rows[0]?.total ?? 0), suppliers: rows.map(({ total: _t, ...r }) => r) };
+          ORDER BY ${order}, s.name LIMIT $1 OFFSET $2`, params)).rows;
+      const counts = (await c.query(`SELECT count(*)::int AS all, count(*) FILTER (WHERE review = 'possible_duplicate')::int AS review, count(*) FILTER (WHERE ${COMPLETE} < 1)::int AS incomplete FROM supplier s`)).rows[0];
+      const autoLinked = Number((await c.query(`SELECT count(*) FROM supplier_match WHERE method = 'similar' AND NOT confirmed`)).rows[0].count);
+      return { total: Number(rows[0]?.total ?? 0), counts: { ...counts, autoLinked }, suppliers: rows.map(({ total: _t, ...r }) => r) };
     });
+  });
+
+  /** What a person should look at: possible duplicates, and names linked automatically. */
+  app.get('/api/suppliers/review', async (req) => {
+    const tenant = requireTenant(req);
+    return tenantTx(tenant, async (c) => ({
+      duplicates: (await c.query(
+        `SELECT s.id, s.name, s.country, s.reference, s.duplicate_score::float8 AS score, d.id AS other_id, d.name AS other_name, d.country AS other_country, d.reference AS other_reference,
+                (SELECT count(*)::int FROM purchase_line l WHERE l.supplier_id = s.id) AS lines, (SELECT count(*)::int FROM purchase_line l WHERE l.supplier_id = d.id) AS other_lines
+           FROM supplier s JOIN supplier d ON d.id = s.duplicate_of WHERE s.review = 'possible_duplicate' ORDER BY s.duplicate_score DESC NULLS LAST, s.name LIMIT 500`)).rows,
+      autoLinked: (await c.query(
+        `SELECT m.id, m.name_seen, m.similar_to, m.score::float8 AS score, m.created_at, s.id AS supplier_id, s.name AS supplier,
+                (SELECT count(*)::int FROM purchase_line l WHERE l.supplier_norm = m.norm) AS lines
+           FROM supplier_match m JOIN supplier s ON s.id = m.supplier_id WHERE m.method = 'similar' AND NOT m.confirmed ORDER BY m.score, m.created_at DESC LIMIT 500`)).rows,
+    }));
   });
 
   app.get('/api/suppliers/:id', async (req) => {
     const tenant = requireTenant(req);
     const id = uuid.parse((req.params as { id: string }).id);
     return tenantTx(tenant, async (c) => {
-      const s = (await c.query('SELECT * FROM supplier WHERE id = $1', [id])).rows[0];
+      const s = (await c.query(`SELECT s.*, round(${COMPLETE}, 2)::float8 AS completeness FROM supplier s WHERE id = $1`, [id])).rows[0];
       if (!s) throw notFound('Supplier');
       const factors = (await c.query(
         `SELECT e.id, e.item_id, i.name AS item, e.co2e::float8 AS co2e, e.unit, e.price_year, to_char(e.valid_from,'YYYY-MM-DD') AS valid_from, to_char(e.valid_to,'YYYY-MM-DD') AS valid_to,
                 e.source, e.boundary, e.created_at FROM supplier_ef e LEFT JOIN item i ON i.id = e.item_id WHERE e.supplier_id = $1 ORDER BY e.created_at DESC`, [id])).rows;
       const categories = (await c.query(
-        `SELECT i.name AS item, count(*)::int AS lines, sum(l.usd)::float8 AS usd, sum(l.co2e)::float8 AS co2e FROM purchase_line l LEFT JOIN item i ON i.id = l.item_id
+        `SELECT i.name AS item, count(*)::int AS lines, sum(l.usd)::float8 AS usd, sum(l.co2e) FILTER (WHERE l.status IN ('ready','published'))::float8 AS co2e FROM purchase_line l LEFT JOIN item i ON i.id = l.item_id
           WHERE l.supplier_id = $1 GROUP BY 1 ORDER BY 3 DESC NULLS LAST LIMIT 15`, [id])).rows;
-      return { supplier: s, factors, categories };
+      const names = (await c.query(
+        `SELECT m.id, m.name_seen, m.method, m.score::float8 AS score, m.confirmed, (SELECT count(*)::int FROM purchase_line l WHERE l.supplier_norm = m.norm) AS lines
+           FROM supplier_match m WHERE m.supplier_id = $1 ORDER BY lines DESC LIMIT 50`, [id])).rows;
+      const months = (await c.query(
+        `SELECT to_char(period_start, 'YYYY-MM') AS month, sum(usd)::float8 AS usd, sum(co2e) FILTER (WHERE status IN ('ready','published'))::float8 AS co2e
+           FROM purchase_line WHERE supplier_id = $1 AND period_start IS NOT NULL GROUP BY 1 ORDER BY 1`, [id])).rows;
+      const duplicateOf = s.duplicate_of ? (await c.query('SELECT id, name FROM supplier WHERE id = $1', [s.duplicate_of])).rows[0] ?? null : null;
+      return { supplier: s, factors, categories, names, months, duplicateOf };
     });
   });
 
@@ -72,36 +106,46 @@ export async function supplierRoutes(app: FastifyInstance) {
     return tenantTx(tenant, async (c) => {
       const norm = normSupplier(b.name);
       if (!norm) throw new AppError('Name needed');
+      const same = (await c.query(`SELECT name FROM supplier WHERE norm = $1 OR $1 = ANY(aliases) OR ($2::text IS NOT NULL AND lower(reference) = lower($2))`, [norm, b.reference ?? null])).rows[0];
+      if (same) throw new AppError(`This supplier already exists: ${same.name}`, 409);
       const r = (await c.query(
-        `INSERT INTO supplier (tenant_id, name, norm, country, reference, contact_email) VALUES ($1,$2,$3,$4,$5,$6) ON CONFLICT (tenant_id, norm) DO NOTHING RETURNING id`,
+        `INSERT INTO supplier (tenant_id, name, norm, country, reference, contact_email) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id`,
         [tenant, b.name, norm, b.country ?? null, b.reference ?? null, b.contactEmail ?? null])).rows[0];
-      if (!r) throw new AppError('A supplier with this name already exists', 409);
+      await c.query(`INSERT INTO supplier_match (tenant_id, supplier_id, name_seen, norm, method, confirmed) VALUES ($1,$2,$3,$4,'manual',true) ON CONFLICT (tenant_id, norm) DO NOTHING`, [tenant, r.id, b.name, norm]);
       await audit(c, req, 'supplier.create', 'supplier', r.id, b);
       return r;
     });
   });
 
+  /** The profile, completed by a person (names from the files stay as aliases). */
   app.patch('/api/suppliers/:id', async (req) => {
     const tenant = requireTenant(req);
     requireRole(req, ...MANAGE);
     const id = uuid.parse((req.params as { id: string }).id);
-    const b = z.object({ name: z.string().trim().min(1).max(300).optional(), aliases: z.array(z.string().max(300)).max(50).optional(), country: z.string().regex(/^[A-Z]{2}$/).nullable().optional(),
-      reference: z.string().max(120).nullable().optional(), contactEmail: z.string().email().max(200).nullable().optional(), note: z.string().max(2000).nullable().optional(), active: z.boolean().optional() }).parse(req.body);
+    const opt = <T extends z.ZodTypeAny>(t: T) => t.nullable().optional();
+    const b = z.object({
+      name: z.string().trim().min(1).max(300).optional(), country: opt(z.string().regex(/^[A-Z]{2}$/)), reference: opt(z.string().max(120)), trn: opt(z.string().max(40)),
+      website: opt(z.string().max(200)), industry: opt(z.string().max(120)), size: opt(z.enum(['micro', 'small', 'medium', 'large'])), contactName: opt(z.string().max(120)),
+      contactEmail: opt(z.string().email().max(200)), reportsEmissions: opt(z.enum(['yes', 'no', 'unknown'])), climateTarget: opt(z.enum(['sbti_validated', 'sbti_committed', 'own', 'none', 'unknown'])),
+      note: opt(z.string().max(2000)), active: z.boolean().optional(),
+    }).parse(req.body);
+    const cols: Record<string, string> = { name: 'name', country: 'country', reference: 'reference', trn: 'trn', website: 'website', industry: 'industry', size: 'size', contactName: 'contact_name',
+      contactEmail: 'contact_email', reportsEmissions: 'reports_emissions', climateTarget: 'climate_target', note: 'note', active: 'active' };
     return tenantTx(tenant, async (c) => {
-      const s = (await c.query('SELECT * FROM supplier WHERE id = $1', [id])).rows[0];
-      if (!s) throw notFound('Supplier');
-      await c.query(
-        `UPDATE supplier SET name = coalesce($2, name), aliases = coalesce($3, aliases), country = CASE WHEN $4::boolean THEN $5 ELSE country END,
-                reference = CASE WHEN $6::boolean THEN $7 ELSE reference END, contact_email = CASE WHEN $8::boolean THEN $9 ELSE contact_email END,
-                note = CASE WHEN $10::boolean THEN $11 ELSE note END, active = coalesce($12, active) WHERE id = $1`,
-        [id, b.name ?? null, b.aliases ? [...new Set(b.aliases.map(normSupplier).filter(Boolean))] : null, b.country !== undefined, b.country ?? null,
-         b.reference !== undefined, b.reference ?? null, b.contactEmail !== undefined, b.contactEmail ?? null, b.note !== undefined, b.note ?? null, b.active ?? null]);
+      if (!(await c.query('SELECT 1 FROM supplier WHERE id = $1', [id])).rowCount) throw notFound('Supplier');
+      const sets: string[] = [], vals: unknown[] = [id];
+      for (const [k, v] of Object.entries(b)) { if (v === undefined) continue; vals.push(v); sets.push(`${cols[k]} = $${vals.length}`); }
+      if (b.reference) {
+        const other = (await c.query(`SELECT name FROM supplier WHERE id <> $1 AND lower(reference) = lower($2)`, [id, b.reference])).rows[0];
+        if (other) throw new AppError(`Vendor number ${b.reference} belongs to ${other.name}: merge the two suppliers instead`, 409);
+      }
+      if (sets.length) await c.query(`UPDATE supplier SET ${sets.join(', ')}, updated_at = now() WHERE id = $1`, vals);
       await audit(c, req, 'supplier.update', 'supplier', id, b);
       return { ok: true };
     });
   });
 
-  /** Two spellings of one supplier: lines, factors and the other name move to `intoId`. */
+  /** Two records of one supplier: lines, factors and names move to `intoId`. */
   app.post('/api/suppliers/:id/merge', async (req) => {
     const tenant = requireTenant(req);
     requireRole(req, ...MANAGE);
@@ -112,13 +156,100 @@ export async function supplierRoutes(app: FastifyInstance) {
       const from = (await c.query('SELECT * FROM supplier WHERE id = $1', [id])).rows[0];
       const into = (await c.query('SELECT * FROM supplier WHERE id = $1', [b.intoId])).rows[0];
       if (!from || !into) throw notFound('Supplier');
-      await c.query(`UPDATE supplier SET aliases = (SELECT array_agg(DISTINCT a) FROM unnest(aliases || $2::text[]) a) WHERE id = $1`, [into.id, [from.norm, ...from.aliases]]);
+      await c.query(`UPDATE supplier SET aliases = (SELECT array_agg(DISTINCT a) FROM unnest(aliases || $2::text[]) a WHERE a <> norm),
+                            country = coalesce(country, $3), reference = coalesce(reference, $4), contact_email = coalesce(contact_email, $5), industry = coalesce(industry, $6),
+                            review = CASE WHEN duplicate_of = $7 THEN 'ok' ELSE review END, duplicate_of = CASE WHEN duplicate_of = $7 THEN NULL ELSE duplicate_of END, updated_at = now()
+                      WHERE id = $1`, [into.id, [from.norm, ...from.aliases], from.country, from.reference, from.contact_email, from.industry, id]);
       const lines = await c.query('UPDATE purchase_line SET supplier_id = $2 WHERE supplier_id = $1', [id, into.id]);
       await c.query('UPDATE supplier_ef SET supplier_id = $2 WHERE supplier_id = $1', [id, into.id]);
+      await c.query(`UPDATE supplier_match SET supplier_id = $2, method = CASE WHEN method = 'new' THEN 'merged' ELSE method END, confirmed = true WHERE supplier_id = $1`, [id, into.id]);
       await c.query('DELETE FROM supplier WHERE id = $1', [id]);
       await recalcSupplier(c, tenant, [into.id], req.user.id);
       await audit(c, req, 'supplier.merge', 'supplier', into.id, { merged: from.name, into: into.name, lines: lines.rowCount });
       return { lines: lines.rowCount };
+    });
+  });
+
+  /** A possible duplicate that is a different supplier. */
+  app.post('/api/suppliers/:id/keep-separate', async (req) => {
+    const tenant = requireTenant(req);
+    requireRole(req, ...MANAGE);
+    const id = uuid.parse((req.params as { id: string }).id);
+    return tenantTx(tenant, async (c) => {
+      const r = await c.query(`UPDATE supplier SET review = 'ok', duplicate_of = NULL, duplicate_score = NULL WHERE id = $1 RETURNING name`, [id]);
+      if (!r.rowCount) throw notFound('Supplier');
+      await audit(c, req, 'supplier.keep_separate', 'supplier', id, r.rows[0]);
+      return { ok: true };
+    });
+  });
+
+  /** A name linked automatically: right (confirm) or wrong (split it off as its own supplier). */
+  app.post('/api/suppliers/matches/:id/:action', async (req) => {
+    const tenant = requireTenant(req);
+    requireRole(req, ...MANAGE);
+    const p = z.object({ id: z.coerce.number().int().positive(), action: z.enum(['confirm', 'split']) }).parse(req.params);
+    return tenantTx(tenant, async (c) => {
+      const m = (await c.query('SELECT * FROM supplier_match WHERE id = $1', [p.id])).rows[0];
+      if (!m) throw notFound('Name');
+      if (p.action === 'confirm') { await c.query('UPDATE supplier_match SET confirmed = true WHERE id = $1', [p.id]); return { ok: true }; }
+      const s = (await c.query(
+        `INSERT INTO supplier (tenant_id, name, norm, origin) VALUES ($1, $2, $3, 'upload') ON CONFLICT (tenant_id, norm) DO UPDATE SET updated_at = now() RETURNING id`,
+        [tenant, m.name_seen, m.norm])).rows[0];
+      await c.query(`UPDATE supplier SET aliases = array_remove(aliases, $2) WHERE id = $1`, [m.supplier_id, m.norm]);
+      await c.query(`UPDATE supplier_match SET supplier_id = $2, method = 'manual', confirmed = true WHERE id = $1`, [p.id, s.id]);
+      const lines = await c.query(`UPDATE purchase_line SET supplier_id = $2 WHERE supplier_norm = $1`, [m.norm, s.id]);
+      await recalcSupplier(c, tenant, [m.supplier_id, s.id], req.user.id);
+      await audit(c, req, 'supplier.split', 'supplier', s.id, { name: m.name_seen, from: m.supplier_id, lines: lines.rowCount });
+      return { supplierId: s.id, lines: lines.rowCount };
+    });
+  });
+
+  /**
+   * Supplier analytics for a year: by country, spend category, Scope 3 category, month; the
+   * largest suppliers, concentration, data quality and how complete the profiles are.
+   * Calculated lines (ready or published) count; excluded and unmapped lines do not.
+   */
+  app.get('/api/suppliers/analytics', async (req) => {
+    const tenant = requireTenant(req);
+    const q = z.object({ year: z.coerce.number().int().min(2000).max(2100).optional() }).parse(req.query);
+    return tenantTx(tenant, async (c) => {
+      const years = (await c.query(`SELECT DISTINCT extract(year FROM period_start)::int AS y FROM purchase_line WHERE period_start IS NOT NULL ORDER BY 1 DESC`)).rows.map((r) => r.y);
+      const year = q.year ?? years[0] ?? new Date().getFullYear();
+      const W = `l.status IN ('ready','published') AND extract(year FROM l.period_start) = $1`;
+      const CAT = `CASE WHEN g.decision = 'move' AND g.target IS NOT NULL THEN g.target WHEN coalesce(l.capital, g.capital) THEN 'capital_goods' ELSE 'purchased_goods' END`;
+      const one = async (sql: string) => (await c.query(sql, [year])).rows;
+      const totals = (await one(`SELECT count(DISTINCT l.supplier_id)::int AS suppliers, count(*)::int AS lines, coalesce(sum(l.usd), 0)::float8 AS usd, coalesce(sum(l.co2e), 0)::float8 AS co2e,
+                                        coalesce(sum(l.co2e) FILTER (WHERE l.method = 'supplier'), 0)::float8 AS co2e_supplier, count(*) FILTER (WHERE l.supplier_id IS NULL)::int AS no_supplier
+                                   FROM purchase_line l WHERE ${W}`))[0];
+      const byCountry = await one(`SELECT coalesce(s.country, '') AS country, count(DISTINCT s.id)::int AS suppliers, sum(l.usd)::float8 AS usd, sum(l.co2e)::float8 AS co2e
+                                     FROM purchase_line l LEFT JOIN supplier s ON s.id = l.supplier_id WHERE ${W} GROUP BY 1 ORDER BY 4 DESC NULLS LAST`);
+      const byItem = await one(`SELECT coalesce(i.attrs->>'group', sc.name, 'Not mapped') AS "group", i.name AS item, count(DISTINCT l.supplier_id)::int AS suppliers, sum(l.usd)::float8 AS usd, sum(l.co2e)::float8 AS co2e
+                                  FROM purchase_line l LEFT JOIN item i ON i.id = l.item_id LEFT JOIN subcategory sc ON sc.id = i.subcategory_id WHERE ${W} GROUP BY 1, 2 ORDER BY 5 DESC NULLS LAST LIMIT 25`);
+      const bySector = await one(`SELECT coalesce(sc.name, 'Not mapped') AS sector, sum(l.usd)::float8 AS usd, sum(l.co2e)::float8 AS co2e FROM purchase_line l LEFT JOIN item i ON i.id = l.item_id
+                                    LEFT JOIN subcategory sc ON sc.id = i.subcategory_id WHERE ${W} GROUP BY 1 ORDER BY 3 DESC NULLS LAST`);
+      const byScope3 = await one(`SELECT ${CAT} AS category, sum(l.usd)::float8 AS usd, sum(l.co2e)::float8 AS co2e FROM purchase_line l
+                                    JOIN purchase_group g ON g.batch_id = l.batch_id AND g.key = l.group_key WHERE ${W} GROUP BY 1 ORDER BY 3 DESC`);
+      const byMonth = await one(`SELECT to_char(l.period_start, 'YYYY-MM') AS month, sum(l.usd)::float8 AS usd, sum(l.co2e)::float8 AS co2e,
+                                        sum(l.co2e) FILTER (WHERE l.method = 'supplier')::float8 AS co2e_supplier FROM purchase_line l WHERE ${W} GROUP BY 1 ORDER BY 1`);
+      const top = await one(`SELECT s.id, s.name, s.country, s.industry, sum(l.usd)::float8 AS usd, sum(l.co2e)::float8 AS co2e, count(*)::int AS lines,
+                                    bool_or(l.method = 'supplier') AS own_factor, round(${COMPLETE}, 2)::float8 AS completeness,
+                                    (array_agg(i.name ORDER BY l.co2e DESC NULLS LAST))[1] AS main_item
+                               FROM purchase_line l JOIN supplier s ON s.id = l.supplier_id LEFT JOIN item i ON i.id = l.item_id WHERE ${W}
+                              GROUP BY s.id ORDER BY 6 DESC NULLS LAST LIMIT 25`);
+      // concentration: how many suppliers make up 50 % and 80 % of the emissions
+      const cum = await one(`SELECT co2e FROM (SELECT sum(l.co2e)::float8 AS co2e FROM purchase_line l WHERE ${W} AND l.supplier_id IS NOT NULL GROUP BY l.supplier_id) x ORDER BY co2e DESC NULLS LAST`);
+      const tot = cum.reduce((s, r) => s + Math.max(0, r.co2e ?? 0), 0);
+      let run = 0, n50 = 0, n80 = 0;
+      for (const [i, r] of cum.entries()) { run += Math.max(0, r.co2e ?? 0); if (!n50 && run >= 0.5 * tot) n50 = i + 1; if (!n80 && run >= 0.8 * tot) { n80 = i + 1; break; } }
+      const profiles = (await c.query(
+        `SELECT count(*)::int AS suppliers, count(*) FILTER (WHERE country IS NOT NULL)::int AS country, count(*) FILTER (WHERE reference IS NOT NULL)::int AS reference,
+                count(*) FILTER (WHERE industry IS NOT NULL)::int AS industry, count(*) FILTER (WHERE contact_email IS NOT NULL)::int AS contact,
+                count(*) FILTER (WHERE reports_emissions = 'yes')::int AS reports, count(*) FILTER (WHERE climate_target IN ('sbti_validated','sbti_committed','own'))::int AS target,
+                count(*) FILTER (WHERE EXISTS (SELECT 1 FROM supplier_ef e WHERE e.supplier_id = s.id))::int AS own_factor,
+                count(*) FILTER (WHERE review = 'possible_duplicate')::int AS review FROM supplier s`)).rows[0];
+      const targets = await one(`SELECT coalesce(s.climate_target, 'unknown') AS target, count(DISTINCT s.id)::int AS suppliers, sum(l.co2e)::float8 AS co2e
+                                   FROM purchase_line l JOIN supplier s ON s.id = l.supplier_id WHERE ${W} GROUP BY 1 ORDER BY 3 DESC NULLS LAST`);
+      return { year, years, totals, byCountry, byItem, bySector, byScope3, byMonth, top, concentration: { suppliers: cum.length, n50, n80 }, profiles, targets };
     });
   });
 

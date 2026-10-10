@@ -23,6 +23,7 @@ import { scopeOf } from '../../lib/access.js';
 import type { User } from '../../lib/auth.js';
 import { cellText, detectKind, sheetRows, type Cell } from '../../lib/sheet.js';
 import { normSupplier, readAmount, readBool, readDate, type Columns, type DateFormat, type Field } from './fields.js';
+import { resolveSuppliers } from './supplierMatch.js';
 
 export const MAX_LINES = 200_000;
 const INSERT_CHUNK = 2000, CALC_CHUNK = 5000;
@@ -48,10 +49,10 @@ export async function progress(jobId: number | undefined, stage: string, done: n
 // ------------------------------------------------------------------ lines --
 export interface RawLine {
   date?: Cell; description?: Cell; amount?: Cell; currency?: Cell; quantity?: Cell; unit?: Cell; supplier?: Cell; category?: Cell;
-  gl?: Cell; po?: Cell; facility?: Cell; supplierEf?: Cell; supplierEfUnit?: Cell; capital?: Cell;
+  gl?: Cell; po?: Cell; facility?: Cell; supplierEf?: Cell; supplierEfUnit?: Cell; capital?: Cell; supplierRef?: Cell; supplierCountry?: Cell;
 }
 export interface LineIn {
-  rowNo: number; description: string; categoryText: string | null; gl: string | null; po: string | null; supplierText: string | null; supplierNorm: string | null;
+  rowNo: number; description: string; categoryText: string | null; gl: string | null; po: string | null; supplierText: string | null; supplierNorm: string | null; supplierRef: string | null; supplierCountry: string | null;
   facilityId: string | null; facilityText: string | null; purchaseDate: string | null; periodStart: string | null; periodEnd: string | null;
   amount: number | null; currency: string | null; quantity: number | null; unit: string | null; supplierEf: number | null; supplierEfUnit: string | null;
   capital: boolean | null; problems: string[]; groupKey: string; fingerprint: string;
@@ -99,7 +100,7 @@ export function buildLine(r: RawLine, rowNo: number, s: BatchSettings, fac: Faci
   const fp = createHash('sha1').update([date ?? periodStart, amt.value, currency, supplierNorm, normText(description), cellText(r.po)].join('|')).digest('base64url').slice(0, 22);
   return {
     rowNo, description: description || '(no description)', categoryText, gl: cellText(r.gl).slice(0, 300) || null, po: cellText(r.po).slice(0, 120) || null,
-    supplierText, supplierNorm, facilityId, facilityText: ft || null, purchaseDate: date, periodStart, periodEnd,
+    supplierText, supplierNorm, supplierRef: cellText(r.supplierRef).slice(0, 80) || null, supplierCountry: cellText(r.supplierCountry).slice(0, 80) || null, facilityId, facilityText: ft || null, purchaseDate: date, periodStart, periodEnd,
     amount: amt.value, currency: currency || null, quantity: qty, unit: cellText(r.unit).slice(0, 30) || null,
     supplierEf: ef, supplierEfUnit: cellText(r.supplierEfUnit).replace(/^kg\s*co2e?\s*\/\s*/i, '').slice(0, 30) || null,
     capital: r.capital != null ? readBool(r.capital) : null, problems, groupKey: groupKey(description, categoryText), fingerprint: fp,
@@ -111,16 +112,16 @@ export async function insertLines(c: Tx, tenant: string, batchId: string, ls: Li
   const col = <K extends keyof LineIn>(k: K) => ls.map((l) => l[k]);
   await c.query(
     `INSERT INTO purchase_line (tenant_id, batch_id, row_no, group_key, facility_id, facility_text, period_start, period_end, purchase_date, description, category_text,
-                                gl_account, po_ref, supplier_text, supplier_norm, amount, currency, quantity, unit, supplier_ef, supplier_ef_unit, capital, problems, fingerprint)
+                                gl_account, po_ref, supplier_text, supplier_norm, amount, currency, quantity, unit, supplier_ef, supplier_ef_unit, capital, problems, fingerprint, supplier_ref, supplier_country)
      SELECT $1, $2, r, k, f, ft, ps, pe, pd, d, ct, gl, po, st, sn, a, cu, q, u, ef, efu, cap,
-            CASE WHEN pr = '' THEN '{}'::text[] ELSE string_to_array(pr, E'\\x1f') END, fp
+            CASE WHEN pr = '' THEN '{}'::text[] ELSE string_to_array(pr, E'\\x1f') END, fp, sr, sc
        FROM unnest($3::int[], $4::text[], $5::uuid[], $6::text[], $7::date[], $8::date[], $9::date[], $10::text[], $11::text[],
                    $12::text[], $13::text[], $14::text[], $15::text[], $16::numeric[], $17::text[], $18::numeric[], $19::text[], $20::numeric[], $21::text[], $22::boolean[],
-                   $23::text[], $24::text[])
-            AS x(r, k, f, ft, ps, pe, pd, d, ct, gl, po, st, sn, a, cu, q, u, ef, efu, cap, pr, fp)`,
+                   $23::text[], $24::text[], $25::text[], $26::text[])
+            AS x(r, k, f, ft, ps, pe, pd, d, ct, gl, po, st, sn, a, cu, q, u, ef, efu, cap, pr, fp, sr, sc)`,
     [tenant, batchId, col('rowNo'), col('groupKey'), col('facilityId'), col('facilityText'), col('periodStart'), col('periodEnd'), col('purchaseDate'), col('description'), col('categoryText'),
      col('gl'), col('po'), col('supplierText'), col('supplierNorm'), col('amount'), col('currency'), col('quantity'), col('unit'), col('supplierEf'), col('supplierEfUnit'), col('capital'),
-     ls.map((l) => l.problems.join('\u001f')), col('fingerprint')]);
+     ls.map((l) => l.problems.join('\u001f')), col('fingerprint'), col('supplierRef'), col('supplierCountry')]);
 }
 
 /** Reads the uploaded file of a batch into lines (job "purchase_ingest"). */
@@ -155,7 +156,7 @@ export async function readFileLines(jobId: number | undefined, tenant: string, b
     chunk.push(buildLine({
       date: pick('date'), description: pick('description'), amount: pick('amount'), currency: pick('currency'), quantity: pick('quantity'), unit: pick('unit'),
       supplier: pick('supplier'), category: pick('category'), gl: pick('gl'), po: pick('po'), facility: pick('facility'), supplierEf: pick('supplierEf'),
-      supplierEfUnit: pick('supplierEfUnit'), capital: pick('capital'),
+      supplierEfUnit: pick('supplierEfUnit'), capital: pick('capital'), supplierRef: pick('supplierRef'), supplierCountry: pick('supplierCountry'),
     }, rowNo, s, fac));
     if (chunk.length >= INSERT_CHUNK) await flush();
   }
@@ -168,15 +169,7 @@ export async function readFileLines(jobId: number | undefined, tenant: string, b
 // ---------------------------------------------------------------- prepare --
 /** Suppliers, duplicates, groups. */
 export async function prepareBatch(c: Tx, tenant: string, batchId: string, origin: 'upload' | 'api' | 'manual' = 'upload') {
-  await c.query(
-    `INSERT INTO supplier (tenant_id, name, norm, origin)
-     SELECT DISTINCT ON (supplier_norm) $1::uuid, supplier_text, supplier_norm, $3 FROM purchase_line
-      WHERE batch_id = $2 AND supplier_norm <> '' AND NOT EXISTS (SELECT 1 FROM supplier s WHERE supplier_norm = ANY(s.aliases))
-      ORDER BY supplier_norm, row_no
-     ON CONFLICT (tenant_id, norm) DO NOTHING`, [tenant, batchId, origin]);
-  await c.query(
-    `UPDATE purchase_line l SET supplier_id = s.id FROM supplier s
-      WHERE l.batch_id = $1 AND l.supplier_norm <> '' AND (s.norm = l.supplier_norm OR l.supplier_norm = ANY(s.aliases))`, [batchId]);
+  await resolveSuppliers(c, tenant, batchId, origin);
   const settings = (await c.query('SELECT settings FROM purchase_batch WHERE id = $1', [batchId])).rows[0]?.settings as BatchSettings | undefined;
   await c.query(
     `UPDATE purchase_line l SET dup_of = o.id

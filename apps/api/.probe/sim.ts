@@ -1,0 +1,8 @@
+import { similarity } from '../src/modules/purchases/supplierMatch.js';
+const P = [['Pearl Management Consultancy Co.', 'Marina Management Consultancy Trading LLC'], ['Dammam Indutsrial Chemicals Co', 'Dammam Industrial Chemicals Co'], ['DESERT ROSE STEEL LLC', 'Desert Rose IT Solutions L.L.C.'],
+['Horizon Steel L.L.C.', 'Emirates Steel'], ['Palm Softwrae FZE', 'Palm Software Co.'], ['Gulf Stationary L.L.C.', 'Gulf Stationery LLC'], ['Al Masood', 'Al Masaood'], ['Big Four Audit LLP', 'Bigfour Audit'],
+['Aramex International', 'Aramex'], ['Masafi Water Co', 'Masafi'], ['Tech Distributors', 'Tech Distribution FZE'], ['Emirates Steel', 'Emirates Cement'], ['Orient', 'Oman Insurance'], ['AlNoor Networks Trading LLC', 'AL NOOR NETWORKS TRADING LLC'],
+['Zenith Auto Spere Perts Co. LLC', 'Zenith Auto Spare Parts Co. LLC'], ['Marina Food Servcies LLC', 'Marina Food'], ['Al Khaleej Express Courier', 'Al Khaleej Courier Services Co.'], ['Corniche Tyres Est.', 'CORNICHE IT SOLUTIONS FZE'],
+['Mirage Training Institute Co. Co.', 'MIRAGE TECHNOLOGY DISTRIBUTION LLC'], ['CoralGardens & Landscaping FZE', 'Coral Gardens & Landscaping FZE'], ['Sahara HVAC Contracting Co. LLC', 'Sahara HVAC Contarcting Co. LLC'], ['Emirates Integrated Telecommunications', 'Etisalat']];
+for (const [a, b] of P) { const s = similarity(a!, b!); console.log(s.auto ? 'AUTO ' : s.score >= 0.88 ? 'REVIEW' : '  -   ', s.score.toFixed(3), a, '|', b, '·', s.why); }
+for (const [a, b] of [['Palm Plastic Industries F.Z.E.', 'PALM PLASTIC INDUSTRIES FZE'], ['Pearl Cement Products Co.', 'Emirates Cement LLC'], ['Gulf Contracting W.L.L.', 'Gulf Contracting WLL']]) { const s = similarity(a!, b!); console.log(s.auto, s.score, a, '|', b); }
