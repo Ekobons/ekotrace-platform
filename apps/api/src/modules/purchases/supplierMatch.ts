@@ -228,6 +228,8 @@ export async function resolveSuppliers(c: Tx, tenant: string, batchId: string, o
     await record(ns, n, 'new', review ? best!.sim.score : undefined, review ? best!.s.name : undefined);
     out.created++; if (review) out.review++;
   }
-  await c.query(`UPDATE purchase_line l SET supplier_id = m.supplier_id FROM supplier_match m WHERE l.batch_id = $1 AND l.supplier_norm = m.norm`, [batchId]);
+  // the supplier of each line, from its spelling (matches read once, joined by hash)
+  await c.query(`WITH m AS MATERIALIZED (SELECT norm, supplier_id FROM supplier_match WHERE norm IN (SELECT DISTINCT supplier_norm FROM purchase_line WHERE batch_id = $1))
+                 UPDATE purchase_line l SET supplier_id = m.supplier_id FROM m WHERE l.batch_id = $1 AND l.supplier_norm = m.norm AND l.supplier_id IS DISTINCT FROM m.supplier_id`, [batchId]);
   return out;
 }

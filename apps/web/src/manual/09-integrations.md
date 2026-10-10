@@ -65,4 +65,4 @@ The client needs the **Purchase lines** permission (tick it when creating the cl
 | quantity, unit, supplierEf, supplierEfUnit | no | for a supplier's own factor (kg CO₂e per unit) |
 | capital | no | true for capitalised purchases (Scope 3.2) |
 
-At most 10,000 lines per call and 200,000 per reference. A completed reference is closed; corrections go under a new one. The batch is then reviewed and published under Capture → Purchases.
+At most 10,000 lines per call and 200,000 per reference. A completed reference is closed; corrections go under a new one. The batch is then reviewed and published under Add data → Purchases (Batches).

@@ -51,7 +51,7 @@ export async function supplierRoutes(app: FastifyInstance) {
                 coalesce(x.lines, 0) AS lines, coalesce(x.usd, 0)::float8 AS usd, coalesce(x.co2e, 0)::float8 AS co2e, coalesce(x.supplier_lines, 0) AS supplier_lines,
                 (SELECT count(*)::int FROM supplier_ef e WHERE e.supplier_id = s.id) AS factors, count(*) OVER () AS total
            FROM supplier s LEFT JOIN supplier d ON d.id = s.duplicate_of
-           LEFT JOIN LATERAL (SELECT count(*)::int AS lines, sum(usd) AS usd, sum(co2e) FILTER (WHERE status IN ('ready','published')) AS co2e,
+           LEFT JOIN LATERAL (SELECT count(*)::int AS lines, sum(usd) AS usd, sum(co2e) FILTER (WHERE status IN ('ready','check','published')) AS co2e,
                                      count(*) FILTER (WHERE method = 'supplier')::int AS supplier_lines FROM purchase_line l WHERE l.supplier_id = s.id) x ON true
           WHERE ${conds.join(' AND ')}
           ORDER BY ${order}, s.name LIMIT $1 OFFSET $2`, params)).rows;
@@ -86,16 +86,22 @@ export async function supplierRoutes(app: FastifyInstance) {
         `SELECT e.id, e.item_id, i.name AS item, e.co2e::float8 AS co2e, e.unit, e.price_year, to_char(e.valid_from,'YYYY-MM-DD') AS valid_from, to_char(e.valid_to,'YYYY-MM-DD') AS valid_to,
                 e.source, e.boundary, e.created_at FROM supplier_ef e LEFT JOIN item i ON i.id = e.item_id WHERE e.supplier_id = $1 ORDER BY e.created_at DESC`, [id])).rows;
       const categories = (await c.query(
-        `SELECT i.name AS item, count(*)::int AS lines, sum(l.usd)::float8 AS usd, sum(l.co2e) FILTER (WHERE l.status IN ('ready','published'))::float8 AS co2e FROM purchase_line l LEFT JOIN item i ON i.id = l.item_id
+        `SELECT i.name AS item, count(*)::int AS lines, sum(l.usd)::float8 AS usd, sum(l.co2e) FILTER (WHERE l.status IN ('ready','check','published'))::float8 AS co2e FROM purchase_line l LEFT JOIN item i ON i.id = l.item_id
           WHERE l.supplier_id = $1 GROUP BY 1 ORDER BY 3 DESC NULLS LAST LIMIT 15`, [id])).rows;
       const names = (await c.query(
         `SELECT m.id, m.name_seen, m.method, m.score::float8 AS score, m.confirmed, (SELECT count(*)::int FROM purchase_line l WHERE l.supplier_norm = m.norm) AS lines
            FROM supplier_match m WHERE m.supplier_id = $1 ORDER BY lines DESC LIMIT 50`, [id])).rows;
       const months = (await c.query(
-        `SELECT to_char(period_start, 'YYYY-MM') AS month, sum(usd)::float8 AS usd, sum(co2e) FILTER (WHERE status IN ('ready','published'))::float8 AS co2e
+        `SELECT to_char(period_start, 'YYYY-MM') AS month, sum(usd)::float8 AS usd, sum(co2e) FILTER (WHERE status IN ('ready','check','published'))::float8 AS co2e
            FROM purchase_line WHERE supplier_id = $1 AND period_start IS NOT NULL GROUP BY 1 ORDER BY 1`, [id])).rows;
       const duplicateOf = s.duplicate_of ? (await c.query('SELECT id, name FROM supplier WHERE id = $1', [s.duplicate_of])).rows[0] ?? null : null;
-      return { supplier: s, factors, categories, names, months, duplicateOf };
+      const def = (await c.query(`SELECT r.item_id AS id, i.name FROM purchase_rule r JOIN item i ON i.id = r.item_id WHERE r.field = 'supplier' AND r.pattern = $1`, [id])).rows[0] ?? null;
+      // suggestion: one category makes up 80 % or more of what is bought from the supplier
+      const top = (await c.query(
+        `SELECT l.item_id AS id, i.name, sum(abs(l.usd)) / nullif(sum(sum(abs(l.usd))) OVER (), 0) AS share, count(*) AS n
+           FROM purchase_line l JOIN item i ON i.id = l.item_id WHERE l.supplier_id = $1 AND i.code NOT LIKE 'purchase:%' GROUP BY 1, 2 ORDER BY 3 DESC NULLS LAST LIMIT 1`, [id])).rows[0];
+      const suggestedDefault = top && Number(top.share) >= 0.8 && Number(top.n) >= 3 && top.id !== def?.id ? { id: top.id, name: top.name, share: Number(top.share) } : null;
+      return { supplier: s, factors, categories, names, months, duplicateOf, defaultItem: def, suggestedDefault };
     });
   });
 
@@ -127,14 +133,25 @@ export async function supplierRoutes(app: FastifyInstance) {
       name: z.string().trim().min(1).max(300).optional(), country: opt(z.string().regex(/^[A-Z]{2}$/)), reference: opt(z.string().max(120)), trn: opt(z.string().max(40)),
       website: opt(z.string().max(200)), industry: opt(z.string().max(120)), size: opt(z.enum(['micro', 'small', 'medium', 'large'])), contactName: opt(z.string().max(120)),
       contactEmail: opt(z.string().email().max(200)), reportsEmissions: opt(z.enum(['yes', 'no', 'unknown'])), climateTarget: opt(z.enum(['sbti_validated', 'sbti_committed', 'own', 'none', 'unknown'])),
-      note: opt(z.string().max(2000)), active: z.boolean().optional(),
+      note: opt(z.string().max(2000)), active: z.boolean().optional(), defaultItemId: z.number().int().positive().nullable().optional(),
     }).parse(req.body);
     const cols: Record<string, string> = { name: 'name', country: 'country', reference: 'reference', trn: 'trn', website: 'website', industry: 'industry', size: 'size', contactName: 'contact_name',
       contactEmail: 'contact_email', reportsEmissions: 'reports_emissions', climateTarget: 'climate_target', note: 'note', active: 'active' };
     return tenantTx(tenant, async (c) => {
       if (!(await c.query('SELECT 1 FROM supplier WHERE id = $1', [id])).rowCount) throw notFound('Supplier');
       const sets: string[] = [], vals: unknown[] = [id];
-      for (const [k, v] of Object.entries(b)) { if (v === undefined) continue; vals.push(v); sets.push(`${cols[k]} = $${vals.length}`); }
+      for (const [k, v] of Object.entries(b)) { if (v === undefined || k === 'defaultItemId') continue; vals.push(v); sets.push(`${cols[k]} = $${vals.length}`); }
+      // default spend category: used for this supplier's purchases that their description does not identify
+      if (b.defaultItemId !== undefined) {
+        if (b.defaultItemId === null) await c.query(`DELETE FROM purchase_rule WHERE field = 'supplier' AND pattern = $1`, [id]);
+        else {
+          const ok = (await c.query(`SELECT 1 FROM item i JOIN subcategory s ON s.id = i.subcategory_id JOIN category ca ON ca.id = s.category_id WHERE i.id = $1 AND ca.code = 'purchased_goods' AND i.active`, [b.defaultItemId])).rowCount;
+          if (!ok) throw new AppError('Not a spend category');
+          await c.query(
+            `INSERT INTO purchase_rule (tenant_id, field, pattern, label, item_id, created_by) SELECT $1, 'supplier', $2, s.name, $3, $4 FROM supplier s WHERE s.id = $2::uuid
+             ON CONFLICT (tenant_id, field, pattern) DO UPDATE SET item_id = EXCLUDED.item_id, label = EXCLUDED.label, created_by = EXCLUDED.created_by`, [tenant, id, b.defaultItemId, req.user.id]);
+        }
+      }
       if (b.reference) {
         const other = (await c.query(`SELECT name FROM supplier WHERE id <> $1 AND lower(reference) = lower($2)`, [id, b.reference])).rows[0];
         if (other) throw new AppError(`Vendor number ${b.reference} belongs to ${other.name}: merge the two suppliers instead`, 409);
@@ -215,7 +232,7 @@ export async function supplierRoutes(app: FastifyInstance) {
     return tenantTx(tenant, async (c) => {
       const years = (await c.query(`SELECT DISTINCT extract(year FROM period_start)::int AS y FROM purchase_line WHERE period_start IS NOT NULL ORDER BY 1 DESC`)).rows.map((r) => r.y);
       const year = q.year ?? years[0] ?? new Date().getFullYear();
-      const W = `l.status IN ('ready','published') AND extract(year FROM l.period_start) = $1`;
+      const W = `l.status IN ('ready','check','published') AND extract(year FROM l.period_start) = $1`;
       const CAT = `CASE WHEN g.decision = 'move' AND g.target IS NOT NULL THEN g.target WHEN coalesce(l.capital, g.capital) THEN 'capital_goods' ELSE 'purchased_goods' END`;
       const one = async (sql: string) => (await c.query(sql, [year])).rows;
       const totals = (await one(`SELECT count(DISTINCT l.supplier_id)::int AS suppliers, count(*)::int AS lines, coalesce(sum(l.usd), 0)::float8 AS usd, coalesce(sum(l.co2e), 0)::float8 AS co2e,
@@ -308,7 +325,7 @@ export async function supplierRoutes(app: FastifyInstance) {
           WHERE calc_error LIKE 'No exchange rate%' AND status <> 'published' GROUP BY 1, 2 ORDER BY 1, 2 LIMIT 200`)).rows;
       const used = (await c.query(`SELECT currency, count(*)::int AS lines FROM purchase_line WHERE currency IS NOT NULL GROUP BY 1 ORDER BY 2 DESC LIMIT 30`)).rows;
       const fallbacks = (await c.query(
-        `SELECT w AS warning, count(*)::int AS lines FROM (SELECT unnest(warnings) AS w FROM purchase_line WHERE status IN ('ready','published')) x GROUP BY 1 ORDER BY 2 DESC LIMIT 20`)).rows;
+        `SELECT w AS warning, count(*)::int AS lines FROM (SELECT unnest(warnings) AS w FROM purchase_line WHERE status IN ('ready','check','published')) x GROUP BY 1 ORDER BY 2 DESC LIMIT 20`)).rows;
       return { fxMethod: t.fx_method, currency: t.currency, rates, cpi, missing, used, fallbacks };
     });
   });

@@ -40,7 +40,7 @@ export interface PurchaseMeta {
 }
 export interface UploadSheet { name: string; headerRow: number; headers: string[]; rows: string[][]; guess: Columns; signature: string; profile: { id: string; name: string; settings: { headerRow: number; columns: Columns; dateFormat: 'dmy' | 'mdy' | 'ymd'; currency: string; facilityId?: string | null; period?: { year?: number; month?: string } | null; sheet?: string } } | null }
 export interface UploadResult { batchId: string; filename: string; kind: string; defaultCurrency: string; sheets: UploadSheet[] }
-export type LineStatus = 'new' | 'problem' | 'unmapped' | 'flagged' | 'excluded' | 'ready' | 'published';
+export type LineStatus = 'new' | 'problem' | 'unmapped' | 'flagged' | 'check' | 'excluded' | 'ready' | 'published';
 export interface PurchaseBatch {
   id: string; name: string; source: 'upload' | 'manual' | 'api'; status: string; error: string | null; created_at: string; published_at: string | null; created_by_name: string | null;
   lines: number; ready: number; published: number; attention: number; usd: number; co2e: number; progress: { stage?: string; done?: number; total?: number } | null; job_status: string | null;
@@ -50,15 +50,17 @@ export interface BatchDetail {
   job: { id: number; kind: string; status: string; progress: { stage?: string; done?: number; total?: number }; error: string | null } | null;
   counts: { status: LineStatus; lines: number; usd: number; co2e: number }[]; byCategory: { category: string; lines: number; co2e: number; usd: number }[];
   byMethod: { method: 'spend' | 'supplier'; lines: number; co2e: number }[]; problems: { problem: string; lines: number }[];
-  groups: { total: number; unmapped: number; flagged: number; capital_hint: number; check: number }; facilitiesMissing: { value: string | null; lines: number }[];
+  groups: { total: number; unmapped: number; flagged: number; capital_hint: number; check: number; fallback: number; excluded: number; moved: number; material: number; material_confirmed: number;
+    co2e: number; co2e_material: number; co2e_confirmed: number; co2e_auto: number; auto: number; coverage: number }; facilitiesMissing: { value: string | null; lines: number }[];
   entries: { n: number; approved: number }; period: { from: string | null; to: string | null };
 }
 export interface PurchaseGroup {
   key: string; description: string; category_text: string | null; gl_account: string | null; supplier: string | null; lines: number; usd: number; co2e: number | null;
-  item_id: number | null; item_name: string | null; naics: string | null; map_method: 'rule' | 'text' | 'ai' | 'manual' | 'code' | null; confidence: number | null;
+  item_id: number | null; item_name: string | null; naics: string | null; map_method: 'rule' | 'text' | 'ai' | 'manual' | 'code' | 'supplier' | 'gl' | 'category' | 'fallback' | null; confidence: number | null;
   candidates: { itemId: number; score: number; name?: string }[]; overlap: string | null; overlap_why: string | null; decision: 'keep' | 'move' | 'exclude' | null; target: string | null;
-  capital: boolean; statuses: Partial<Record<LineStatus, number>> | null;
+  capital: boolean; capital_why: string | null; material: boolean; confirmed: boolean; supplier_id: string | null; batch_co2e: number | null; statuses: Partial<Record<LineStatus, number>> | null;
 }
+export interface PurchaseAccount { account: string; groups: number; lines: number; usd: number; co2e: number | null; capital_groups: number; accountType: 'purchase' | 'capital' | 'not_purchase' | null; itemId: number | null; item: string | null; decision: string | null; target: string | null }
 export interface PurchaseLine {
   id: string; row_no: number; date: string | null; month: string | null; description: string; category_text: string | null; supplier_text: string | null; po_ref: string | null;
   facility: string | null; facility_text: string | null; amount: number | null; currency: string | null; quantity: number | null; unit: string | null; status: LineStatus;
@@ -277,13 +279,15 @@ export const api = {
   addUnit: (b: unknown) => call<Unit>('POST', '/api/admin/units', b),
   // purchases
   purchaseMeta: () => call<PurchaseMeta>('GET', '/api/purchases/meta'),
-  purchaseSettings: (b: { aiMapping: boolean }) => call<{ aiMapping: boolean }>('PATCH', '/api/purchases/settings', b),
+  purchaseSettings: (b: { aiMapping?: boolean; reviewCoverage?: number }) => call<{ aiMapping?: boolean; reviewCoverage?: number }>('PATCH', '/api/purchases/settings', b),
+  purchaseAccounts: (batchId: string) => call<{ accounts: PurchaseAccount[] }>('GET', `/api/purchases/batches/${batchId}/accounts`),
+  setPurchaseAccount: (b: { account: string; accountType?: string | null; itemId?: number | null; target?: string | null; batchId?: string }) => call<{ ok: true; lines: number }>('PUT', '/api/purchases/accounts', b),
   uploadPurchases: (f: File, again = false) => call<UploadResult>('POST', `/api/purchases/upload${again ? '?again=1' : ''}`, undefined, f, { 'x-filename': encodeURIComponent(f.name) }),
   setupBatch: (id: string, b: unknown) => call<{ batchId: string; jobId: number }>('POST', `/api/purchases/batches/${id}/setup`, b),
   purchaseBatches: () => call<{ batches: PurchaseBatch[] }>('GET', '/api/purchases/batches'),
   purchaseBatch: (id: string) => call<BatchDetail>('GET', `/api/purchases/batches/${id}`),
   purchaseGroups: (id: string, q: Record<string, string | number | undefined>) => call<{ total: number; groups: PurchaseGroup[] }>('GET', `/api/purchases/batches/${id}/groups?${new URLSearchParams(Object.entries(q).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)]))}`),
-  patchGroups: (id: string, b: { keys: string[]; itemId?: number | null; decision?: 'keep' | 'move' | 'exclude' | null; target?: string | null; capital?: boolean; remember?: boolean }) =>
+  patchGroups: (id: string, b: { keys: string[]; itemId?: number | null; decision?: 'keep' | 'move' | 'exclude' | null; target?: string | null; capital?: boolean; remember?: boolean; confirm?: boolean; scope?: 'text' | 'supplier' | 'gl' }) =>
     call<{ groups: number; lines: number; background: boolean }>('PATCH', `/api/purchases/batches/${id}/groups`, b),
   purchaseLines: (id: string, q: Record<string, string | number | undefined>) => call<{ total: number; lines: PurchaseLine[] }>('GET', `/api/purchases/batches/${id}/lines?${new URLSearchParams(Object.entries(q).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)]))}`),
   purchaseLine: (id: string) => call<{ status: LineStatus; method: string | null; co2e: number | null; steps: string[]; warnings: string[]; error: string | null; factor: { name: string; source: string; value: number; unit: string } | null }>('GET', `/api/purchases/lines/${id}`),
@@ -298,7 +302,7 @@ export const api = {
   deleteRule: (id: string) => call<{ ok: true }>('DELETE', `/api/purchases/rules/${id}`),
   manualPurchases: (b: { facilityId: string; dryRun?: boolean; name?: string; lines: ManualLine[] }) => call<ManualResult>('POST', '/api/purchases/manual', b),
   suppliers: (q: Record<string, string | number | undefined>) => call<{ total: number; suppliers: Supplier[] }>('GET', `/api/suppliers?${new URLSearchParams(Object.entries(q).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)]))}`),
-  supplier: (id: string) => call<{ supplier: SupplierProfile; factors: SupplierFactor2[]; categories: { item: string | null; lines: number; usd: number; co2e: number }[]; names: SupplierName[]; months: { month: string; usd: number; co2e: number | null }[]; duplicateOf: { id: string; name: string } | null }>('GET', `/api/suppliers/${id}`),
+  supplier: (id: string) => call<{ supplier: SupplierProfile; factors: SupplierFactor2[]; categories: { item: string | null; lines: number; usd: number; co2e: number }[]; names: SupplierName[]; months: { month: string; usd: number; co2e: number | null }[]; duplicateOf: { id: string; name: string } | null; defaultItem: { id: number; name: string } | null; suggestedDefault: { id: number; name: string; share: number } | null }>('GET', `/api/suppliers/${id}`),
   supplierCounts: () => call<{ total: number; counts: { all: number; review: number; incomplete: number; autoLinked: number } }>('GET', '/api/suppliers?limit=1'),
   supplierReview: () => call<SupplierReview>('GET', '/api/suppliers/review'),
   supplierAnalytics: (year?: number) => call<SupplierAnalytics>('GET', `/api/suppliers/analytics${year ? `?year=${year}` : ''}`),

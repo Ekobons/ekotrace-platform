@@ -9,10 +9,10 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useApp } from '../App';
-import { api, num, tco2e, type Category, type ManualLine, type ManualResult, type PurchaseMeta, type UploadResult } from '../lib/api';
+import { api, download, num, tco2e, type Category, type ManualLine, type ManualResult, type PurchaseMeta, type UploadResult } from '../lib/api';
 import { ItemPicker } from '../components/ItemPicker';
 import { Icon } from '../components/Icon';
-import { ColumnSetup, TARGETS, UploadBox } from './Purchases';
+import { BatchList, ColumnSetup, FactorBanner, TARGETS, UploadBox } from './Purchases';
 
 interface Row extends ManualLine { itemName: string | null; cands: { itemId: number; name: string }[] }
 const blank = (date: string, currency: string): Row => ({ date, description: '', itemId: null, itemName: null, cands: [], target: 'purchased_goods', amount: null, currency, supplier: '', supplierEf: null, supplierEfUnit: null, quantity: null, unit: null });
@@ -25,17 +25,19 @@ export function PurchaseEntry(props: { cat: Category; facilityId: string; period
   useEffect(() => { api.purchaseMeta().then(setMeta).catch(() => {}); }, []);
   return (
     <div style={{ display: 'grid', gap: 12 }}>
+      <FactorBanner meta={meta} />
       <div className="row" style={{ gap: 10 }}>
         <div className="seg" role="group" aria-label="How to add purchases">
           <button className={mode === 'upload' ? 'on' : ''} onClick={() => setMode('upload')}><Icon name="upload" /> Upload Excel / CSV</button>
           <button className={mode === 'hand' ? 'on' : ''} onClick={() => setMode('hand')}><Icon name="edit" /> Type by hand</button>
         </div>
-        <span className="sub grow">{mode === 'upload' ? <>An export from the ERP or finance system, any layout, up to 200,000 lines. All batches: <Link to="/purchases">Capture → Purchases</Link>.</> : 'For a few purchases; saved straight as entries.'}</span>
+        <span className="sub grow">{mode === 'upload' ? <>An export from the ERP or finance system, any layout, up to 200,000 lines; <button className="link" onClick={() => download('/api/purchases/template', 'Ekotrace purchases template.xlsx')}>template</button>.</> : 'For a few purchases; saved straight as entries.'}</span>
       </div>
       {mode === 'upload' && !up && <UploadBox onUploaded={setUp} />}
       {mode === 'upload' && up && meta && <ColumnSetup meta={meta} up={up} defaultFacility={props.facilityId}
         onCancel={() => { api.deleteBatch(up.batchId).catch(() => {}); setUp(null); }} onStarted={(id) => nav(`/purchases/${id}`)} />}
       {mode === 'hand' && <ManualGrid {...props} />}
+      <BatchList title="Batches" />
     </div>
   );
 }

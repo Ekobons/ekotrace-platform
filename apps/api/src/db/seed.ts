@@ -20,7 +20,7 @@ import { fileURLToPath } from 'node:url';
 import { pool, platformTx, type Tx } from './pool.js';
 import { parseDesnz } from '../import/desnz.js';
 import { importDesnz } from '../import/desnzWrite.js';
-import { importEpa, importOldProducts, parseEpa, type OldProduct } from '../import/epa.js';
+import { importEpa, importOldProducts, parseEpa, refreshAverages, type OldProduct } from '../import/epa.js';
 import { csvObjects } from '../lib/csv.js';
 
 const DATA = join(dirname(fileURLToPath(import.meta.url)), '../../../../data');
@@ -156,6 +156,7 @@ export async function seed(log = console.log) {
     const s = await platformTx((c) => importEpa(c, parsed, { createdBy: 'seed' }));
     log(`[seed] ${s.source}: ${s.skipped ? 'already imported' : `${s.factors} spend factors (${parsed.priceYear} USD)`}`);
   }
+  await platformTx((c) => refreshAverages(c));   // average services / goods factors (fallback)
   // products of the previous Ekotrace list, on top of the EPA codes
   const old = join(DATA, 'ekotrace-old', 'products.csv');
   if (existsSync(old) && (await platformTx((c) => c.query(`SELECT 1 FROM factor_source WHERE code LIKE 'EPA-SC-%'`))).rowCount) {

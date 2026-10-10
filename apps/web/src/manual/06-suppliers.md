@@ -33,6 +33,7 @@ Open a supplier to see and complete:
 - **Profile:** name, vendor number, country, tax registration number (TRN), industry, size, sustainability contact and e-mail, website, whether it reports its emissions, its climate target (SBTi validated or committed, own target, none) and a note. The bar shows how complete the profile is (country, vendor number, industry, contact, reports emissions, climate target).
 - **Emissions by month** and **what is bought** (spend categories, spend and tCO₂e).
 - **Names seen in purchases:** every spelling linked to the supplier, how it was linked and its lines.
+- **Default spend category:** used for this supplier's purchases that their description does not identify (“Monthly charges”, “Service fee”). Suggested when one category makes up 80 % or more of what is bought from the supplier; also set from a batch with *Remember my choices for everything from this supplier*.
 - **Own emission factors:** an EPD, product footprint or the supplier's inventory, per unit (kg, t, L, m³, kWh, piece) or per money spent; it replaces the spend-based estimate for that supplier's lines.
 
 A vendor number can belong to one supplier only: if it is already used, merge the two records instead. Country and vendor number are filled from the files when the profile has none; a person's entry is never overwritten.

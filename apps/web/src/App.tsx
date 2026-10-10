@@ -45,7 +45,6 @@ const NAV: { group?: string; items: NavItem[] }[] = [
     { to: '/entries', label: 'Entries & results', icon: 'list' },
     { to: '/meters', label: 'Meters', icon: 'gauge', roles: ['super_admin', 'admin', 'manager', 'preparer', 'verifier'] },
     { to: '/bills', label: 'Bills', icon: 'doc', roles: ['super_admin', 'admin', 'manager', 'preparer', 'verifier'] },
-    { to: '/purchases', label: 'Purchases', icon: 'upload', roles: ['super_admin', 'admin', 'manager', 'preparer', 'verifier'] },
     { label: 'Approvals', icon: 'check', stage: 2 }, { label: 'Data progress', icon: 'grid', stage: 2 }, { label: 'Collection calendar', icon: 'calendar', stage: 2 },
     { label: 'Inbox & to-dos', icon: 'inbox', stage: 2 }, { label: 'Document vault', icon: 'folder', stage: 2 }, { label: 'Batch runs', icon: 'upload', stage: 4 },
     { label: 'QR & field app', icon: 'qr', stage: 4 },

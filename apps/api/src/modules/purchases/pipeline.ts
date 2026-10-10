@@ -4,10 +4,14 @@
  *   read      file rows → lines (chunks of 2,000, one INSERT … unnest each); every line keeps
  *             its problems (no amount, no date, facility not found…)
  *   prepare   suppliers registered and linked; duplicates of earlier uploads marked; lines
- *             grouped by normalised description (+ category text) — mapping is per group
- *   map       remembered rules → codes in the file → text matching → (approved AI service);
- *             overlap with other categories flagged
- *   calculate each line with the best factor (supplier, else spend-based) — chunks of 5,000
+ *             grouped by description + supplier + account — decisions are made per group
+ *   map       remembered choice → code in the file → clear description → supplier default →
+ *             account default → weaker description match → (approved AI) → average factor;
+ *             account type (capital / not a purchase) and the capital-goods list; overlap with
+ *             other categories decided by default (fuel / energy excluded, travel moved…)
+ *   calculate each line with the best factor (supplier, else spend-based) — chunks of 5,000;
+ *             then groups ranked by emissions: the largest (company coverage, 95 %) wait for a
+ *             person to confirm, the small tail is accepted as it is
  *   publish   ready lines summed into one entry per facility × period × category × spend
  *             category × method, each linked back to its lines
  *
@@ -66,7 +70,10 @@ export async function loadFacilities(c: Tx): Promise<Facilities> {
 }
 const monthEnd = (d: string) => { const [y, m] = d.split('-').map(Number); return new Date(Date.UTC(y!, m!, 0)).toISOString().slice(0, 10); };
 
-export function groupKey(description: string, category: string | null) { return `${normText(description) || '(blank)'}|${normText(category ?? '')}`.slice(0, 400); }
+/** Lines with the same description, category text and account (vague descriptions are later split by supplier). */
+export function groupKey(description: string, category: string | null, gl: string | null = null) {
+  return `${normText(description) || '(blank)'}|${normText(category ?? '')}|${normText(gl ?? '')}`.slice(0, 330);
+}
 
 /** One raw row (file cells or API values) → a line ready to store, with its problems. */
 export function buildLine(r: RawLine, rowNo: number, s: BatchSettings, fac: Facilities): LineIn {
@@ -103,7 +110,7 @@ export function buildLine(r: RawLine, rowNo: number, s: BatchSettings, fac: Faci
     supplierText, supplierNorm, supplierRef: cellText(r.supplierRef).slice(0, 80) || null, supplierCountry: cellText(r.supplierCountry).slice(0, 80) || null, facilityId, facilityText: ft || null, purchaseDate: date, periodStart, periodEnd,
     amount: amt.value, currency: currency || null, quantity: qty, unit: cellText(r.unit).slice(0, 30) || null,
     supplierEf: ef, supplierEfUnit: cellText(r.supplierEfUnit).replace(/^kg\s*co2e?\s*\/\s*/i, '').slice(0, 30) || null,
-    capital: r.capital != null ? readBool(r.capital) : null, problems, groupKey: groupKey(description, categoryText), fingerprint: fp,
+    capital: r.capital != null ? readBool(r.capital) : null, problems, groupKey: groupKey(description, categoryText, cellText(r.gl) || null), fingerprint: fp,
   };
 }
 
@@ -167,8 +174,16 @@ export async function readFileLines(jobId: number | undefined, tenant: string, b
 }
 
 // ---------------------------------------------------------------- prepare --
+/** Fresh planner statistics after many rows changed (else tens of thousands of lines look like a handful). */
+async function freshStats(c: Tx, ...tables: string[]) {
+  await c.query('SAVEPOINT stats');
+  try { await c.query(`ANALYZE ${tables.join(', ')}`); await c.query('RELEASE SAVEPOINT stats'); } catch { await c.query('ROLLBACK TO SAVEPOINT stats'); }
+}
+
 /** Suppliers, duplicates, groups. */
 export async function prepareBatch(c: Tx, tenant: string, batchId: string, origin: 'upload' | 'api' | 'manual' = 'upload') {
+  // fresh statistics: the planner otherwise takes tens of thousands of new lines for a handful
+  if (origin !== 'manual') await freshStats(c, 'purchase_line');
   await resolveSuppliers(c, tenant, batchId, origin);
   const settings = (await c.query('SELECT settings FROM purchase_batch WHERE id = $1', [batchId])).rows[0]?.settings as BatchSettings | undefined;
   await c.query(
@@ -179,12 +194,25 @@ export async function prepareBatch(c: Tx, tenant: string, batchId: string, origi
       WHERE l.batch_id = $1 AND l.fingerprint = o.fingerprint`, [batchId, tenant]);
   if (!settings?.includeDuplicates)
     await c.query(`UPDATE purchase_line SET problems = array_append(problems, 'Duplicate of a line uploaded earlier') WHERE batch_id = $1 AND dup_of IS NOT NULL AND NOT ('Duplicate of a line uploaded earlier' = ANY(problems))`, [batchId]);
+  // a clear description is one kind of purchase whoever sold it; a vague one ("Monthly charges")
+  // is split by supplier, so that each supplier's default category can decide
+  if (origin !== 'manual') {
+    const ix = await spendIndex(c);
+    const known = new Set((await c.query(`SELECT pattern FROM purchase_rule WHERE field = 'text' AND item_id IS NOT NULL`)).rows.map((r) => r.pattern as string));
+    const keys = (await c.query(
+      `SELECT group_key AS key, min(description) AS d, mode() WITHIN GROUP (ORDER BY category_text) AS cat, mode() WITHIN GROUP (ORDER BY gl_account) AS gl
+         FROM purchase_line WHERE batch_id = $1 AND position('|s:' in group_key) = 0 GROUP BY 1`, [batchId])).rows as { key: string; d: string; cat: string | null; gl: string | null }[];
+    const vague = keys.filter((k) => !known.has(normText(k.d)) && !/\b\d{6}\b/.test(`${k.cat ?? ''} ${k.d}`)
+      && classify(ix.index, k.d, 2, [k.cat, k.gl && !/^\d+$/.test(k.gl) ? k.gl : ''].filter(Boolean).join(' · ')).confidence < STRONG).map((k) => k.key);
+    if (vague.length)
+      await c.query(`UPDATE purchase_line SET group_key = left(group_key, 330) || '|s:' || coalesce(supplier_id::text, supplier_norm, '') WHERE batch_id = $1 AND group_key = ANY($2)`, [batchId, vague]);
+  }
   await c.query(
-    `INSERT INTO purchase_group (tenant_id, batch_id, key, description, category_text, gl_account, supplier, lines)
+    `INSERT INTO purchase_group (tenant_id, batch_id, key, description, category_text, gl_account, supplier, supplier_id, lines)
      SELECT $1, $2, group_key, min(description), mode() WITHIN GROUP (ORDER BY category_text), mode() WITHIN GROUP (ORDER BY gl_account),
-            mode() WITHIN GROUP (ORDER BY supplier_text), count(*)
+            mode() WITHIN GROUP (ORDER BY supplier_text), mode() WITHIN GROUP (ORDER BY supplier_id), count(*)
        FROM purchase_line WHERE batch_id = $2 GROUP BY group_key
-     ON CONFLICT (batch_id, key) DO UPDATE SET lines = EXCLUDED.lines`, [tenant, batchId]);
+     ON CONFLICT (batch_id, key) DO UPDATE SET lines = EXCLUDED.lines, supplier_id = EXCLUDED.supplier_id`, [tenant, batchId]);
 }
 
 // -------------------------------------------------------------------- map --
@@ -196,67 +224,100 @@ export async function spendIndex(c: Tx): Promise<SpendIndex> {
        FROM item i JOIN subcategory s ON s.id = i.subcategory_id JOIN category c ON c.id = s.category_id WHERE c.code = 'purchased_goods' AND i.active`)).rows[0].s;
   if (indexCache && indexCache.sig === sig) return indexCache;
   const rows = (await c.query(
-    `SELECT i.id, i.name, i.aliases, i.attrs->>'naics' AS naics, coalesce(i.attrs->>'group', s.name) AS grp, coalesce((i.attrs->>'capital')::boolean, false) AS capital
+    `SELECT i.id, i.name, i.aliases, i.attrs->>'naics' AS naics, coalesce(i.attrs->>'group', s.name) AS grp, coalesce((i.attrs->>'capital')::boolean, false) AS capital, i.code LIKE 'old:%' AS old
        FROM item i JOIN subcategory s ON s.id = i.subcategory_id JOIN category c ON c.id = s.category_id
-      WHERE c.code = 'purchased_goods' AND i.active AND i.code <> 'purchase:supplier-specific'
+      WHERE c.code = 'purchased_goods' AND i.active AND i.code NOT LIKE 'purchase:%'
         AND EXISTS (SELECT 1 FROM factor f WHERE f.item_id = i.id AND f.status = 'active')`)).rows;
   const fresh = {
     sig, index: buildIndex(rows.map((r) => ({ id: r.id, name: r.name, aliases: r.aliases, group: r.grp, key: r.naics ?? undefined, boost: /^(42|44|45)/.test(r.naics ?? '') ? 0.85 : 1 }))),
     naics: new Map<number, string | null>(rows.map((r) => [r.id, r.naics])), names: new Map<number, string>(rows.map((r) => [r.id, r.name])),
-    capital: new Set<number>(rows.filter((r) => r.capital).map((r) => r.id)),
+    // the capital-goods list (previous Ekotrace products marked capital), and the EPA codes whose
+    // products on that list are all capital goods (machinery, vehicles, computers…)
+    capital: (() => {
+      const by = new Map<string, { all: number; cap: number }>();
+      for (const r of rows) if (r.old && r.naics) { const x = by.get(r.naics) ?? { all: 0, cap: 0 }; x.all++; if (r.capital) x.cap++; by.set(r.naics, x); }
+      return new Set<number>(rows.filter((r) => r.capital || (r.naics && (by.get(r.naics)?.cap ?? 0) > 0 && by.get(r.naics)!.cap === by.get(r.naics)!.all)).map((r) => r.id));
+    })(),
   };
   indexCache = fresh;
   return fresh;
 }
 
-interface GroupRow { key: string; description: string; category_text: string | null; gl_account: string | null; supplier: string | null; item_id: number | null; map_method: string | null; decision: string | null }
+interface GroupRow {
+  key: string; description: string; category_text: string | null; gl_account: string | null; supplier: string | null; supplier_id: string | null;
+  item_id: number | null; map_method: string | null; decision: string | null; target: string | null; capital: boolean; confirmed: boolean; updated_by: string | null;
+}
+type Rule = { id: string; field: string; pattern: string; item_id: number | null; decision: string | null; target: string | null; capital: boolean | null; account_type: string | null; label: string | null };
+/** Methods a person (or a remembered choice) stands behind; the others are suggestions. */
+export const CONFIRMED_METHODS = ['rule', 'code', 'manual', 'supplier', 'gl', 'category'];
+const STRONG = 0.6, WEAK = 0.3;
+const MOVE_TO = ['business_travel', 'upstream_transport', 'upstream_leased'];
 
-/** Maps groups not mapped yet (or `keys`), then flags overlap. */
+/**
+ * Spend category, capital goods and other-category decision of each group not settled by a
+ * person (or of `keys`). First answer wins: remembered choice for the description → NAICS code
+ * in the file → clear description match → supplier default → account default → category text
+ * default → weaker description match → approved AI (large unclear groups only) → average factor.
+ */
 export async function mapGroups(c: Tx, tenant: string, batchId: string, opts: { keys?: string[]; jobId?: number } = {}) {
   const groups = (await c.query(
-    `SELECT key, description, category_text, gl_account, supplier, item_id, map_method, decision FROM purchase_group
+    `SELECT key, description, category_text, gl_account, supplier, supplier_id::text, item_id, map_method, decision, target, capital, confirmed, updated_by FROM purchase_group
       WHERE batch_id = $1 AND ($2::text[] IS NULL OR key = ANY($2))`, [batchId, opts.keys ?? null])).rows as GroupRow[];
   const ix = await spendIndex(c);
-  const rules = (await c.query('SELECT id, field, pattern, item_id, decision, target, capital FROM purchase_rule')).rows as { id: string; field: string; pattern: string; item_id: number | null; decision: string | null; target: string | null; capital: boolean | null }[];
+  const rules = (await c.query('SELECT id, field, pattern, item_id, decision, target, capital, account_type, label FROM purchase_rule')).rows as Rule[];
   const rule = new Map(rules.map((r) => [`${r.field}:${r.pattern}`, r]));
   const naicsItem = new Map<string, number>(); ix.naics.forEach((n, id) => { if (n) naicsItem.set(n, id); });
-  const upd: { key: string; item: number | null; method: string | null; conf: number | null; cand: unknown; decision: string | null; target: string | null; capital: boolean | null; overlap: string | null; why: string | null }[] = [];
+  const avg = new Map<string, number>((await c.query(`SELECT code, id FROM item WHERE code IN ('purchase:average-services','purchase:average-goods')
+                                                       AND EXISTS (SELECT 1 FROM factor f WHERE f.item_id = item.id AND f.status = 'active')`)).rows.map((r) => [r.code, r.id]));
+  type Upd = { key: string; item: number | null; method: string | null; conf: number | null; cand: unknown; decision: string | null; target: string | null; capital: boolean;
+    capitalWhy: string | null; capitalSet: boolean; overlap: string | null; why: string | null; confirmed: boolean };
+  const upd: Upd[] = [];
   const hits = new Map<string, number>();
+  const hit = (r: Rule) => hits.set(r.id, (hits.get(r.id) ?? 0) + 1);
   const tenantRow = (await c.query('SELECT ai_mapping FROM tenant WHERE id = $1', [tenant])).rows[0];
-  const forAi: { g: GroupRow; u: typeof upd[number] }[] = [];
+  const forAi: { g: GroupRow; u: Upd }[] = [];
   let n = 0;
   for (const g of groups) {
-    const u = { key: g.key, item: g.item_id, method: g.map_method, conf: null as number | null, cand: null as unknown, decision: g.decision, target: null as string | null, capital: null as boolean | null, overlap: null as string | null, why: null as string | null };
-    if (!g.map_method || g.map_method === 'text' || g.map_method === 'ai') {
-      // 1. remembered rules
-      const r = rule.get(`text:${normText(g.description)}`) ?? (g.category_text ? rule.get(`category:${normText(g.category_text)}`) : undefined)
-        ?? (g.gl_account ? rule.get(`gl:${normText(g.gl_account)}`) : undefined) ?? (g.supplier ? rule.get(`supplier:${normSupplier(g.supplier)}`) : undefined);
-      if (r) {
-        hits.set(r.id, (hits.get(r.id) ?? 0) + 1);
-        if (r.item_id) { u.item = r.item_id; u.method = 'rule'; u.conf = 1; }
-        if (r.decision) { u.decision = r.decision; u.target = r.target; }
-        if (r.capital != null) u.capital = r.capital;
-      }
-      // 2. a NAICS code in the file
-      if (!r?.item_id) {
-        const code = /\b(\d{6})\b/.exec(`${g.category_text ?? ''} ${g.description}`)?.[1];
-        if (code && naicsItem.has(code)) { u.item = naicsItem.get(code)!; u.method = 'code'; u.conf = 1; }
-      }
-      // 3. text matching
-      if (!u.method || u.method === 'text' || u.method === 'ai') {
-        const cl = classify(ix.index, g.description, 5, [g.category_text, g.gl_account && !/^\d+$/.test(g.gl_account) ? g.gl_account : ''].filter(Boolean).join(' · '));
-        u.cand = cl.candidates; u.conf = cl.confidence; u.item = cl.itemId; u.method = cl.itemId ? 'text' : null;
-        if (tenantRow?.ai_mapping && config.aiMap && cl.confidence < 0.6 && cl.candidates.length) forAi.push({ g, u });
-      }
+    const settled = g.confirmed && g.updated_by != null;   // a person decided this group: keep it
+    const u: Upd = { key: g.key, item: g.item_id, method: g.map_method, conf: null, cand: null, decision: settled ? g.decision : null, target: settled ? g.target : null,
+      capital: settled ? g.capital : false, capitalWhy: null, capitalSet: settled, overlap: null, why: null, confirmed: settled };
+    const rText = rule.get(`text:${normText(g.description)}`);
+    const rSup = g.supplier_id ? rule.get(`supplier:${g.supplier_id}`) : undefined;
+    const rGl = g.gl_account ? rule.get(`gl:${normText(g.gl_account)}`) : undefined;
+    const rCat = g.category_text ? rule.get(`category:${normText(g.category_text)}`) : undefined;
+    if (!settled) {
+      u.item = null; u.method = null; u.confirmed = false;
+      let cl: ReturnType<typeof classify> | null = null;
+      const text = () => (cl ??= classify(ix.index, g.description, 5, [g.category_text, g.gl_account && !/^\d+$/.test(g.gl_account) ? g.gl_account : ''].filter(Boolean).join(' · ')));
+      const code = /\b(\d{6})\b/.exec(`${g.category_text ?? ''} ${g.description}`)?.[1];
+      if (rText?.item_id) { u.item = rText.item_id; u.method = 'rule'; u.conf = 1; hit(rText); }                         // 1. remembered for this description
+      else if (code && naicsItem.has(code)) { u.item = naicsItem.get(code)!; u.method = 'code'; u.conf = 1; }             // 2. NAICS code in the file
+      else if (text().itemId && text().confidence >= STRONG) { u.item = text().itemId; u.method = 'text'; u.conf = text().confidence; } // 3. clear description
+      else if (rSup?.item_id) { u.item = rSup.item_id; u.method = 'supplier'; u.conf = 1; hit(rSup); }                    // 4. supplier default
+      else if (rGl?.item_id) { u.item = rGl.item_id; u.method = 'gl'; u.conf = 1; hit(rGl); }                             // 5. account default
+      else if (rCat?.item_id) { u.item = rCat.item_id; u.method = 'category'; u.conf = 1; hit(rCat); }                    //    category-text default
+      else if (text().itemId && text().confidence >= WEAK) { u.item = text().itemId; u.method = 'text'; u.conf = text().confidence; } // 6. weaker match
+      if (cl) u.cand = (cl as ReturnType<typeof classify>).candidates;
+      if (!u.item && tenantRow?.ai_mapping && config.aiMap && text().candidates.length) forAi.push({ g, u });               // 7. AI (only if switched on)
+      u.confirmed = CONFIRMED_METHODS.includes(u.method ?? '');
+      // decisions remembered for this description, else the account's, supplier's or category's
+      const dr = [rText, rGl, rSup, rCat].find((r) => r?.decision);
+      if (dr) { u.decision = dr.decision; u.target = dr.target; }
+      // capital goods: a remembered choice → the account type → the capital-goods list
+      const cr = [rText, rSup, rCat].find((r) => r?.capital != null);
+      if (cr) { u.capital = !!cr.capital; u.capitalWhy = cr.capital ? 'remembered choice' : null; u.capitalSet = true; }
+      else if (rGl?.account_type === 'capital' || rGl?.capital) { u.capital = true; u.capitalWhy = `account “${g.gl_account}” is a capital account`; u.capitalSet = true; }
+      else if (rGl?.account_type === 'purchase') u.capitalSet = true;   // an expense account: not capital goods
+      if (rGl?.account_type === 'not_purchase') { u.decision = 'exclude'; u.target = null; u.overlap = 'not_purchase'; u.why = `account “${g.gl_account}” is not a purchase`; u.confirmed = true; }
     }
     upd.push(u);
     if (++n % 2000 === 0) await progress(opts.jobId, 'mapping', n, groups.length);
   }
-  // 4. AI, for unclear groups (only among the candidates)
+  // AI, for unclear groups (only among the candidates)
   if (forAi.length) {
     try {
       await progress(opts.jobId, 'mapping (AI)', 0, forAi.length);
-      const res = await aiChoose(forAi.map(({ g, u }) => ({ key: g.key, text: [g.description, g.category_text].filter(Boolean).join(' · '), candidates: (u.cand as { itemId: number }[]).map((x) => ({ id: x.itemId, name: ix.names.get(x.itemId) ?? '' })) })));
+      const res = await aiChoose(forAi.map(({ g, u }) => ({ key: g.key, text: [g.description, g.category_text].filter(Boolean).join(' · '), candidates: ((u.cand ?? []) as { itemId: number }[]).map((x) => ({ id: x.itemId, name: ix.names.get(x.itemId) ?? '' })) })));
       for (const r of res) {
         const u = forAi.find((x) => x.g.key === r.key)?.u;
         if (u && r.itemId) { u.item = r.itemId; u.method = 'ai'; u.conf = r.confidence; }
@@ -265,26 +326,60 @@ export async function mapGroups(c: Tx, tenant: string, batchId: string, opts: { 
       await c.query(`UPDATE purchase_batch SET error = $2 WHERE id = $1`, [batchId, `AI mapping not used: ${(e as Error).message}`]);
     }
   }
-  // overlap with other categories (unless already decided)
   for (const u of upd) {
     const g = groups.find((x) => x.key === u.key)!;
+    // 8. nothing identifies it: the average factor of services (or of goods, when the best guess is a product)
+    if (!u.item && !u.confirmed) {
+      const best = ((u.cand ?? []) as { itemId: number }[])[0];
+      const goods = /^(1|2[13]|3)/.test((best && ix.naics.get(best.itemId)) ?? '') || /\b(pcs|kg|t|ton|tonnes?|litres?|l|m3|ea|each|nos|box|bags?)\b/i.test(g.description);
+      const id = avg.get(goods ? 'purchase:average-goods' : 'purchase:average-services');
+      if (id) { u.item = id; u.method = 'fallback'; u.conf = null; }
+    }
+    if (u.overlap === 'not_purchase') continue;
+    // other categories: flagged and decided by default (a person confirms the large ones)
     const o = detectOverlap([g.description, g.category_text, g.gl_account].filter(Boolean).join(' '), u.item ? ix.naics.get(u.item) : null);
-    u.overlap = o?.target ?? null; u.why = o?.why ?? null;
-    if (!u.overlap && u.item && ix.capital.has(u.item)) { u.overlap = 'capital_goods'; u.why = 'capital goods in the category list'; }
-    if (u.overlap && u.overlap !== 'capital_goods' && u.decision === 'move' && !u.target) u.target = ['fuel', 'energy', 'waste'].includes(u.overlap) ? null : u.overlap;
+    if (o && o.target !== 'capital_goods') {
+      u.overlap = o.target; u.why = o.why;
+      if (!u.decision) { if (['fuel', 'energy', 'waste'].includes(o.target)) u.decision = 'exclude'; else if (MOVE_TO.includes(o.target)) { u.decision = 'move'; u.target = o.target; } }
+      if (u.decision === 'move' && !u.target && MOVE_TO.includes(o.target)) u.target = o.target;
+    }
+    if (!u.capitalSet && u.item && ix.capital.has(u.item)) { u.capital = true; u.capitalWhy = 'on the capital-goods list'; }
+    if (o?.target === 'capital_goods' && !u.capital && !u.capitalSet) { u.overlap = 'capital_goods'; u.why = o.why; }      // a hint only
   }
   for (let i = 0; i < upd.length; i += 5000) {
     const p = upd.slice(i, i + 5000);
     await c.query(
       `UPDATE purchase_group g SET item_id = x.item, map_method = x.method, confidence = x.conf, candidates = coalesce(x.cand, g.candidates),
-              decision = x.decision, target = coalesce(x.target, g.target), capital = coalesce(x.capital, g.capital), overlap = x.overlap, overlap_why = x.why, updated_at = now()
-         FROM unnest($2::text[], $3::int[], $4::text[], $5::numeric[], $6::jsonb[], $7::text[], $8::text[], $9::boolean[], $10::text[], $11::text[])
-              AS x(key, item, method, conf, cand, decision, target, capital, overlap, why)
+              decision = x.decision, target = x.target, capital = x.capital, capital_why = x.cwhy, overlap = x.overlap, overlap_why = x.why, confirmed = x.confirmed, updated_at = now()
+         FROM unnest($2::text[], $3::int[], $4::text[], $5::numeric[], $6::jsonb[], $7::text[], $8::text[], $9::boolean[], $10::text[], $11::text[], $12::text[], $13::boolean[])
+              AS x(key, item, method, conf, cand, decision, target, capital, cwhy, overlap, why, confirmed)
         WHERE g.batch_id = $1 AND g.key = x.key`,
       [batchId, p.map((u) => u.key), p.map((u) => u.item), p.map((u) => u.method), p.map((u) => u.conf), p.map((u) => (u.cand ? JSON.stringify(u.cand) : null)),
-       p.map((u) => u.decision), p.map((u) => u.target), p.map((u) => u.capital), p.map((u) => u.overlap), p.map((u) => u.why)]);
+       p.map((u) => u.decision), p.map((u) => u.target), p.map((u) => u.capital), p.map((u) => u.capitalWhy), p.map((u) => u.overlap), p.map((u) => u.why), p.map((u) => u.confirmed)]);
   }
   for (const [id, h] of hits) await c.query('UPDATE purchase_rule SET hits = hits + $2 WHERE id = $1', [id, h]);
+}
+
+/**
+ * Groups ranked by emissions: the largest, up to the company's coverage (95 % by default),
+ * must be confirmed by a person — their ready lines wait as "check"; the small tail is
+ * accepted with its best answer. Spend categories of services have similar factors, so a
+ * wrong guess in the tail barely moves the total.
+ */
+export async function markMaterial(c: Tx, batchId: string) {
+  await c.query(
+    `UPDATE purchase_group g SET co2e = x.co2e FROM (SELECT group_key, sum(abs(co2e)) AS co2e FROM purchase_line WHERE batch_id = $1 GROUP BY group_key) x
+      WHERE g.batch_id = $1 AND g.key = x.group_key`, [batchId]);
+  await c.query(
+    `UPDATE purchase_group g SET material = r.material FROM (
+       SELECT key, coalesce(sum(co2e) OVER (ORDER BY co2e DESC NULLS LAST, key ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING), 0)
+                   < (SELECT review_coverage FROM tenant WHERE id = g0.tenant_id) * nullif(sum(co2e) OVER (), 0) AND co2e > 0 AS material
+         FROM purchase_group g0 WHERE batch_id = $1) r
+      WHERE g.batch_id = $1 AND g.key = r.key`, [batchId]);
+  await c.query(
+    `${GRP} UPDATE purchase_line l SET status = CASE WHEN g.material AND NOT g.confirmed THEN 'check' ELSE 'ready' END
+       FROM grp g WHERE l.batch_id = $1 AND g.key = l.group_key AND l.status IN ('ready','check')
+        AND l.status <> CASE WHEN g.material AND NOT g.confirmed THEN 'check' ELSE 'ready' END`, [batchId]);
 }
 
 // -------------------------------------------------------------- calculate --
@@ -424,6 +519,8 @@ export async function calcLines(c: Tx, batchId: string, opts: { keys?: string[];
     `UPDATE purchase_group g SET usd = coalesce(x.usd, 0), lines = x.n
        FROM (SELECT group_key, sum(usd) AS usd, count(*) AS n FROM purchase_line WHERE batch_id = $1 GROUP BY group_key) x
       WHERE g.batch_id = $1 AND g.key = x.group_key`, [batchId]);
+  if (!opts.keys && !opts.supplierIds && total > 5000) await freshStats(c, 'purchase_line', 'purchase_group');
+  await markMaterial(c, batchId);
 }
 
 /** The calculation of one line, step by step (for the line's detail). */
@@ -436,12 +533,15 @@ export async function explainLine(c: Tx, lineId: string) {
 }
 
 // ---------------------------------------------------------------- publish --
+/** The batch's groups, read once (a join per line would check row security for every line). */
+const GRP = `WITH grp AS MATERIALIZED (SELECT key, decision, target, capital, material, confirmed FROM purchase_group WHERE batch_id = $1)`;
 const CATEGORY_SQL = `CASE WHEN g.decision = 'move' AND g.target IS NOT NULL THEN g.target WHEN coalesce(l.capital, g.capital) THEN 'capital_goods' ELSE 'purchased_goods' END`;
 
 export interface PublishResult { entries: number; lines: number; co2e: number; skipped: { facility: string; lines: number }[] }
 
 /** Ready lines → entries (one per facility × period × category × spend category × method × unit). */
 export async function publishBatch(c: Tx, tenant: string, batchId: string, user: User): Promise<PublishResult> {
+  if (Number((await c.query(`SELECT count(*) FROM purchase_line WHERE batch_id = $1`, [batchId])).rows[0].count) > 5000) await freshStats(c, 'purchase_line', 'purchase_group');
   const scope = await scopeOf(c, user);
   const allowed = [...scope.enter];
   const b = (await c.query(`SELECT b.name, t.gwp_set FROM purchase_batch b JOIN tenant t ON t.id = b.tenant_id WHERE b.id = $1`, [batchId])).rows[0];
@@ -449,20 +549,20 @@ export async function publishBatch(c: Tx, tenant: string, batchId: string, user:
     `SELECT coalesce(f.name, 'no facility') AS facility, count(*)::int AS lines FROM purchase_line l LEFT JOIN org_node f ON f.id = l.facility_id
       WHERE l.batch_id = $1 AND l.status = 'ready' AND NOT (l.facility_id = ANY($2)) GROUP BY 1`, [batchId, allowed])).rows;
   const agg = (await c.query(
-    `SELECT l.facility_id, to_char(l.period_start,'YYYY-MM-DD') AS ps, to_char(l.period_end,'YYYY-MM-DD') AS pe, ${CATEGORY_SQL} AS cat, l.item_id, l.method, l.base_unit,
+    `${GRP} SELECT l.facility_id, to_char(l.period_start,'YYYY-MM-DD') AS ps, to_char(l.period_end,'YYYY-MM-DD') AS pe, ${CATEGORY_SQL} AS cat, l.item_id, l.method, l.base_unit,
             min(l.factor_id) AS factor_id, count(*)::int AS n, sum(l.co2e)::float8 AS co2e, sum(l.base_amount)::float8 AS base, sum(l.usd)::float8 AS usd,
             count(*) FILTER (WHERE cardinality(l.warnings) > 0)::int AS warned,
             (array_agg(DISTINCT s.name) FILTER (WHERE l.method = 'supplier'))[1:5] AS suppliers,
             min(i.name) AS item_name, min(fs.code) AS source
-       FROM purchase_line l JOIN purchase_group g ON g.batch_id = l.batch_id AND g.key = l.group_key JOIN item i ON i.id = l.item_id
+       FROM purchase_line l JOIN grp g ON g.key = l.group_key JOIN item i ON i.id = l.item_id
        LEFT JOIN supplier s ON s.id = l.supplier_id LEFT JOIN factor f ON f.id = l.factor_id LEFT JOIN factor_source fs ON fs.id = f.source_id
       WHERE l.batch_id = $1 AND l.status = 'ready' AND l.facility_id = ANY($2)
       GROUP BY 1, 2, 3, 4, 5, 6, 7`, [batchId, allowed])).rows;
   if (!agg.length) return { entries: 0, lines: 0, co2e: 0, skipped };
   // spend per currency per entry
   const spendRows = (await c.query(
-    `SELECT l.facility_id, to_char(l.period_start,'YYYY-MM-DD') AS ps, ${CATEGORY_SQL} AS cat, l.item_id, l.method, l.base_unit, l.currency, sum(l.amount)::float8 AS amount
-       FROM purchase_line l JOIN purchase_group g ON g.batch_id = l.batch_id AND g.key = l.group_key
+    `${GRP} SELECT l.facility_id, to_char(l.period_start,'YYYY-MM-DD') AS ps, ${CATEGORY_SQL} AS cat, l.item_id, l.method, l.base_unit, l.currency, sum(l.amount)::float8 AS amount
+       FROM purchase_line l JOIN grp g ON g.key = l.group_key
       WHERE l.batch_id = $1 AND l.status = 'ready' AND l.facility_id = ANY($2) AND l.currency IS NOT NULL GROUP BY 1, 2, 3, 4, 5, 6, 7`, [batchId, allowed])).rows;
   const keyOf = (r: { facility_id: string; ps: string; cat: string; item_id: number; method: string; base_unit: string }) => [r.facility_id, r.ps, r.cat, r.item_id, r.method, r.base_unit].join('|');
   const spendBy = new Map<string, Record<string, number>>();
@@ -505,9 +605,9 @@ export async function publishBatch(c: Tx, tenant: string, batchId: string, user:
        SELECT a, $1, 'scope3', 'CO2e', NULL, v, fid, 'published' FROM unnest($2::uuid[], $3::numeric[], $4::bigint[]) AS x(a, v, fid)`,
       [tenant, ins.rows.map((r) => r.id), ins.rows.map((r) => r.co2e_scope3), ins.rows.map((r) => factorOf.get(r.key) ?? null)]);
     await c.query(
-      `UPDATE purchase_line l SET activity_id = a.id, status = 'published'
-         FROM purchase_group g, unnest($2::uuid[], $3::text[]) AS a(id, key)
-        WHERE l.batch_id = $1 AND l.status = 'ready' AND g.batch_id = l.batch_id AND g.key = l.group_key
+      `${GRP} UPDATE purchase_line l SET activity_id = a.id, status = 'published'
+         FROM grp g, unnest($2::uuid[], $3::text[]) AS a(id, key)
+        WHERE l.batch_id = $1 AND l.status = 'ready' AND g.key = l.group_key
           AND a.key = concat_ws('|', l.facility_id, to_char(l.period_start,'YYYY-MM-DD'), ${CATEGORY_SQL}, l.item_id, l.method, l.base_unit)`,
       [batchId, ins.rows.map((r) => r.id), ins.rows.map((r) => r.key)]);
     entries += ins.rowCount ?? 0;

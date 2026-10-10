@@ -2,6 +2,24 @@
 
 Newest first.
 
+## 2026-10-10 (13) — Purchases decided once per kind of purchase; one Purchases tab; dashboards in the prototype design
+
+**Purchases logic** (migration 013):
+- Kinds of purchase: same description + account + category; vague descriptions (no clear match) split by supplier.
+- Spend category, first answer wins: remembered choice → NAICS code in file → clear description (≥ 60 %) → supplier default → account default → category default → weaker match (≥ 30 %) → approved AI (only if switched on) → **average factor** (median EPA factor: services 0.111, goods 0.278 kg CO₂e / 2022 USD; marked as estimate).
+- Capital goods: account type → capital column → **capital-goods list** (old "Capital Goods" products, and EPA codes whose listed products are all capital) → else 3.1. Account type *Not a purchase* (VAT, salaries…) excludes.
+- Other categories decided by default: travel / freight / rent moved, fuel / energy / waste excluded; shown, changeable.
+- **Review by impact:** kinds of purchase ranked by emissions; the largest up to 95 % of the batch (company setting 80–100 %) wait as "to confirm" (new line status `check`); the small rest is accepted as it is. Confirm per row, per page, or by any change; remember for this description / supplier / account.
+- Accounts tab (GL type, default category, Scope 3 category) `GET /api/purchases/batches/:id/accounts`, `PUT /api/purchases/accounts`; supplier default category (`PATCH /api/suppliers/:id { defaultItemId }`, suggested at 80 % share).
+- Classifier: "X for Y" → X ("Diesel for generators" is diesel); gasoil; generator synonyms.
+- Speed: groups read once per query (no per-line row-security join), fresh planner statistics after large changes. 50,000 lines: ~22 s read+map+calculate, ~8 s publish. 10,000-line test file: ~11 s.
+
+**One Purchases tab:** Add data → Purchases holds upload (default), typing by hand and the batch list; Capture → Purchases left the menu (`/purchases` still lists batches).
+
+**Dashboards** redone in the prototype's compact design: one-line header, tabs (Overview, Scopes & categories, Facilities, Waste, Mobility & travel, Value chain; Energy, Water, Net zero later), stat strip, card grid; stacked monthly bars with last year's line, donuts, treemap, top 5, upstream · own · downstream, GHG category × month heat table, facility × month heatmap, intensities. API returns facility × month × category × item rows (tonnes). Supplier analytics use the same cards.
+
+**Tests:** 44 API (new: decision logic — supplier/account defaults, account types, capital list, average factor, review by impact), 47 engine. Manual: Purchases rewritten (how the category is found, capital goods, review by impact), Suppliers, Dashboards.
+
 ## 2026-10-10 (12) — Upload purchases from Add data; lines without a facility
 
 - Add data → Purchases now offers **Upload Excel / CSV** (default) or **Type by hand**; the upload is the same as Capture → Purchases, with the page's facility suggested for lines without one, and opens the batch when read.

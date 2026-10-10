@@ -18,7 +18,7 @@ import { sendWorkbook, styleHeader } from '../../lib/xlsx.js';
 import { apiClient } from '../meters.routes.js';
 import { FIELDS, FIELD_LABEL, guessColumns, signature, normSupplier, type Field } from './fields.js';
 import {
-  buildLine, calcLines, explainLine, groupKey, insertLines, loadFacilities, mapGroups, MAX_LINES, prepareBatch, publishBatch, readFileLines, reopenBatch, spendIndex,
+  buildLine, calcLines, explainLine, groupKey, insertLines, loadFacilities, mapGroups, markMaterial, MAX_LINES, prepareBatch, publishBatch, readFileLines, reopenBatch, spendIndex,
   type BatchSettings, type RawLine,
 } from './pipeline.js';
 
@@ -35,9 +35,11 @@ async function setBatch(tenant: string, id: string, status: string, error?: stri
 async function afterLines(job: Job, origin: 'upload' | 'api' | 'manual') {
   await setBatch(job.tenant_id, job.ref!, 'mapping');
   await tenantTx(job.tenant_id, async (c) => {
-    await prepareBatch(c, job.tenant_id, job.ref!, origin);
-    await mapGroups(c, job.tenant_id, job.ref!, { jobId: job.id });
-    await calcLines(c, job.ref!, { jobId: job.id });
+    const T = process.env.EKO_TIMING ? (l: string, t0: number) => console.log(`[timing] ${l} ${Date.now() - t0} ms`) : () => {};
+    let t0 = Date.now();
+    await prepareBatch(c, job.tenant_id, job.ref!, origin); T('prepare', t0); t0 = Date.now();
+    await mapGroups(c, job.tenant_id, job.ref!, { jobId: job.id }); T('map', t0); t0 = Date.now();
+    await calcLines(c, job.ref!, { jobId: job.id }); T('calc', t0);
     await c.query(`UPDATE purchase_batch SET status = 'review', updated_at = now() WHERE id = $1`, [job.ref]);
   });
 }
@@ -59,7 +61,9 @@ registerJob('purchase_calc', guarded(async (job) => {
 }, 'review'));
 registerJob('purchase_publish', guarded(async (job) => {
   await setBatch(job.tenant_id, job.ref!, 'publishing', null);
+  const t0 = Date.now();
   const r = await tenantTx(job.tenant_id, (c) => publishBatch(c, job.tenant_id, job.ref!, job.args.user as User));
+  if (process.env.EKO_TIMING) console.log(`[timing] publish ${Date.now() - t0} ms`);
   await tenantTx(job.tenant_id, async (c) => {
     if (!r.entries) await c.query(`UPDATE purchase_batch SET status = 'review' WHERE id = $1`, [job.ref]);
     await c.query(`INSERT INTO audit_log (tenant_id, user_id, user_name, action, entity, entity_id, detail) VALUES ($1, $2, $5, 'purchases.publish', 'purchase_batch', $3, $4)`,
@@ -104,13 +108,13 @@ export async function purchaseRoutes(app: FastifyInstance) {
   app.get('/api/purchases/meta', async (req) => {
     const tenant = requireTenant(req);
     return tenantTx(tenant, async (c) => {
-      const t = (await c.query('SELECT fx_method, currency, ai_mapping FROM tenant WHERE id = $1', [tenant])).rows[0];
+      const t = (await c.query('SELECT fx_method, currency, ai_mapping, review_coverage::float8 AS review_coverage FROM tenant WHERE id = $1', [tenant])).rows[0];
       const cats = (await c.query(`SELECT id, code, name, ghg_category FROM category WHERE code = ANY($1) ORDER BY sort`, [SPEND_CATEGORIES])).rows;
       const factorSet = (await c.query(
         `SELECT s.code, s.title, count(*)::int AS n FROM factor f JOIN factor_source s ON s.id = f.source_id JOIN item i ON i.id = f.item_id JOIN subcategory sc ON sc.id = i.subcategory_id
            JOIN category ca ON ca.id = sc.category_id WHERE ca.code = 'purchased_goods' AND f.status = 'active' GROUP BY 1, 2 ORDER BY 3 DESC`)).rows;
       return {
-        fields: FIELDS.map((f) => ({ field: f, label: FIELD_LABEL[f] })), fxMethod: t.fx_method, currency: t.currency, aiMapping: t.ai_mapping,
+        fields: FIELDS.map((f) => ({ field: f, label: FIELD_LABEL[f] })), fxMethod: t.fx_method, currency: t.currency, aiMapping: t.ai_mapping, reviewCoverage: t.review_coverage,
         aiAvailable: !!config.aiMap, aiName: config.aiMap?.name ?? null, overlap: OVERLAP_LABEL, categories: cats, factorSets: factorSet, maxLines: MAX_LINES,
       };
     });
@@ -119,11 +123,12 @@ export async function purchaseRoutes(app: FastifyInstance) {
   app.patch('/api/purchases/settings', async (req) => {
     const tenant = requireTenant(req);
     requireRole(req, 'super_admin');
-    const b = z.object({ aiMapping: z.boolean() }).parse(req.body);
+    const b = z.object({ aiMapping: z.boolean().optional(), reviewCoverage: z.number().min(0.5).max(1).optional() }).parse(req.body);
     if (b.aiMapping && !config.aiMap) throw new AppError('No approved AI service is configured on this deployment');
     return tenantTx(tenant, async (c) => {
-      await c.query('UPDATE tenant SET ai_mapping = $2 WHERE id = $1', [tenant, b.aiMapping]);
-      await audit(c, req, 'purchases.ai_mapping', 'tenant', tenant, b);
+      if (b.aiMapping !== undefined) await c.query('UPDATE tenant SET ai_mapping = $2 WHERE id = $1', [tenant, b.aiMapping]);
+      if (b.reviewCoverage !== undefined) await c.query('UPDATE tenant SET review_coverage = $2 WHERE id = $1', [tenant, b.reviewCoverage]);
+      await audit(c, req, 'purchases.settings', 'tenant', tenant, b);
       return b;
     });
   });
@@ -220,8 +225,8 @@ export async function purchaseRoutes(app: FastifyInstance) {
                 coalesce(s.usd, 0) AS usd, coalesce(s.co2e, 0) AS co2e, j.progress, j.status AS job_status
            FROM purchase_batch b LEFT JOIN app_user u ON u.id::text = b.created_by
            LEFT JOIN LATERAL (SELECT count(*)::int AS lines, count(*) FILTER (WHERE status = 'ready')::int AS ready, count(*) FILTER (WHERE status = 'published')::int AS published,
-                                     count(*) FILTER (WHERE status IN ('problem','unmapped','flagged'))::int AS attention, sum(usd)::float8 AS usd,
-                                     sum(co2e) FILTER (WHERE status IN ('ready','published'))::float8 AS co2e,
+                                     count(*) FILTER (WHERE status IN ('problem','unmapped','flagged','check'))::int AS attention, sum(usd)::float8 AS usd,
+                                     sum(co2e) FILTER (WHERE status IN ('ready','check','published'))::float8 AS co2e,
                                      bool_and(facility_id IS NULL OR facility_id = ANY($1)) AS visible
                                 FROM purchase_line l WHERE l.batch_id = b.id) s ON true
            LEFT JOIN LATERAL (SELECT progress, status FROM job WHERE ref = b.id ORDER BY id DESC LIMIT 1) j ON true
@@ -242,16 +247,25 @@ export async function purchaseRoutes(app: FastifyInstance) {
       const byCategory = (await c.query(
         `SELECT CASE WHEN g.decision = 'move' AND g.target IS NOT NULL THEN g.target WHEN coalesce(l.capital, g.capital) THEN 'capital_goods' ELSE 'purchased_goods' END AS category,
                 count(*)::int AS lines, sum(l.co2e)::float8 AS co2e, sum(l.usd)::float8 AS usd
-           FROM purchase_line l JOIN purchase_group g ON g.batch_id = l.batch_id AND g.key = l.group_key
-          WHERE l.batch_id = $1 AND l.status IN ('ready','published') GROUP BY 1 ORDER BY 3 DESC NULLS LAST`, [id])).rows;
-      const byMethod = (await c.query(`SELECT method, count(*)::int AS lines, sum(co2e)::float8 AS co2e FROM purchase_line WHERE batch_id = $1 AND status IN ('ready','published') GROUP BY 1`, [id])).rows;
+           FROM purchase_line l JOIN (SELECT key, decision, target, capital FROM purchase_group WHERE batch_id = $1 OFFSET 0) g ON g.key = l.group_key
+          WHERE l.batch_id = $1 AND l.status IN ('ready','check','published') GROUP BY 1 ORDER BY 3 DESC NULLS LAST`, [id])).rows;
+      const byMethod = (await c.query(`SELECT method, count(*)::int AS lines, sum(co2e)::float8 AS co2e FROM purchase_line WHERE batch_id = $1 AND status IN ('ready','check','published') GROUP BY 1`, [id])).rows;
       const problems = (await c.query(
-        `SELECT p AS problem, count(*)::int AS lines FROM (SELECT unnest(problems) AS p FROM purchase_line WHERE batch_id = $1
+        `SELECT regexp_replace(p, 'No exchange rate for ([A-Z]{3}) \\((\\d{4})-\\d{2}\\)', 'No exchange rate for \\1 (\\2, some months)') AS problem, count(*)::int AS lines
+           FROM (SELECT unnest(problems) AS p FROM purchase_line WHERE batch_id = $1
            UNION ALL SELECT calc_error FROM purchase_line WHERE batch_id = $1 AND calc_error IS NOT NULL AND cardinality(problems) = 0 AND status = 'problem') x
           GROUP BY 1 ORDER BY 2 DESC LIMIT 25`, [id])).rows;
       const groups = (await c.query(
-        `SELECT count(*)::int AS total, count(*) FILTER (WHERE item_id IS NULL)::int AS unmapped, count(*) FILTER (WHERE overlap IS NOT NULL AND overlap <> 'capital_goods' AND decision IS NULL)::int AS flagged, count(*) FILTER (WHERE overlap = 'capital_goods' AND decision IS NULL AND NOT capital)::int AS capital_hint,
-                count(*) FILTER (WHERE map_method IN ('text','ai') AND confidence < 0.6)::int AS check FROM purchase_group WHERE batch_id = $1`, [id])).rows[0];
+        `SELECT count(*)::int AS total, count(*) FILTER (WHERE item_id IS NULL)::int AS unmapped, count(*) FILTER (WHERE overlap IS NOT NULL AND overlap NOT IN ('capital_goods','not_purchase'))::int AS flagged,
+                count(*) FILTER (WHERE capital OR (overlap = 'capital_goods' AND decision IS NULL))::int AS capital_hint,
+                count(*) FILTER (WHERE material AND NOT confirmed)::int AS check, count(*) FILTER (WHERE map_method = 'fallback')::int AS fallback,
+                count(*) FILTER (WHERE decision = 'exclude')::int AS excluded, count(*) FILTER (WHERE decision = 'move')::int AS moved,
+                count(*) FILTER (WHERE material)::int AS material, count(*) FILTER (WHERE material AND confirmed)::int AS material_confirmed,
+                coalesce(sum(co2e), 0)::float8 AS co2e, coalesce(sum(co2e) FILTER (WHERE material), 0)::float8 AS co2e_material,
+                coalesce(sum(co2e) FILTER (WHERE material AND confirmed), 0)::float8 AS co2e_confirmed,
+                coalesce(sum(co2e) FILTER (WHERE NOT material AND NOT confirmed), 0)::float8 AS co2e_auto, count(*) FILTER (WHERE NOT material AND NOT confirmed)::int AS auto,
+                (SELECT review_coverage::float8 FROM tenant WHERE id = $2) AS coverage
+           FROM purchase_group WHERE batch_id = $1`, [id, tenant])).rows[0];
       const facilitiesMissing = (await c.query(
         `SELECT facility_text AS value, count(*)::int AS lines FROM purchase_line WHERE batch_id = $1 AND facility_id IS NULL GROUP BY 1 ORDER BY 2 DESC LIMIT 50`, [id])).rows;
       const entries = (await c.query(`SELECT count(*)::int AS n, count(*) FILTER (WHERE status = 'approved')::int AS approved FROM activity WHERE purchase_batch_id = $1`, [id])).rows[0];
@@ -266,25 +280,27 @@ export async function purchaseRoutes(app: FastifyInstance) {
     const tenant = requireTenant(req);
     const id = idParam(req);
     const q = z.object({
-      filter: z.enum(['all', 'unmapped', 'check', 'flagged', 'capital', 'excluded', 'moved', 'mapped']).default('all'), q: z.string().max(200).optional(),
-      offset: z.coerce.number().int().min(0).default(0), limit: z.coerce.number().int().min(1).max(200).default(50), sort: z.enum(['spend', 'lines', 'name', 'confidence']).default('spend'),
+      filter: z.enum(['all', 'unmapped', 'check', 'flagged', 'capital', 'excluded', 'moved', 'mapped', 'fallback', 'auto', 'confirmed']).default('all'), q: z.string().max(200).optional(),
+      offset: z.coerce.number().int().min(0).default(0), limit: z.coerce.number().int().min(1).max(200).default(50), sort: z.enum(['co2e', 'spend', 'lines', 'name', 'confidence']).default('co2e'),
     }).parse(req.query);
     return tenantTx(tenant, async (c) => {
       await batchRow(c, id);
       await assertSees(c, req, id);
       const where = {
-        all: 'true', unmapped: 'g.item_id IS NULL', check: `g.map_method IN ('text','ai') AND g.confidence < 0.6`, flagged: `g.overlap IS NOT NULL AND g.overlap <> 'capital_goods' AND g.decision IS NULL`, capital: `g.overlap = 'capital_goods' OR g.capital`,
-        excluded: `g.decision = 'exclude'`, moved: `g.decision = 'move'`, mapped: 'g.item_id IS NOT NULL',
+        all: 'true', unmapped: 'g.item_id IS NULL', check: 'g.material AND NOT g.confirmed', flagged: `g.overlap IS NOT NULL AND g.overlap NOT IN ('capital_goods','not_purchase')`,
+        capital: `g.capital OR (g.overlap = 'capital_goods' AND g.decision IS NULL)`, excluded: `g.decision = 'exclude'`, moved: `g.decision = 'move'`, mapped: 'g.item_id IS NOT NULL',
+        fallback: `g.map_method = 'fallback'`, auto: 'NOT g.material AND NOT g.confirmed', confirmed: 'g.confirmed',
       }[q.filter];
-      const order = { spend: 'abs(g.usd) DESC', lines: 'g.lines DESC', name: 'g.description', confidence: 'g.confidence NULLS FIRST' }[q.sort];
+      const order = { co2e: 'g.co2e DESC NULLS LAST', spend: 'abs(g.usd) DESC', lines: 'g.lines DESC', name: 'g.description', confidence: 'g.confidence NULLS FIRST' }[q.sort];
       const params: unknown[] = [id, q.limit, q.offset];
       let search = '';
       if (q.q) { params.push(`%${q.q.toLowerCase()}%`); search = ` AND (lower(g.description) LIKE $4 OR lower(coalesce(g.category_text,'')) LIKE $4 OR lower(coalesce(g.supplier,'')) LIKE $4)`; }
       const rows = (await c.query(
         `SELECT g.key, g.description, g.category_text, g.gl_account, g.supplier, g.lines, g.usd::float8 AS usd, g.item_id, i.name AS item_name, i.attrs->>'naics' AS naics,
-                g.map_method, g.confidence::float8 AS confidence, g.candidates, g.overlap, g.overlap_why, g.decision, g.target, g.capital,
+                g.map_method, g.confidence::float8 AS confidence, g.candidates, g.overlap, g.overlap_why, g.decision, g.target, g.capital, g.capital_why,
+                g.material, g.confirmed, g.supplier_id, (SELECT sum(co2e) FROM purchase_group WHERE batch_id = g.batch_id)::float8 AS batch_co2e,
                 (SELECT jsonb_object_agg(status, n) FROM (SELECT status, count(*) AS n FROM purchase_line l WHERE l.batch_id = g.batch_id AND l.group_key = g.key GROUP BY status) s) AS statuses,
-                (SELECT sum(co2e)::float8 FROM purchase_line l WHERE l.batch_id = g.batch_id AND l.group_key = g.key) AS co2e,
+                g.co2e::float8 AS co2e,
                 count(*) OVER () AS total
            FROM purchase_group g LEFT JOIN item i ON i.id = g.item_id
           WHERE g.batch_id = $1 AND ${where}${search}
@@ -307,7 +323,8 @@ export async function purchaseRoutes(app: FastifyInstance) {
     const b = z.object({
       keys: z.array(z.string().max(400)).min(1).max(5000), itemId: z.number().int().positive().nullable().optional(),
       decision: z.enum(['keep', 'move', 'exclude']).nullable().optional(), target: z.enum(['business_travel', 'upstream_transport', 'upstream_leased', 'capital_goods']).nullable().optional(),
-      capital: z.boolean().optional(), remember: z.boolean().default(true),
+      capital: z.boolean().optional(), confirm: z.boolean().optional(), remember: z.boolean().default(true),
+      scope: z.enum(['text', 'supplier', 'gl']).default('text'),   // remembered for: this description, everything from the supplier, or everything in the account
     }).parse(req.body);
     if (b.decision === 'move' && !b.target) throw new AppError('Choose the category to move to');
     return tenantTx(tenant, async (c) => {
@@ -324,8 +341,8 @@ export async function purchaseRoutes(app: FastifyInstance) {
       if (b.itemId !== undefined) { vals.push(b.itemId); sets.push(`item_id = $${vals.length}`, `map_method = CASE WHEN $${vals.length}::int IS NULL THEN NULL ELSE 'manual' END`, `confidence = CASE WHEN $${vals.length}::int IS NULL THEN NULL ELSE 1 END`); }
       if (b.decision !== undefined) { vals.push(b.decision); sets.push(`decision = $${vals.length}`); vals.push(b.decision === 'move' ? b.target : null); sets.push(`target = $${vals.length}`); }
       if (b.capital !== undefined) { vals.push(b.capital); sets.push(`capital = $${vals.length}`); }
-      if (!sets.length) throw new AppError('Nothing to change');
-      const g = await c.query(`UPDATE purchase_group SET ${sets.join(', ')}, updated_by = $3, updated_at = now() WHERE batch_id = $1 AND key = ANY($2) RETURNING key, description`, vals);
+      if (!sets.length && !b.confirm) throw new AppError('Nothing to change');
+      const g = await c.query(`UPDATE purchase_group SET ${[...sets, 'confirmed = true'].join(', ')}, updated_by = $3, updated_at = now() WHERE batch_id = $1 AND key = ANY($2) RETURNING key, description, supplier, supplier_id, gl_account`, vals);
       // the category of a re-mapped group may now overlap (or no longer)
       if (b.itemId !== undefined) {
         const naics = b.itemId ? (await c.query(`SELECT attrs->>'naics' AS n FROM item WHERE id = $1`, [b.itemId])).rows[0]?.n : null;
@@ -335,18 +352,36 @@ export async function purchaseRoutes(app: FastifyInstance) {
           await c.query(`UPDATE purchase_group SET overlap = $3, overlap_why = $4 WHERE batch_id = $1 AND key = $2`, [id, r.key, o?.target ?? null, o?.why ?? null]);
         }
       }
-      if (b.remember) {
+      let keys = b.keys;
+      const changes = b.itemId !== undefined || b.decision !== undefined || b.capital !== undefined;
+      if (b.remember && changes) {
+        const patterns = new Map<string, string>();
         for (const r of g.rows) {
+          const pat = b.scope === 'supplier' ? r.supplier_id : b.scope === 'gl' ? (r.gl_account ? normText(r.gl_account) : null) : normText(r.description);
+          if (pat) patterns.set(pat, b.scope === 'supplier' ? r.supplier : b.scope === 'gl' ? r.gl_account : r.description);
+        }
+        if (b.scope !== 'text' && !patterns.size) throw new AppError(b.scope === 'supplier' ? 'These lines have no supplier' : 'These lines have no account');
+        for (const [pat, label] of patterns) {
           await c.query(
-            `INSERT INTO purchase_rule (tenant_id, field, pattern, item_id, decision, target, capital, created_by) VALUES ($1, 'text', $2, $3, $4, $5, $6, $7)
+            `INSERT INTO purchase_rule (tenant_id, field, pattern, label, item_id, decision, target, capital, created_by) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
              ON CONFLICT (tenant_id, field, pattern) DO UPDATE SET item_id = coalesce(EXCLUDED.item_id, purchase_rule.item_id), decision = coalesce(EXCLUDED.decision, purchase_rule.decision),
-                    target = coalesce(EXCLUDED.target, purchase_rule.target), capital = coalesce(EXCLUDED.capital, purchase_rule.capital), created_by = EXCLUDED.created_by`,
-            [tenant, normText(r.description), b.itemId ?? null, b.decision ?? null, b.decision === 'move' ? b.target : null, b.capital ?? null, req.user.id]);
+                    target = coalesce(EXCLUDED.target, purchase_rule.target), capital = coalesce(EXCLUDED.capital, purchase_rule.capital), label = EXCLUDED.label, created_by = EXCLUDED.created_by`,
+            [tenant, b.scope, pat, label, b.itemId ?? null, b.decision ?? null, b.decision === 'move' ? b.target : null, b.capital ?? null, req.user.id]);
+        }
+        // the other groups of that supplier / account in this batch follow (unless a person settled them)
+        if (b.scope !== 'text') {
+          const others = (await c.query(
+            `SELECT key FROM purchase_group WHERE batch_id = $1 AND NOT (key = ANY($2)) AND NOT (confirmed AND updated_by IS NOT NULL)
+               AND ${b.scope === 'supplier' ? 'supplier_id::text = ANY($3)' : 'gl_account = ANY($4)'} AND $3::text[] IS NOT NULL AND $4::text[] IS NOT NULL`,
+            [id, b.keys, [...patterns.keys()], g.rows.map((r) => r.gl_account).filter(Boolean)])).rows.map((r) => r.key as string);
+          if (others.length) { await mapGroups(c, tenant, id, { keys: others }); keys = [...keys, ...others]; }
         }
       }
-      const n = Number((await c.query(`SELECT count(*) FROM purchase_line WHERE batch_id = $1 AND group_key = ANY($2)`, [id, b.keys])).rows[0].count);
-      if (n > 20000) { await enqueue(c, tenant, 'purchase_calc', id, { keys: b.keys }, req.user.id); return { groups: g.rowCount, lines: n, background: true }; }
-      await calcLines(c, id, { keys: b.keys });
+      const n = Number((await c.query(`SELECT count(*) FROM purchase_line WHERE batch_id = $1 AND group_key = ANY($2)`, [id, keys])).rows[0].count);
+      if (process.env.EKO_TIMING) console.log(`[timing] patch ${keys.length} groups, ${changes ? 'changes' : 'confirm'}`);
+      if (!changes) { await markMaterial(c, id); return { groups: g.rowCount, lines: n, background: false }; }   // confirmed as it is: nothing to recalculate
+      if (n > 20000) { await enqueue(c, tenant, 'purchase_calc', id, { keys }, req.user.id); return { groups: g.rowCount, lines: n, background: true }; }
+      await calcLines(c, id, { keys });
       return { groups: g.rowCount, lines: n, background: false };
     });
   });
@@ -354,7 +389,7 @@ export async function purchaseRoutes(app: FastifyInstance) {
   app.get('/api/purchases/batches/:id/lines', async (req) => {
     const tenant = requireTenant(req);
     const id = idParam(req);
-    const q = z.object({ status: z.enum(['problem', 'unmapped', 'flagged', 'excluded', 'ready', 'published', 'duplicate', 'warning']).optional(), group: z.string().max(400).optional(),
+    const q = z.object({ status: z.enum(['problem', 'unmapped', 'flagged', 'check', 'excluded', 'ready', 'published', 'duplicate', 'warning']).optional(), group: z.string().max(400).optional(),
       q: z.string().max(200).optional(), offset: z.coerce.number().int().min(0).default(0), limit: z.coerce.number().int().min(1).max(500).default(100) }).parse(req.query);
     return tenantTx(tenant, async (c) => {
       await batchRow(c, id);
@@ -511,12 +546,68 @@ export async function purchaseRoutes(app: FastifyInstance) {
     });
   });
 
+  /** The accounts (GL) of a batch with their spend and settings: type (purchase / capital / not a purchase) and default category. */
+  app.get('/api/purchases/batches/:id/accounts', async (req) => {
+    const tenant = requireTenant(req);
+    const id = idParam(req);
+    return tenantTx(tenant, async (c) => {
+      await batchRow(c, id);
+      await assertSees(c, req, id);
+      const rows = (await c.query(
+        `SELECT g.gl_account AS account, count(*)::int AS groups, sum(g.lines)::int AS lines, sum(g.usd)::float8 AS usd, sum(g.co2e)::float8 AS co2e,
+                count(*) FILTER (WHERE g.capital)::int AS capital_groups
+           FROM purchase_group g WHERE g.batch_id = $1 AND g.gl_account IS NOT NULL GROUP BY 1 ORDER BY 4 DESC NULLS LAST LIMIT 500`, [id])).rows;
+      const rules = new Map((await c.query(
+        `SELECT r.pattern, r.account_type, r.item_id, i.name AS item, r.decision, r.target FROM purchase_rule r LEFT JOIN item i ON i.id = r.item_id WHERE r.field = 'gl'`)).rows.map((r) => [r.pattern, r]));
+      return { accounts: rows.map((r) => { const x = rules.get(normText(r.account)); return { ...r, accountType: x?.account_type ?? null, itemId: x?.item_id ?? null, item: x?.item ?? null, decision: x?.decision ?? null, target: x?.target ?? null }; }) };
+    });
+  });
+
+  /** Settings of one account, remembered for every upload; the batch (if given) follows at once. */
+  app.put('/api/purchases/accounts', async (req) => {
+    const tenant = requireTenant(req);
+    requireRole(req, ...ENTER);
+    const b = z.object({
+      account: z.string().trim().min(1).max(300), accountType: z.enum(['purchase', 'capital', 'not_purchase']).nullable().optional(), itemId: z.number().int().positive().nullable().optional(),
+      target: z.enum(['business_travel', 'upstream_transport', 'upstream_leased']).nullable().optional(), batchId: uuid.optional(),
+    }).parse(req.body);
+    return tenantTx(tenant, async (c) => {
+      const pat = normText(b.account);
+      if (!pat) throw new AppError('Account needed');
+      const cur = (await c.query(`SELECT * FROM purchase_rule WHERE field = 'gl' AND pattern = $1`, [pat])).rows[0];
+      const next = {
+        account_type: b.accountType !== undefined ? b.accountType : cur?.account_type ?? null, item_id: b.itemId !== undefined ? b.itemId : cur?.item_id ?? null,
+        decision: b.target !== undefined ? (b.target ? 'move' : null) : cur?.decision ?? null, target: b.target !== undefined ? b.target : cur?.target ?? null,
+      };
+      if (!next.account_type && !next.item_id && !next.decision) await c.query(`DELETE FROM purchase_rule WHERE field = 'gl' AND pattern = $1`, [pat]);
+      else await c.query(
+        `INSERT INTO purchase_rule (tenant_id, field, pattern, label, account_type, item_id, decision, target, capital, created_by) VALUES ($1, 'gl', $2, $3, $4, $5, $6, $7, $8, $9)
+         ON CONFLICT (tenant_id, field, pattern) DO UPDATE SET label = EXCLUDED.label, account_type = EXCLUDED.account_type, item_id = EXCLUDED.item_id, decision = EXCLUDED.decision,
+                target = EXCLUDED.target, capital = EXCLUDED.capital, created_by = EXCLUDED.created_by`,
+        [tenant, pat, b.account, next.account_type, next.item_id, next.decision, next.target, next.account_type === 'capital' ? true : null, req.user.id]);
+      await audit(c, req, 'purchases.account', 'purchase_rule', pat, b);
+      let lines = 0;
+      if (b.batchId) {
+        const batch = await batchRow(c, b.batchId);
+        if (['reading', 'mapping', 'publishing', 'queued'].includes(batch.status)) throw new AppError('The batch is still being processed: try again in a moment', 409);
+        const keys = (await c.query(
+          `SELECT key FROM purchase_group g WHERE batch_id = $1 AND gl_account IS NOT NULL AND NOT (confirmed AND updated_by IS NOT NULL)
+             AND NOT EXISTS (SELECT 1 FROM purchase_line l WHERE l.batch_id = g.batch_id AND l.group_key = g.key AND l.status = 'published')`, [b.batchId])).rows
+          .map((r) => r.key as string);
+        const mine = (await c.query(`SELECT key, gl_account FROM purchase_group WHERE batch_id = $1 AND key = ANY($2)`, [b.batchId, keys])).rows.filter((r) => normText(r.gl_account) === pat).map((r) => r.key as string);
+        if (mine.length) { await mapGroups(c, tenant, b.batchId, { keys: mine }); await calcLines(c, b.batchId, { keys: mine }); }
+        lines = Number((await c.query(`SELECT count(*) FROM purchase_line WHERE batch_id = $1 AND group_key = ANY($2)`, [b.batchId, mine])).rows[0].count);
+      }
+      return { ok: true, lines };
+    });
+  });
+
   /** Remembered mappings. */
   app.get('/api/purchases/rules', async (req) => {
     const tenant = requireTenant(req);
     return tenantTx(tenant, async (c) => ({
       rules: (await c.query(
-        `SELECT r.id, r.field, r.pattern, r.item_id, i.name AS item, r.decision, r.target, r.capital, r.hits, r.created_at, u.name AS created_by
+        `SELECT r.id, r.field, r.pattern, r.label, r.account_type, r.item_id, i.name AS item, r.decision, r.target, r.capital, r.hits, r.created_at, u.name AS created_by
            FROM purchase_rule r LEFT JOIN item i ON i.id = r.item_id LEFT JOIN app_user u ON u.id::text = r.created_by ORDER BY r.created_at DESC LIMIT 2000`)).rows,
     }));
   });
@@ -585,8 +676,8 @@ export async function purchaseRoutes(app: FastifyInstance) {
         for (const [i, l] of b.lines.entries()) {
           const capital = l.target === 'capital_goods';
           const move = !capital && l.target !== 'purchased_goods';
-          await c.query(`UPDATE purchase_group SET item_id = $3, map_method = CASE WHEN $3::int IS NULL THEN NULL ELSE 'manual' END, confidence = 1, decision = $4, target = $5, capital = $6
-                          WHERE batch_id = $1 AND key = $2`, [batch.id, lines[i]!.groupKey, l.itemId ?? null, move ? 'move' : 'keep', move ? l.target : null, capital]);
+          await c.query(`UPDATE purchase_group SET item_id = $3, map_method = CASE WHEN $3::int IS NULL THEN NULL ELSE 'manual' END, confidence = 1, decision = $4, target = $5, capital = $6,
+                                 confirmed = true, updated_by = $7 WHERE batch_id = $1 AND key = $2`, [batch.id, lines[i]!.groupKey, l.itemId ?? null, move ? 'move' : 'keep', move ? l.target : null, capital, req.user.id]);
         }
         await calcLines(c, batch.id);
         const rows = (await c.query(

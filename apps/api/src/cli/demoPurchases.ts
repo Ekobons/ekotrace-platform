@@ -137,7 +137,7 @@ export async function demoPurchases(t: string, superAdmin: User) {
   // what a reviewer decided on the first file (remembered for the next one)
   const decide = async (batch: string, like: string, d: { decision?: string; target?: string; capital?: boolean; item?: string }) => tenantTx(t, async (c) => {
     const item = d.item ? (await c.query('SELECT id FROM item WHERE code = $1', [d.item])).rows[0]?.id ?? null : null;
-    const g = await c.query(`UPDATE purchase_group SET decision = coalesce($3, decision), target = $4, capital = coalesce($5, capital), updated_by = $6,
+    const g = await c.query(`UPDATE purchase_group SET decision = coalesce($3, decision), target = $4, capital = coalesce($5, capital), updated_by = $6, confirmed = true,
                                     item_id = coalesce($7, item_id), map_method = CASE WHEN $7::int IS NULL THEN map_method ELSE 'manual' END, confidence = CASE WHEN $7::int IS NULL THEN confidence ELSE 1 END
                               WHERE batch_id = $1 AND description ILIKE $2 RETURNING description`,
       [batch, like, d.decision ?? null, d.target ?? null, d.capital ?? null, superAdmin.id, item]);
@@ -163,7 +163,12 @@ export async function demoPurchases(t: string, superAdmin: User) {
   await decide(h1, 'Excavator%', { item: 'epa:naics:333120' });
   await decide(h1, 'Mobile and data%', { item: 'epa:naics:517312' });
   await decide(h1, 'Office rent%', { item: 'epa:naics:531120' });
-  const r1 = await tenantTx(t, async (c) => { await calcLines(c, h1); return publishBatch(c, t, h1, superAdmin); });
+  // the reviewer confirms the rest of the large groups as they are, then publishes
+  const r1 = await tenantTx(t, async (c) => {
+    await c.query(`UPDATE purchase_group SET confirmed = true, updated_by = $2 WHERE batch_id = $1 AND material AND NOT confirmed`, [h1, superAdmin.id]);
+    await calcLines(c, h1);
+    return publishBatch(c, t, h1, superAdmin);
+  });
   const h2 = await upload('ERP purchase orders Jul–Dec 2025', await exportFile([6, 7, 8, 9, 10, 11], NEW_H2, 2));
   await drainJobs();
   const counts = await tenantTx(t, async (c) => (await c.query(`SELECT status, count(*)::int AS n FROM purchase_line WHERE batch_id = $1 GROUP BY 1 ORDER BY 1`, [h2])).rows);

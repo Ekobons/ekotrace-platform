@@ -1,20 +1,18 @@
 # Dashboards
 
-Dashboards (top of the menu) shows the year's inventory at a glance, for the whole group, a sub-group or one facility.
+Dashboards (top of the menu) shows the year's inventory at a glance, for the whole group, a sub-group or one facility — in the same compact layout as the prototype.
 
-## What it shows
+## Tabs
 
-| Part | Shows |
+Overview · Scopes & categories · Facilities · Waste · Mobility & travel · Value chain (Energy, Water and Net zero follow with their modules). Each tab has a stat strip and small cards; filters at the top: year, part of the group, Scope 2 location / market.
+
+| Tab | Shows |
 |---|---|
-| Totals | Scope 1 + 2 + 3 with the change against the previous year and the base year; each scope with its share; biogenic CO₂ and gases outside the Kyoto basket apart from the totals; entries, approved and estimated |
-| Scope 2 | location-based or market-based (switch at the top). The other figure is shown beside it; the two are never added together |
-| By month | monthly entries stacked by scope. Entries for longer periods (a quarter, a year — such as a landfill's annual methane) are in the totals but not in the months, and the page says how much |
-| By category | each data category with its scope; click to open the category |
-| By facility | click a facility to show only its figures |
-| Scope 3 categories | the GHG Protocol categories with data; 3.3 includes the upstream emissions and grid losses of the fuels and energy used |
-| Largest sources | the ten items with the most emissions |
-| Data coverage | which months each facility has data for — the gaps to chase |
-| Purchases: data quality | published purchases with suppliers' own factors versus spend-based estimates |
+| Overview | totals by scope with the change against last year (same months), monthly bars by scope with last year's line, scope split, where emissions come from (treemap and list), top 5, upstream · own operations · downstream, data status |
+| Scopes & categories | a donut per scope, and a table GHG Protocol category × month |
+| Facilities | emissions by facility and scope (click to filter), share, intensity per employee and per m², facility × month heatmap (gaps show) |
+| Value chain | Scope 3 by category, purchases by product group, top suppliers, supplier-specific share |
+| Mobility & travel, Waste | by month and by activity / treatment |
 
 ## How totals are counted
 
@@ -22,4 +20,4 @@ Dashboards (top of the menu) shows the year's inventory at a glance, for the who
 - Rejected entries are left out; entries waiting for approval count.
 - People see only the facilities they have access to.
 - Purchases count once published.
-- The comparison with last year covers the whole of last year: during the year it compares a part year with a full year.
+- The change against last year compares the months that have data this year with the same months last year; entries for whole years (e.g. landfill methane) are left out of that comparison.

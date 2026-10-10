@@ -848,7 +848,9 @@ test('purchases: EPA factor file import; ERP export in its own layout → groups
   assert.equal(d.batch.status, 'review', JSON.stringify(d.batch));
   const count = (s: string) => d.counts.find((x: { status: string }) => x.status === s)?.lines ?? 0;
   assert.equal(count('problem'), 2, JSON.stringify(d.problems)); // Mars base, EUR rate missing
-  assert.equal(count('flagged'), 2); // airfare, diesel
+  assert.equal(count('flagged'), 0);  // airfare moved and diesel excluded by default…
+  assert.ok(count('check') > 0);      // …but large groups wait for a person to confirm
+  assert.equal(count('excluded'), 1);
   assert.ok(d.problems.some((p: { problem: string }) => p.problem === 'Facility "Mars base" not found'));
   assert.ok(d.problems.some((p: { problem: string }) => /No exchange rate for EUR/.test(p.problem)));
   // suppliers: two spellings of Gulf Stationery are one supplier
@@ -861,6 +863,8 @@ test('purchases: EPA factor file import; ERP export in its own layout → groups
   assert.equal(g('OPC cement').naics, '327310');
   assert.equal(g('Airfare').overlap, 'business_travel');
   assert.equal(g('Diesel').overlap, 'fuel');
+  assert.deepEqual([(g('Airfare') as unknown as { decision: string; target: string }).decision, (g('Airfare') as unknown as { target: string }).target], ['move', 'business_travel']);
+  assert.equal((g('Diesel') as unknown as { decision: string }).decision, 'exclude');
   assert.equal(g('Dell').naics, '334111');
   // the paper line: AED 3,672.50 at the peg = USD 1,000 of 2024 → 2022 dollars × the EPA factor
   const lines = (await api('GET', `/api/purchases/batches/${u.batchId}/lines?limit=100`, undefined, tenantA)).body.lines as { id: string; row_no: number; co2e: number; status: string; method: string; amount: number }[];
@@ -884,11 +888,13 @@ test('purchases: EPA factor file import; ERP export in its own layout → groups
   const sf = await api('POST', `/api/suppliers/${cementSup}/factors`, { co2e: 650, unit: 't', source: 'EPD 2023 (cradle to gate)' }, tenantA);
   assert.equal(sf.status, 200, JSON.stringify(sf.body));
   assert.equal(sf.body.linesRecalculated, 1);
+  // a person confirms the rest as it is
+  assert.equal((await api('PATCH', `/api/purchases/batches/${u.batchId}/groups`, { keys: groups.map((x) => x.key), confirm: true }, tenantA)).status, 200);
   assert.equal((await api('POST', `/api/purchases/batches/${u.batchId}/recalculate`, {}, tenantA)).status, 200);
   await drain();
   const d2 = (await api('GET', `/api/purchases/batches/${u.batchId}`, undefined, tenantA)).body;
   const c2 = (s: string) => d2.counts.find((x: { status: string }) => x.status === s)?.lines ?? 0;
-  assert.deepEqual([c2('ready'), c2('excluded'), c2('problem'), c2('flagged')], [8, 1, 0, 0], JSON.stringify(d2.counts));
+  assert.deepEqual([c2('ready'), c2('excluded'), c2('problem'), c2('flagged'), c2('check')], [8, 1, 0, 0, 0], JSON.stringify(d2.counts));
   const l2 = (await api('GET', `/api/purchases/batches/${u.batchId}/lines?limit=100`, undefined, tenantA)).body.lines as { row_no: number; co2e: number; method: string; fx: number }[];
   assert.deepEqual([l2.find((l) => l.row_no === 6)!.method, l2.find((l) => l.row_no === 6)!.co2e], ['supplier', 6500]);
   const eur = l2.find((l) => l.row_no === 9)!;
@@ -959,7 +965,7 @@ test('purchases: manual entry (check, then save) and ERP API (several calls, the
   assert.equal((await send(key.body.key, '/api/v1/purchases', { reference: 'SAP-2024-04', lines: part(1, 0) })).statusCode, 409);
   await drain();
   const st = await app.inject({ method: 'GET', url: '/api/v1/purchases/SAP-2024-04', headers: { authorization: `Bearer ${key.body.key}` } });
-  assert.deepEqual([st.json().status, st.json().lines.ready], ['review', 1000], st.body);
+  assert.deepEqual([st.json().status, (st.json().lines.ready ?? 0) + (st.json().lines.check ?? 0)], ['review', 1000], st.body);
 });
 
 test('suppliers: one record however written (vendor number, spellings, typos), possible duplicates, merge / split / keep apart, profile, analytics; dashboard', async () => {
@@ -1028,15 +1034,17 @@ test('suppliers: one record however written (vendor number, spellings, typos), p
   assert.ok(an.totals.lines > 0 && an.top.length > 0 && an.concentration.n80 >= 1);
   assert.ok(an.profiles.target >= 1);
 
-  // dashboard: the scopes add up; Scope 2 location / market never both in the total
+  // dashboard: rows per facility × month × category; Scope 2 location or market, never both
   const loc = (await api('GET', '/api/dashboard?year=2024', undefined, tenantA)).body;
   const mkt = (await api('GET', '/api/dashboard?year=2024&scope2=market', undefined, tenantA)).body;
-  for (const d of [loc, mkt]) assert.ok(Math.abs(d.totals.total - ((d.totals.s1 ?? 0) + (d.totals.s2 ?? 0) + (d.totals.s3 ?? 0))) < 1e-6);
-  assert.equal(loc.totals.s2 ?? 0, loc.totals.s2_location ?? 0);
-  assert.equal(mkt.totals.s2 ?? 0, mkt.totals.s2_market ?? 0);
-  assert.equal(loc.totals.s3, mkt.totals.s3);
-  assert.ok(Array.isArray(loc.monthly) && Array.isArray(loc.coverage) && loc.years.includes(2024));
-  assert.equal((await api('GET', '/api/dashboard?year=2024', undefined, tenantB)).body.totals.entries, 0 + (await pq(`SELECT count(*)::int AS n FROM activity WHERE tenant_id = $1 AND extract(year FROM period_start) = 2024 AND status <> 'rejected'`, [tenantB])).rows[0].n);
+  const tot = (d: { rows: { s1: number; s2: number; s3: number; s33: number }[] }, k: 's1' | 's2' | 's3' | 's33') => d.rows.reduce((a, r) => a + r[k], 0);
+  assert.ok(loc.rows.length > 0 && loc.years.includes(2024) && loc.facilities.length > 0);
+  assert.ok(Math.abs(tot(loc, 's1') - tot(mkt, 's1')) < 1e-6 && Math.abs(tot(loc, 's3') - tot(mkt, 's3')) < 1e-6);
+  const s2 = Number((await pq(`SELECT coalesce(sum(co2e_scope2), 0) / 1000 AS l, coalesce(sum(co2e_scope2_market), 0) / 1000 AS m FROM activity a JOIN org_node f ON f.id = a.facility_id
+                               WHERE a.tenant_id = $1 AND extract(year FROM period_start) = 2024 AND a.status <> 'rejected' AND f.operational_control`, [tenantA])).rows[0].l);
+  assert.ok(Math.abs(tot(loc, 's2') - s2) < 0.01, `${tot(loc, 's2')} vs ${s2}`);
+  assert.ok(loc.purchases.suppliers >= 1 && loc.categories.some((x: { ghg: string }) => x.ghg === '3.1'));
+  assert.equal((await api('GET', '/api/dashboard?year=2024', undefined, tenantB)).body.rows.every((r: { f: string }) => !loc.facilities.some((f: { id: string }) => f.id === r.f)), true);
 });
 
 test('purchases: lines with no facility written go to the facility chosen for the file, or wait for one in the review', async () => {
@@ -1059,6 +1067,58 @@ test('purchases: lines with no facility written go to the facility chosen for th
   assert.equal(blank?.lines, 2, JSON.stringify(d.facilitiesMissing));
   assert.equal((await api('POST', `/api/purchases/batches/${later}/facilities`, { value: null, facilityId: facA }, tenantA)).body.lines, 2);
   assert.equal((await pq(`SELECT settings->>'facilityId' AS f FROM purchase_batch WHERE id = $1`, [later])).rows[0].f, facA);
+});
+
+test('purchases: decided once per kind of purchase — supplier and account defaults, account type, capital-goods list, average factor, review of the large groups only', async () => {
+  const cap = (await pq(`SELECT name FROM item WHERE code LIKE 'old:%' AND (attrs->>'capital')::boolean AND name ILIKE '%machinery%' AND name ~ '^[A-Za-z ,-]+$' ORDER BY length(name) LIMIT 1`)).rows[0].name as string;
+  const L = ['Date;Description;Amount;Vendor Name;Account;Site'];
+  const add = (n: number, d: string, amt: number, v: string, gl: string) => { for (let i = 0; i < n; i++) L.push(`${String(1 + i).padStart(2, '0')}/0${1 + (i % 6)}/2024;${d};${amt};${v};${gl};Sharjah plant`); };
+  add(6, 'Monthly charges', 73450, 'Shield Guarding LLC', 'Facility management');     // says nothing: big → must be confirmed
+  add(2, 'Service fee Q2', 36725, 'Shield Guarding LLC', 'Facility management');
+  add(2, 'VAT input', 9000, 'Federal Tax Authority', 'VAT receivable');                // not a purchase
+  add(1, 'Equipment purchase', 1836250, 'Heavy Kit Trading', 'Capital WIP');           // capital account
+  add(1, cap, 367250, 'Machines LLC', 'Plant & machinery');                             // on the capital-goods list
+  add(3, 'Xqz wvk', 120, 'Corner Shop', 'Zzk');                                // small and unclear → average factor
+  const up = (await raw('/api/purchases/upload', Buffer.from(L.join('\n')), tenantA, { 'x-filename': 'logic.csv' })).json();
+  const sh = up.sheets[0];
+  await api('POST', `/api/purchases/batches/${up.batchId}/setup`, { headerRow: sh.headerRow, columns: { ...sh.guess, gl: 'Account' }, dateFormat: 'dmy', currency: 'AED', headers: sh.headers, remember: false }, tenantA);
+  await drain();
+  type G = { key: string; description: string; item_id: number; item_name: string; map_method: string; decision: string; capital: boolean; capital_why: string; material: boolean; confirmed: boolean; statuses: Record<string, number> };
+  const groups = async () => (await api('GET', `/api/purchases/batches/${up.batchId}/groups?limit=50`, undefined, tenantA)).body.groups as G[];
+  let gs = await groups();
+  const g = (d: string) => gs.find((x) => x.description.startsWith(d))!;
+  assert.equal(g('Xqz').map_method, 'fallback');
+  assert.match(g('Xqz').item_name, /average factor/);
+  assert.equal(g(cap).capital, true, JSON.stringify(g(cap)));
+  assert.equal(g(cap).capital_why, 'on the capital-goods list');
+  // the large unclear group waits for a person; the small one is accepted as it is
+  assert.equal(g('Monthly charges').material && !g('Monthly charges').confirmed, true);
+  assert.ok((g('Monthly charges').statuses.check ?? 0) === 6, JSON.stringify(g('Monthly charges').statuses));
+  assert.equal(g('Xqz').statuses.ready, 3);
+  // accounts: VAT is not a purchase; Capital WIP is a capital account (remembered for every upload)
+  assert.equal((await api('PUT', '/api/purchases/accounts', { account: 'VAT receivable', accountType: 'not_purchase', batchId: up.batchId }, tenantA)).status, 200);
+  assert.equal((await api('PUT', '/api/purchases/accounts', { account: 'Capital WIP', accountType: 'capital', batchId: up.batchId }, tenantA)).status, 200);
+  const acc = (await api('GET', `/api/purchases/batches/${up.batchId}/accounts`, undefined, tenantA)).body.accounts as { account: string; accountType: string }[];
+  assert.equal(acc.find((a) => a.account === 'VAT receivable')?.accountType, 'not_purchase');
+  gs = await groups();
+  assert.equal(g('VAT').decision, 'exclude');
+  assert.equal(g('VAT').statuses.excluded, 2);
+  assert.deepEqual([g('Equipment').capital, g('Equipment').capital_why], [true, 'account “Capital WIP” is a capital account']);
+  // the supplier's default: "Monthly charges" from a guarding company are security services — for all its unclear purchases
+  const security = await itemId('epa:naics:561612');
+  const r = await api('PATCH', `/api/purchases/batches/${up.batchId}/groups`, { keys: [g('Monthly charges').key], itemId: security, scope: 'supplier' }, tenantA);
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  gs = await groups();
+  assert.deepEqual([g('Monthly charges').map_method, g('Monthly charges').confirmed], ['manual', true]);
+  assert.deepEqual([g('Service fee').item_id, g('Service fee').map_method], [security, 'supplier']);
+  assert.equal(g('Monthly charges').statuses.ready, 6);
+  // the supplier profile shows the default
+  const sup = (await pq(`SELECT id FROM supplier WHERE tenant_id = $1 AND norm = 'shield guarding'`, [tenantA])).rows[0].id;
+  assert.equal((await api('GET', `/api/suppliers/${sup}`, undefined, tenantA)).body.defaultItem?.id, security);
+  // batch summary: how much of the emissions is confirmed
+  const d = (await api('GET', `/api/purchases/batches/${up.batchId}`, undefined, tenantA)).body;
+  assert.ok(d.groups.coverage === 0.95 && d.groups.material >= 1 && d.groups.co2e > 0, JSON.stringify(d.groups));
+  assert.equal((await api('DELETE', `/api/purchases/batches/${up.batchId}`, undefined, tenantA)).status, 200);
 });
 
 test('purchases: 50,000 lines (CSV) read, mapped, calculated and published in the background within a minute', async () => {
@@ -1086,6 +1146,10 @@ test('purchases: 50,000 lines (CSV) read, mapped, calculated and published in th
     const keys = flagged.filter((x) => x.overlap === target).map((x) => x.key);
     if (keys.length) assert.equal((await api('PATCH', `/api/purchases/batches/${up.batchId}/groups`, { keys, decision: 'move', target, remember: false }, tenantA)).status, 200);
   }
+  // the large groups waiting for a person: confirmed in bulk
+  const toConfirm = (await api('GET', `/api/purchases/batches/${up.batchId}/groups?filter=check&limit=200`, undefined, tenantA)).body.groups.map((x: { key: string }) => x.key);
+  if (toConfirm.length) assert.equal((await api('PATCH', `/api/purchases/batches/${up.batchId}/groups`, { keys: toConfirm, confirm: true }, tenantA)).status, 200);
+  await drain();
   const ready = (await api('GET', `/api/purchases/batches/${up.batchId}`, undefined, tenantA)).body.counts.find((x: { status: string }) => x.status === 'ready').lines;
   await api('POST', `/api/purchases/batches/${up.batchId}/publish`, {}, tenantA);
   await drain();

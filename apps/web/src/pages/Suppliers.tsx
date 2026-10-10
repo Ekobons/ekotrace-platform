@@ -12,7 +12,8 @@ import { useApp } from '../App';
 import { api, num, tco2e, type Supplier, type SupplierAnalytics, type SupplierFactor2, type SupplierProfile, type SupplierReview } from '../lib/api';
 import { ItemPicker } from '../components/ItemPicker';
 import { Icon } from '../components/Icon';
-import { BarList, Kpi, MonthColumns, PALETTE, ShareBar, countryName, t as tonnes, usdShort } from '../components/Charts';
+import { countryName, t as tonnes, usdShort } from '../components/Charts';
+import { Bars, DCard, Donut, DStat, HBars, Legend, MN, PAL as PAL2, Treemap, fmt0, fmtT, type BarRow } from '../components/DashCharts';
 
 const MANAGE = ['super_admin', 'admin', 'manager'];
 const UNITS = ['kg', 't', 'L', 'm3', 'kWh', 'pcs', 'AED', 'USD', 'EUR', 'GBP', 'SAR', 'INR'];
@@ -199,7 +200,14 @@ function SupplierPanel({ id, canManage, onChanged, onClose, onOpen }: { id: stri
         </fieldset>
         <div style={{ display: 'grid', gap: 12, alignContent: 'start' }}>
           <div><h3>Emissions by month{monthly.length ? ` (${d.months.at(-1)!.month.slice(0, 4)})` : ''}</h3>
-            {monthly.length ? <MonthColumns data={monthly} series={[{ key: 'co2e', label: 'tCO₂e', color: 'var(--s3)' }]} height={120} /> : <div className="sub">No calculated purchases yet.</div>}</div>
+            {monthly.length ? <Bars rows={MN.map((lbl, i) => { const x = monthly.find((m) => m.m === i + 1); return { lbl, parts: x ? [{ v: (x.co2e ?? 0) / 1000, c: 'var(--s3)', n: 'tCO₂e' }] : [] }; })} h={120} /> : <div className="sub">No calculated purchases yet.</div>}</div>
+          <div><h3>Default spend category</h3>
+            <div className="sub">Used for this supplier's purchases that their description does not identify (e.g. “Monthly charges”). A clear description still wins.</div>
+            {canManage ? <ItemPicker value={d.defaultItem?.id ?? null} valueName={d.defaultItem?.name ?? null} placeholder="none — description decides"
+              onPick={(it) => act(() => api.patchSupplier(id, { defaultItemId: it?.id ?? null }), it ? `Default: ${it.name}` : 'Default removed')} /> : <div>{d.defaultItem?.name ?? <span className="muted">none</span>}</div>}
+            {canManage && d.suggestedDefault && <div className="note info row" style={{ gap: 8, marginTop: 6 }}><span className="grow">{Math.round(d.suggestedDefault.share * 100)}% of what is bought from this supplier is <b>{d.suggestedDefault.name}</b>.</span>
+              <button className="btn xs" onClick={() => act(() => api.patchSupplier(id, { defaultItemId: d.suggestedDefault!.id }), `Default: ${d.suggestedDefault!.name}`)}>Use as default</button></div>}
+          </div>
           <div><h3>What is bought</h3>
             {d.categories.length ? <table className="t compact"><thead><tr><th>Spend category</th><th className="num">Lines</th><th className="num">USD</th><th className="num">tCO₂e</th></tr></thead>
               <tbody>{d.categories.map((c, i) => <tr key={i}><td>{c.item ?? <span className="muted">no category yet</span>}</td><td className="num">{c.lines}</td><td className="num">{usd(c.usd ?? 0)}</td><td className="num">{tco2e(c.co2e ?? 0)}</td></tr>)}</tbody></table> : <div className="sub">No purchases yet.</div>}</div>
@@ -335,65 +343,76 @@ function Analytics() {
   const p = d.profiles;
   const pctOf = (n: number) => (p.suppliers ? `${Math.round((n / p.suppliers) * 100)}%` : '—');
   const supplierShare = d.totals.co2e ? d.totals.co2e_supplier / d.totals.co2e : 0;
-  const monthly = d.byMonth.map((m) => ({ m: Number(m.month.slice(5, 7)), supplier: metric === 'co2e' ? m.co2e_supplier ?? 0 : null, spend: metric === 'co2e' ? (m.co2e ?? 0) - (m.co2e_supplier ?? 0) : m.usd }));
+
+  const v = (x: { usd: number | null; co2e: number | null }) => (metric === 'co2e' ? (x.co2e ?? 0) / 1000 : x.usd ?? 0);   // tonnes or USD
+  const u = metric === 'co2e' ? 't' : 'USD';
+  const tot = metric === 'co2e' ? d.totals.co2e / 1000 : d.totals.usd;
+  const top = [...d.top].sort((a, b) => v(b) - v(a));
+  const cParts = sorted(d.byCountry).map((r, i) => ({ n: countryName(r.country), v: v(r), c: r.country ? PAL2[i % PAL2.length]! : '#9AA7A2' }));
+  const s3 = sorted(d.byScope3).map((r, i) => ({ n: SCOPE3_LABEL[r.category] ?? r.category, v: v(r), c: PAL2[(i + 3) % PAL2.length]! }));
+  const tParts = d.targets.map((r, i) => ({ n: TARGET_LABEL[r.target] ?? r.target, v: (r.co2e ?? 0) / 1000, c: r.target === 'unknown' ? '#C9D9D2' : r.target === 'none' ? '#C2523C' : PAL2[i % PAL2.length]! }));
+  const q = [{ n: "Supplier's own factor", v: d.totals.co2e_supplier / 1000, c: 'var(--ok)' }, { n: 'Spend-based average', v: (d.totals.co2e - d.totals.co2e_supplier) / 1000, c: '#E9B44C' }];
+  const mrows: BarRow[] = MN.map((lbl, i) => { const m = d.byMonth.find((x) => Number(x.month.slice(5, 7)) === i + 1);
+    return { lbl, parts: !m ? [] : metric === 'co2e' ? [{ v: (m.co2e_supplier ?? 0) / 1000, c: 'var(--ok)', n: "Supplier's own factor" }, { v: ((m.co2e ?? 0) - (m.co2e_supplier ?? 0)) / 1000, c: '#E9B44C', n: 'Spend-based' }] : [{ v: m.usd ?? 0, c: 'var(--info)', n: 'Spend' }] }; });
+  const fmtV = (x: number) => (metric === 'co2e' ? `${fmtT(x)} t` : usdShort(x));
 
   return (
-    <div style={{ display: 'grid', gap: 14 }}>
-      <div className="row" style={{ gap: 8 }}>
-        <label className="field" style={{ width: 120 }}><span>Year</span><select className="input" value={d.year} onChange={(e) => setYear(Number(e.target.value))}>{d.years.map((y) => <option key={y}>{y}</option>)}</select></label>
-        <div className="grow" />
+    <div style={{ display: 'grid', gap: 10 }}>
+      <div className="dhead">
+        <div><span className="muted">{d.totals.lines.toLocaleString('en')} calculated purchase lines in {d.year}{d.totals.no_supplier ? ` · ${d.totals.no_supplier.toLocaleString('en')} without a supplier` : ''}</span></div>
+        <span style={{ flex: 1 }} />
+        <select className="input" value={d.year} onChange={(e) => setYear(Number(e.target.value))} aria-label="Year">{d.years.map((y) => <option key={y}>{y}</option>)}</select>
         <div className="seg" role="group" aria-label="Show"><button className={metric === 'co2e' ? 'on' : ''} onClick={() => setMetric('co2e')}>Emissions</button><button className={metric === 'usd' ? 'on' : ''} onClick={() => setMetric('usd')}>Spend (USD)</button></div>
       </div>
-      <div className="kpis">
-        <Kpi label="Suppliers with purchases" value={d.totals.suppliers.toLocaleString('en')} sub={<span>{d.totals.lines.toLocaleString('en')} calculated lines{d.totals.no_supplier ? ` · ${d.totals.no_supplier.toLocaleString('en')} without a supplier` : ''}</span>} />
-        <Kpi label="Spend" value={usdShort(d.totals.usd)} sub="in USD, at the exchange rates used" />
-        <Kpi label="Emissions" value={tonnes(d.totals.co2e)} unit="tCO₂e" tone="s3" sub="purchased goods, capital goods and moved lines" />
-        <Kpi label="From suppliers' own factors" value={`${Math.round(supplierShare * 100)}%`} sub={`${tonnes(d.totals.co2e_supplier)} t; the rest is spend-based`} />
-        <Kpi label="Concentration" value={`${d.concentration.n80}`} unit={`of ${d.concentration.suppliers}`} sub={`suppliers make 80% of emissions (${d.concentration.n50} make 50%) — start supplier engagement there`} />
-      </div>
-      <div className="dashgrid">
-        <div className="card"><h3>By supplier country</h3><p className="sub">Where suppliers are registered. Click a country to see its suppliers.</p>
-          <BarList rows={sorted(d.byCountry).map((r, i) => ({ key: r.country || 'none', label: countryName(r.country), sub: `${r.suppliers} supplier${r.suppliers === 1 ? '' : 's'}`, value: val(r), color: r.country ? PALETTE[i % PALETTE.length] : 'var(--line2)',
-            onClick: () => nav(`/suppliers?country=${r.country || 'none'}`) }))} format={fmt} unit={unit} />
-          {d.byCountry.some((r) => !r.country) && <div className="note info" style={{ marginTop: 10 }}>Some suppliers have no country yet: add a supplier-country column to uploads, or complete their profiles.</div>}</div>
-        <div className="card"><div className="row"><h3 className="grow">By product</h3>
-          <div className="seg"><button className={itemView === 'group' ? 'on' : ''} onClick={() => setItemView('group')}>Groups</button><button className={itemView === 'item' ? 'on' : ''} onClick={() => setItemView('item')}>Spend categories</button></div></div>
-          <p className="sub">{itemView === 'group' ? 'Product groups of the mapped spend categories (25 largest categories).' : 'The spend categories purchases are mapped to (EPA / NAICS).'}</p>
+      <DStat cells={[
+        ['Suppliers with purchases', d.totals.suppliers.toLocaleString('en'), `${p.suppliers.toLocaleString('en')} in the list`],
+        ['Spend', usdShort(d.totals.usd), 'USD, at the exchange rates used'],
+        ['Emissions', <>{fmt0(d.totals.co2e / 1000)} <small>tCO₂e</small></>, 'purchases, capital goods, moved lines'],
+        ["Suppliers' own factors", `${Math.round(supplierShare * 100)}%`, 'of purchase emissions; the rest is spend-based', supplierShare ? 'var(--ok)' : undefined],
+        ['Concentration', `${d.concentration.n80} of ${d.concentration.suppliers}`, `suppliers make 80% of emissions (${d.concentration.n50} make 50%)`],
+      ]} />
+      <div className="dgrid">
+        <DCard title="By supplier country" sub="click a country to list its suppliers">
+          <div className="dsplit"><Donut parts={cParts} center={String(d.byCountry.filter((r) => r.country).length)} sub="countries" size={124} /><Legend parts={cParts} unit={u === 't' ? 't' : ''} /></div>
+          <HBars items={sorted(d.byCountry).slice(0, 6).map((r) => ({ n: `${countryName(r.country)} · ${r.suppliers}`, v: v(r), p: tot ? (v(r) / tot) * 100 : 0, onClick: () => nav(`/suppliers?country=${r.country || 'none'}`) }))} unit={u === 't' ? 't' : ''} c="var(--s2)" />
+        </DCard>
+        <DCard title="By product" span={2} right={<div className="seg"><button className={itemView === 'group' ? 'on' : ''} onClick={() => setItemView('group')}>Groups</button><button className={itemView === 'item' ? 'on' : ''} onClick={() => setItemView('item')}>Spend categories</button></div>}>
           {itemView === 'group'
-            ? <BarList rows={sorted(groups).map((g) => ({ key: g.group, label: g.group, sub: `${g.items} categor${g.items === 1 ? 'y' : 'ies'}`, value: val(g) }))} format={fmt} unit={unit} />
-            : <BarList rows={sorted(d.byItem).map((r, i) => ({ key: `${r.item}${i}`, label: r.item ?? 'Not mapped', sub: `${r.group} · ${r.suppliers} supplier${r.suppliers === 1 ? '' : 's'}`, value: val(r) }))} format={fmt} unit={unit} max={15} />}
-        </div>
-        <div className="card"><h3>By Scope 3 category</h3><p className="sub">Lines moved to transport, travel or leased assets, and capital goods, count in their own category.</p>
-          <BarList rows={sorted(d.byScope3).map((r, i) => ({ key: r.category, label: SCOPE3_LABEL[r.category] ?? r.category, value: val(r), color: PALETTE[i % PALETTE.length] }))} format={fmt} unit={unit} /></div>
-        <div className="card"><h3>By industry sector</h3><p className="sub">The economic sector of each spend category.</p>
-          <BarList rows={sorted(d.bySector).map((r) => ({ key: r.sector, label: r.sector, value: val(r), color: 'var(--s2)' }))} format={fmt} unit={unit} max={10} /></div>
-        <div className="card" style={{ gridColumn: '1 / -1' }}><h3>By month</h3><p className="sub">{metric === 'co2e' ? 'Emissions from suppliers\' own factors and spend-based estimates.' : 'Spend in USD.'}</p>
-          <MonthColumns data={monthly} series={metric === 'co2e' ? [{ key: 'spend', label: 'Spend-based', color: 'var(--s3)' }, { key: 'supplier', label: "Supplier's own factor", color: 'var(--s1)' }] : [{ key: 'spend', label: 'Spend', color: 'var(--info)' }]} format={fmt} unit={unit} /></div>
+            ? <Treemap items={sorted(groups).map((g, i) => ({ n: g.group, v: v(g), c: PAL2[i % PAL2.length]! }))} W={640} H={200} />
+            : <HBars items={sorted(d.byItem).slice(0, 12).map((r) => ({ n: r.item ?? 'Not mapped', v: v(r), d: 1, p: tot ? (v(r) / tot) * 100 : 0 }))} unit={u === 't' ? 't' : ''} c="var(--s3)" />}
+        </DCard>
+        <DCard title="Largest suppliers" span={2} sub="engage these first: ask for their own factors, complete their profiles">
+          <HBars items={top.slice(0, 10).map((x) => ({ n: x.name, v: v(x), d: 1, p: tot ? (v(x) / tot) * 100 : 0, c: x.own_factor ? 'var(--ok)' : 'var(--s3)', onClick: () => nav(`/suppliers?open=${x.id}`) }))} unit={u === 't' ? 't' : ''} />
+          <div className="lgd"><span><i style={{ background: 'var(--ok)' }} />own factor</span><span><i style={{ background: 'var(--s3)' }} />spend-based</span></div>
+        </DCard>
+        <DCard title="By Scope 3 category"><div className="dsplit"><Donut parts={s3} center={metric === 'co2e' ? fmt0(tot) : usdShort(tot)} sub={metric === 'co2e' ? 't' : ''} size={124} /><Legend parts={s3} unit={u === 't' ? 't' : ''} /></div></DCard>
+        <DCard title={metric === 'co2e' ? 'Emissions by month (t)' : 'Spend by month (USD)'} span={2}>
+          <Bars rows={mrows} unit={u} h={165} />
+          {metric === 'co2e' && <div className="lgd"><span><i style={{ background: 'var(--ok)' }} />Supplier's own factor</span><span><i style={{ background: '#E9B44C' }} />Spend-based</span></div>}
+        </DCard>
+        <DCard title="Data quality"><div className="dsplit"><Donut parts={q} center={`${Math.round(supplierShare * 100)}%`} sub="specific" size={124} /><Legend parts={q} unit="t" /></div></DCard>
+        <DCard title="By industry sector" span={2}><HBars items={sorted(d.bySector).slice(0, 10).map((r) => ({ n: r.sector, v: v(r), d: 1, p: tot ? (v(r) / tot) * 100 : 0 }))} unit={u === 't' ? 't' : ''} c="var(--s2)" /></DCard>
+        <DCard title="Climate targets of suppliers"><div className="dsplit"><Donut parts={tParts} center={`${p.target}`} sub="with a target" size={124} /><Legend parts={tParts} unit="t" /></div></DCard>
+        <DCard title="Supplier profiles" span={2} sub={`how much is known about the ${p.suppliers.toLocaleString('en')} suppliers`}>
+          <HBars items={([['Country', p.country], ['Vendor number', p.reference], ['Industry', p.industry], ['Sustainability contact', p.contact], ['Reports its emissions', p.reports], ['Has a climate target', p.target], ['Own emission factor', p.own_factor]] as [string, number][])
+            .map(([n, x]) => ({ n, v: x, p: p.suppliers ? (x / p.suppliers) * 100 : 0, c: 'var(--primary)' }))} unit="" />
+          {p.review > 0 && <div className="sins">{p.review} possible duplicate{p.review === 1 ? '' : 's'} to check under “Check names”.</div>}
+        </DCard>
       </div>
       <div className="card flush">
-        <div style={{ padding: '14px 16px 6px' }}><h3>Largest suppliers</h3><p className="sub">By {metric === 'co2e' ? 'emissions' : 'spend'} in {d.year}. Engage these first: ask for their own emission factors (EPDs, product footprints) and complete their profiles.</p></div>
-        <div className="scrollx"><table className="t">
+        <div style={{ padding: '12px 14px 4px' }}><h3 style={{ fontSize: 13.5 }}>Largest suppliers · detail</h3></div>
+        <div className="scrollx"><table className="t dt">
           <thead><tr><th>#</th><th>Supplier</th><th>Country</th><th>Mainly</th><th className="num">Lines</th><th className="num">Spend (USD)</th><th className="num">tCO₂e</th><th className="num">Share</th><th>Factor</th><th>Profile</th></tr></thead>
-          <tbody>{[...d.top].sort((a, b) => val(b) - val(a)).map((s, i) => (
-            <tr key={s.id} className="click" onClick={() => nav(`/suppliers?open=${s.id}`)}>
-              <td className="muted">{i + 1}</td><td><b>{s.name}</b></td><td className="small">{s.country ? countryName(s.country) : <span className="muted">—</span>}</td>
-              <td className="small">{s.main_item ?? '—'}</td><td className="num">{s.lines.toLocaleString('en')}</td><td className="num">{usd(s.usd)}</td><td className="num">{tonnes(s.co2e)}</td>
-              <td className="num">{d.totals.co2e ? `${((s.co2e / d.totals.co2e) * 100).toFixed(1)}%` : ''}</td>
-              <td>{s.own_factor ? <span className="chip">own factor</span> : <span className="chip grey">spend-based</span>}</td><td><Completeness v={s.completeness} /></td>
+          <tbody>{top.map((x, i) => (
+            <tr key={x.id} className="click" onClick={() => nav(`/suppliers?open=${x.id}`)}>
+              <td className="muted">{i + 1}</td><td><b>{x.name}</b></td><td className="small">{x.country ? countryName(x.country) : <span className="muted">—</span>}</td>
+              <td className="small">{x.main_item ?? '—'}</td><td className="num">{x.lines.toLocaleString('en')}</td><td className="num">{usd(x.usd)}</td><td className="num">{tonnes(x.co2e)}</td>
+              <td className="num">{tot ? `${((v(x) / tot) * 100).toFixed(1)}%` : ''}</td>
+              <td>{x.own_factor ? <span className="chip">own factor</span> : <span className="chip grey">spend-based</span>}</td><td><Completeness v={x.completeness} /></td>
             </tr>))}</tbody>
         </table></div>
       </div>
-      <div className="dashgrid">
-        <div className="card"><h3>Supplier profiles</h3><p className="sub">How much is known about the {p.suppliers.toLocaleString('en')} suppliers. Fill in the gaps on each supplier's profile.</p>
-          <table className="t compact"><tbody>
-            {([['Country', p.country], ['Vendor number', p.reference], ['Industry', p.industry], ['Sustainability contact', p.contact], ['Reports its emissions', p.reports], ['Has a climate target', p.target], ['Own emission factor', p.own_factor]] as [string, number][]).map(([l, n]) => (
-              <tr key={l}><td>{l}</td><td style={{ width: '45%' }}><div className="cov"><i style={{ width: pctOf(n) }} /></div></td><td className="num">{n.toLocaleString('en')}</td><td className="num muted">{pctOf(n)}</td></tr>))}
-          </tbody></table>
-          {p.review > 0 && <div className="note warn" style={{ marginTop: 10 }}>{p.review} possible duplicate{p.review === 1 ? '' : 's'} to check under “Check names”.</div>}</div>
-        <div className="card"><h3>Climate targets of suppliers</h3><p className="sub">Share of purchased emissions by the supplier's climate target (from profiles).</p>
-          <ShareBar parts={d.targets.map((r, i) => ({ key: r.target, label: TARGET_LABEL[r.target] ?? r.target, value: r.co2e ?? 0, color: r.target === 'unknown' ? 'var(--line2)' : r.target === 'none' ? 'var(--bad)' : PALETTE[i % PALETTE.length]! }))} />
-          <table className="t compact" style={{ marginTop: 10 }}><tbody>{d.targets.map((r) => <tr key={r.target}><td>{TARGET_LABEL[r.target] ?? r.target}</td><td className="num">{r.suppliers} suppliers</td><td className="num">{tonnes(r.co2e)} t</td></tr>)}</tbody></table></div>
-      </div>
+      <span className="muted small">{fmtV(tot)} in {d.year}</span>
     </div>
   );
 }

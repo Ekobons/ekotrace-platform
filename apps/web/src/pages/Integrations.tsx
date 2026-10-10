@@ -25,7 +25,7 @@ export function Integrations() {
   return (
     <div className="page">
       <div className="head"><div><div className="eyebrow">Setup</div><h1>Integrations & API</h1>
-        <p className="sub">Systems that send data to {tenant?.name ?? 'the company'}: building management, utility portals, IoT platforms and data loggers (meter readings, matched by the meter's id); ERP and finance systems (purchase lines, reviewed under Capture → Purchases).</p></div></div>
+        <p className="sub">Systems that send data to {tenant?.name ?? 'the company'}: building management, utility portals, IoT platforms and data loggers (meter readings, matched by the meter's id); ERP and finance systems (purchase lines, reviewed under Add data → Purchases).</p></div></div>
       {err && <div className="note bad">{err}</div>}
 
       {admin && (
@@ -90,7 +90,7 @@ Content-Type: application/json
 
       <div className="card" style={{ display: 'grid', gap: 10 }}>
         <h2>Sending purchase lines (ERP)</h2>
-        <p className="sub">For SAP, Oracle, Dynamics or any finance system: send the lines of a period under one reference, in as many calls as needed (up to 10,000 lines each), then mark the batch complete. It is then mapped and calculated, and reviewed and published under Capture → Purchases like an upload. The client needs the “Purchase lines” permission.</p>
+        <p className="sub">For SAP, Oracle, Dynamics or any finance system: send the lines of a period under one reference, in as many calls as needed (up to 10,000 lines each), then mark the batch complete. It is then mapped and calculated, and reviewed and published under Add data → Purchases like an upload. The client needs the “Purchase lines” permission.</p>
         <pre className="code">{`POST ${origin}/api/v1/purchases
 Authorization: Bearer <access token>
 Content-Type: application/json

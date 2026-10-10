@@ -95,7 +95,36 @@ export async function importEpa(c: Tx, p: EpaParsed, opts: { createdBy?: string;
     [sourceId, p.priceYear, opts.createdBy ?? 'importer',
      rows.map((r) => idOf.get(`epa:naics:${r.naics}`)!), rows.map((r) => r.withMargins), rows.map((r) => prev.get(idOf.get(`epa:naics:${r.naics}`)!) ?? null),
      rows.map((r) => `NAICS ${r.naics}. With margins (purchaser price)${r.withoutMargins != null ? `; without margins ${r.withoutMargins}, margins ${r.margins ?? '—'}` : ''}.`)]);
+  await refreshAverages(c);
   return { source: code, skipped: false, items: items.rowCount ?? 0, factors: ins.rowCount ?? 0, superseded: old.rowCount ?? 0 };
+}
+
+/**
+ * The two average factors (services, goods): median of the active EPA factors of those
+ * industries, with the same source and price year. Fuels (211, 324), utilities (22) and
+ * waste (562) are left out — those purchases are counted from activity data.
+ */
+export async function refreshAverages(c: Tx) {
+  const groups: [string, string][] = [
+    ['purchase:average-services', `n ~ '^(4[2-9]|5[1-9]|6[1-2]|7[1-2]|81)' AND n !~ '^562'`],
+    ['purchase:average-goods', `n ~ '^(1[1-9]|2[13]|3[1-3])' AND n !~ '^(211|2212|324)'`],
+  ];
+  for (const [code, where] of groups) {
+    const m = (await c.query(
+      `SELECT percentile_cont(0.5) WITHIN GROUP (ORDER BY f.co2e)::float8 AS v, count(*)::int AS n, min(f.source_id) AS source_id, min(f.price_year) AS price_year
+         FROM factor f JOIN item i ON i.id = f.item_id CROSS JOIN LATERAL (SELECT i.attrs->>'naics' AS n) x
+        WHERE i.code LIKE 'epa:naics:%' AND f.status = 'active' AND f.basis = 'scope3' AND ${where}`)).rows[0];
+    if (!m?.n) continue;
+    const item = (await c.query('SELECT id FROM item WHERE code = $1', [code])).rows[0]?.id;
+    if (!item) continue;
+    const cur = (await c.query(`SELECT id, co2e::float8 AS co2e, source_id FROM factor WHERE item_id = $1 AND status = 'active'`, [item])).rows[0];
+    if (cur && Math.abs(cur.co2e - m.v) < 1e-9 && cur.source_id === m.source_id) continue;
+    if (cur) await c.query(`UPDATE factor SET status = 'superseded' WHERE id = $1`, [cur.id]);
+    await c.query(
+      `INSERT INTO factor (item_id, source_id, region, basis, unit, co2e, valid_from, valid_to, price_year, version, supersedes_id, note, created_by)
+       VALUES ($1, $2, 'US', 'scope3', 'USD', $3, '2000-01-01', '2100-12-31', $4, $5, $6, $7, 'importer')`,
+      [item, m.source_id, Math.round(m.v * 1e6) / 1e6, m.price_year, cur ? 2 : 1, cur?.id ?? null, `Median of ${m.n} EPA factors (with margins). Fallback for small purchases nothing else identifies.`]);
+  }
 }
 
 // ------------------------------------------------------- old Ekotrace list --

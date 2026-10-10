@@ -102,6 +102,9 @@ export function stem(w: string): string {
 function queryTerms(s: string, vocab?: Map<string, number>): { terms: Map<string, number>; covered: Set<string> } {
   const out = new Map<string, number>(), covered = new Set<string>();
   s = s.replace(/\bflue gas(es)?\b/gi, 'flue');                    // flue gas treatment is not natural gas
+  // "Diesel for generators": what is bought comes before "for" (the rest is its purpose)
+  const head = /^(.{3,}?)\s+for\s+\S/i.exec(s.trim());
+  if (head && (head[1]!.match(/[a-z][a-z0-9]+/gi) ?? []).length >= 1) s = head[1]!;
   const raw = s.toLowerCase().match(/[a-z][a-z0-9]+/g) ?? [];
   for (const w of tokens(s)) out.set(w, Math.max(out.get(w) ?? 0, 1));
   for (const r of raw) {
@@ -196,7 +199,7 @@ export function classify(ix: ClassIndex, text: string, k = 5, context = ''): Cla
 export interface Overlap { target: string; label: string; why: string; actions: ('keep' | 'move' | 'exclude')[] }
 export const OVERLAP_LABEL: Record<string, string> = {
   business_travel: 'Business travel (3.6)', upstream_transport: 'Upstream transport (3.4)', upstream_leased: 'Upstream leased assets (3.8)',
-  capital_goods: 'Capital goods (3.2)', fuel: 'Fuel (Scope 1 / 3.3)', energy: 'Electricity, heat, water (Scope 2 / 3.3)', waste: 'Waste (Scope 3.5)',
+  capital_goods: 'Capital goods (3.2)', not_purchase: 'Not a purchase', fuel: 'Fuel (Scope 1 / 3.3)', energy: 'Electricity, heat, water (Scope 2 / 3.3)', waste: 'Waste (Scope 3.5)',
 };
 const MOVE: ('keep' | 'move' | 'exclude')[] = ['keep', 'move', 'exclude'];
 const EXCL: ('keep' | 'move' | 'exclude')[] = ['keep', 'exclude'];

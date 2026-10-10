@@ -76,7 +76,7 @@ The scope follows **who runs the treatment site**: one Waste tab with a switch.
 ## Purchased goods & services — Scope 3.1 (and 3.2, 3.4, 3.6, 3.8)
 
 **What:** everything the company buys that is not fuel or energy it uses itself: materials, equipment, IT, services, travel and freight paid for, rent.
-**Enter:** purchase lines — uploaded from the ERP or finance system (Capture → Purchases), sent by the ERP through the API, or typed under Add data → Purchases. Each line: date, description, amount and currency; supplier, category and GL account help the mapping.
+**Enter:** purchase lines — uploaded from the ERP or finance system or typed by hand (both under Add data → Purchases), or sent by the ERP through the API. Each line: date, description, amount and currency; supplier, category and GL account help the mapping.
 
 ```flow
 > Spend category | each description is mapped to a spend category (US EPA NAICS commodity)

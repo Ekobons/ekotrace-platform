@@ -1,12 +1,12 @@
 # Purchases (Scope 3.1)
 
-Purchased goods & services usually come from the ERP or finance system — often tens of thousands of lines a year. Ekotrace reads them in any layout, groups them, maps each group to a spend category, flags what belongs elsewhere and publishes entries. Capture → Purchases lists every batch; Value chain → Suppliers holds the suppliers and their own factors; Setup → Currencies & price index holds exchange rates.
+Purchased goods & services usually come from the ERP or finance system — often tens of thousands of lines a year. Ekotrace reads them in any layout, groups them, maps each group to a spend category, flags what belongs elsewhere and publishes entries. Add data → Purchases holds the upload, typing by hand and every batch; Value chain → Suppliers holds the suppliers and their own factors; Setup → Currencies & price index holds exchange rates.
 
 ## Three ways in
 
 | Way | When | Where |
 |---|---|---|
-| Upload | an export from the ERP or finance system, any layout, up to 200,000 lines (60 MB) | Add data → Purchases → Upload Excel / CSV, or Capture → Purchases |
+| Upload | an export from the ERP or finance system, any layout, up to 200,000 lines (60 MB) | Add data → Purchases → Upload Excel / CSV |
 | ERP API | the ERP sends the lines itself, in calls of up to 10,000 | Setup → Integrations & API |
 | By hand | a few purchases | Add data → Purchases → Type by hand |
 
@@ -15,55 +15,65 @@ All three go through the same steps; an upload or API batch is reviewed before p
 ## From a file to entries
 
 ```flow
-* Upload the file | Excel (.xlsx) or CSV — any column names, title rows above the header are fine
-* Say which column is which | best guess shown (including vendor number and supplier country); the layout is remembered for the next file with the same columns
+* Upload the file | Add data → Purchases → Upload Excel / CSV — any column names, title rows above the header are fine
+* Say which column is which | best guess shown (including vendor number, supplier country and account); the layout is remembered for the next file with the same columns
 ! Same file twice | recognised; it can be uploaded again only on purpose, and its lines are then marked as duplicates
 > Read in the background | 50,000 lines take well under a minute; you can leave the page
 > Suppliers linked | each supplier name is linked to the supplier list, new suppliers added (see Suppliers)
-> Grouped | lines with the same description (PO numbers, dates and pack sizes ignored) form one group — you map groups, not lines
-> Mapped | 1. your remembered choices → 2. a NAICS code in the file → 3. text matching against the spend categories → 4. an approved AI service (only if switched on)
-! Overlap checked | travel, freight, rent, fuel, electricity, waste and capital goods flagged for a decision
-> Calculated | each line with the best factor; problems listed (facility not recognised, no exchange rate…)
-* Review | fix problems, choose categories for unclear groups, decide on flagged groups
+> Grouped | lines with the same description, account and category form one kind of purchase (PO numbers, dates and pack sizes ignored); a vague description (“Monthly charges”) is split by supplier
+> Category found | for each kind of purchase, once — see the order below
+> Calculated by month | each line keeps its month; entries are per facility, month and category
+* Review by impact | confirm the largest kinds of purchase; the small rest is accepted as it is
 ? Publish | ready lines become entries | the rest wait in the batch
 ```
 
-## Facility of each line
+## How the spend category is found
 
-Every line needs a facility, because entries are kept per facility.
+The first answer wins, for each kind of purchase:
 
-| The file has | What happens |
-|---|---|
-| no facility column | choose the facility of the whole file when saying which column is which (on Add data → Purchases, the facility chosen at the top is suggested) |
-| a facility / site / cost-centre column | each value is matched to a facility name; values not recognised are listed in the review, where you choose the facility each one stands for |
-| a column, but some lines blank | choose where **lines with no facility written** go — or leave it, and choose in the review under “no facility written” |
+| # | Source | Example |
+|---|---|---|
+| 1 | A choice remembered for this description | “Copier paper A4” → Stationery, decided last month |
+| 2 | A NAICS code written in the file | 322230 |
+| 3 | A clear description | “Ready mix concrete C40” → Ready-mix concrete |
+| 4 | The supplier's default category | “Monthly charges” from a guarding company → Security services |
+| 5 | The account's default category | account “Audit fees” → Accounting services |
+| 6 | A weaker description match | shown with how sure it is |
+| 7 | An average factor (estimate) | median EPA factor of services (0.11 kg CO₂e per 2022 USD) or of goods (0.28) |
 
-Purchases made centrally for the whole group (audit, insurance, software) are usually booked to the head office or a “Corporate” facility; create one under Organisation if the group has none.
+No AI is used unless the company switches on an approved AI service; even then only for large unclear purchases, choosing among the candidates found. Services have similar factors, so a wrong guess for a small purchase barely changes the total.
 
-## How fast
+## Capital goods and what is not a purchase
 
-A test export of 10,000 lines (Jan–Sep, about 450 different supplier spellings, six currencies) is read, linked to suppliers, mapped and calculated in about 8 seconds; 50,000 lines take about 20 seconds, publishing another 10.
+Checked in this order:
 
-## Reviewing a batch
+1. **The account:** under the Accounts tab of a batch, each account (GL) gets a type, remembered for every upload — *Purchase* (default), *Capital* (Scope 3.2) or *Not a purchase* (VAT, salaries, depreciation, intercompany: left out).
+2. **A capital column in the file** (e.g. asset or capex flag) for single lines.
+3. **The capital-goods list:** products marked “Capital Goods” in the previous Ekotrace list (225 products — machinery, vehicles, computers…), and EPA categories whose products on that list are all capital goods.
+4. Otherwise standard goods and services (3.1).
 
-- **By description:** one row per group with its lines, spend and result. The spend category shows how it was found (remembered, code in file, text match, AI, by hand) and how sure the match is; groups below 60 % are under **Check**.
-- Change a category and every line of the group follows. With **Remember my choices**, the next uploads get the same category and decision automatically.
-- Select several groups to set a category or a decision for all of them at once.
-- **Facilities not recognised:** choose the facility each value in the file stands for.
-- **Lines:** every line, filterable (problems, duplicates, warnings); open one to see its calculation step by step.
-- **Publish** creates one entry per facility, month, Scope 3 category, spend category and method, each with its lines behind it. **Reopen** takes the entries back (approved ones stay) so the batch can be changed and published again.
+A person can always change it for a kind of purchase; the choice is remembered.
 
 ## Other categories
 
-| Flag | Choices |
-|---|---|
-| Business travel (3.6): flights, hotels, taxis | move, keep, exclude |
-| Upstream transport (3.4): freight, couriers, warehousing | move, keep, exclude |
-| Upstream leased assets (3.8): rent | move, keep, exclude |
-| Fuel, electricity & water, waste | keep, or exclude when already counted from activity data |
-| Capital goods (3.2): machinery, vehicles, construction, computers | a hint: mark as capital goods when the company capitalised the purchase |
+Purchases that belong elsewhere are decided by default and shown:
 
-Moved lines are spend-based in their category until activity data (distances, nights, tonne-km) replaces them. Nothing flagged is published until someone decides — except the capital-goods hint, which never blocks.
+| Found | Default | Can be changed to |
+|---|---|---|
+| Business travel (3.6): flights, hotels, taxis | moved to 3.6 | keep in 3.1, exclude |
+| Upstream transport (3.4): freight, couriers | moved to 3.4 | keep, exclude |
+| Upstream leased assets (3.8): rent | moved to 3.8 | keep, exclude |
+| Fuel, electricity & water, waste | excluded (already counted from activity data) | keep |
+
+An account can also move its lines (e.g. account “Travel” → business travel). Moved lines are spend-based in their category until activity data (distances, nights, tonne-km) replaces them.
+
+## Review by impact
+
+- Kinds of purchase are sorted by emissions. The largest, up to **95 %** of the batch's emissions (company setting: 80–100 %), wait under **To confirm** until a person confirms them — *Confirm* on a row, *Confirm these* for a page, or any change.
+- The small rest is **accepted as it is** and publishes without a check.
+- The review bar shows confirmed, to confirm and accepted shares. Changing a category or decision confirms it; with **Remember my choices** the next uploads follow — for *this description*, *everything from this supplier* (the supplier's default) or *everything in this account*.
+- **Facilities not recognised:** choose the facility each value in the file stands for. **Lines:** every line, filterable; open one to see its calculation.
+- **Publish** creates one entry per facility, month, Scope 3 category, spend category and method, each with its lines behind it. **Reopen** takes the entries back (approved ones stay).
 
 ## Factors
 

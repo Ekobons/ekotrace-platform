@@ -10,7 +10,7 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useApp } from '../App';
-import { ApiError, api, download, num, tco2e, type BatchDetail, type Columns, type Facility, type LineStatus, type PurchaseBatch, type PurchaseField, type PurchaseGroup, type PurchaseLine, type PurchaseMeta, type UploadResult } from '../lib/api';
+import { ApiError, api, download, num, tco2e, type BatchDetail, type Columns, type Facility, type LineStatus, type PurchaseBatch, type PurchaseField, type PurchaseGroup, type PurchaseLine, type PurchaseMeta, type UploadResult, type PurchaseAccount } from '../lib/api';
 import { ItemPicker } from '../components/ItemPicker';
 import { Icon } from '../components/Icon';
 
@@ -20,16 +20,16 @@ const BATCH_STATUS: Record<string, [string, string]> = {
   review: ['To review', 'warn'], publishing: ['Publishing', 'info'], published: ['Published', ''], failed: ['Failed', 'bad'],
 };
 const LINE_STATUS: Record<LineStatus, [string, string]> = {
-  new: ['new', 'grey'], problem: ['problem', 'bad'], unmapped: ['no category', 'warn'], flagged: ['other category?', 'warn'], excluded: ['excluded', 'grey'], ready: ['ready', 'info'], published: ['published', ''],
+  new: ['new', 'grey'], problem: ['problem', 'bad'], unmapped: ['no category', 'warn'], flagged: ['other category?', 'warn'], check: ['to confirm', 'warn'], excluded: ['excluded', 'grey'], ready: ['ready', 'info'], published: ['published', ''],
 };
 const SOURCE: Record<string, string> = { upload: 'File', manual: 'Entered', api: 'ERP API' };
-const METHOD: Record<string, string> = { rule: 'remembered', text: 'text match', ai: 'AI', manual: 'by hand', code: 'code in file' };
+const METHOD: Record<string, string> = { rule: 'remembered', text: 'description', ai: 'AI', manual: 'by hand', code: 'code in file', supplier: 'supplier default', gl: 'account default', category: 'category default', fallback: 'average factor (estimate)' };
 export const TARGETS: [string, string][] = [['business_travel', 'Business travel (3.6)'], ['upstream_transport', 'Upstream transport (3.4)'], ['upstream_leased', 'Upstream leased assets (3.8)'], ['capital_goods', 'Capital goods (3.2)']];
 const CAT_NAME: Record<string, string> = { purchased_goods: 'Purchased goods & services (3.1)', capital_goods: 'Capital goods (3.2)', upstream_transport: 'Upstream transport (3.4)', business_travel: 'Business travel (3.6)', upstream_leased: 'Upstream leased assets (3.8)' };
 const usd = (v: number | null | undefined) => (v == null ? '—' : `$${Math.round(v).toLocaleString('en')}`);
 const running = (s: string) => ['queued', 'reading', 'mapping', 'publishing'].includes(s);
 
-function FactorBanner({ meta }: { meta: PurchaseMeta | null }) {
+export function FactorBanner({ meta }: { meta: PurchaseMeta | null }) {
   if (!meta) return null;
   const demoOnly = meta.factorSets.length > 0 && meta.factorSets.every((f) => f.code === 'DEMO-SPEND');
   if (!meta.factorSets.length) return <div className="note warn">No spend-based factors are loaded yet: a platform admin loads the US EPA supply chain factors (v1.3) under Factors &amp; dictionary. Lines with a supplier's own factor can still be calculated.</div>;
@@ -41,52 +41,61 @@ export function Purchases() {
   const { role } = useApp();
   const nav = useNavigate();
   const [meta, setMeta] = useState<PurchaseMeta | null>(null);
-  const [batches, setBatches] = useState<PurchaseBatch[] | null>(null);
   const [upload, setUpload] = useState<UploadResult | null>(null);
+  const [rev, setRev] = useState(0);
   const canEnter = ENTER.includes(role);
+  useEffect(() => { api.purchaseMeta().then(setMeta); }, []);
+  return (
+    <div className="page">
+      <div className="head">
+        <div><div className="eyebrow">Capture · Scope 3.1</div><h1>Purchases</h1>
+          <p className="sub">All purchase batches (uploads, ERP API, entered by hand). Upload and enter purchases under Add data → Purchases.</p></div>
+        <div className="row" style={{ alignSelf: 'flex-end' }}>
+          {canEnter && <Link className="btn" to="/data/purchased_goods"><Icon name="plus" />Add purchases</Link>}
+        </div>
+      </div>
+      <FactorBanner meta={meta} />
+      {canEnter && !upload && <UploadBox onUploaded={setUpload} />}
+      {upload && meta && <ColumnSetup meta={meta} up={upload} onCancel={() => { api.deleteBatch(upload.batchId).catch(() => {}); setUpload(null); setRev((r) => r + 1); }} onStarted={(id) => { setUpload(null); nav(`/purchases/${id}`); }} />}
+      <BatchList key={rev} />
+    </div>
+  );
+}
+
+/** Every purchase batch with its state; follows running ones. */
+export function BatchList({ title }: { title?: string }) {
+  const nav = useNavigate();
+  const [batches, setBatches] = useState<PurchaseBatch[] | null>(null);
   const load = () => api.purchaseBatches().then((r) => setBatches(r.batches));
-  useEffect(() => { api.purchaseMeta().then(setMeta); load(); }, []);
+  useEffect(() => { load(); }, []);
   useEffect(() => { // follow running batches
     if (!batches?.some((b) => running(b.status))) return;
     const t = window.setTimeout(load, 1500);
     return () => window.clearTimeout(t);
   }, [batches]);
-
   return (
-    <div className="page">
-      <div className="head">
-        <div><div className="eyebrow">Capture · Scope 3.1</div><h1>Purchases</h1>
-          <p className="sub">Purchased goods &amp; services from your ERP or finance system: upload an export in any layout, or connect the ERP through the API. Lines are grouped by description, mapped to a spend category, checked for overlap with other categories, and published as entries.</p></div>
-        <div className="row" style={{ alignSelf: 'flex-end' }}>
-          <button className="btn" onClick={() => download('/api/purchases/template', 'Ekotrace purchases template.xlsx')}><Icon name="doc" />Template</button>
-          {canEnter && <Link className="btn" to="/data/purchased_goods"><Icon name="edit" />Enter by hand</Link>}
-        </div>
-      </div>
-      <FactorBanner meta={meta} />
-      {canEnter && !upload && <UploadBox onUploaded={setUpload} />}
-      {upload && meta && <ColumnSetup meta={meta} up={upload} onCancel={() => { api.deleteBatch(upload.batchId).catch(() => {}); setUpload(null); }} onStarted={(id) => { setUpload(null); nav(`/purchases/${id}`); }} />}
-      <div className="card flush">
-        {batches === null ? <div className="empty">Loading…</div> : batches.length ? (
-          <table className="t">
-            <thead><tr><th>Batch</th><th>Source</th><th>State</th><th className="num">Lines</th><th className="num">Need attention</th><th className="num">Spend (USD)</th><th className="num">tCO₂e</th><th>Added</th></tr></thead>
-            <tbody>{batches.map((b) => {
-              const [label, tone] = BATCH_STATUS[b.status] ?? [b.status, 'grey'];
-              const p = b.progress;
-              return (
-                <tr key={b.id} className="click" onClick={() => nav(`/purchases/${b.id}`)}>
-                  <td><b>{b.name}</b>{b.error && b.status === 'failed' && <div className="bad small">{b.error}</div>}</td>
-                  <td>{SOURCE[b.source]}</td>
-                  <td><span className={`chip ${tone}`}>{label}</span>{running(b.status) && p?.done != null && <div className="muted small">{p.stage} {p.done.toLocaleString('en')}{p.total ? ` / ${p.total.toLocaleString('en')}` : ''}</div>}</td>
-                  <td className="num">{b.lines.toLocaleString('en')}</td>
-                  <td className="num">{b.attention ? <span className="chip warn">{b.attention.toLocaleString('en')}</span> : '—'}</td>
-                  <td className="num">{usd(b.usd)}</td>
-                  <td className="num">{tco2e(b.co2e)}</td>
-                  <td className="muted small">{new Date(b.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}{b.created_by_name ? ` · ${b.created_by_name}` : ''}</td>
-                </tr>);
-            })}</tbody>
-          </table>
-        ) : <div className="empty">No purchases yet. Upload an export from your ERP, download the template, or enter purchases by hand.</div>}
-      </div>
+    <div className="card flush">
+      {title && <div style={{ padding: '14px 16px 4px' }}><h3>{title}</h3></div>}
+      {batches === null ? <div className="empty">Loading…</div> : batches.length ? (
+        <div className="scrollx"><table className="t">
+          <thead><tr><th>Batch</th><th>Source</th><th>State</th><th className="num">Lines</th><th className="num">To confirm / fix</th><th className="num">Spend (USD)</th><th className="num">tCO₂e</th><th>Added</th></tr></thead>
+          <tbody>{batches.map((b) => {
+            const [label, tone] = BATCH_STATUS[b.status] ?? [b.status, 'grey'];
+            const p = b.progress;
+            return (
+              <tr key={b.id} className="click" onClick={() => nav(`/purchases/${b.id}`)}>
+                <td><b>{b.name}</b>{b.error && b.status === 'failed' && <div className="bad small">{b.error}</div>}</td>
+                <td>{SOURCE[b.source]}</td>
+                <td><span className={`chip ${tone}`}>{label}</span>{running(b.status) && p?.done != null && <div className="muted small">{p.stage} {p.done.toLocaleString('en')}{p.total ? ` / ${p.total.toLocaleString('en')}` : ''}</div>}</td>
+                <td className="num">{b.lines.toLocaleString('en')}</td>
+                <td className="num">{b.attention ? <span className="chip warn">{b.attention.toLocaleString('en')}</span> : '—'}</td>
+                <td className="num">{usd(b.usd)}</td>
+                <td className="num">{tco2e(b.co2e)}</td>
+                <td className="muted small">{new Date(b.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}{b.created_by_name ? ` · ${b.created_by_name}` : ''}</td>
+              </tr>);
+          })}</tbody>
+        </table></div>
+      ) : <div className="empty">No purchases yet. Upload an export from your ERP, download the template, or enter purchases by hand.</div>}
     </div>
   );
 }
@@ -211,7 +220,7 @@ export function PurchaseBatchPage() {
   const { role, toast } = useApp();
   const nav = useNavigate();
   const [d, setD] = useState<BatchDetail | null>(null);
-  const [tab, setTab] = useState<'groups' | 'lines' | 'summary'>('groups');
+  const [tab, setTab] = useState<'groups' | 'lines' | 'summary' | 'accounts'>('groups');
   const [err, setErr] = useState<string | null>(null);
   const [rev, setRev] = useState(0);
   const canEnter = ENTER.includes(role);
@@ -232,10 +241,12 @@ export function PurchaseBatchPage() {
   const [label, tone] = BATCH_STATUS[b.status] ?? [b.status, 'grey'];
   const p = d.job?.progress;
   const attention = count('problem') + count('unmapped') + count('flagged');
+  const G = d.groups;
+  const pct = (v: number) => (G.co2e ? Math.round((100 * v) / G.co2e) : 0);
   return (
     <div className="page">
       <div className="head">
-        <div><div className="eyebrow"><Link to="/purchases">Purchases</Link> · {SOURCE[b.source]}{b.file ? ` · ${b.file.filename}` : ''}{b.external_ref ? ` · ref ${b.external_ref}` : ''}</div>
+        <div><div className="eyebrow"><Link to="/data/purchased_goods">Purchases</Link> · {SOURCE[b.source]}{b.file ? ` · ${b.file.filename}` : ''}{b.external_ref ? ` · ref ${b.external_ref}` : ''}</div>
           <h1>{b.name} <span className={`chip ${tone}`} style={{ verticalAlign: 'middle' }}>{label}</span></h1>
           <p className="sub">{total.toLocaleString('en')} lines{d.period.from ? ` · ${d.period.from.slice(0, 7)} to ${d.period.to?.slice(0, 7)}` : ''} · {d.groups.total.toLocaleString('en')} distinct descriptions · {d.entries.n ? `${d.entries.n} entries published` : 'not published yet'}</p></div>
         {canEnter && !busy && b.status !== 'setup' && (
@@ -259,12 +270,34 @@ export function PurchaseBatchPage() {
       {b.error && b.status !== 'failed' && <div className="note warn">{b.error}</div>}
       {err && <div className="note bad">{err}</div>}
 
+      {!busy && G.total > 0 && (
+        <div className="card review" style={{ display: 'grid', gap: 8 }}>
+          <div className="row"><h3 className="grow">Review by impact</h3>
+            <span className="muted small">the largest kinds of purchase, up to</span>
+            {role === 'super_admin' && canEnter ? <select className="input sm" style={{ width: 'auto' }} value={String(G.coverage)} title="Company setting"
+              onChange={(e) => act(async () => { await api.purchaseSettings({ reviewCoverage: Number(e.target.value) }); await api.recalcBatch(id!); }, 'Review coverage changed')}>
+              {[0.8, 0.9, 0.95, 0.98, 1].map((v) => <option key={v} value={String(v)}>{Math.round(v * 100)}%</option>)}</select> : <b className="small">{Math.round(G.coverage * 100)}%</b>}
+            <span className="muted small">of the batch's emissions, need a person; the small rest is accepted as it is</span></div>
+          <div className="revbar" role="img" aria-label="Review coverage">
+            <span className="c" style={{ flex: Math.max(0.001, G.co2e_confirmed) }} title="Large groups confirmed" />
+            <span className="t" style={{ flex: Math.max(0.001, G.co2e_material - G.co2e_confirmed) }} title="Large groups to confirm" />
+            <span className="a" style={{ flex: Math.max(0.001, G.co2e_auto) }} title="Small groups, accepted as they are" />
+          </div>
+          <div className="legend">
+            <span><i style={{ background: 'var(--primary)' }} />Confirmed: {G.material_confirmed} of {G.material} large groups · {pct(G.co2e_confirmed)}% of emissions</span>
+            <span><i style={{ background: 'var(--s3)' }} />To confirm: {G.check} groups · {pct(G.co2e_material - G.co2e_confirmed)}%</span>
+            <span><i style={{ background: 'var(--line2)' }} />Accepted as they are: {G.auto.toLocaleString('en')} small groups · {pct(G.co2e_auto)}%</span>
+            {G.fallback > 0 && <span className="muted">{G.fallback} groups use an average factor (estimate)</span>}
+          </div>
+        </div>
+      )}
       <div className="stats">
+        <div className={`stat ${count('check') ? 'warnb' : ''}`}><div className="lbl">To confirm</div><div className="v">{count('check').toLocaleString('en')}</div><div className="muted small">lines in {G.check} large groups · {tco2e(co2('check'))} tCO₂e</div></div>
         <div className="stat"><div className="lbl">Ready to publish</div><div className="v">{count('ready').toLocaleString('en')}</div><div className="muted small">{tco2e(co2('ready'))} tCO₂e</div></div>
         <div className="stat s3"><div className="lbl">Published</div><div className="v">{count('published').toLocaleString('en')}</div><div className="muted small">{tco2e(co2('published'))} tCO₂e</div></div>
-        <div className={`stat ${attention ? 'warnb' : ''}`}><div className="lbl">Need attention</div><div className="v">{attention.toLocaleString('en')}</div>
-          <div className="muted small">{count('problem')} problems · {count('unmapped')} no category · {count('flagged')} other category?</div></div>
-        <div className="stat"><div className="lbl">Excluded</div><div className="v">{count('excluded').toLocaleString('en')}</div><div className="muted small">already counted elsewhere</div></div>
+        <div className={`stat ${attention ? 'warnb' : ''}`}><div className="lbl">Problems</div><div className="v">{attention.toLocaleString('en')}</div>
+          <div className="muted small">{count('problem')} to fix{count('unmapped') ? ` · ${count('unmapped')} no category` : ''}{count('flagged') ? ` · ${count('flagged')} other category?` : ''}</div></div>
+        <div className="stat"><div className="lbl">Excluded</div><div className="v">{count('excluded').toLocaleString('en')}</div><div className="muted small">already counted elsewhere, or not a purchase</div></div>
       </div>
 
       {(d.facilitiesMissing.length > 0 || d.problems.length > 0) && !busy && (
@@ -279,12 +312,14 @@ export function PurchaseBatchPage() {
       )}
 
       <div className="tabs">
-        <button className={tab === 'groups' ? 'on' : ''} onClick={() => setTab('groups')}>By description ({d.groups.total.toLocaleString('en')})</button>
+        <button className={tab === 'groups' ? 'on' : ''} onClick={() => setTab('groups')}>Purchases ({d.groups.total.toLocaleString('en')} kinds)</button>
+        <button className={tab === 'accounts' ? 'on' : ''} onClick={() => setTab('accounts')}>Accounts</button>
         <button className={tab === 'lines' ? 'on' : ''} onClick={() => setTab('lines')}>Lines ({total.toLocaleString('en')})</button>
         <button className={tab === 'summary' ? 'on' : ''} onClick={() => setTab('summary')}>Summary</button>
       </div>
       {tab === 'groups' && <Groups key={rev} batchId={id!} d={d} canEdit={canEnter && !busy} onChanged={refresh} />}
       {tab === 'lines' && <Lines key={rev} batchId={id!} />}
+      {tab === 'accounts' && <Accounts key={rev} batchId={id!} canEdit={canEnter && !busy} onChanged={refresh} />}
       {tab === 'summary' && <Summary d={d} />}
     </div>
   );
@@ -308,15 +343,16 @@ function FacilityFix({ batchId, missing, onDone, canEnter }: { batchId: string; 
 }
 
 const FILTERS: [string, string, (d: BatchDetail) => number | null][] = [
-  ['all', 'All', (d) => d.groups.total], ['unmapped', 'No category', (d) => d.groups.unmapped], ['check', 'Check (low confidence)', (d) => d.groups.check],
-  ['flagged', 'Other category?', (d) => d.groups.flagged], ['capital', 'Capital goods?', (d) => d.groups.capital_hint], ['moved', 'Moved', () => null], ['excluded', 'Excluded', () => null],
+  ['check', 'To confirm', (d) => d.groups.check], ['all', 'All', (d) => d.groups.total], ['flagged', 'Other category', (d) => d.groups.flagged], ['capital', 'Capital goods', (d) => d.groups.capital_hint],
+  ['excluded', 'Excluded', (d) => d.groups.excluded], ['fallback', 'Average factor', (d) => d.groups.fallback], ['auto', 'Small, accepted', (d) => d.groups.auto], ['unmapped', 'No category', (d) => d.groups.unmapped || null],
 ];
 
 function Groups({ batchId, d, canEdit, onChanged }: { batchId: string; d: BatchDetail; canEdit: boolean; onChanged: () => void }) {
   const { toast } = useApp();
-  const [filter, setFilter] = useState(d.groups.flagged ? 'flagged' : d.groups.unmapped ? 'unmapped' : 'all');
+  const [filter, setFilter] = useState(d.groups.check ? 'check' : d.groups.unmapped ? 'unmapped' : 'all');
   const [q, setQ] = useState('');
-  const [sort, setSort] = useState('spend');
+  const [sort, setSort] = useState('co2e');
+  const [scope, setScope] = useState<'text' | 'supplier' | 'gl'>('text');
   const [offset, setOffset] = useState(0);
   const [rows, setRows] = useState<PurchaseGroup[] | null>(null);
   const [total, setTotal] = useState(0);
@@ -331,7 +367,7 @@ function Groups({ batchId, d, canEdit, onChanged }: { batchId: string; d: BatchD
   useEffect(() => { setOffset(0); setSel(new Set()); }, [filter, q, sort]);
   const patch = async (keys: string[], b: Parameters<typeof api.patchGroups>[1] extends infer T ? Omit<T & object, 'keys'> : never) => {
     setErr(null);
-    try { const r = await api.patchGroups(batchId, { keys, remember, ...b }); toast(r.background ? `${r.lines.toLocaleString('en')} lines: recalculating in the background` : `${r.groups} group${r.groups === 1 ? '' : 's'} · ${r.lines.toLocaleString('en')} lines updated`); setSel(new Set()); load(); onChanged(); }
+    try { const r = await api.patchGroups(batchId, { keys, remember, scope, ...b }); toast(r.background ? `${r.lines.toLocaleString('en')} lines: recalculating in the background` : `${r.groups} group${r.groups === 1 ? '' : 's'} · ${r.lines.toLocaleString('en')} lines updated`); setSel(new Set()); load(); onChanged(); }
     catch (e) { setErr((e as Error).message); }
   };
   const all = rows?.length ? rows.every((r) => sel.has(r.key)) : false;
@@ -341,8 +377,9 @@ function Groups({ batchId, d, canEdit, onChanged }: { batchId: string; d: BatchD
       <div className="row" style={{ padding: 12, gap: 6, flexWrap: 'wrap' }}>
         {FILTERS.map(([k, l, n]) => { const c = n(d); return <button key={k} className={`btn sm ${filter === k ? 'p' : ''}`} onClick={() => setFilter(k)}>{l}{c != null ? ` (${c.toLocaleString('en')})` : ''}</button>; })}
         <div className="grow" />
+        {canEdit && filter === 'check' && !!rows?.length && <button className="btn sm p" title="The categories and decisions shown on this page are right" onClick={() => patch(rows.map((r) => r.key), { confirm: true })}>Confirm these {rows.length}</button>}
         <input className="input sm" type="search" placeholder="Search description, category, supplier…" value={q} onChange={(e) => setQ(e.target.value)} style={{ width: 260 }} />
-        <select className="input sm" value={sort} onChange={(e) => setSort(e.target.value)} style={{ width: 'auto' }}><option value="spend">by spend</option><option value="lines">by lines</option><option value="confidence">least sure first</option><option value="name">A–Z</option></select>
+        <select className="input sm" value={sort} onChange={(e) => setSort(e.target.value)} style={{ width: 'auto' }}><option value="co2e">by emissions</option><option value="spend">by spend</option><option value="lines">by lines</option><option value="confidence">least sure first</option><option value="name">A–Z</option></select>
       </div>
       {canEdit && sel.size > 0 && (
         <div className="bulkbar">
@@ -352,6 +389,7 @@ function Groups({ batchId, d, canEdit, onChanged }: { batchId: string; d: BatchD
           <select className="input sm" value={moveTo} onChange={(e) => setMoveTo(e.target.value)} style={{ width: 'auto' }}>{TARGETS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select>
           <button className="btn sm" onClick={() => patch([...sel], moveTo === 'capital_goods' ? { capital: true, decision: 'keep' } : { decision: 'move', target: moveTo })}>Move</button>
           <button className="btn sm" onClick={() => patch([...sel], { decision: 'exclude' })}>Exclude</button>
+          <button className="btn sm p" onClick={() => patch([...sel], { confirm: true })}>Confirm as shown</button>
           <button className="btn sm ghost" onClick={() => setSel(new Set())}>Clear</button>
         </div>
       )}
@@ -359,13 +397,13 @@ function Groups({ batchId, d, canEdit, onChanged }: { batchId: string; d: BatchD
       {rows === null ? <div className="empty">Loading…</div> : !rows.length ? <div className="empty">Nothing here.</div> : (
         <div className="scrollx"><table className="t groups">
           <thead><tr>{canEdit && <th style={{ width: 28 }}><input type="checkbox" checked={all} onChange={() => setSel(all ? new Set() : new Set(rows.map((r) => r.key)))} /></th>}
-            <th>Description</th><th className="num">Lines</th><th className="num">Spend (USD)</th><th style={{ minWidth: 280 }}>Spend category</th><th style={{ minWidth: 220 }}>Other category?</th><th className="num">tCO₂e</th></tr></thead>
+            <th>Purchase</th><th className="num">Lines</th><th className="num">Spend (USD)</th><th style={{ minWidth: 280 }}>Spend category</th><th style={{ minWidth: 220 }}>Scope 3 category</th><th className="num">tCO₂e</th><th /></tr></thead>
           <tbody>{rows.map((g) => (
             <Fragment key={g.key}>
               <tr className={sel.has(g.key) ? 'sel' : ''}>
                 {canEdit && <td><input type="checkbox" checked={sel.has(g.key)} onChange={() => setSel((s) => { const n = new Set(s); n.has(g.key) ? n.delete(g.key) : n.add(g.key); return n; })} /></td>}
                 <td style={{ maxWidth: 380 }}><b>{g.description}</b>
-                  <div className="muted small">{[g.category_text, g.gl_account, g.supplier].filter(Boolean).join(' · ')}</div>
+                  <div className="muted small">{[g.supplier, g.gl_account && `account ${g.gl_account}`, g.category_text].filter(Boolean).join(' · ')}</div>
                   {g.statuses && (g.statuses.problem ?? 0) > 0 && <span className="chip bad">{g.statuses.problem} with problems</span>}
                 </td>
                 <td className="num"><button className="link" onClick={() => setLineOf(lineOf === g.key ? null : g.key)}>{g.lines.toLocaleString('en')}</button></td>
@@ -373,16 +411,17 @@ function Groups({ batchId, d, canEdit, onChanged }: { batchId: string; d: BatchD
                 <td>
                   {canEdit ? <ItemPicker value={g.item_id} valueName={g.item_name} candidates={g.candidates} onPick={(it) => patch([g.key], { itemId: it?.id ?? null })} /> : (g.item_name ?? <span className="muted">—</span>)}
                   <div className="row" style={{ gap: 4, marginTop: 3 }}>
-                    {g.map_method && <span className="chip grey">{METHOD[g.map_method]}</span>}
-                    {g.confidence != null && g.map_method !== 'manual' && g.map_method !== 'rule' && <span className={`chip ${g.confidence >= 0.6 ? '' : 'warn'}`}>{Math.round(g.confidence * 100)}%</span>}
+                    {g.map_method && <span className={`chip ${g.map_method === 'fallback' ? 'warn' : 'grey'}`}>{METHOD[g.map_method]}</span>}
+                    {g.confidence != null && g.map_method === 'text' && <span className={`chip ${g.confidence >= 0.6 ? '' : 'warn'}`}>{Math.round(g.confidence * 100)}% sure</span>}
                     {g.naics && <span className="muted small">NAICS {g.naics}</span>}
                   </div>
                 </td>
                 <td>
                   {g.overlap && !(g.overlap === 'capital_goods' && g.capital) && <div className={`chip ${g.decision ? 'grey' : 'warn'}`} title={g.overlap_why ?? ''}>{d.batch && (CAT_NAME[g.overlap] ?? OVERLAP_TEXT[g.overlap] ?? g.overlap)}?</div>}
                   {g.decision === 'move' && <div className="small">→ moved to {CAT_NAME[g.target ?? ''] ?? g.target}</div>}
-                  {g.decision === 'exclude' && <div className="small">excluded (counted elsewhere)</div>}
-                  {g.capital && <div className="small">→ capital goods (3.2)</div>}
+                  {g.decision === 'exclude' && <div className="small">{g.overlap === 'not_purchase' ? 'not a purchase: left out' : 'excluded (counted elsewhere)'}</div>}
+                  {g.capital && <div className="small">→ capital goods (3.2){g.capital_why ? <span className="muted"> · {g.capital_why}</span> : null}</div>}
+                  {!g.decision && !g.capital && !g.overlap && <div className="small muted">3.1 Purchased goods &amp; services</div>}
                   {canEdit && (g.overlap || g.decision || g.capital) && (
                     <div className="row" style={{ gap: 4, marginTop: 4 }}>
                       {g.overlap && g.overlap !== 'capital_goods' && !['fuel', 'energy', 'waste'].includes(g.overlap) && g.decision !== 'move' && <button className="btn xs" onClick={() => patch([g.key], { decision: 'move', target: g.overlap })}>Move</button>}
@@ -392,17 +431,22 @@ function Groups({ batchId, d, canEdit, onChanged }: { batchId: string; d: BatchD
                       {g.decision !== 'exclude' && g.overlap !== 'capital_goods' && <button className="btn xs" onClick={() => patch([g.key], { decision: 'exclude' })}>Exclude</button>}
                     </div>
                   )}
-                  {g.overlap_why && !g.decision && <div className="muted small">{g.overlap_why}</div>}
+                  {g.overlap_why && <div className="muted small">{g.overlap_why}</div>}
                 </td>
-                <td className="num">{g.co2e != null ? tco2e(g.co2e) : '—'}</td>
+                <td className="num">{g.co2e != null ? tco2e(g.co2e) : '—'}{g.batch_co2e && g.co2e ? <div className="muted small">{((100 * g.co2e) / g.batch_co2e).toFixed(g.co2e / g.batch_co2e < 0.01 ? 2 : 1)}%</div> : null}</td>
+                <td>{g.material && !g.confirmed ? (canEdit ? <button className="btn xs p" onClick={() => patch([g.key], { confirm: true })} title="The category and decision shown are right">Confirm</button> : <span className="chip warn">to confirm</span>)
+                  : g.confirmed ? <span className="chip" title="Settled by a person or a remembered choice">✓</span> : <span className="chip grey" title="Small: accepted as it is">small</span>}</td>
               </tr>
-              {lineOf === g.key && <tr className="sub-row"><td colSpan={canEdit ? 7 : 6}><Lines batchId={batchId} group={g.key} compact /></td></tr>}
+              {lineOf === g.key && <tr className="sub-row"><td colSpan={canEdit ? 8 : 7}><Lines batchId={batchId} group={g.key} compact /></td></tr>}
             </Fragment>
           ))}</tbody>
         </table></div>
       )}
       <div className="row" style={{ padding: 12 }}>
-        {canEdit && <label className="row" style={{ gap: 6, fontSize: 13 }} title="Next uploads with the same description get the same category and decision"><input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} />Remember my choices for future uploads</label>}
+        {canEdit && <label className="row" style={{ gap: 6, fontSize: 13 }}><input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} />Remember my choices</label>}
+        {canEdit && remember && <label className="row" style={{ gap: 6, fontSize: 13 }}>for
+          <select className="input sm" value={scope} onChange={(e) => setScope(e.target.value as 'text')} style={{ width: 'auto' }}>
+            <option value="text">this description</option><option value="supplier">everything from this supplier</option><option value="gl">everything in this account</option></select></label>}
         <div className="grow" />
         {total > LIMIT && <>
           <span className="muted small">{offset + 1}–{Math.min(total, offset + LIMIT)} of {total.toLocaleString('en')}</span>
@@ -413,7 +457,44 @@ function Groups({ batchId, d, canEdit, onChanged }: { batchId: string; d: BatchD
     </div>
   );
 }
-const OVERLAP_TEXT: Record<string, string> = { fuel: 'Fuel (Scope 1 / 3.3)', energy: 'Electricity / water (Scope 2 / 3.3)', waste: 'Waste (3.5)' };
+const OVERLAP_TEXT: Record<string, string> = { fuel: 'Fuel (Scope 1 / 3.3)', energy: 'Electricity / water (Scope 2 / 3.3)', waste: 'Waste (3.5)', not_purchase: 'Not a purchase' };
+
+const ACCOUNT_TYPES: [string, string][] = [['', 'Purchase (default)'], ['capital', 'Capital (Scope 3.2)'], ['not_purchase', 'Not a purchase (VAT, salaries…)']];
+/** The accounts of a batch: their type and default category, remembered for every upload. */
+function Accounts({ batchId, canEdit, onChanged }: { batchId: string; canEdit: boolean; onChanged: () => void }) {
+  const { toast } = useApp();
+  const [rows, setRows] = useState<PurchaseAccount[] | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const load = () => api.purchaseAccounts(batchId).then((r) => setRows(r.accounts)).catch((e) => setErr(e.message));
+  useEffect(() => { load(); }, [batchId]); // eslint-disable-line react-hooks/exhaustive-deps
+  const save = async (a: PurchaseAccount, b: { accountType?: string | null; itemId?: number | null; target?: string | null }) => {
+    setErr(null);
+    try { const r = await api.setPurchaseAccount({ account: a.account, batchId, ...b }); toast(`Saved for every upload · ${r.lines.toLocaleString('en')} lines updated`); load(); onChanged(); }
+    catch (e) { setErr((e as Error).message); }
+  };
+  if (!rows) return <div className="card empty">{err ?? 'Loading…'}</div>;
+  if (!rows.length) return <div className="card empty">The file has no account (GL) column. Choose one when uploading to use account settings.</div>;
+  return (
+    <div className="card flush">
+      <div style={{ padding: '14px 16px 4px' }}><h3>Accounts (GL)</h3>
+        <p className="sub">Set once, used for every upload: the account's type decides capital goods and what is not a purchase; its default category is used for purchases whose description and supplier do not identify them; a Scope 3 category moves its lines (e.g. Travel → business travel).</p></div>
+      {err && <div className="note bad" style={{ margin: 12 }}>{err}</div>}
+      <div className="scrollx"><table className="t">
+        <thead><tr><th>Account</th><th className="num">Lines</th><th className="num">Spend (USD)</th><th className="num">tCO₂e</th><th>Type</th><th style={{ minWidth: 260 }}>Default spend category</th><th>Scope 3 category</th></tr></thead>
+        <tbody>{rows.map((a) => (
+          <tr key={a.account}>
+            <td><b>{a.account}</b><div className="muted small">{a.groups} kinds of purchase{a.capital_groups ? ` · ${a.capital_groups} capital` : ''}</div></td>
+            <td className="num">{a.lines.toLocaleString('en')}</td><td className="num">{usd(a.usd)}</td><td className="num">{a.co2e != null ? tco2e(a.co2e) : '—'}</td>
+            <td><select className="input sm" disabled={!canEdit} value={a.accountType ?? ''} onChange={(e) => save(a, { accountType: e.target.value || null })} style={{ width: 'auto' }}>
+              {ACCOUNT_TYPES.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></td>
+            <td>{canEdit ? <ItemPicker value={a.itemId} valueName={a.item} compact placeholder="none (description decides)" onPick={(it) => save(a, { itemId: it?.id ?? null })} /> : a.item ?? <span className="muted">—</span>}</td>
+            <td><select className="input sm" disabled={!canEdit || a.accountType === 'not_purchase'} value={a.target ?? ''} onChange={(e) => save(a, { target: e.target.value || null })} style={{ width: 'auto' }}>
+              <option value="">as mapped (3.1 / 3.2)</option>{TARGETS.filter(([k]) => k !== 'capital_goods').map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></td>
+          </tr>))}</tbody>
+      </table></div>
+    </div>
+  );
+}
 
 function Lines({ batchId, group, compact }: { batchId: string; group?: string; compact?: boolean }) {
   const [status, setStatus] = useState('');
@@ -431,7 +512,7 @@ function Lines({ batchId, group, compact }: { batchId: string; group?: string; c
     <div className={compact ? '' : 'card flush'}>
       {!compact && (
         <div className="row" style={{ padding: 12, gap: 6 }}>
-          {[['', 'All'], ['problem', 'Problems'], ['unmapped', 'No category'], ['flagged', 'Other category?'], ['ready', 'Ready'], ['published', 'Published'], ['excluded', 'Excluded'], ['duplicate', 'Duplicates'], ['warning', 'With warnings']].map(([k, l]) =>
+          {[['', 'All'], ['check', 'To confirm'], ['problem', 'Problems'], ['unmapped', 'No category'], ['flagged', 'Other category?'], ['ready', 'Ready'], ['published', 'Published'], ['excluded', 'Excluded'], ['duplicate', 'Duplicates'], ['warning', 'With warnings']].map(([k, l]) =>
             <button key={k} className={`btn sm ${status === k ? 'p' : ''}`} onClick={() => { setStatus(k!); setOffset(0); }}>{l}</button>)}
           <div className="grow" />
           <input className="input sm" type="search" placeholder="Search description, supplier, PO…" value={q} onChange={(e) => { setQ(e.target.value); setOffset(0); }} style={{ width: 240 }} />
