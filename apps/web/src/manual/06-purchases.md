@@ -101,7 +101,8 @@ A factor written in the file (vendor-specific EF and its unit) counts as a suppl
 Spend-based factors are per US dollar of 2022. Each line is converted in one or two steps, all shown in the line's calculation:
 
 1. **Exchange rate:** amount ÷ units of the currency per US dollar. By default the **average rate of the purchase month**; the company can choose the annual average or a fixed budget rate (Setup → Currencies & price index). Currencies pegged to the dollar (AED, SAR, QAR, OMR, BHD) use the peg. A missing month falls back to the annual average, and the line says so.
-2. **Inflation:** × US CPI of 2022 ÷ US CPI of the purchase year. A 2024 dollar is worth about 7 % fewer 2022 dollars, so without this step emissions would rise with prices. A year not yet loaded uses the latest year, and the line says so.
+   **Rates loaded for everyone:** the Federal Reserve's monthly averages (G.5 release, units per US dollar) for EUR, GBP, INR, CNY, JPY, CHF, AUD, CAD and SGD from January 2019, with the annual average of each complete year. A company can add its own rates (e.g. its bank's or a budget rate); its own rate wins for the same currency and period. Other currencies: add them on the same page.
+2. **Inflation:** × US CPI of 2022 ÷ US CPI of the purchase year (US BLS CPI-U annual averages 2019–2025; 2025 = 321.943, the average of 11 months because October 2025 was not collected). A 2024 dollar is worth about 7 % fewer 2022 dollars, so without this step emissions would rise with prices. A year not yet loaded uses the latest year, and the line says so.
 
 **Two options** (Setup → Currencies & price index → *Converting spend to the factor's dollars*, Super admin):
 

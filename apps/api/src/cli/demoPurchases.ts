@@ -113,10 +113,7 @@ export async function demoPurchases(t: string, superAdmin: User) {
     await platformTx((c) => importEpa(c, p, { demo: true, createdBy: 'demo' }));
   }
   await tenantTx(t, async (c) => {
-    // DEMO exchange rates (company's own): EUR Jan–Jun 2025 only, GBP 2025 average
-    const eur = [0.962, 0.958, 0.925, 0.893, 0.887, 0.869];
-    for (const [i, v] of eur.entries()) await c.query(`INSERT INTO fx_rate (tenant_id, currency, kind, period, per_usd, source) VALUES ($1, 'EUR', 'month', $2, $3, 'DEMO rate (not real)')`, [t, `2025-${String(i + 1).padStart(2, '0')}-01`, v]);
-    await c.query(`INSERT INTO fx_rate (tenant_id, currency, kind, period, per_usd, source) VALUES ($1, 'GBP', 'year', '2025-01-01', 0.76, 'DEMO rate (not real)')`, [t]);
+    // exchange rates: the shared Federal Reserve monthly averages (migration 019), no demo rates
     // a supplier with its own factor (EPD, per tonne of cement)
     const s = (await c.query(`INSERT INTO supplier (tenant_id, name, norm, reference, origin) VALUES ($1, 'Emirates Cement LLC', 'emirates cement', 'V-10023', 'manual') RETURNING id`, [t])).rows[0].id;
     await c.query(`INSERT INTO supplier_ef (tenant_id, supplier_id, co2e, unit, source, boundary) VALUES ($1, $2, 840, 't', 'DEMO EPD (not real): OPC cement, cradle to gate', 'cradle-to-gate')`, [t, s]);

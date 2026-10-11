@@ -2,6 +2,14 @@
 
 Newest first.
 
+## 2026-10-12 (17) — Real exchange rates and the 2025 price index
+
+- Migration 019: shared exchange rates (all companies) from the **Federal Reserve G.5** monthly averages of daily noon buying rates (via FRED), Jan 2019 – Sep 2026 (Sep 2026 preliminary), units per US dollar, for **EUR, GBP, INR, CNY, JPY, CHF, AUD, CAD, SGD** (EUR, GBP, AUD inverted from USD per unit), plus the annual average of each complete year 2019–2025. Source files in `data/fx/`.
+- **US CPI-U 2025 = 321.943** (BLS annual average; October 2025 not collected during the 2025 lapse in appropriations, so 11 months — checked: the monthly values give 2023 and 2024 exactly as stored).
+- Demo rates (EUR Jan–Jun 2025, GBP 2025 "DEMO rate") removed; the demo no longer creates them. A company's own rate still wins over the shared one for the same currency and period.
+- Demo batches in review recalculated: no missing rates; 2026 lines use the 2025 index until the 2026 average is published (marked on each line); the published H1 2025 batch keeps its figures until reopened.
+- Tests: 47 API (EUR line now uses the shared June 2024 rate, then the company's own rate wins), 48 engine. Manual: Purchases → Currencies and inflation.
+
 ## 2026-10-12 (16) — Spend conversion: exchange rate + price index, or exchange rate only
 
 - Company setting (migration 018, `tenant.price_adjust`): **Exchange rate + price index** (default; currency → USD of the purchase year → USD of the factor's year with the US CPI-U) or **Exchange rate only** (currency → USD, used as it is; no price index, no "CPI year not loaded" warning). Setup → Currencies & price index (Super admin); `PATCH /api/currency/settings { priceAdjust: 'cpi' | 'none' }`, returned by `GET /api/currency`.

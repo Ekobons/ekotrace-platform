@@ -930,12 +930,14 @@ test('purchases: EPA factor file import; ERP export in its own layout → groups
   const d = (await api('GET', `/api/purchases/batches/${u.batchId}`, undefined, tenantA)).body;
   assert.equal(d.batch.status, 'review', JSON.stringify(d.batch));
   const count = (s: string) => d.counts.find((x: { status: string }) => x.status === s)?.lines ?? 0;
-  assert.equal(count('problem'), 2, JSON.stringify(d.problems)); // Mars base, EUR rate missing
+  assert.equal(count('problem'), 1, JSON.stringify(d.problems)); // Mars base (EUR uses the shared Federal Reserve rate)
   assert.equal(count('flagged'), 0);  // airfare moved and diesel excluded by default…
   assert.ok(count('check') > 0);      // …but large groups wait for a person to confirm
   assert.equal(count('excluded'), 1);
   assert.ok(d.problems.some((p: { problem: string }) => p.problem === 'Facility "Mars base" not found'));
-  assert.ok(d.problems.some((p: { problem: string }) => /No exchange rate for EUR/.test(p.problem)));
+  assert.ok(!d.problems.some((p: { problem: string }) => /No exchange rate/.test(p.problem)));
+  const eur0 = (await api('GET', `/api/purchases/batches/${u.batchId}/lines?limit=100`, undefined, tenantA)).body.lines.find((l: { row_no: number }) => l.row_no === 9);
+  assert.ok(Math.abs(eur0.fx - 1 / 1.0763) < 1e-6, String(eur0.fx)); // June 2024 Federal Reserve monthly average
   // suppliers: two spellings of Gulf Stationery are one supplier
   assert.equal(Number((await pq(`SELECT count(*) FROM supplier WHERE tenant_id = $1 AND norm = 'gulf stationery'`, [tenantA])).rows[0].count), 1);
 
@@ -964,7 +966,7 @@ test('purchases: EPA factor file import; ERP export in its own layout → groups
   assert.equal((await api('PATCH', `/api/purchases/batches/${u.batchId}/groups`, { keys: [g('Diesel').key], decision: 'exclude' }, tenantA)).status, 200);
   // a facility written differently in the file
   assert.equal((await api('POST', `/api/purchases/batches/${u.batchId}/facilities`, { value: 'Mars base', facilityId: facA }, tenantA)).body.lines, 1);
-  // EUR rate for June 2024 → recalculate
+  // the company's own EUR rate for June 2024 wins over the shared one → recalculate
   assert.equal((await api('POST', '/api/currency/rates', { rows: [{ currency: 'EUR', kind: 'month', period: '2024-06', perUsd: 0.92, source: 'ECB monthly average' }] }, tenantA)).status, 200);
   // the cement supplier's own factor, per tonne
   const cementSup = (await pq(`SELECT id FROM supplier WHERE tenant_id = $1 AND norm = 'emirates cement'`, [tenantA])).rows[0].id;
