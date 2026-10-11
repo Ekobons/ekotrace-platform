@@ -13,6 +13,7 @@ import { z } from 'zod';
 import { tenantTx, type Tx } from '../../db/pool.js';
 import { requireTenant } from '../../lib/auth.js';
 import { scopeOf } from '../../lib/access.js';
+import { requireFeature } from '../../lib/plans.js';
 
 const filters = z.object({
   batch: z.string().uuid().optional(), activity: z.string().uuid().optional(), facility: z.string().uuid().optional(), supplier: z.string().uuid().optional(),
@@ -83,6 +84,7 @@ export async function publishedLineRoutes(app: FastifyInstance) {
     const tenant = requireTenant(req);
     const q = filters.extend({ format: z.enum(['xlsx', 'csv']).default('xlsx') }).parse(req.query);
     const rows = await tenantTx(tenant, async (c) => {
+      await requireFeature(c, tenant, 'export');
       const w = await where(c, req, q);
       return (await c.query(`SELECT ${COLS} ${FROM} WHERE ${w.sql} ORDER BY l.period_start, fac.name, l.batch_id, l.row_no LIMIT ${MAX_EXPORT}`, w.params)).rows;
     });

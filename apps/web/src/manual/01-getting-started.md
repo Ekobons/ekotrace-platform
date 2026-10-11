@@ -43,7 +43,18 @@ Every request is checked on the server against these rules — hiding a button i
 
 Organisation & groups holds the structure: **main entity → sub-groups → facilities**. Data is always entered for a facility.
 
-The hierarchy can be seen as a **List** or an **Org chart** (switch at the top right; the choice is remembered). Colours show the level: **teal** main entity, **olive** sub-group, **blue** facility.
+The page has four tabs:
+
+| Tab | Shows |
+|---|---|
+| Tree | the hierarchy as a **List** or an **Org chart** (the choice is remembered); colours show the level: **teal** main entity, **olive** sub-group, **blue** facility |
+| Facilities | one table of every facility: type, sub-group, location, manager (red when missing), meters, vehicles, landfill sites, the share of the year's entries approved and the tCO₂e — click a row to open the facility |
+| Sub-groups | the main entity and each sub-group: where it sits, its admins, its facilities and tCO₂e; **Edit** and **+ Facility here** |
+| Dashboard groups | any mix of facilities to view together (for example “Sharjah sites” or the SBTi boundary); **Open dashboard** shows it in Dashboards, where it is also in the “part of the group” list. Groups never change the structure. A person sees a group only if they can see every facility in it; the creator or a Super admin deletes it. Professional and Enterprise plans. |
+
+**+ Facility** and **+ Sub-group** at the top add under the main entity (Super admin); inside the tree, the buttons under each sub-group add there. The number of facilities is limited by the company's plan.
+
+In the Tree tab:
 
 - **Click a facility** (anywhere on its row, or its card in the chart) to open it.
 - **Click a sub-group or the main entity** to fold or unfold it; **Details** opens its profile.
@@ -60,9 +71,22 @@ Everything that **describes** a facility — set up once, changed rarely — is 
 | Vehicle fleet | the vehicles based here, with in-service and retired dates |
 | Landfill sites | landfills the company operates here, with their history of waste placed |
 
-What **arrives** month after month stays under Capture, where it can be followed across all facilities at once: **Meters** (all meters and how their readings are coming in) and **Bills** (the one place to upload PDF bills). Certificates and supplier factors are kept for the whole company under Setup → Energy certificates & suppliers; the Energy tab shows the ones that apply to the facility.
+What **arrives** month after month is under Add data, in the tab it belongs to: **Bills** (PDF bills, checked, previewed, then published) and **Meter readings** (batches sent by connected meters, previewed before they count). Certificates and supplier factors are kept for the whole company under Setup → Energy certificates & suppliers; the Energy tab shows the ones that apply to the facility.
 
 **Methodology & boundaries** sets how the company reports: the consolidation approach (operational control, financial control or equity share — totals shown live for all three), the GWP set (AR4, AR5 or AR6) and the base year. A joint venture is handled by its ownership % and control flags.
+
+## Plans
+
+The company's plan (shown under its name in the menu) is set by the Ekobon team:
+
+| Plan | Facilities | People | Eko AI | Data export | Dashboard groups |
+|---|---|---|---|---|---|
+| Trial (30-day evaluation) | 3 | 5 | — | — | — |
+| Starter | 10 | 15 | — | ✓ | — |
+| Professional | 40 | 75 | ✓ | ✓ | ✓ |
+| Enterprise | unlimited | unlimited | ✓ | ✓ | ✓ |
+
+A facility or a person above the limit cannot be added (or brought back); what the plan does not include is greyed out with the plan it needs. Changing plan never deletes anything. To upgrade, contact the Ekobon team.
 
 ## Moving around
 

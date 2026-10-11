@@ -11,7 +11,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useApp } from '../App';
-import { api, type OrgNode } from '../lib/api';
+import { api, type DashGroup, type OrgNode } from '../lib/api';
 import { MN, fmt } from '../components/DashCharts';
 
 interface Row {
@@ -19,7 +19,7 @@ interface Row {
   n: number; approved: number; estimated: number; qty: number; rec: number; kind: 'fuel' | 'electricity' | 'cooling' | 'heat' | null; kwh: number | null;
 }
 interface Data {
-  year: number; years: number[]; consolidation: string; scope2: 'location' | 'market'; baseYear: { year: number; total: number | null } | null; cmpYear: number;
+  year: number; years: number[]; group: { id: string; name: string } | null; consolidation: string; scope2: 'location' | 'market'; baseYear: { year: number; total: number | null } | null; cmpYear: number;
   rows: Row[]; prevRows: Row[];
   facilities: { id: string; name: string; parent: string | null; type: string | null; employees: number | null; area: number | null; weight: number }[];
   categories: { code: string; name: string; scope: number; ghg_category: number | null; ghg: string }[]; s3Names: Record<number, string>;
@@ -45,11 +45,14 @@ const qtyTxt = (q: number, u: string) => (q >= 1e6 ? `${fmt(q / 1e6, 2)}M ${u}` 
 const UNIT_LABEL: Record<string, string> = { L: 'L', kg: 'kg', m3: 'm³', t: 't', km: 'km', kWh_e: 'kWh', TRh: 'TRh' };
 
 export function Dashboards() {
-  const { toast } = useApp();
+  const { toast, tenant } = useApp();
   const [sp, setSp] = useSearchParams();
   const tab = ((sp.get('tab') as Tab) || 'overview');
   const year = sp.get('year') ? Number(sp.get('year')) : undefined;
   const node = sp.get('node') ?? '';
+  const group = sp.get('group') ?? '';
+  const [groups, setGroups] = useState<DashGroup[]>([]);
+  useEffect(() => { api.dashGroups().then((r) => setGroups(r.allowed ? r.groups : [])).catch(() => {}); }, []);
   const scope2 = (sp.get('scope2') as 'location' | 'market') || 'location';
   const period = sp.get('period') ?? 'year';
   const cmp = (sp.get('cmp') as 'prev' | 'base' | 'none') || 'prev';
@@ -62,9 +65,9 @@ export function Dashboards() {
   const cmpYear = cmp === 'base' && baseYear ? baseYear : undefined;
   useEffect(() => {
     setErr(null);
-    api.dashboard({ year, node: node || undefined, scope2, cmp: cmpYear }).then((x) => { const dd = x as unknown as Data; setD(dd); if (dd.baseYear) setBaseYear(dd.baseYear.year); }).catch((e) => setErr(e.message));
-  }, [year, node, scope2, cmpYear]);
-  const c = useMemo(() => (d ? ctx(d, period, cmp === 'none' || (cmp === 'base' && !baseYear) ? null : d.cmpYear, nodes, node) : null), [d, period, cmp, baseYear, nodes, node]);
+    api.dashboard({ year, node: group ? undefined : node || undefined, group: group || undefined, scope2, cmp: cmpYear }).then((x) => { const dd = x as unknown as Data; setD(dd); if (dd.baseYear) setBaseYear(dd.baseYear.year); }).catch((e) => setErr(e.message));
+  }, [year, node, group, scope2, cmpYear]);
+  const c = useMemo(() => (d ? ctx(d, period, cmp === 'none' || (cmp === 'base' && !baseYear) ? null : d.cmpYear, nodes, d.group ? '' : node) : null), [d, period, cmp, baseYear, nodes, node]);
   if (!d || !c) return <div className="page"><div className="card empty">{err ?? 'Loading…'}</div></div>;
 
   const exportCsv = () => {
@@ -75,14 +78,14 @@ export function Dashboards() {
     const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['﻿' + body], { type: 'text/csv' })); a.download = `Ekotrace dashboard ${d.year} ${c.periodLabel}.csv`; a.click(); URL.revokeObjectURL(a.href);
   };
   const shareView = () => { navigator.clipboard?.writeText(window.location.href).then(() => toast('Link to this view copied'), () => toast('Copy the address bar to share this view')); };
-  const pickNode = (id: string | null) => set({ node: id });
+  const pickNode = (id: string | null) => set({ node: id, group: null });
 
   return (
     <div className="page db">
       <div className="dbh">
         <div><div className="eyebrow">ANALYSE</div><h1>Dashboards</h1>
           <p>{c.path} · {d.year} · {c.periodLabel} · {CONS[d.consolidation] ?? d.consolidation} · Scope 2 {d.scope2}-based</p></div>
-        <div className="row" style={{ gap: 8 }}><button className="dbtn" onClick={exportCsv}>Export</button><button className="dbtn" onClick={shareView}>Share view</button></div>
+        <div className="row" style={{ gap: 8 }}>{tenant?.planLimits?.export !== false ? <button className="dbtn" onClick={exportCsv}>Export</button> : <button className="dbtn" disabled title="Downloading data comes with the Starter plan and above">Export (Starter plan +)</button>}<button className="dbtn" onClick={shareView}>Share view</button></div>
       </div>
       <nav className="dbtabs" role="tablist">{TABS.map(([k, n]) => <button key={k} role="tab" aria-selected={tab === k} className={tab === k ? 'on' : ''} disabled={k === 'boards'} title={k === 'boards' ? 'Pinned views come in a later release' : undefined} onClick={() => set({ tab: k === 'overview' ? null : k })}>{n}</button>)}</nav>
       <div className="dbf">
@@ -95,8 +98,9 @@ export function Dashboards() {
           <option value="prev">vs {d.year - 1}</option>{baseYear && baseYear !== d.year - 1 && <option value="base">vs base year {baseYear}</option>}<option value="none">No comparison</option>
         </select>
         <div className="seg" role="group" aria-label="Scope 2 method"><button className={scope2 === 'location' ? 'on' : ''} onClick={() => set({ scope2: null })}>Location</button><button className={scope2 === 'market' ? 'on' : ''} onClick={() => set({ scope2: 'market' })}>Market</button></div>
-        <select aria-label="Part of the group" value={node} onChange={(e) => pickNode(e.target.value || null)} style={{ maxWidth: 220 }}>
+        <select aria-label="Part of the group" value={group ? `g:${group}` : node} onChange={(e) => { const v = e.target.value; if (v.startsWith('g:')) set({ group: v.slice(2), node: null }); else pickNode(v || null); }} style={{ maxWidth: 220 }}>
           <option value="">Whole group</option>
+          {groups.length > 0 && <optgroup label="Dashboard groups">{groups.map((g) => <option key={g.id} value={`g:${g.id}`}>{g.name} ({g.facilityIds.length})</option>)}</optgroup>}
           <optgroup label="Entities & sub-groups">{nodes.filter((n) => n.kind === 'subgroup').map((n) => <option key={n.id} value={n.id}>{n.name}</option>)}</optgroup>
           <optgroup label="Facilities">{nodes.filter((n) => n.kind === 'facility').map((n) => <option key={n.id} value={n.id}>{n.name}</option>)}</optgroup>
         </select>
@@ -136,7 +140,9 @@ function ctx(d: Data, period: string, cmpY: number | null, nodes: OrgNode[], nod
   const path: string[] = []; for (let n = here; n; n = n.parent_id ? byId.get(n.parent_id) ?? null : null) path.unshift(n.name);
   const staff = sum(d.facilities, (f) => f.employees ?? 0), area = sum(d.facilities, (f) => f.area ?? 0);
   const cat = new Map(d.categories.map((x) => [x.code, x]));
-  return { cur, prev, cmpY, months, whole, dataMonths, lastM, periodLabel, total, un, here, kids, facsOf, byId, path: path.join(' › ') || 'Whole group', staff, area, cat,
+  const groupFacs = d.group ? d.facilities.map((f) => f.id) : null;
+  return { cur, prev, cmpY, months, whole, dataMonths, lastM, periodLabel, total, un, here: d.group ? null : here, groupFacs, kids, facsOf, byId,
+    path: d.group ? `Dashboard group · ${d.group.name}` : path.join(' › ') || 'Whole group', staff, area, cat,
     t: (v: number) => `${fmt(v / un.k, un.d)}`, tu: (v: number) => `${fmt(v / un.k, un.d)} ${un.u}` };
 }
 type Ctx = ReturnType<typeof ctx>;
@@ -312,7 +318,7 @@ function Overview({ d, c, pick, go }: { d: Data; c: Ctx; pick: (id: string | nul
     </section>
     <div className="two">
       <section className="bx">
-        <div className="bxh"><h2>Where · inside {c.here?.name ?? 'the group'}</h2><span className="lbl">click a row to view just that</span></div>
+        <div className="bxh"><h2>Where · inside {c.groupFacs ? c.path.replace('Dashboard group · ', '') : c.here?.name ?? 'the group'}</h2><span className="lbl">click a row to view just that</span></div>
         <WhereList rows={where} c={c} pick={pick} />
         {c.here?.parent_id && <button className="dbtn" style={{ alignSelf: 'flex-start', height: 34 }} onClick={() => pick(c.byId.get(c.here!.parent_id!)?.parent_id ? c.here!.parent_id : null)}>↑ Up to {c.byId.get(c.here.parent_id)?.name ?? 'the group'}</button>}
       </section>
@@ -338,6 +344,7 @@ function Overview({ d, c, pick, go }: { d: Data; c: Ctx; pick: (id: string | nul
 
 interface WRow { id: string; n: string; t: string; v: number; p: number | null; sub?: boolean }
 function whereRows(c: Ctx, v: (r: Row) => number, withFacilities = false): WRow[] {
+  if (c.groupFacs) return c.groupFacs.map((f) => { const x = sum(c.cur.filter((r) => r.f === f), v); return { id: f, n: c.byId.get(f)?.name ?? 'Facility', t: 'Facility', v: x, p: c.cmpY && c.prev.length ? chg(x, sum(c.prev.filter((r) => r.f === f), v)) : null }; }).filter((r) => r.v).sort((a, b) => b.v - a.v);
   const here = c.here;
   const kids = here ? c.kids(here.id) : [];
   const valOf = (rows: Row[], fs: Set<string>) => sum(rows.filter((r) => fs.has(r.f)), v);

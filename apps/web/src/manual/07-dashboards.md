@@ -4,7 +4,7 @@ Dashboards (top of the menu) shows the year's inventory for the whole group, an 
 
 ## Filters
 
-Along the top: **year**; **months** (the year so far, a quarter, or one month); **compare with** the previous year, the base year, or nothing; **Scope 2** location- or market-based; and **which part of the group**. The comparison always uses the same months, so January–September 2026 is compared with January–September 2025. **Export** downloads the figures behind the view (CSV); **Share view** copies a link that opens the same view.
+Along the top: **year**; **months** (the year so far, a quarter, or one month); **compare with** the previous year, the base year, or nothing; **Scope 2** location- or market-based; and **which part of the group** — the whole group, an entity or sub-group, a facility, or a **dashboard group** (Organisation → Dashboard groups). The comparison always uses the same months, so January–September 2026 is compared with January–September 2025. **Export** downloads the figures behind the view (CSV; Starter plan and above); **Share view** copies a link that opens the same view.
 
 ## Tabs
 

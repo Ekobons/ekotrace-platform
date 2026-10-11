@@ -16,6 +16,7 @@ import { enqueue, registerJob, type Job } from '../../lib/jobs.js';
 import { detectKind, findHeaderRow, previewFile, cellText } from '../../lib/sheet.js';
 import { sendWorkbook, styleHeader } from '../../lib/xlsx.js';
 import { apiClient } from '../meters.routes.js';
+import { planOf, requireFeature } from '../../lib/plans.js';
 import { FIELDS, FIELD_LABEL, guessColumns, signature, normSupplier, type Field } from './fields.js';
 import {
   buildLine, calcLines, explainLine, groupKey, insertLines, loadFacilities, mapGroups, markMaterial, MAX_LINES, prepareBatch, publishBatch, readFileLines, reopenBatch, spendIndex,
@@ -114,7 +115,7 @@ export async function purchaseRoutes(app: FastifyInstance) {
         `SELECT s.code, s.title, count(*)::int AS n FROM factor f JOIN factor_source s ON s.id = f.source_id JOIN item i ON i.id = f.item_id JOIN subcategory sc ON sc.id = i.subcategory_id
            JOIN category ca ON ca.id = sc.category_id WHERE ca.code = 'purchased_goods' AND f.status = 'active' GROUP BY 1, 2 ORDER BY 3 DESC`)).rows;
       return {
-        fields: FIELDS.map((f) => ({ field: f, label: FIELD_LABEL[f] })), fxMethod: t.fx_method, currency: t.currency, aiMapping: t.ai_mapping, reviewCoverage: t.review_coverage,
+        fields: FIELDS.map((f) => ({ field: f, label: FIELD_LABEL[f] })), fxMethod: t.fx_method, currency: t.currency, aiMapping: t.ai_mapping && (await planOf(c, tenant)).ai, aiOnPlan: (await planOf(c, tenant)).ai, reviewCoverage: t.review_coverage,
         aiAvailable: !!config.aiMap, aiName: config.aiMap?.name ?? null, overlap: OVERLAP_LABEL, categories: cats, factorSets: factorSet, maxLines: MAX_LINES,
       };
     });
@@ -152,6 +153,7 @@ export async function purchaseRoutes(app: FastifyInstance) {
     const b = z.object({ aiMapping: z.boolean().optional(), reviewCoverage: z.number().min(0.5).max(1).optional() }).parse(req.body);
     if (b.aiMapping && !config.aiMap) throw new AppError('No approved AI service is configured on this deployment');
     return tenantTx(tenant, async (c) => {
+      if (b.aiMapping) await requireFeature(c, tenant, 'ai');
       if (b.aiMapping !== undefined) await c.query('UPDATE tenant SET ai_mapping = $2 WHERE id = $1', [tenant, b.aiMapping]);
       if (b.reviewCoverage !== undefined) await c.query('UPDATE tenant SET review_coverage = $2 WHERE id = $1', [tenant, b.reviewCoverage]);
       await audit(c, req, 'purchases.settings', 'tenant', tenant, b);

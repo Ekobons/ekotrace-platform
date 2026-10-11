@@ -11,6 +11,7 @@ import { tenantTx, type Tx } from '../db/pool.js';
 import { audit, requireTenant } from '../lib/auth.js';
 import { scopeOf, subtreeNodes } from '../lib/access.js';
 import { AppError, forbidden, notFound } from '../lib/errors.js';
+import { checkFacilityLimit } from '../lib/plans.js';
 
 const nodeFields = z.object({
   name: z.string().trim().min(1).max(160),
@@ -52,6 +53,28 @@ export async function orgRoutes(app: FastifyInstance) {
     });
   });
 
+  /** Per facility for the Facilities and Sub-groups tabs: meters, vehicles, landfill sites, the year's entries, approvals and tCO2e. */
+  app.get('/api/org/summary', async (req) => {
+    const tenant = requireTenant(req);
+    const q = z.object({ year: z.coerce.number().int().min(2000).max(2100).default(new Date().getFullYear()) }).parse(req.query);
+    return tenantTx(tenant, async (c) => {
+      const see = (await scopeOf(c, req.user)).see;
+      const rows = (await c.query(
+        `SELECT n.id,
+                (SELECT count(*)::int FROM meter m WHERE m.facility_id = n.id AND m.active) AS meters,
+                (SELECT count(*)::int FROM vehicle v WHERE v.facility_id = n.id) AS vehicles,
+                (SELECT count(*)::int FROM waste_site w WHERE w.facility_id = n.id) AS sites,
+                count(a.id)::int AS entries, count(a.id) FILTER (WHERE a.status = 'approved')::int AS approved,
+                count(DISTINCT extract(month FROM a.period_start)) FILTER (WHERE a.period_end - a.period_start < 40)::int AS months,
+                coalesce(sum(a.co2e_direct + coalesce(a.co2e_scope2, 0) + coalesce(a.co2e_scope3, 0) + a.co2e_wtt + coalesce(a.co2e_td, 0)), 0)::float8 / 1000 AS t
+           FROM org_node n LEFT JOIN activity a ON a.facility_id = n.id AND a.status <> 'rejected' AND extract(year FROM a.period_start) = $1
+          WHERE n.kind = 'facility' GROUP BY n.id`, [q.year])).rows.filter((r) => see.has(r.id));
+      const admins = (await c.query(`SELECT scope_node_id AS node, json_agg(name ORDER BY name) AS names FROM app_user WHERE role = 'admin' AND NOT disabled AND scope_node_id IS NOT NULL GROUP BY 1`)).rows;
+      const supers = (await c.query(`SELECT name FROM app_user WHERE role = 'super_admin' AND NOT disabled ORDER BY name`)).rows.map((r) => r.name);
+      return { year: q.year, facilities: rows, admins: Object.fromEntries(admins.map((a) => [a.node, a.names])), superAdmins: supers };
+    });
+  });
+
   app.post('/api/org/nodes', async (req) => {
     const tenant = requireTenant(req);
     const b = nodeFields.extend({ parentId: z.string().uuid(), kind: z.enum(['subgroup', 'facility']) }).parse(req.body);
@@ -60,6 +83,7 @@ export async function orgRoutes(app: FastifyInstance) {
       if (!parent) throw notFound('Parent');
       if (parent.kind === 'facility') throw new AppError('A facility cannot contain other nodes');
       if (!canEdit(await editable(c, req), parent.id)) throw forbidden('You can only add inside your own part of the organisation');
+      if (b.kind === 'facility') await checkFacilityLimit(c, tenant);
       const r = (await c.query(
         `INSERT INTO org_node (tenant_id, parent_id, kind, name, facility_type, location, country, floor_area_m2, employees, ownership_pct,
                                operational_control, financial_control, manager_user_id, grid_region)
@@ -80,6 +104,7 @@ export async function orgRoutes(app: FastifyInstance) {
       if (!before) throw notFound('Node');
       const e = await editable(c, req);
       if (!canEdit(e, id)) throw forbidden('You can only change your own part of the organisation');
+      if (b.active === true && !before.active && before.kind === 'facility') await checkFacilityLimit(c, tenant);
       if (b.parentId) {
         if (before.kind === 'group') throw new AppError('The main entity cannot be moved');
         const p = (await c.query('SELECT kind FROM org_node WHERE id = $1', [b.parentId])).rows[0];

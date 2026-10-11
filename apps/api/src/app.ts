@@ -26,6 +26,7 @@ import { billRoutes } from './modules/bills.routes.js';
 import { purchaseIngestRoutes, purchaseRoutes } from './modules/purchases/purchases.routes.js';
 import { supplierRoutes } from './modules/purchases/suppliers.routes.js';
 import { publishedLineRoutes } from './modules/purchases/publishedLines.routes.js';
+import { groupRoutes } from './modules/groups.routes.js';
 import { dashboardRoutes } from './modules/dashboard.routes.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -80,6 +81,7 @@ export async function buildApp(opts: { logger?: boolean } = {}): Promise<Fastify
     await secured.register(purchaseRoutes);
     await secured.register(supplierRoutes);
     await secured.register(publishedLineRoutes);
+    await secured.register(groupRoutes);
     await secured.register(dashboardRoutes);
   });
 

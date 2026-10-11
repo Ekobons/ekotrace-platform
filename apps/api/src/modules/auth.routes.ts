@@ -12,6 +12,7 @@ import { platformTx, tenantTx } from '../db/pool.js';
 import { audit, authenticate, COOKIE, readCookie, SESSION_HOURS, setSessionCookie } from '../lib/auth.js';
 import { AppError } from '../lib/errors.js';
 import { hashPassword, newToken, passwordProblem, sha256, verifyPassword } from '../lib/password.js';
+import { PLANS, type PlanCode } from '../lib/plans.js';
 
 const LOCK_AFTER = 5;
 const LOCK_MINUTES = 15;
@@ -77,7 +78,8 @@ export async function authRoutes(app: FastifyInstance) {
                     (SELECT name FROM org_node WHERE kind = 'subgroup' AND id = $2) AS scope_name
                FROM tenant t WHERE t.id = $1`, [u.tenantId, u.scopeNodeId])).rows[0] ?? null)
         : null;
-      return { user: u, company };
+      const plan = company ? PLANS[company.plan as PlanCode] ?? PLANS.trial : null;
+      return { user: u, company: company ? { ...company, planLimits: plan } : null };
     });
 
     s.post('/api/auth/password', async (req) => {

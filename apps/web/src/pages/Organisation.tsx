@@ -12,6 +12,7 @@ import { Fleet } from '../components/Fleet';
 import { WasteSites } from '../components/WasteSites';
 import { FacilityEnergy } from '../components/FacilityEnergy';
 import { MeterRegister } from './Meters';
+import { FacilitiesTab, GroupsTab, SubgroupsTab } from './OrgTabs';
 
 const TYPES = ['Office', 'Plant', 'Warehouse', 'Fleet depot', 'Data centre', 'Residential', 'Retail', 'Landfill', 'Laboratory', 'Other'];
 
@@ -20,8 +21,10 @@ const VIEW_KEY = 'eko.orgView';
 const readView = (): 'list' | 'chart' => { try { return localStorage.getItem(VIEW_KEY) === 'chart' ? 'chart' : 'list'; } catch { return 'list'; } };
 
 export function Organisation() {
-  const { toast } = useApp();
+  const { toast, tenant } = useApp();
   const [params, setParams] = useSearchParams();
+  const [tab, setTab] = useState<'tree' | 'facs' | 'subs' | 'groups'>('tree');
+  const groupsOn = tenant?.planLimits?.groups !== false;
   const [nodes, setNodes] = useState<OrgNode[]>([]);
   const [people, setPeople] = useState<Person[]>([]);
   const [closed, setClosed] = useState<Set<string>>(new Set());
@@ -130,9 +133,17 @@ export function Organisation() {
     <div className="page">
       <div className="head">
         <div><div className="eyebrow">Setup</div><h1>Organisation & groups</h1><p className="sub">Main entity → sub-groups → facilities. Click a facility to open it: profile, meters, energy, fleet and landfill sites. Data is entered per facility; totals roll up the tree.</p></div>
-        <div className="row"><span className="chip">{counts.sub} sub-groups</span><span className="chip">{counts.fac} facilities</span></div>
+        <div className="row"><span className="chip">{counts.sub} sub-groups</span><span className="chip">{counts.fac} facilities{tenant?.planLimits?.facilities != null ? ` of ${tenant.planLimits.facilities}` : ''}</span>
+          {root?.canEdit && <><button className="btn" onClick={() => setAdding({ parent: root, kind: 'facility' })}><Icon name="plus" size={14} />Facility</button><button className="btn" onClick={() => setAdding({ parent: root, kind: 'subgroup' })}><Icon name="plus" size={14} />Sub-group</button></>}</div>
       </div>
-      <div className="card" style={{ padding: 14, display: 'grid', gap: 12 }}>
+      <div className="tabs">
+        {([['tree', 'Tree'], ['facs', 'Facilities'], ['subs', 'Sub-groups'], ...(groupsOn ? [['groups', 'Dashboard groups']] : [])] as [typeof tab, string][]).map(([k, l]) => <button key={k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>{l}</button>)}
+        {!groupsOn && <button disabled title="Dashboard groups come with the Professional plan and above">Dashboard groups (Professional plan +)</button>}
+      </div>
+      {tab === 'facs' && <FacilitiesTab nodes={nodes} onOpen={(n) => openNode(n)} />}
+      {tab === 'subs' && <SubgroupsTab nodes={nodes} onOpen={(n) => openNode(n)} onEdit={(n) => openNode(n)} onAddFacility={(n) => setAdding({ parent: n, kind: 'facility' })} />}
+      {tab === 'groups' && groupsOn && <GroupsTab nodes={nodes} />}
+      {tab === 'tree' && <div className="card" style={{ padding: 14, display: 'grid', gap: 12 }}>
         <div className="row" style={{ gap: 10 }}>
           <div className="grow"><h2 style={{ fontSize: 16 }}>Organisation hierarchy</h2><div className="sub">Click a facility to open its profile; click a group to fold or unfold it.</div></div>
           <span className="ohchip group">● Main entity</span><span className="ohchip subgroup">● Sub-group</span><span className="ohchip facility">● Facility</span>
@@ -160,7 +171,7 @@ export function Organisation() {
             {root && filtering && !matches(root) && <div className="empty">Nothing matches.</div>}
           </div>
         )}
-      </div>
+      </div>}
 
       <dialog ref={dlg} className={`drawer${sel?.node.kind === 'facility' ? ' wide' : ''}`} onClose={() => setSel(null)}>
         {sel && <Profile key={sel.node.id} node={sel.node} initialTab={sel.tab} nodes={nodes} managers={managers} onClose={() => dlg.current?.close()}

@@ -20,12 +20,15 @@ export interface FactorUsed {
 /** A calorific value the user entered, and what it converted the quantity to. */
 export interface CvUsed { value: number; energyUnit: string; perUnit: string; energyUnitName: string; perUnitName: string; basis: 'net' | 'gross'; convertedQuantity: number; convertedUnit: string; convertedUnitName: string }
 export interface CalcResponse { cv?: CvUsed; stored?: { quantity: number; unit: string; inputs: Record<string, unknown> }; item: { id: number; name: string; category: string }; gwpSet: string; lines: ResultLine[]; factors: FactorUsed[]; totals: Record<Basis, number>; steps: string[]; warnings: string[] }
-export interface Tenant { id: string; name: string; country: string; gwp_set: string; timezone?: string; consolidation?: string; base_year?: number; plan?: string; status?: string; access_expiry?: string }
+export interface PlanLimits { code: string; name: string; facilities: number | null; users: number | null; ai: boolean; export: boolean; groups: boolean; note: string }
+export interface Tenant { id: string; name: string; country: string; gwp_set: string; timezone?: string; consolidation?: string; base_year?: number; plan?: string; status?: string; access_expiry?: string; planLimits?: PlanLimits | null }
 export type Role = 'platform_admin' | 'super_admin' | 'admin' | 'manager' | 'preparer' | 'verifier';
 export interface Me { user: { id: string; name: string; email: string; role: Role; tenantId: string | null; scopeNodeId: string | null; mustChangePassword: boolean }; company: (Tenant & { scope_name: string | null }) | null }
 export interface OrgNode { id: string; parent_id: string | null; kind: 'group' | 'subgroup' | 'facility'; name: string; facility_type: string | null; location: string | null; country: string; floor_area_m2: number | null; employees: number | null; ownership_pct: number; operational_control: boolean; financial_control: boolean; active: boolean; sort: number; manager_user_id: string | null; manager_name: string | null; grid_region?: string | null; entries: number; canEdit: boolean; canSee: boolean; canEnter: boolean }
 export interface Person { id: string; name: string; email: string; role: Role; scope_node_id: string | null; scope_name: string | null; disabled: boolean; last_login_at: string | null; created_at: string; must_change_password: boolean; facilities: { id: string; name: string }[]; manages: { id: string; name: string }[]; canEdit: boolean }
-export interface Company { id: string; name: string; country: string; gwp_set: string; plan: string; status: string; access_start: string; access_expiry: string; created_at: string; users: number; facilities: number; entries: number; last_login: string | null }
+export interface Company { id: string; name: string; country: string; gwp_set: string; plan: string; status: string; access_start: string; access_expiry: string; created_at: string; users: number; facilities: number; entries: number; last_login: string | null; notes: string | null; price: number | null; billing_currency: string; billing_cycle: 'annual' | 'monthly'; po_ref: string | null; billing_email: string | null }
+export interface DashGroup { id: string; name: string; facilityIds: string[]; facilities: { id: string; name: string; parent: string | null }[]; created_by: string; created_by_name: string; created_at: string; canDelete: boolean }
+export interface FacSummary { id: string; meters: number; vehicles: number; sites: number; entries: number; approved: number; months: number; t: number }
 export const ROLE_LABEL: Record<Role, string> = { platform_admin: 'Platform admin', super_admin: 'Super admin', admin: 'Admin', manager: 'Manager', preparer: 'Data preparer', verifier: 'Verifier' };
 export interface Facility { id: string; name: string; country: string; grid_region?: string | null; active: boolean; facility_type?: string | null; parent_name?: string | null; canEnter?: boolean; canApprove?: boolean }
 export interface Factor { id: number; item_id: number; item: string; subcategory: string; basis: Basis; unit: string; co2e: number | null; region: string; valid_from: string; valid_to: string; status: string; version: number; supersedes_id: number | null; note: string | null; source: string; gwp_set: string | null; gases: { gas: string; kgPerUnit: number }[] | null }
@@ -204,7 +207,11 @@ export const api = {
   resetPassword: (id: string) => call<{ temporaryPassword: string }>('POST', `/api/users/${id}/reset-password`),
   audit: (q: Record<string, string | number | undefined> = {}) => call<{ events: { id: number; at: string; user_name: string | null; action: string; entity: string | null; entity_id: string | null; detail: unknown; ip: string | null }[] }>('GET', `/api/audit?${new URLSearchParams(Object.entries(q).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)]))}`),
   // platform console
-  companies: () => call<{ companies: Company[] }>('GET', '/api/platform/companies'),
+  companies: () => call<{ companies: Company[]; plans: PlanLimits[] }>('GET', '/api/platform/companies'),
+  orgSummary: (year?: number) => call<{ year: number; facilities: FacSummary[]; admins: Record<string, string[]>; superAdmins: string[] }>('GET', `/api/org/summary${year ? `?year=${year}` : ''}`),
+  dashGroups: () => call<{ allowed: boolean; hidden: number; groups: DashGroup[] }>('GET', '/api/dashboard-groups'),
+  createGroup: (b: { name: string; facilityIds: string[] }) => call<{ id: string; name: string }>('POST', '/api/dashboard-groups', b),
+  deleteGroup: (id: string) => call<{ ok: true }>('DELETE', `/api/dashboard-groups/${id}`),
   createCompany: (b: Record<string, unknown>) => call<{ company: Company; superAdmin: { email: string; temporaryPassword: string } }>('POST', '/api/platform/companies', b),
   updateCompany: (id: string, b: Record<string, unknown>) => call<Company>('PATCH', `/api/platform/companies/${id}`, b),
   calculate: (b: unknown) => call<CalcResponse>('POST', '/api/calculate', b),
@@ -325,7 +332,7 @@ export const api = {
   supplierAnalytics: (year?: number) => call<SupplierAnalytics>('GET', `/api/suppliers/analytics${year ? `?year=${year}` : ''}`),
   keepSupplierSeparate: (id: string) => call<{ ok: true }>('POST', `/api/suppliers/${id}/keep-separate`),
   supplierMatch: (id: number, action: 'confirm' | 'split') => call<{ ok?: true; supplierId?: string; lines?: number }>('POST', `/api/suppliers/matches/${id}/${action}`),
-  dashboard: (q: { year?: number; node?: string; scope2?: 'location' | 'market'; cmp?: number }) => call<Dashboard>('GET', `/api/dashboard?${new URLSearchParams(Object.entries(q).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)]))}`),
+  dashboard: (q: { year?: number; node?: string; group?: string; scope2?: 'location' | 'market'; cmp?: number }) => call<Dashboard>('GET', `/api/dashboard?${new URLSearchParams(Object.entries(q).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)]))}`),
   addSupplier: (b: unknown) => call<{ id: string }>('POST', '/api/suppliers', b),
   patchSupplier: (id: string, b: unknown) => call<{ ok: true }>('PATCH', `/api/suppliers/${id}`, b),
   mergeSupplier: (id: string, intoId: string) => call<{ lines: number }>('POST', `/api/suppliers/${id}/merge`, { intoId }),

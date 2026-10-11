@@ -828,6 +828,37 @@ test('bills by category: checked bills previewed (months, emissions), duplicates
   assert.equal((await api('PATCH', `/api/bills/${c.id}`, { note: 'wrong period?' }, tenantA)).body.status, 'to_check');
 });
 
+test('plans: trial limits facilities and people, refuses AI, export and dashboard groups; groups on a full plan, shown only with every facility visible', async () => {
+  const co = await api('POST', '/api/platform/companies', { name: 'Trial Co', country: 'AE', plan: 'trial', superAdmin: { name: 'Tia', email: 'tia@trial.test' } });
+  assert.equal(co.status, 200, JSON.stringify(co.body));
+  const T = co.body.company.id as string;
+  const root = (await api('GET', '/api/org', undefined, T)).body.nodes.find((n: { kind: string }) => n.kind === 'group');
+  const fac = (i: number) => api('POST', '/api/org/nodes', { parentId: root.id, kind: 'facility', name: `Site ${i}` }, T);
+  for (let i = 1; i <= 3; i++) assert.equal((await fac(i)).status, 200);
+  const fourth = await fac(4);
+  assert.equal(fourth.status, 403); assert.match(fourth.body.error?.message ?? JSON.stringify(fourth.body), /Trial plan allows 3 facilities/);
+  for (let i = 1; i <= 4; i++) assert.equal((await api('POST', '/api/users', { name: `Person ${i}`, email: `p${i}@trial.test`, role: 'verifier' }, T)).status, 200);
+  assert.equal((await api('POST', '/api/users', { name: 'Person 5', email: 'p5@trial.test', role: 'verifier' }, T)).status, 403, '5 people incl. the super admin');
+  const facs = (await api('GET', '/api/org', undefined, T)).body.nodes.filter((n: { kind: string }) => n.kind === 'facility').map((n: { id: string }) => n.id);
+  assert.equal((await api('POST', '/api/dashboard-groups', { name: 'Two sites', facilityIds: facs.slice(0, 2) }, T)).status, 403);
+  assert.equal((await api('GET', '/api/purchases/published/export?format=csv', undefined, T)).status, 403);
+  const me = (await api('GET', '/api/dashboard-groups', undefined, T)).body; assert.equal(me.allowed, false);
+  // upgraded: groups work, open in the dashboard
+  assert.equal((await api('PATCH', `/api/platform/companies/${T}`, { plan: 'professional', price: 24000, billingCycle: 'annual', poRef: 'PO-77' })).status, 200);
+  const listed = (await api('GET', '/api/platform/companies')).body;
+  const row = listed.companies.find((c: { id: string }) => c.id === T);
+  assert.equal(row.price, 24000); assert.equal(row.po_ref, 'PO-77'); assert.equal(listed.plans.length, 4);
+  const g = await api('POST', '/api/dashboard-groups', { name: 'Two sites', facilityIds: facs.slice(0, 2) }, T);
+  assert.equal(g.status, 200, JSON.stringify(g.body));
+  assert.equal((await api('POST', '/api/dashboard-groups', { name: 'two sites', facilityIds: facs.slice(0, 1) }, T)).status, 409);
+  assert.equal((await api('GET', '/api/dashboard-groups', undefined, T)).body.groups[0].facilityIds.length, 2);
+  const d = await api('GET', `/api/dashboard?group=${g.body.id}`, undefined, T);
+  assert.equal(d.status, 200); assert.equal(d.body.group.name, 'Two sites'); assert.equal(d.body.facilities.length, 2);
+  const sum = (await api('GET', '/api/org/summary', undefined, T)).body; assert.equal(sum.facilities.length, 3);
+  assert.equal((await api('DELETE', `/api/dashboard-groups/${g.body.id}`, undefined, T)).status, 200);
+  assert.equal((await api('GET', '/api/dashboard-groups', undefined, tenantA)).body.groups.length, 0, 'other company sees none');
+});
+
 test('capital goods list: parts, materials and consumables of the old list count as purchased goods', async () => {
   const items = (await api('GET', '/api/purchases/capital-list', undefined, tenantA)).body.items as { name: string; capital: boolean; note: string | null }[];
   if (!items.length) return; // the old product list is not loaded in this database

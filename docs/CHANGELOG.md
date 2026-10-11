@@ -2,6 +2,18 @@
 
 Newest first.
 
+## 2026-10-11 (15) — Organisation tabs (Facilities, Sub-groups, Dashboard groups); plans with limits; console subscription
+
+**Organisation & groups** now has the prototype's tabs: **Tree** (list / org chart, as before), **Facilities** (one table: type, sub-group, location, manager — red when missing —, meters, vehicles, landfill sites, share of the year's entries approved, tCO₂e; `GET /api/org/summary?year=`), **Sub-groups** (main entity and sub-groups with where each sits, admins, facilities, tCO₂e; Edit, + Facility here), **Dashboard groups**. Header buttons + Facility / + Sub-group.
+
+**Dashboard groups** (migration 017, table `dashboard_group`): any mix of facilities viewed together; never change the structure; listed only to people who see every facility in them; created by anyone who enters data, deleted by the creator or a Super admin (`GET/POST /api/dashboard-groups`, `DELETE /api/dashboard-groups/:id`). Dashboards: groups in the "part of the group" list; `GET /api/dashboard?group=` (Where lists the group's facilities).
+
+**Plans** (`src/lib/plans.ts`): Trial 3 facilities / 5 people; Starter 10 / 15 + data export; Professional 40 / 75 + Eko AI, export, dashboard groups; Enterprise unlimited, everything. Enforced on the server: adding or reactivating a facility or person above the limit, AI mapping (setting refused and ignored in mapping), published-lines export, dashboard groups (403 `PLAN_LIMIT` with the plan needed). Screens: plan name under the company in the menu, facility count of the limit, export buttons and the groups tab greyed with the plan needed. `/api/auth/me` returns `planLimits`.
+
+**Platform console**: tabs Companies / Plans (plan cards with limits and number of companies); per company the plan's limits, facilities and people used against them (red when above), subscription price and cycle, PO, days left; **Edit** dialog: name, plan, access until, price, currency, annual / monthly, PO / contract reference, billing email, notes (migration 017 columns). Lowering a plan never deletes anything.
+
+**Tests:** 47 API (new: trial limits on facilities and people, AI / export / groups refused, upgrade, subscription fields, groups create / duplicate / dashboard by group / delete / isolation), 47 engine. Manual: Getting started (organisation tabs, plans), Dashboards, Glossary.
+
 ## 2026-10-10 (14) — Capital goods list corrected; published lines viewable; dashboards in the Ekotrace 2.0 design; bills and API readings per category with preview
 
 **Capital goods list** (migration 014, `src/import/capitalList.ts`): of the 225 old "Capital Goods" products, 57 parts, materials and consumables now count as purchased goods (3.1) with the reason stored (vehicle and aircraft parts, primary metals, forgings, valves, bearings, fittings, cable, medicines and reagents, gloves and dressings, dentures, tool accessories, keyboards and mice). 168 stay capital (machinery, vehicles, IT, electrical equipment, buildings, construction). Applied on import too. Add data → Purchases → **Capital goods list** shows it (platform admin can switch a product: `GET /api/purchases/capital-list`, `PATCH /api/purchases/capital-list/:itemId`).

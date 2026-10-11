@@ -6,6 +6,7 @@
  */
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
+import { useApp } from '../App';
 import { api, download, num, tco2e, type PublishedLines } from '../lib/api';
 
 const KEYS = ['batch', 'activity', 'facility', 'supplier', 'item', 'category', 'year', 'month', 'estimate', 'q'] as const;
@@ -25,6 +26,7 @@ export function PublishedPurchasesPage() {
 }
 
 export function PublishedLinesView({ fixed }: { fixed?: Record<string, string> }) {
+  const canExport = useApp().tenant?.planLimits?.export !== false;
   const [sp, setSp] = useSearchParams();
   const f = useMemo(() => {
     const o: Record<string, string> = { ...fixed };
@@ -83,8 +85,10 @@ export function PublishedLinesView({ fixed }: { fixed?: Record<string, string> }
         <div className="row" style={{ padding: '12px 16px', gap: 8, flexWrap: 'wrap' }}>
           <div className="seg">{([['co2e', 'Largest emissions'], ['usd', 'Largest spend'], ['date', 'Latest']] as const).map(([k, l]) => <button key={k} className={sort === k ? 'on' : ''} onClick={() => { setSort(k); setPage(0); }}>{l}</button>)}</div>
           <span className="grow" />
+          {canExport ? <>
           <button className="btn sm" disabled={!T?.lines} onClick={() => download(`/api/purchases/published/export?${qs}`, 'Ekotrace published purchases.xlsx')}>Download Excel</button>
           <button className="btn sm ghost" disabled={!T?.lines} onClick={() => download(`/api/purchases/published/export?${qs}${qs ? '&' : ''}format=csv`, 'Ekotrace published purchases.csv')}>CSV</button>
+          </> : <span className="chip grey" title="Downloading data comes with the Starter plan and above">Download: Starter plan and above</span>}
         </div>
         {!d ? <div className="empty">Loading…</div> : !d.lines.length ? <div className="empty">No published lines for this selection.</div> : (
           <div className="scrollx"><table className="t compact">

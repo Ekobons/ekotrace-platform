@@ -16,6 +16,7 @@ import { tenantTx, type Tx } from '../db/pool.js';
 import { requireTenant } from '../lib/auth.js';
 import { scopeOf, subtreeFacilities } from '../lib/access.js';
 import { refdata } from './refdata.js';
+import { AppError } from '../lib/errors.js';
 import { defaultCalorificValue } from './calc.service.js';
 
 /** kWh in a quantity: energy units directly; fuels by mass or volume with the calorific value their factors imply. */
@@ -56,10 +57,16 @@ const S3_NAME: Record<number, string> = {
 export async function dashboardRoutes(app: FastifyInstance) {
   app.get('/api/dashboard', async (req) => {
     const tenant = requireTenant(req);
-    const q = z.object({ year: z.coerce.number().int().min(2000).max(2100).optional(), cmp: z.coerce.number().int().min(2000).max(2100).optional(), node: z.string().uuid().optional(), scope2: z.enum(['location', 'market']).default('location') }).parse(req.query);
+    const q = z.object({ year: z.coerce.number().int().min(2000).max(2100).optional(), cmp: z.coerce.number().int().min(2000).max(2100).optional(), node: z.string().uuid().optional(), group: z.string().uuid().optional(), scope2: z.enum(['location', 'market']).default('location') }).parse(req.query);
     return tenantTx(tenant, async (c) => {
       const see = (await scopeOf(c, req.user)).see;
-      const within = q.node ? await subtreeFacilities(c, q.node) : null;
+      let within = q.node ? await subtreeFacilities(c, q.node) : null;
+      let group: { id: string; name: string } | null = null;
+      if (q.group) {
+        const g = (await c.query('SELECT id, name, facility_ids FROM dashboard_group WHERE id = $1', [q.group])).rows[0];
+        if (!g || !(g.facility_ids as string[]).every((f) => see.has(f))) throw new AppError('Dashboard group not found', 404, 'NOT_FOUND');
+        within = new Set(g.facility_ids as string[]); group = { id: g.id, name: g.name };
+      }
       const facs = [...see].filter((f) => !within || within.has(f));
       const t = (await c.query('SELECT consolidation, base_year FROM tenant WHERE id = $1', [tenant])).rows[0];
       const years = (await c.query(`SELECT DISTINCT extract(year FROM period_start)::int AS y FROM activity WHERE facility_id = ANY($1) AND status <> 'rejected' ORDER BY 1 DESC`, [facs])).rows.map((r) => r.y as number);
@@ -117,7 +124,7 @@ export async function dashboardRoutes(app: FastifyInstance) {
         withTarget: Number((await c.query(`SELECT count(DISTINCT s.id) AS n ${P.replace('JOIN org_node f', 'JOIN supplier s ON s.id = l.supplier_id JOIN org_node f')} AND s.climate_target IN ('sbti_validated','sbti_committed')`, [facs, year])).rows[0].n),
       };
       return {
-        year, years, consolidation: t.consolidation, scope2: q.scope2, baseYear: t.base_year && t.base_year !== year ? { year: t.base_year, total: base } : null,
+        year, years, group, consolidation: t.consolidation, scope2: q.scope2, baseYear: t.base_year && t.base_year !== year ? { year: t.base_year, total: base } : null,
         rows, cmpYear, prevRows, prevMonthly, facilities, categories, s3Names: S3_NAME, purchases,
       };
     });

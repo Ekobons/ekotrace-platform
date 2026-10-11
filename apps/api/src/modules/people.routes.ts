@@ -13,6 +13,7 @@ import { audit, requireTenant, type Role } from '../lib/auth.js';
 import { subtreeFacilities } from '../lib/access.js';
 import { AppError, forbidden, notFound } from '../lib/errors.js';
 import { hashPassword, temporaryPassword } from '../lib/password.js';
+import { checkUserLimit } from '../lib/plans.js';
 
 const companyRole = z.enum(['super_admin', 'admin', 'manager', 'preparer', 'verifier']);
 
@@ -69,6 +70,7 @@ export async function peopleRoutes(app: FastifyInstance) {
     const hash = await hashPassword(pw);
     return tenantTx(tenant, async (c) => {
       await checkGrant(c, req, b.role, b.scopeNodeId, b.facilityIds);
+      await checkUserLimit(c, tenant);
       if (b.scopeNodeId) {
         const n = (await c.query('SELECT kind FROM org_node WHERE id = $1', [b.scopeNodeId])).rows[0];
         if (!n || n.kind === 'facility') throw new AppError('An Admin runs the main entity or a sub-group, not a single facility');
@@ -93,8 +95,9 @@ export async function peopleRoutes(app: FastifyInstance) {
     }).parse(req.body);
     if (id === req.user.id && (b.role || b.disabled)) throw new AppError('You cannot change your own role or disable yourself');
     return tenantTx(tenant, async (c) => {
-      const u = (await c.query('SELECT id, role, scope_node_id FROM app_user WHERE id = $1', [id])).rows[0];
+      const u = (await c.query('SELECT id, role, scope_node_id, disabled FROM app_user WHERE id = $1', [id])).rows[0];
       if (!u) throw notFound('Person');
+      if (b.disabled === false && u.disabled) await checkUserLimit(c, tenant);
       const role: Role = b.role ?? u.role;
       const current: string[] = (await c.query('SELECT node_id FROM user_facility WHERE user_id = $1', [id])).rows.map((r) => r.node_id);
       const facs = b.facilityIds ?? current;

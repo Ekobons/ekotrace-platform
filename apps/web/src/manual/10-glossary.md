@@ -35,4 +35,5 @@
 | Reading batch | Meter readings sent through the API in one request, waiting for review: new, corrections, duplicates (skipped), conflicts (skipped) |
 | Published lines | The purchase lines behind published purchase entries, kept line by line and downloadable |
 | What moved | On each dashboard tab: the three sources that changed most against the comparison year, calculated from the entries |
-
+| Dashboard group | Any mix of facilities viewed together in Dashboards; never changes the organisation; shown only to people who can see all its facilities |
+| Plan | Trial, Starter, Professional or Enterprise: how many facilities and people, and whether Eko AI, data export and dashboard groups are on |

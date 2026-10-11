@@ -274,7 +274,7 @@ export async function mapGroups(c: Tx, tenant: string, batchId: string, opts: { 
   const upd: Upd[] = [];
   const hits = new Map<string, number>();
   const hit = (r: Rule) => hits.set(r.id, (hits.get(r.id) ?? 0) + 1);
-  const tenantRow = (await c.query('SELECT ai_mapping FROM tenant WHERE id = $1', [tenant])).rows[0];
+  const tenantRow = (await c.query(`SELECT ai_mapping AND plan IN ('professional','enterprise') AS ai_mapping FROM tenant WHERE id = $1`, [tenant])).rows[0];
   const forAi: { g: GroupRow; u: Upd }[] = [];
   let n = 0;
   for (const g of groups) {
