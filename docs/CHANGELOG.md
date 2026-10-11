@@ -2,6 +2,13 @@
 
 Newest first.
 
+## 2026-10-12 (16) — Spend conversion: exchange rate + price index, or exchange rate only
+
+- Company setting (migration 018, `tenant.price_adjust`): **Exchange rate + price index** (default; currency → USD of the purchase year → USD of the factor's year with the US CPI-U) or **Exchange rate only** (currency → USD, used as it is; no price index, no "CPI year not loaded" warning). Setup → Currencies & price index (Super admin); `PATCH /api/currency/settings { priceAdjust: 'cpi' | 'none' }`, returned by `GET /api/currency`.
+- Engine: `PurchaseContext.priceAdjust`; with 'none' the line's steps say "used as it is against the 2022 factor (no price-index adjustment: company setting)". Supplier factors per kg / litre / unit unaffected.
+- Applies to new calculations; Recalculate open batches; published entries unchanged until reopened.
+- Tests: 47 API (manual purchase with each option), 48 engine (new). Manual: Purchases → Currencies and inflation.
+
 ## 2026-10-11 (15) — Organisation tabs (Facilities, Sub-groups, Dashboard groups); plans with limits; console subscription
 
 **Organisation & groups** now has the prototype's tabs: **Tree** (list / org chart, as before), **Facilities** (one table: type, sub-group, location, manager — red when missing —, meters, vehicles, landfill sites, share of the year's entries approved, tCO₂e; `GET /api/org/summary?year=`), **Sub-groups** (main entity and sub-groups with where each sits, admins, facilities, tCO₂e; Edit, + Facility here), **Dashboard groups**. Header buttons + Facility / + Sub-group.

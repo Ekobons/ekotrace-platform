@@ -383,10 +383,10 @@ export async function markMaterial(c: Tx, batchId: string) {
 }
 
 // -------------------------------------------------------------- calculate --
-interface Ctx { tenant: { fx_method: FxMethod; currency: string }; rates: FxRate[]; cpi: PriceIndex[]; units: Map<string, { code: string; dimension: string; to_base: number }> }
+interface Ctx { tenant: { fx_method: FxMethod; currency: string; price_adjust: 'cpi' | 'none' }; rates: FxRate[]; cpi: PriceIndex[]; units: Map<string, { code: string; dimension: string; to_base: number }> }
 
 async function calcContext(c: Tx): Promise<Ctx> {
-  const tenant = (await c.query(`SELECT fx_method, currency FROM tenant WHERE id = nullif(current_setting('app.tenant_id', true), '')::uuid`)).rows[0];
+  const tenant = (await c.query(`SELECT fx_method, currency, price_adjust FROM tenant WHERE id = nullif(current_setting('app.tenant_id', true), '')::uuid`)).rows[0];
   // the company's own rates first, so they win over the platform list
   const rates = (await c.query(`SELECT currency, kind, to_char(period, 'YYYY-MM-DD') AS period, per_usd::float8 AS "perUsd", source FROM fx_rate ORDER BY (tenant_id IS NULL), period DESC`)).rows as FxRate[];
   const cpi = (await c.query(`SELECT year, value::float8 AS value FROM price_index WHERE region = 'US' ORDER BY year`)).rows as PriceIndex[];
@@ -414,7 +414,7 @@ interface Env {
 async function loadEnv(c: Tx, batchId: string, lineFilter?: string): Promise<Env> {
   const ctx = await calcContext(c);
   const pc: PurchaseContext = {
-    rates: ctx.rates, fxMethod: ctx.tenant.fx_method, index: () => ctx.cpi,
+    rates: ctx.rates, fxMethod: ctx.tenant.fx_method, index: () => ctx.cpi, priceAdjust: ctx.tenant.price_adjust,
     convertQty: (v: number, from: string, to: string) => { const a = unitOf(ctx, from), b = unitOf(ctx, to); return a && b && a.dimension === b.dimension ? (v * a.to_base) / b.to_base : null; },
   };
   const groups = new Map((await c.query(

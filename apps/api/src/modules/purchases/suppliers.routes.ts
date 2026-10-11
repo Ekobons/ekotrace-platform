@@ -314,7 +314,7 @@ export async function supplierRoutes(app: FastifyInstance) {
     const tenant = requireTenant(req);
     const q = z.object({ currency: z.string().regex(/^[A-Z]{3}$/).optional() }).parse(req.query);
     return tenantTx(tenant, async (c) => {
-      const t = (await c.query('SELECT fx_method, currency FROM tenant WHERE id = $1', [tenant])).rows[0];
+      const t = (await c.query('SELECT fx_method, currency, price_adjust FROM tenant WHERE id = $1', [tenant])).rows[0];
       const rates = (await c.query(
         `SELECT id, currency, kind, to_char(period,'YYYY-MM-DD') AS period, per_usd::float8 AS per_usd, source, tenant_id IS NOT NULL AS own FROM fx_rate
           WHERE ($1::text IS NULL OR currency = $1) ORDER BY currency, kind, period DESC LIMIT 2000`, [q.currency ?? null])).rows;
@@ -326,16 +326,16 @@ export async function supplierRoutes(app: FastifyInstance) {
       const used = (await c.query(`SELECT currency, count(*)::int AS lines FROM purchase_line WHERE currency IS NOT NULL GROUP BY 1 ORDER BY 2 DESC LIMIT 30`)).rows;
       const fallbacks = (await c.query(
         `SELECT w AS warning, count(*)::int AS lines FROM (SELECT unnest(warnings) AS w FROM purchase_line WHERE status IN ('ready','check','published')) x GROUP BY 1 ORDER BY 2 DESC LIMIT 20`)).rows;
-      return { fxMethod: t.fx_method, currency: t.currency, rates, cpi, missing, used, fallbacks };
+      return { fxMethod: t.fx_method, currency: t.currency, priceAdjust: t.price_adjust, rates, cpi, missing, used, fallbacks };
     });
   });
 
   app.patch('/api/currency/settings', async (req) => {
     const tenant = requireTenant(req);
     requireRole(req, 'super_admin');
-    const b = z.object({ fxMethod: z.enum(['month', 'year', 'fixed']).optional(), currency: z.string().regex(/^[A-Z]{3}$/).optional() }).parse(req.body);
+    const b = z.object({ fxMethod: z.enum(['month', 'year', 'fixed']).optional(), currency: z.string().regex(/^[A-Z]{3}$/).optional(), priceAdjust: z.enum(['cpi', 'none']).optional() }).parse(req.body);
     return tenantTx(tenant, async (c) => {
-      await c.query('UPDATE tenant SET fx_method = coalesce($2, fx_method), currency = coalesce($3, currency) WHERE id = $1', [tenant, b.fxMethod ?? null, b.currency ?? null]);
+      await c.query('UPDATE tenant SET fx_method = coalesce($2, fx_method), currency = coalesce($3, currency), price_adjust = coalesce($4, price_adjust) WHERE id = $1', [tenant, b.fxMethod ?? null, b.currency ?? null, b.priceAdjust ?? null]);
       await audit(c, req, 'methodology.currency', 'tenant', tenant, b);
       return b;
     });

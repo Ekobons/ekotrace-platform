@@ -44,6 +44,15 @@ test('spend-based line: AED → USD at the peg → 2022 dollars → × EPA facto
   assert.equal(r.factorUnit, 'kg CO2e / USD 2022');
 });
 
+test('company option "exchange rate only": no price-index step, no CPI warning', () => {
+  const r = calcPurchase({ date: '2026-05-20', amount: 36725, currency: 'AED', spend: EPA }, { ...ctx(), priceAdjust: 'none' });
+  close(r.baseAmount, 10000); close(r.co2e, 2000);
+  assert.equal(r.cpi, undefined); assert.equal(r.warnings.length, 0);
+  assert.match(r.steps[1]!, /no price-index adjustment/);
+  const withCpi = calcPurchase({ date: '2026-05-20', amount: 36725, currency: 'AED', spend: EPA }, ctx());
+  assert.ok(withCpi.co2e < r.co2e && withCpi.cpi);
+});
+
 test('credit notes (negative spend) reduce emissions', () => {
   const r = calcPurchase({ date: '2022-05-20', amount: -100, currency: 'USD', spend: EPA }, ctx());
   close(r.co2e, -20);

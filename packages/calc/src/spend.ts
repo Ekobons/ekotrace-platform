@@ -101,6 +101,12 @@ export interface PurchaseContext {
   fxMethod: FxMethod;
   /** price index of the factor's currency (US CPI-U for USD factors) */
   index: (currency: string) => PriceIndex[];
+  /**
+   * How spend of another year meets the factor's price year: 'cpi' (default) — inflate or deflate
+   * with the price index (GHG Protocol / EPA guidance); 'none' — exchange rate only, the
+   * spend is used as it is (simpler, slightly overstates emissions when prices have risen).
+   */
+  priceAdjust?: 'cpi' | 'none';
   /** same dimension conversion for quantities (kg ↔ t…); return null when not convertible */
   convertQty?: (value: number, from: string, to: string) => number | null;
 }
@@ -145,7 +151,9 @@ export function moneyToFactor(amount: number, currency: string, date: string, f:
   }
   let cpi: Deflator | undefined;
   const y = Number(date.slice(0, 4));
-  if (f.priceYear && f.priceYear !== y) {
+  if (f.priceYear && f.priceYear !== y && ctx.priceAdjust === 'none') {
+    steps.push(`${to} ${fmt(base)} of ${y} used as it is against the ${f.priceYear} factor (no price-index adjustment: company setting)`);
+  } else if (f.priceYear && f.priceYear !== y) {
     cpi = deflator(ctx.index(to), y, f.priceYear);
     const before = base;
     base *= cpi.ratio;

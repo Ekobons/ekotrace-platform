@@ -1029,6 +1029,12 @@ test('purchases: manual entry (check, then save) and ERP API (several calls, the
   assert.equal(check.body.saved, false);
   assert.ok(Math.abs(check.body.lines[0].co2e - 2000 * CPI_24_22 * Number((await pq(`SELECT co2e FROM factor WHERE item_id = $1 AND status = 'active'`, [laptop])).rows[0].co2e)) < 1e-6);
   assert.equal(Number((await pq(`SELECT count(*) FROM purchase_batch WHERE source = 'manual'`)).rows[0].count), 0); // nothing kept
+  // company option "exchange rate only": the same line without the price index
+  assert.equal((await api('PATCH', '/api/currency/settings', { priceAdjust: 'none' }, tenantA)).status, 200);
+  assert.equal((await api('GET', '/api/currency', undefined, tenantA)).body.priceAdjust, 'none');
+  const fxOnly = (await api('POST', '/api/purchases/manual', { facilityId: facA, dryRun: true, lines }, tenantA)).body;
+  assert.ok(Math.abs(fxOnly.lines[0].co2e - check.body.lines[0].co2e / CPI_24_22) < 1e-6);
+  assert.equal((await api('PATCH', '/api/currency/settings', { priceAdjust: 'cpi' }, tenantA)).status, 200);
   const save = await api('POST', '/api/purchases/manual', { facilityId: facA, lines }, tenantA);
   assert.equal(save.body.saved, true, JSON.stringify(save.body));
   const cats = (await pq(`SELECT c.code FROM activity a JOIN category c ON c.id = a.category_id WHERE a.purchase_batch_id = $1 ORDER BY 1`, [save.body.batchId])).rows.map((r) => r.code);

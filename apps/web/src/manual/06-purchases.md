@@ -98,11 +98,19 @@ A factor written in the file (vendor-specific EF and its unit) counts as a suppl
 
 ## Currencies and inflation
 
-Spend-based factors are per US dollar of 2022. Each line is converted in two steps, both shown in the line's calculation:
-
+Spend-based factors are per US dollar of 2022. Each line is converted in one or two steps, all shown in the line's calculation:
 
 1. **Exchange rate:** amount ÷ units of the currency per US dollar. By default the **average rate of the purchase month**; the company can choose the annual average or a fixed budget rate (Setup → Currencies & price index). Currencies pegged to the dollar (AED, SAR, QAR, OMR, BHD) use the peg. A missing month falls back to the annual average, and the line says so.
 2. **Inflation:** × US CPI of 2022 ÷ US CPI of the purchase year. A 2024 dollar is worth about 7 % fewer 2022 dollars, so without this step emissions would rise with prices. A year not yet loaded uses the latest year, and the line says so.
+
+**Two options** (Setup → Currencies & price index → *Converting spend to the factor's dollars*, Super admin):
+
+| Option | Steps | When |
+|---|---|---|
+| Exchange rate + price index (default, recommended) | currency → US dollars of the purchase year → 2022 dollars with the CPI | follows GHG Protocol and EPA guidance; inflation does not raise emissions |
+| Exchange rate only | currency → US dollars, used as they are | simpler, no price index needed; emissions rise with prices (about 7 % more for 2024 spend on 2022 factors) |
+
+A change applies to new calculations: use **Recalculate** on open batches; published entries keep their figures until the batch is reopened. Supplier factors per kg, litre or unit are not affected.
 
 ## Safety checks
 

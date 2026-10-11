@@ -41,7 +41,7 @@ export function Currencies() {
   return (
     <div className="page">
       <div className="head"><div><div className="eyebrow">Setup</div><h1>Currencies &amp; price index</h1>
-        <p className="sub">Spend-based factors are in kg CO₂e per US dollar of a given year (EPA v1.3: 2022 dollars). Each purchase is converted to US dollars with an exchange rate, then brought to that year's prices with the US consumer price index, so inflation does not inflate emissions.</p></div></div>
+        <p className="sub">Spend-based factors are in kg CO₂e per US dollar of a given year (EPA v1.3: 2022 dollars). Each purchase is converted to US dollars with an exchange rate and — if the company chooses — brought to that year's prices with the US consumer price index.</p></div></div>
 
       <div className="card" style={{ display: 'grid', gap: 10 }}>
         <h3>Exchange rate used</h3>
@@ -52,6 +52,18 @@ export function Currencies() {
           </label>
         ))}
         <div className="sub">Currencies pegged to the US dollar (AED 3.6725, SAR 3.75, QAR 3.64, OMR 0.3845, BHD 0.376) always use the peg, whatever the method. Company currency (default for files without a currency column): <b>{d.currency}</b>.</div>
+      </div>
+
+      <div className="card" style={{ display: 'grid', gap: 10 }}>
+        <h3>Converting spend to the factor's dollars</h3>
+        {([['cpi', 'Exchange rate + price index (recommended)', "Spend → US dollars of the purchase year → dollars of the factor's year with the US CPI-U (e.g. 2024 → 2022: × 0.933). Inflation does not inflate emissions; matches GHG Protocol and EPA guidance."],
+           ['none', 'Exchange rate only', 'Spend → US dollars, used as they are against the factor. Simpler and needs no price index, but emissions rise with prices (about 7 % more for 2024 spend on 2022 factors).']] as const).map(([k, l, help]) => (
+          <label key={k} className={`choice ${d.priceAdjust === k ? 'on' : ''}`} style={{ cursor: isSuper ? 'pointer' : 'default' }}>
+            <span className="row" style={{ gap: 8 }}><input type="radio" disabled={!isSuper} checked={d.priceAdjust === k} onChange={async () => { try { await api.currencySettings({ priceAdjust: k }); toast('Saved: recalculate open purchase batches to apply (published entries keep their figures until reopened)'); load(); } catch (e) { setErr((e as Error).message); } }} /><b>{l}</b></span>
+            <span className="sub">{help}</span>
+          </label>
+        ))}
+        <div className="sub">Each purchase line shows the steps used, so either choice can be checked line by line. Supplier factors per kg, litre or unit are not affected; supplier factors per currency of the same year never use the index.</div>
       </div>
 
       {d.missing.length > 0 && (
