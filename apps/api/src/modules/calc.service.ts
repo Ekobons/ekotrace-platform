@@ -110,7 +110,7 @@ export const calcInputSchema = z.object({
 export type CalcInput = z.infer<typeof calcInputSchema>;
 
 interface ItemRow {
-  id: number; name: string; active: boolean; category_id: number; category: string; calc_method: 'combustion' | 'fugitive' | 'vehicle' | 'electricity' | 'waste' | 'waste_disposal';
+  id: number; name: string; active: boolean; category_id: number; category: string; calc_method: 'combustion' | 'fugitive' | 'vehicle' | 'electricity' | 'waste' | 'waste_disposal' | 'travel';
   sub_units: string[]; gas_code: string | null; sub_active: boolean; code: string;
   attrs: { vehicle?: string; powertrain?: string; fuel?: string | null; electric?: boolean; phev?: boolean; distance?: boolean };
 }
@@ -190,6 +190,23 @@ export async function calculate(input: CalcInput, ctx: CalcContext): Promise<{ r
   } else if (item.calc_method === 'waste_disposal') {
     if (input.quantity === undefined) throw new AppError('Enter the tonnes of waste');
     result = calcCombustion({ itemName: item.name, quantity: input.quantity, unit: input.unit, date, region, factors: await loadFactors(item.id), gwp, units: ref.units });
+    stored = { quantity: input.quantity, unit: input.unit, inputs: {} };
+  } else if (item.calc_method === 'travel') {
+    if (input.quantity === undefined) throw new AppError('Enter the distance');
+    const factors = await loadFactors(item.id);
+    if (!factors.length) {
+      // walking and cycling: distance counted, no emissions
+      result = { totals: { direct: 0, wtt: 0, outside_scopes: 0, memo: 0, scope2: 0, scope2_market: 0, td_loss: 0, scope3: 0 }, lines: [], steps: [`${item.name}: no emissions`], warnings: [], factors: [] } as unknown as CalcResult;
+    } else {
+      result = calcCombustion({ itemName: item.name, quantity: input.quantity, unit: input.unit, date, region, factors, gwp, units: ref.units });
+      // Employee commuting: the fuel's well-to-tank belongs to the same category (3.7), not to 3.3.
+      if (result.totals.wtt) {
+        result.totals.scope3 += result.totals.wtt;
+        result.steps.push(`Well-to-tank ${result.totals.wtt.toFixed(3)} kg CO2e counted in the same Scope 3 category`);
+        result.totals.wtt = 0;
+        for (const l of result.lines) if (l.basis === 'wtt') l.basis = 'scope3';
+      }
+    }
     stored = { quantity: input.quantity, unit: input.unit, inputs: {} };
   } else if (item.calc_method === 'electricity') {
     if (input.quantity === undefined) throw new AppError('Enter the quantity of energy');

@@ -8,7 +8,7 @@ export interface Item { id: number; subcategory_id: number; code: string; name: 
 /** Vehicle types: class, powertrain, the fuel it burns, electric / plug-in, distance factors or not. */
 export interface VehicleAttrs { vehicle?: string; powertrain?: string; load?: string; fuel?: string | null; electric?: boolean; phev?: boolean; distance?: boolean }
 export interface Subcategory { id: number; category_id: number; code: string; name: string; grp?: string | null; units: string[]; default_unit: string | null; is_bioenergy: boolean; sort: number; active: boolean; hiddenForClient?: boolean; items: Item[] }
-export interface Category { id: number; scope: number; code: string; name: string; calc_method: 'combustion' | 'fugitive' | 'vehicle' | 'electricity' | 'waste' | 'waste_disposal' | 'spend'; ghg_category?: number | null; description: string | null; active: boolean; subcategories: Subcategory[] }
+export interface Category { id: number; scope: number; code: string; name: string; calc_method: 'combustion' | 'fugitive' | 'vehicle' | 'electricity' | 'waste' | 'waste_disposal' | 'spend' | 'travel'; ghg_category?: number | null; description: string | null; active: boolean; subcategories: Subcategory[] }
 export interface Unit { code: string; name: string; dimension: string; to_base: number; is_base: boolean; aliases: string[]; active: boolean }
 export interface ResultLine { basis: Basis; gas: string; kgGas: number | null; kgCo2e: number; factorId: number | null; method: 'gas' | 'published' }
 /** CO2e emission factor behind one part of a result: quantity × perEnteredUnit = total. */
@@ -167,6 +167,36 @@ async function call<T>(method: string, path: string, body?: unknown, raw?: Blob,
   if (r.status === 401 && !path.startsWith('/api/auth/login')) onUnauthenticated();
   if (!r.ok) throw new ApiError(data.message ?? `Request failed (${r.status})`, r.status, data.error, data.details);
   return data as T;
+}
+
+// ------------------------------------------------------------ employee commuting --
+export type CommuteMode = 'car' | 'carpool' | 'motorbike' | 'taxi' | 'bus' | 'shuttle' | 'metro' | 'train' | 'active' | 'wfh';
+export type Weekend = 'sat_sun' | 'fri_sat' | 'sun';
+export interface CommuteOptions {
+  modes: { key: CommuteMode; label: string; unit: 'km' | 'pkm' | null; item: string | null; perVehicle: boolean }[];
+  fuels: { key: string; label: string }[];
+  items: { code: string; name: string; sub: string; sub_name: string; unit: string; note: string | null }[];
+  defaults: Record<Weekend, { weekdays: number; workingDays: number }>; holidays: number; leave: number;
+}
+export interface CommuteTypedRow { mode: CommuteMode; itemCode?: string; fuel?: string; employees: number; oneWayKm?: number; daysPerWeek?: number; occupants?: number; annualKm?: number }
+export interface CommuteAnswer { row?: number; mode: CommuteMode; km?: number | null; days?: number | null; occupants?: number | null; fuel?: string; mode2?: CommuteMode | null; km2?: number | null }
+export interface CommuteBody {
+  facilityId: string; year: number; method: 'typed' | 'survey'; headcount: number; workingDays: number; weekend: Weekend; holidays?: number; leave?: number;
+  rows?: CommuteTypedRow[]; answers?: CommuteAnswer[]; survey?: { file?: string; columns?: Record<string, string>; site?: string | null; unrecognised?: number }; note?: string | null;
+}
+export interface CommuteLine { item: string; name: string; mode: CommuteMode; fuel?: string; unit: 'km' | 'pkm'; quantity: number; personKm: number; people: number; measured: boolean; kg: number; perUnit: number; source: string | null }
+export interface CommuteResult {
+  lines: CommuteLine[]; personKm: number; kg: number; scale: number; respondents?: number; responseRate?: number;
+  byMode: { mode: CommuteMode; label: string; people: number; share: number }[]; steps: string[]; warnings: string[];
+}
+export interface CommuteRecord {
+  id: string; facility_id: string; facility: string; year: number; method: 'typed' | 'survey'; headcount: number; working_days: number; weekend: Weekend;
+  rows: CommuteTypedRow[]; survey: CommuteBody['survey'] | null; result: CommuteResult & { settings?: { holidays: number | null; leave: number | null } }; note: string | null;
+  updated_at: string; updated_by_name: string | null; entries: number; approved: number; answers: number;
+}
+export interface SurveyRead {
+  file: string; headers: string[]; columns: Record<string, string>; answers: CommuteAnswer[]; blank: number; otherSite: number; site: string | null;
+  sites: { value: string; count: number }[]; unrecognised: { value: string; count: number }[];
 }
 
 export const api = {
@@ -342,6 +372,14 @@ export const api = {
   currencySettings: (b: { fxMethod?: string; currency?: string; priceAdjust?: 'cpi' | 'none' }) => call('PATCH', '/api/currency/settings', b),
   addRates: (rows: { currency: string; kind: string; period: string; perUsd: number; source: string }[], shared = false) => call<{ saved: number }>('POST', '/api/currency/rates', { rows, shared }),
   deleteRate: (id: number) => call<{ ok: true }>('DELETE', `/api/currency/rates/${id}`),
+  commuteOptions: (year: number) => call<CommuteOptions>('GET', `/api/commuting/options?year=${year}`),
+  commuting: (year: number) => call<{ facilities: { id: string; name: string; parent: string | null; employees: number | null; canEnter: boolean; record: { id: string; method: string; headcount: number; kg: number; personKm: number; responseRate: number | null; entries: number; approved: number; updated_at: string; updated_by_name: string | null } | null }[] }>('GET', `/api/commuting?year=${year}`),
+  commuteRecord: (facilityId: string, year: number) => call<{ facility: { id: string; name: string; employees: number | null }; record: CommuteRecord | null; answers: CommuteAnswer[]; months: { m: number; t: number; n: number; approved: number }[] }>('GET', `/api/commuting/record?facilityId=${facilityId}&year=${year}`),
+  readSurvey: (facilityId: string, f: File, q: { map?: Record<string, string>; site?: string; weekend?: Weekend } = {}) =>
+    call<SurveyRead>('POST', `/api/commuting/survey?${new URLSearchParams({ facilityId, ...(q.map ? { map: JSON.stringify(q.map) } : {}), ...(q.site != null ? { site: q.site } : {}), ...(q.weekend ? { weekend: q.weekend } : {}) })}`, undefined, f, { 'x-filename': encodeURIComponent(f.name) }),
+  commutePreview: (b: CommuteBody) => call<CommuteResult>('POST', '/api/commuting/preview', b),
+  commuteSave: (b: CommuteBody) => call<CommuteResult & { id: string; entries: number }>('PUT', '/api/commuting', b),
+  commuteDelete: (id: string) => call<{ ok: true; entries: number }>('DELETE', `/api/commuting/${id}`),
   addPriceIndex: (b: { region: string; year: number; value: number; source: string }) => call('POST', '/api/admin/price-index', b),
 };
 

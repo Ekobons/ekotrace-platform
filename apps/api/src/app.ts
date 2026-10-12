@@ -28,6 +28,7 @@ import { supplierRoutes } from './modules/purchases/suppliers.routes.js';
 import { publishedLineRoutes } from './modules/purchases/publishedLines.routes.js';
 import { groupRoutes } from './modules/groups.routes.js';
 import { dashboardRoutes } from './modules/dashboard.routes.js';
+import { commuteRoutes } from './modules/commute.routes.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const BRANDS = join(HERE, '../../../brands');
@@ -83,6 +84,7 @@ export async function buildApp(opts: { logger?: boolean } = {}): Promise<Fastify
     await secured.register(publishedLineRoutes);
     await secured.register(groupRoutes);
     await secured.register(dashboardRoutes);
+    await secured.register(commuteRoutes);
   });
 
   // The screens (apps/web, after `npm run build`) are served from the same

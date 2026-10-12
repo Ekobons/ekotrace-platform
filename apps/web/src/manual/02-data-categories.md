@@ -87,3 +87,36 @@ The scope follows **who runs the treatment site**: one Waste tab with a switch.
 
 - **Other categories:** air tickets, hotels and taxis belong to business travel (3.6); freight and couriers to upstream transport (3.4); rent to upstream leased assets (3.8); capitalised assets to capital goods (3.2). Fuel, electricity and waste are usually already counted from activity data — those lines are **excluded** to avoid counting twice. The tool flags them; a person decides.
 - Spend-based factors are averages: supplier-specific factors are better and are shown separately in the data-quality split.
+
+## Employee commuting — Scope 3.7
+
+**What:** travel between home and the workplace by employees, in vehicles the company does not own or control (own cars, car-pools, taxis, public transport, a contracted staff shuttle). A shuttle the company owns or leases and runs itself is fleet (Scope 1) instead.
+**Enter:** **once a year per facility**, under Add data → Employee commuting. Saving again for the same facility and year replaces the earlier figures; nothing is added twice.
+
+**Two ways in**
+
+| | What you give | Good for |
+|---|---|---|
+| **Type in** | per way of travelling: employees, average one-way distance, days at the workplace per week (and people per car for cars); or the year's total distance when it is known (e.g. the shuttle contractor's passenger-km) | small sites, or when HR already knows the split |
+| **From a survey** | one answer per employee, uploaded as Excel or CSV — the Ekotrace survey file (Download the survey file) or an export of Microsoft Forms / Google Forms | larger sites; the better method |
+
+**The survey.** Questions: main way to work; one-way distance (km); days at the workplace per week; people in the car (including the driver); car fuel; optionally a second way and its distance (e.g. bus then metro) and the site. Columns are recognised by their names (you can change the choice under *Columns*), and so are everyday answers ("Dubai Metro", "Careem", "drive my car", "work from home"). Answers that cannot be read are listed and left out. When one file covers several sites, only the rows of the facility are used (choose the site value if the name differs).
+
+**Scaling up.** The answers stand for all employees of the facility: each answer counts for *employees ÷ answers* people (110 answers for 171 employees → 1.55 each). People who work from home all week count as answers with no travel, so they are not scaled up as commuters. Below 30% of employees answering, a warning is shown.
+
+```flow
+> Per person and year | 2 × one-way km × working days × (days at the workplace ÷ working days per week, 5 or 6)
+> Cars | ÷ people in the car (car-km); motorbikes per km
+> Taxi, bus, shuttle, metro, train | passenger-km
+> Factors | DESNZ land travel of the year (cars by fuel, average size), with well-to-tank, all in 3.7
+> Months | the year split by the working days of each month → one entry per mode and month
+```
+
+**Working days.** Weekdays of the year (by the facility's weekend: Saturday–Sunday, Friday–Saturday or Sunday only) − public holidays (12 by default) − annual leave (22 by default), or typed over. Holidays and leave come off the **year's total**; the year is then spread over the months by each month's working days.
+
+**Why no seasonal weights?** For the year — the figure that is reported — they change nothing: the holidays and leave are already taken off the total. They would only move tonnes between months, and doing that well needs a company holiday calendar and leave records per month; for most companies a guess would make the months look precise without being so. The months are therefore split by working days, the same for every mode. If a site has a known shutdown (e.g. two weeks in August), lower its working days for the year.
+
+- **Locked once approved:** the monthly entries are made from the record and change only with it. When any of them is approved, the record can no longer be changed or removed.
+- **Electric cars:** the DESNZ factor assumes charging on the UK grid; with few electric cars the difference is small.
+- Working from home (home-office energy) is optional in the GHG Protocol and is not counted.
+- On dashboards, commuting shows under Mobility & travel and Scope 3.7; it does not count towards "% of required data in".

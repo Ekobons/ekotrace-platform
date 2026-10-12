@@ -78,10 +78,31 @@ export function wasteRoute(t: string): WasteRoute | null {
   return null;
 }
 
+/**
+ * Land travel by passengers (Scope 3, "Business travel- land"; DESNZ advises the same factors for
+ * employee commuting): cars by size and fuel and motorbikes per vehicle-km, taxis, buses and rail
+ * per passenger-km; and their well-to-tank.
+ */
+export type TravelMode = 'car' | 'motorbike' | 'taxi' | 'bus' | 'rail';
+export interface DesnzTravelRow {
+  mode: TravelMode; vehicle: string; variant: string; unit: 'km' | 'pkm'; basis: 'scope3' | 'wtt';
+  co2e: number | null; gasCo2e: { CO2?: number; CH4?: number; N2O?: number };
+}
+function travelMode(l2: string): TravelMode | null {
+  const x = l2.replace(/^WTT-\s*/i, '').toLowerCase();
+  if (x === 'cars (by size)') return 'car';
+  if (x === 'motorbike') return 'motorbike';
+  if (x === 'taxis') return 'taxi';
+  if (x === 'bus') return 'bus';
+  if (x === 'rail') return 'rail';
+  return null;
+}
+
 export type VehicleGroup = 'cars_by_size' | 'cars_by_segment' | 'vans' | 'hgv' | 'hgv_refrigerated' | 'motorbikes';
 
 export interface DesnzParsed {
   vehicles: DesnzVehicleRow[];
+  travel: DesnzTravelRow[];
   evEnergy: DesnzEvEnergyRow[];
   /** UK grid electricity (Scope 2, location-based), kg CO2e per kWh and its gas split */
   ukGrid: { co2e: number | null; gasCo2e: { CO2?: number; CH4?: number; N2O?: number } } | null;
@@ -168,6 +189,7 @@ export async function parseDesnz(path: string): Promise<DesnzParsed> {
   const fuels = new Map<string, DesnzFuelRow>();
   const gases = new Map<string, DesnzGasRow>();
   const vehicles = new Map<string, DesnzVehicleRow>();
+  const travel = new Map<string, DesnzTravelRow>();
   const evEnergy: DesnzEvEnergyRow[] = [];
   const waste: DesnzWasteRow[] = [];
   let ukGrid: DesnzParsed['ukGrid'] = null;
@@ -184,6 +206,22 @@ export async function parseDesnz(path: string): Promise<DesnzParsed> {
       const route = wasteRoute(colText);
       if (route && v != null && ghg.startsWith('kg co2e')) waste.push({ group: l2, material: l3, route, co2e: v });
       return;
+    }
+    // Land travel by passengers (employee commuting): per km or passenger-km, and well-to-tank.
+    const tmode = scope === 'Scope 3' && (l1 === 'Business travel- land' || /^WTT- pass vehs & travel[- (]+land/.test(l1)) ? travelMode(l2) : null;
+    const tunit = uom === 'km' ? 'km' : uom === 'passenger.km' ? 'pkm' : null;
+    if (tmode && tunit && !(tunit === 'km' && tmode === 'taxi')) {
+      const basis = l1 === 'Business travel- land' ? 'scope3' : 'wtt';
+      const variant = colText === 'None' ? '' : colText;
+      const key = `${tmode}|${l3}|${variant}|${tunit}|${basis}`;
+      const r = travel.get(key) ?? { mode: tmode, vehicle: l3, variant, unit: tunit, basis, co2e: null, gasCo2e: {} };
+      if (/of co2/.test(ghg)) r.gasCo2e.CO2 = v ?? undefined;
+      else if (/of ch4/.test(ghg)) r.gasCo2e.CH4 = v ?? undefined;
+      else if (/of n2o/.test(ghg)) r.gasCo2e.N2O = v ?? undefined;
+      else if (ghg.startsWith('kg co2e')) r.co2e = v;
+      travel.set(key, r);
+      // the WTT rows of cars and motorbikes are also read below as vehicle rows (fleet)
+      if (basis === 'scope3') return;
     }
     // Road vehicles: Scope 1 per km/mile, and their well-to-tank (Scope 3).
     const vunit = VEH_UNIT[uom];
@@ -259,6 +297,7 @@ export async function parseDesnz(path: string): Promise<DesnzParsed> {
     fuels: [...fuels.values()].filter((r) => r.co2e != null || Object.keys(r.gasCo2e).length),
     gases: [...gases.values()],
     vehicles: [...vehicles.values()].filter((r) => r.co2e != null),
+    travel: [...travel.values()].filter((r) => r.co2e != null),
     evEnergy, ukGrid, ukEnergy, waste,
     sha256: createHash('sha256').update(buf).digest('hex'),
   };

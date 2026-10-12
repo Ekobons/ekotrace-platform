@@ -70,7 +70,7 @@ export type SaveInput = z.infer<typeof saveSchema>;
  * Calculate and save one entry inside the caller's transaction (used by the form,
  * the fleet grid and Excel uploads). With dryRun, calculates only.
  */
-export async function saveEntry(c: Tx, req: FastifyRequest, t: { id: string; gwp_set: string }, b: SaveInput, opts: { dryRun?: boolean } = {}) {
+export async function saveEntry(c: Tx, req: FastifyRequest, t: { id: string; gwp_set: string }, b: SaveInput, opts: { dryRun?: boolean; quiet?: boolean } = {}) {
   const tenant = t.id;
   const fac = (await c.query(`SELECT id, name, country, grid_region FROM org_node WHERE id = $1 AND kind = 'facility' AND active`, [b.facilityId])).rows[0];
   if (!fac) throw notFound('Facility');
@@ -100,7 +100,7 @@ export async function saveEntry(c: Tx, req: FastifyRequest, t: { id: string; gwp
        result.lines.map((l) => l.kgCo2e), result.lines.map((l) => l.factorId), result.lines.map((l) => l.method)],
     );
   }
-  await audit(c, req, 'activity.create', 'activity', a.id, { facility: fac.id, item: item.name, vehicle: veh?.name, period: b.periodStart, quantity, unit: stored.unit, co2e: result.totals.direct, scope2: result.totals.scope2 || undefined, scope3: result.totals.scope3 || undefined });
+  if (!opts.quiet) await audit(c, req, 'activity.create', 'activity', a.id, { facility: fac.id, item: item.name, vehicle: veh?.name, period: b.periodStart, quantity, unit: stored.unit, co2e: result.totals.direct, scope2: result.totals.scope2 || undefined, scope3: result.totals.scope3 || undefined });
   return { id: a.id as string, createdAt: a.created_at, item: item.name, gwpSet, totals: result.totals, warnings: result.warnings, stored };
 }
 

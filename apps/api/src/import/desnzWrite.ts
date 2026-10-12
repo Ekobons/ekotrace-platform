@@ -11,10 +11,11 @@
  *  - Anything unexpected is written to import_issue for the admin to review.
  */
 import type { Tx } from '../db/pool.js';
+import type { TravelMode } from './desnz.js';
 import { DESNZ_UNIT, slug, type DesnzParsed, type WasteRoute } from './desnz.js';
 
 /** Raise when the importer learns to read more of the file: editions already loaded are read again once. */
-export const IMPORTER_VERSION = 5;
+export const IMPORTER_VERSION = 7;
 
 export interface ImportSummary {
   source: string;
@@ -230,6 +231,26 @@ export async function importDesnz(c: Tx, p: DesnzParsed, opts: { createdBy?: str
     factors.push({ item, basis: 'scope3', unit: 't', co2e: w.co2e, gases: [] });
   }
 
+  // ---- land travel by passengers (employee commuting, Scope 3.7) ----------------------
+  // Cars by size and fuel and motorbikes per vehicle-km; taxis, buses, rail per passenger-km.
+  // The well-to-tank is stored as 'wtt' and counted inside 3.7 by the calculation.
+  const hasCommute = subId.has('commute_car');
+  for (const r of hasCommute ? p.travel : []) {
+    const t = travelItem(r.mode, r.vehicle, r.variant);
+    let item = itemIds.get(t.code);
+    if (!item) {
+      item = await upsertItem(t.code, t.sub, t.name, { defaultUnit: r.unit, sort: t.sort, note: t.note });
+      await c.query('UPDATE item SET attrs = $2, sort = $3, note = $4 WHERE id = $1', [item, JSON.stringify(t.attrs), t.sort, t.note ?? null]);
+    }
+    const split: [string, number][] = [];
+    if (r.basis === 'scope3' && r.gasCo2e.CO2 != null) {
+      split.push(['CO2', r.gasCo2e.CO2]);
+      if (r.gasCo2e.CH4 != null) split.push(['CH4_fossil', r.gasCo2e.CH4 / gwp.get('CH4_fossil')!]);
+      if (r.gasCo2e.N2O != null) split.push(['N2O', r.gasCo2e.N2O / gwp.get('N2O')!]);
+    }
+    factors.push({ item, basis: r.basis, unit: r.unit, co2e: r.co2e, gases: split });
+  }
+
   // ---- bulk insert factors + gas split ------------------------------------------
   const vf = `${p.year}-01-01`, vt = `${p.year}-12-31`;
   let inserted = 0;
@@ -300,4 +321,30 @@ export function vehicleItem(group: string, vehicleName: string, variant: string)
   const name = `${group === 'vans' ? `Van ${vehicle}` : vehicle} · ${pt.label}`;
   return { code, sub: group, name,
     attrs: { vehicle, powertrain: pt.key, fuel: pt.fuel, distance: true, ...(pt.electric ? { electric: true } : {}), ...(pt.phev ? { phev: true } : {}) } };
+}
+
+// ------------------------------------------------------------ land travel --
+const TRAVEL_SUB: Record<TravelMode, string> = { car: 'commute_car', motorbike: 'commute_motorbike', taxi: 'commute_taxi', bus: 'commute_bus', rail: 'commute_rail' };
+const CAR_SIZE_SORT: Record<string, number> = { 'Average car': 0, 'Small car': 100, 'Medium car': 200, 'Large car': 300 };
+const FUEL_SORT_T: Record<string, number> = { Petrol: 1, Diesel: 2, Hybrid: 3, 'Plug-in Hybrid Electric Vehicle': 4, 'Battery Electric Vehicle': 5, LPG: 6, CNG: 7, Unknown: 8 };
+const FUEL_KEY: Record<string, string> = { Petrol: 'petrol', Diesel: 'diesel', Hybrid: 'hybrid', 'Plug-in Hybrid Electric Vehicle': 'phev', 'Battery Electric Vehicle': 'bev', LPG: 'lpg', CNG: 'cng', Unknown: 'unknown' };
+const TRAVEL_NAME: Record<string, string> = {
+  'Plug-in Hybrid Electric Vehicle': 'Plug-in hybrid', 'Battery Electric Vehicle': 'Electric', Unknown: 'Fuel not known',
+  'Regular taxi': 'Taxi / ride-hailing', 'Black cab': 'Black cab (London)', 'Average local bus': 'Bus (average local)', Coach: 'Coach / staff shuttle',
+  'Local London bus': 'Bus (London)', 'Local bus (not London)': 'Bus (outside London)', 'National rail': 'Train (national rail)',
+  'Light rail and tram': 'Metro, light rail and tram', 'London Underground': 'Underground (London)', 'International rail': 'International rail',
+};
+/** Catalogue item of a land travel factor row. */
+export function travelItem(mode: TravelMode, vehicle: string, variant: string) {
+  const sub = TRAVEL_SUB[mode];
+  if (mode === 'car') {
+    const fuel = FUEL_KEY[variant] ?? slug(variant);
+    return { code: `commute:car:${slug(vehicle)}:${fuel}`, sub, name: `${vehicle} · ${TRAVEL_NAME[variant] ?? variant}`,
+      sort: (CAR_SIZE_SORT[vehicle] ?? 400) + (FUEL_SORT_T[variant] ?? 50), attrs: { mode, size: vehicle, fuel },
+      note: fuel === 'bev' || fuel === 'phev' ? 'DESNZ value: charging on the UK grid. Per vehicle-km; shared cars are divided by the people in the car.' : 'Per vehicle-km; shared cars are divided by the people in the car.' };
+  }
+  const name = mode === 'motorbike' ? `Motorbike · ${vehicle.toLowerCase()}` : TRAVEL_NAME[vehicle] ?? vehicle;
+  const first = ['Average', 'Regular taxi', 'Average local bus', 'Light rail and tram'].includes(vehicle);
+  return { code: `commute:${mode}:${slug(vehicle)}`, sub, name, sort: first ? 0 : vehicle === 'Coach' || vehicle === 'National rail' ? 1 : 10, attrs: { mode },
+    note: mode === 'motorbike' ? 'Per vehicle-km.' : 'Per passenger-km.' };
 }

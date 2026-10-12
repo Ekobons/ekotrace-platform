@@ -1267,3 +1267,64 @@ test('purchases: 50,000 lines (CSV) read, mapped, calculated and published in th
   console.log(`[perf] published lines: first page ${tq} ms; CSV + Excel of ${pubLines} lines ${Date.now() - t3} ms`);
   assert.equal((await api('GET', `/api/purchases/published?batch=${up.batchId}`, undefined, tenantB)).body.total.lines, 0, 'other company sees none');
 });
+
+test('employee commuting: once a year per facility — typed in or survey scaled up; monthly entries by working days; locked once approved', async () => {
+  const groupOf = async (tt: string) => (await api('GET', '/api/org', undefined, tt)).body.nodes.find((n: { kind: string }) => n.kind === 'group').id;
+  const fac = (await api('POST', '/api/org/nodes', { parentId: await groupOf(tenantA), kind: 'facility', name: 'Commute office' }, tenantA)).body.id as string;
+  const opt = (await api('GET', '/api/commuting/options?year=2025', undefined, tenantA)).body;
+  assert.ok(opt.items.some((i: { code: string }) => i.code === 'commute:car:average-car:petrol') && opt.defaults.sat_sun.weekdays === 261);
+  // typed in
+  const typed = { facilityId: fac, year: 2025, method: 'typed', headcount: 30, workingDays: 220, weekend: 'sat_sun',
+    rows: [{ mode: 'car', fuel: 'petrol', employees: 20, oneWayKm: 15, daysPerWeek: 5 }, { mode: 'metro', employees: 10, oneWayKm: 12, daysPerWeek: 4 }] };
+  const pv = await api('POST', '/api/commuting/preview', typed, tenantA);
+  assert.equal(pv.status, 200, JSON.stringify(pv.body));
+  const car = pv.body.lines.find((l: { item: string }) => l.item === 'commute:car:average-car:petrol');
+  assert.equal(car.quantity, 20 * 2 * 15 * 220);
+  const f = (await pq(`SELECT sum(f.co2e)::float8 AS k FROM factor f JOIN factor_source s ON s.id = f.source_id JOIN item i ON i.id = f.item_id
+                        WHERE i.code = 'commute:car:average-car:petrol' AND s.code = 'DESNZ-2025' AND f.status = 'active' AND f.unit = 'km'`)).rows[0].k;
+  assert.ok(Math.abs(car.kg - car.quantity * f) / car.kg < 1e-3, `${car.kg} vs ${car.quantity * f} (well-to-tank counted in 3.7)`);
+  const saved = await api('PUT', '/api/commuting', typed, tenantA);
+  assert.equal(saved.status, 200, JSON.stringify(saved.body));
+  assert.equal(saved.body.entries, 24);
+  const acts = (await pq(`SELECT a.period_start::text AS p, a.quantity::float8 AS q, a.co2e_scope3::float8 AS s3, a.co2e_wtt::float8 AS wtt, i.code FROM activity a JOIN item i ON i.id = a.item_id
+                           WHERE a.commute_record_id = $1 ORDER BY 1`, [saved.body.id])).rows;
+  const carActs = acts.filter((a) => a.code === 'commute:car:average-car:petrol');
+  assert.ok(Math.abs(carActs.reduce((x, a) => x + a.q, 0) - car.quantity) < 0.01, 'months add up to the year');
+  assert.ok(acts.every((a) => a.wtt === 0 && a.s3 > 0));
+  const feb = carActs.find((a) => a.p === '2025-02-01')!.q, mar = carActs.find((a) => a.p === '2025-03-01')!.q;
+  assert.ok(Math.abs(feb / mar - 20 / 21) < 1e-3, 'split by working days (Feb 2025: 20, Mar 2025: 21)');
+  // once a year: saving again replaces, it does not add
+  const again = await api('PUT', '/api/commuting', { ...typed, rows: [{ mode: 'car', fuel: 'diesel', employees: 30, oneWayKm: 10 }] }, tenantA);
+  assert.equal(again.body.entries, 12);
+  assert.equal(Number((await pq('SELECT count(*) FROM activity WHERE facility_id = $1', [fac])).rows[0].count), 12);
+  // survey file: columns recognised, other sites left out, unknown answers listed, scaled to the headcount
+  const csv = ['Timestamp,Site,How do you usually travel to work?,One-way distance (km),Days in the office per week,People in the car,Car fuel',
+    '1,Commute office,Drive my car,20,5,1,Diesel', '2,Commute office,Dubai Metro,15,5,,', '3,Commute office,Work from home,,0,,', '4,Commute office,Hovercraft,5,5,,', '5,Other site,Car,50,5,1,Petrol'].join('\n');
+  const sv = await raw(`/api/commuting/survey?facilityId=${fac}`, Buffer.from(csv), tenantA, { 'x-filename': 'answers.csv' });
+  assert.equal(sv.statusCode, 200, sv.body);
+  const s = sv.json();
+  assert.equal(s.answers.length, 3); assert.equal(s.otherSite, 1); assert.equal(s.unrecognised[0].value, 'Hovercraft');
+  assert.equal(s.columns.mode, 'How do you usually travel to work?'); assert.equal(s.answers[0].fuel, 'diesel');
+  const survey = { facilityId: fac, year: 2025, method: 'survey', headcount: 30, workingDays: 220, weekend: 'sat_sun', answers: s.answers, survey: { file: 'answers.csv', columns: s.columns } };
+  const sp = (await api('POST', '/api/commuting/preview', survey, tenantA)).body;
+  assert.equal(sp.scale, 10); assert.equal(sp.lines.find((l: { item: string }) => l.item === 'commute:car:average-car:diesel').quantity, 2 * 20 * 220 * 10);
+  const ss = await api('PUT', '/api/commuting', survey, tenantA);
+  assert.equal(ss.status, 200, JSON.stringify(ss.body));
+  const rec = (await api('GET', `/api/commuting/record?facilityId=${fac}&year=2025`, undefined, tenantA)).body;
+  assert.equal(rec.record.method, 'survey'); assert.equal(rec.answers.length, 3); assert.equal(rec.months.length, 12);
+  // dashboards: Scope 3.7 in the rows; not counted as "data in" for completeness
+  const d = (await api('GET', `/api/dashboard?year=2025&node=${fac}&pend=1`, undefined, tenantA)).body;
+  assert.ok(d.rows.some((r: { cat: string; s3: number }) => r.cat === 'employee_commuting' && r.s3 > 0));
+  assert.equal(d.filled.length, 0);
+  // locked once an entry is approved
+  await pq(`UPDATE activity SET status = 'approved' WHERE id = (SELECT id FROM activity WHERE commute_record_id = $1 LIMIT 1)`, [ss.body.id]);
+  assert.equal((await api('PUT', '/api/commuting', survey, tenantA)).status, 409);
+  assert.equal((await api('DELETE', `/api/commuting/${ss.body.id}`, undefined, tenantA)).status, 409);
+  await pq(`UPDATE activity SET status = 'draft' WHERE commute_record_id = $1`, [ss.body.id]);
+  assert.equal((await api('DELETE', `/api/commuting/${ss.body.id}`, undefined, tenantA)).body.entries, 24);
+  assert.equal(Number((await pq('SELECT count(*) FROM activity WHERE facility_id = $1', [fac])).rows[0].count), 0);
+  const tpl = await app.inject({ method: 'GET', url: '/api/commuting/survey-template', headers: { cookie: adminCookie, 'x-tenant-id': tenantA } });
+  assert.equal(tpl.statusCode, 200); assert.ok(tpl.rawPayload.length > 4000);
+  // another company cannot see it
+  assert.equal((await api('GET', `/api/commuting/record?facilityId=${fac}&year=2025`, undefined, tenantB)).status, 404);
+});

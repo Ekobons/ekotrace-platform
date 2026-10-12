@@ -37,3 +37,7 @@
 | What moved | On each dashboard tab: the three sources that changed most against the comparison year, calculated from the entries |
 | Dashboard group | Any mix of facilities viewed together in Dashboards; never changes the organisation; shown only to people who can see all its facilities |
 | Plan | Trial, Starter, Professional or Enterprise: how many facilities and people, and whether Eko AI, data export and dashboard groups are on |
+| Passenger-km | One person travelling one km; buses, rail and taxis are counted this way. Cars are counted per car-km (shared cars divided by the people in them) |
+| Commuting survey | One answer per employee about how they travel to work; scaled up to all employees of the facility (employees ÷ answers) |
+| Response rate | Survey answers ÷ employees of the facility; below 30% a warning is shown |
+| Working days | Weekdays of the year minus public holidays and annual leave; used for commuting distances and to split the year into months |

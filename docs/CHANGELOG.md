@@ -2,6 +2,15 @@
 
 Newest first.
 
+## 2026-10-12 (20) — Employee commuting (Scope 3.7)
+
+- **Once a year per facility** (migration 020: `commute_record` unique per facility and year, `commute_response` for the survey answers, `activity.commute_record_id`; category `employee_commuting`, calc method `travel`, unit `pkm`). Saving again replaces; any approved monthly entry locks the record (409 `LOCKED`).
+- **Typed in:** per mode employees, one-way km, days at the workplace per week, people per car — or the year's total distance (kept as "actual"). **Survey:** .xlsx / .csv (Ekotrace survey file or a Forms export); columns guessed by name (changeable), everyday answers recognised (metro, Careem, drive, work from home…), miles converted, rows of other sites left out (site chosen when names differ), unrecognised answers listed; answers scaled to the headcount (employees ÷ answers; work-from-home answers count with no travel); warning below 30% response.
+- **Engine** (`packages/calc/src/commute.ts`): 2 × one-way km × working days × days ÷ working days per week; cars ÷ people in the car (car-km), motorbikes per km, taxi / bus / shuttle / metro / train per passenger-km. Working days = weekdays (weekend Sat–Sun, Fri–Sat or Sun) − public holidays (12) − leave (22), or typed. The year is split into months by working days (no seasonal weights) → one entry per mode and month.
+- **Factors:** DESNZ "Business travel- land" 2022–2026 (cars by size × fuel, motorbikes, taxis, buses, rail) with their well-to-tank, both counted in 3.7 (importer v7). Defaults: average car by fuel, average motorbike, regular taxi, average local bus, coach for staff shuttles, light rail and tram for metro, national rail.
+- API: `/api/commuting/options`, `GET /api/commuting?year=`, `/record`, `POST /survey`, `/preview`, `PUT /api/commuting`, `DELETE /:id`, `/survey-template`. Screen: Add data → Employee commuting. Dashboards: commuting not counted in "% of required data in".
+- Tests: 50 API (+1: typed, survey, monthly split, replace, lock, isolation), 52 engine (+4). Manual: Data categories → Employee commuting; Glossary.
+
 ## 2026-10-12 (19) — Spend factors: newer versions (v1.4) can be loaded
 
 - Importer reads the published **.xlsx** (sheet "CO2e") as well as the CSV; version taken from the file name, including release candidates (`1.4.0-rc.1` ranks just below `1.4.0`); price year from the unit; publisher, GWP set and licence by version (v1.3 US EPA, AR5, public domain; v1.4 Cornerstone Sustainability Data Initiative, AR6, CC BY 4.0). The fingerprint is of the factors, so the same data as CSV or .xlsx is recognised.

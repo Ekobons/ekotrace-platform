@@ -129,7 +129,7 @@ export async function dashboardRoutes(app: FastifyInstance) {
       const months = (await c.query(
         `SELECT a.facility_id AS f, extract(month FROM a.period_start)::int AS m, bool_and(a.status = 'approved') AS ok
            FROM activity a JOIN category cat ON cat.id = a.category_id WHERE a.facility_id = ANY($1) AND a.status <> 'rejected' AND extract(year FROM a.period_start) = $2
-            AND a.period_end - a.period_start < 40 AND cat.calc_method <> 'spend' GROUP BY 1, 2`, [facs, year])).rows as { f: string; m: number; ok: boolean }[];
+            AND a.period_end - a.period_start < 40 AND cat.calc_method NOT IN ('spend', 'travel') GROUP BY 1, 2`, [facs, year])).rows as { f: string; m: number; ok: boolean }[];
       return {
         filled: months.map((r) => [r.f, r.m]), waiting: months.filter((r) => !r.ok).map((r) => [r.f, r.m]),
         year, years, group, pend: q.pend === '1', consolidation: t.consolidation, scope2: q.scope2, baseYear: t.base_year && t.base_year !== year ? { year: t.base_year, total: base } : null,
