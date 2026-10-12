@@ -261,7 +261,7 @@ export function AddData() {
               {ways.length > 1 && <>
                 <div className="methods">{ways.map((w) => (
                   <button key={w} className={`meth${wayOk === w ? ' on' : ''}`} onClick={() => (w === 'auto' ? navigate('/integrations') : setParam('via', w === 'form' ? null : w))}>
-                    <Icon name={WAYS[w][1]} /><b>{WAYS[w][0]}</b><small>{w === 'auto' ? 'see Integrations' : 'available'}</small>
+                    <Icon name={WAYS[w][1]} size={16} />{WAYS[w][0]}{w === 'auto' && <small>→ Integrations</small>}
                   </button>))}
                 </div>
                 <div className="sub" style={{ marginTop: -4 }}>{WAYS[wayOk][2]}</div>
