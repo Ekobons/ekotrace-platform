@@ -2,6 +2,13 @@
 
 Newest first.
 
+## 2026-10-12 (18) — Dashboards as in the Ekotrace prototype
+
+- **Dashboards rebuilt to the prototype's design:** top bar with **VIEWING** (company / sub-group / facility / dashboard group, facility count; opens the organisation tree and the dashboard groups) and **PERIOD** (year with the base year marked; year to date / quarters / one month; same months last year or no comparison; Scope 2 method). Header: what is viewed · period · consolidation · approved data or approved + waiting · % of required data in; **Include waiting**; nine tabs: Overview · Scopes & categories · Facilities · Energy · Water · Waste · Mobility & travel · Value chain · Net zero.
+- Overview as in the prototype: stat strip (total with ▲/▼ vs last year on the complete months, Scope 1/2/3, per employee and per m²), scope-wise monthly bars with last year as a line and pale months still filling, scope split (donut, t, %, change, levers), treemap of every source with the full list, top 5 contributors, upstream · own operations · downstream, net zero vs offsets.
+- API `GET /api/dashboard`: **approved entries only by default**, `pend=1` adds those waiting for approval; returns `filled` (facility-months with activity data, purchases excluded) and `waiting` (facility-months with entries waiting) for completeness, pale months and the heatmap outline.
+- Tests: 47 API (dashboard check uses `pend=1`). Manual: Dashboards rewritten.
+
 ## 2026-10-12 (17) — Real exchange rates and the 2025 price index
 
 - Migration 019: shared exchange rates (all companies) from the **Federal Reserve G.5** monthly averages of daily noon buying rates (via FRED), Jan 2019 – Sep 2026 (Sep 2026 preliminary), units per US dollar, for **EUR, GBP, INR, CNY, JPY, CHF, AUD, CAD, SGD** (EUR, GBP, AUD inverted from USD per unit), plus the annual average of each complete year 2019–2025. Source files in `data/fx/`.

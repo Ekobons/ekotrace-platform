@@ -1126,8 +1126,8 @@ test('suppliers: one record however written (vendor number, spellings, typos), p
   assert.ok(an.profiles.target >= 1);
 
   // dashboard: rows per facility × month × category; Scope 2 location or market, never both
-  const loc = (await api('GET', '/api/dashboard?year=2024', undefined, tenantA)).body;
-  const mkt = (await api('GET', '/api/dashboard?year=2024&scope2=market', undefined, tenantA)).body;
+  const loc = (await api('GET', '/api/dashboard?year=2024&pend=1', undefined, tenantA)).body;
+  const mkt = (await api('GET', '/api/dashboard?year=2024&pend=1&scope2=market', undefined, tenantA)).body;
   const tot = (d: { rows: { s1: number; s2: number; s3: number; s33: number }[] }, k: 's1' | 's2' | 's3' | 's33') => d.rows.reduce((a, r) => a + r[k], 0);
   assert.ok(loc.rows.length > 0 && loc.years.includes(2024) && loc.facilities.length > 0);
   assert.ok(Math.abs(tot(loc, 's1') - tot(mkt, 's1')) < 1e-6 && Math.abs(tot(loc, 's3') - tot(mkt, 's3')) < 1e-6);

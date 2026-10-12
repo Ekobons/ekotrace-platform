@@ -57,7 +57,7 @@ const S3_NAME: Record<number, string> = {
 export async function dashboardRoutes(app: FastifyInstance) {
   app.get('/api/dashboard', async (req) => {
     const tenant = requireTenant(req);
-    const q = z.object({ year: z.coerce.number().int().min(2000).max(2100).optional(), cmp: z.coerce.number().int().min(2000).max(2100).optional(), node: z.string().uuid().optional(), group: z.string().uuid().optional(), scope2: z.enum(['location', 'market']).default('location') }).parse(req.query);
+    const q = z.object({ year: z.coerce.number().int().min(2000).max(2100).optional(), cmp: z.coerce.number().int().min(2000).max(2100).optional(), node: z.string().uuid().optional(), group: z.string().uuid().optional(), pend: z.enum(['0', '1']).optional(), scope2: z.enum(['location', 'market']).default('location') }).parse(req.query);
     return tenantTx(tenant, async (c) => {
       const see = (await scopeOf(c, req.user)).see;
       let within = q.node ? await subtreeFacilities(c, q.node) : null;
@@ -71,12 +71,14 @@ export async function dashboardRoutes(app: FastifyInstance) {
       const t = (await c.query('SELECT consolidation, base_year FROM tenant WHERE id = $1', [tenant])).rows[0];
       const years = (await c.query(`SELECT DISTINCT extract(year FROM period_start)::int AS y FROM activity WHERE facility_id = ANY($1) AND status <> 'rejected' ORDER BY 1 DESC`, [facs])).rows.map((r) => r.y as number);
       const year = q.year ?? years[0] ?? new Date().getFullYear();
+      // approved data only, unless "include waiting" (then everything except rejected)
+      const STATUS = q.pend === '1' ? `a.status <> 'rejected'` : `a.status = 'approved'`;
       const W = t.consolidation === 'equity' ? 'f.ownership_pct / 100.0' : t.consolidation === 'financial' ? 'CASE WHEN f.financial_control THEN 1 ELSE 0 END' : 'CASE WHEN f.operational_control THEN 1 ELSE 0 END';
       const S2 = q.scope2 === 'market' ? 'a.co2e_scope2_market' : 'a.co2e_scope2';
       // month 0 = an entry for a longer period (a quarter, the year): in the totals, not in the months
       const M = `CASE WHEN a.period_end - a.period_start < 40 THEN extract(month FROM a.period_start)::int ELSE 0 END`;
       const FROM = `FROM activity a JOIN org_node f ON f.id = a.facility_id JOIN category cat ON cat.id = a.category_id JOIN item i ON i.id = a.item_id
-                    WHERE a.facility_id = ANY($1) AND a.status <> 'rejected' AND extract(year FROM a.period_start) = $2`;
+                    WHERE a.facility_id = ANY($1) AND ${STATUS} AND extract(year FROM a.period_start) = $2`;
       const t1 = (v: string) => `round(sum(${v} * ${W})::numeric / 1000, 4)::float8`;   // tonnes
       const ROWS = `SELECT a.facility_id AS f, ${M} AS m, cat.code AS cat, i.id AS iid, i.name AS item, coalesce(i.attrs->>'group', '') AS grp, sc.name AS sub, a.unit,
                 ${t1('a.co2e_direct')} AS s1, ${t1(S2)} AS s2, ${t1('a.co2e_scope3')} AS s3, ${t1('(a.co2e_wtt + a.co2e_td)')} AS s33,
@@ -112,7 +114,7 @@ export async function dashboardRoutes(app: FastifyInstance) {
         .map((r) => ({ ...r, ghg: r.scope === 3 ? `3.${r.ghg_category}` : CODE[r.code] ?? `${r.scope}.0` }));
       // purchases behind the published entries: product groups, suppliers, supplier-specific share
       const P = `FROM purchase_line l JOIN activity a ON a.id = l.activity_id JOIN org_node f ON f.id = a.facility_id
-                 WHERE l.status = 'published' AND a.facility_id = ANY($1) AND a.status <> 'rejected' AND extract(year FROM a.period_start) = $2`;
+                 WHERE l.status = 'published' AND a.facility_id = ANY($1) AND ${STATUS} AND extract(year FROM a.period_start) = $2`;
       const tl = `round(sum(l.co2e * ${W})::numeric / 1000, 4)::float8`;
       const purchases = {
         byGroup: (await c.query(`SELECT coalesce(nullif(split_part(i.attrs->>'group', ' › ', 1), ''), sc.name, 'Other') AS name, ${tl} AS t
@@ -123,8 +125,14 @@ export async function dashboardRoutes(app: FastifyInstance) {
         suppliers: Number((await c.query(`SELECT count(DISTINCT l.supplier_id) AS n ${P}`, [facs, year])).rows[0].n),
         withTarget: Number((await c.query(`SELECT count(DISTINCT s.id) AS n ${P.replace('JOIN org_node f', 'JOIN supplier s ON s.id = l.supplier_id JOIN org_node f')} AND s.climate_target IN ('sbti_validated','sbti_committed')`, [facs, year])).rows[0].n),
       };
+      // which facility-months have activity data in (anything not rejected; purchases come in files, not monthly), and which still wait for approval
+      const months = (await c.query(
+        `SELECT a.facility_id AS f, extract(month FROM a.period_start)::int AS m, bool_and(a.status = 'approved') AS ok
+           FROM activity a JOIN category cat ON cat.id = a.category_id WHERE a.facility_id = ANY($1) AND a.status <> 'rejected' AND extract(year FROM a.period_start) = $2
+            AND a.period_end - a.period_start < 40 AND cat.calc_method <> 'spend' GROUP BY 1, 2`, [facs, year])).rows as { f: string; m: number; ok: boolean }[];
       return {
-        year, years, group, consolidation: t.consolidation, scope2: q.scope2, baseYear: t.base_year && t.base_year !== year ? { year: t.base_year, total: base } : null,
+        filled: months.map((r) => [r.f, r.m]), waiting: months.filter((r) => !r.ok).map((r) => [r.f, r.m]),
+        year, years, group, pend: q.pend === '1', consolidation: t.consolidation, scope2: q.scope2, baseYear: t.base_year && t.base_year !== year ? { year: t.base_year, total: base } : null,
         rows, cmpYear, prevRows, prevMonthly, facilities, categories, s3Names: S3_NAME, purchases,
       };
     });

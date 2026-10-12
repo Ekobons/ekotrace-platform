@@ -332,7 +332,7 @@ export const api = {
   supplierAnalytics: (year?: number) => call<SupplierAnalytics>('GET', `/api/suppliers/analytics${year ? `?year=${year}` : ''}`),
   keepSupplierSeparate: (id: string) => call<{ ok: true }>('POST', `/api/suppliers/${id}/keep-separate`),
   supplierMatch: (id: number, action: 'confirm' | 'split') => call<{ ok?: true; supplierId?: string; lines?: number }>('POST', `/api/suppliers/matches/${id}/${action}`),
-  dashboard: (q: { year?: number; node?: string; group?: string; scope2?: 'location' | 'market'; cmp?: number }) => call<Dashboard>('GET', `/api/dashboard?${new URLSearchParams(Object.entries(q).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)]))}`),
+  dashboard: (q: { year?: number; node?: string; group?: string; scope2?: 'location' | 'market'; cmp?: number; pend?: string }) => call<Dashboard>('GET', `/api/dashboard?${new URLSearchParams(Object.entries(q).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)]))}`),
   addSupplier: (b: unknown) => call<{ id: string }>('POST', '/api/suppliers', b),
   patchSupplier: (id: string, b: unknown) => call<{ ok: true }>('PATCH', `/api/suppliers/${id}`, b),
   mergeSupplier: (id: string, intoId: string) => call<{ lines: number }>('POST', `/api/suppliers/${id}/merge`, { intoId }),
