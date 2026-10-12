@@ -45,10 +45,12 @@ const categoryOfEnergy = (e: string | null | undefined) => (!e || ['electricity'
 const localMidnight = (d: string, tz: string) => { const u = Date.parse(`${d}T00:00:00Z`); return u - tzOffset(tz, u - tzOffset(tz, u)); };
 const nextDay = (d: string) => new Date(Date.parse(`${d}T00:00:00Z`) + 86_400_000).toISOString().slice(0, 10);
 
-async function matchMeter(c: Tx, account: string | null | undefined) {
+/** The meter of an account number; water and energy meters of the same (combined) account are told apart. */
+async function matchMeter(c: Tx, account: string | null | undefined, water = false) {
   if (!account) return null;
   const norm = account.replace(/[\s\-\/]/g, '').toUpperCase();
-  const r = (await c.query(`SELECT id FROM meter WHERE active AND upper(regexp_replace(account_no, '[\\s\\-/]', '', 'g')) = $1`, [norm])).rows;
+  const r = (await c.query(`SELECT m.id FROM meter m JOIN item i ON i.id = m.item_id JOIN subcategory s ON s.id = i.subcategory_id JOIN category k ON k.id = s.category_id
+                             WHERE m.active AND upper(regexp_replace(m.account_no, '[\\s\\-/]', '', 'g')) = $1 AND (k.code LIKE 'water%') = $2`, [norm, water])).rows;
   return r.length === 1 ? (r[0].id as string) : null;
 }
 
@@ -62,14 +64,17 @@ async function visible(c: Tx, req: FastifyRequest, b: { facility_id: string | nu
 export async function createBill(c: Tx, tenant: string, buf: Buffer, filename: string, by: string, category?: string | null): Promise<{ id: string; duplicate: boolean }> {
   if (buf.subarray(0, 5).toString('latin1') !== '%PDF-') throw new AppError('This is not a PDF file');
   const hash = sha256(buf.toString('binary'));
-  const dup = (await c.query('SELECT b.id FROM document d JOIN bill b ON b.document_id = d.id WHERE d.sha256 = $1', [hash])).rows[0];
+  // A combined electricity & water bill (DEWA, SEWA…) may be uploaded once for each: the same file is one document, one bill per kind.
+  const water = !!category && category.startsWith('water');
+  const prior = (await c.query(`SELECT d.id AS doc, b.id, coalesce(b.category, '') LIKE 'water%' AS water FROM document d LEFT JOIN bill b ON b.document_id = d.id WHERE d.sha256 = $1`, [hash])).rows;
+  const dup = prior.find((x) => x.id && x.water === water);
   if (dup) return { id: dup.id, duplicate: true };
   let text = '', scanned = false, problem: string | null = null;
   try { const t = await pdfText(new Uint8Array(buf)); text = t.text; scanned = t.scanned; } catch (e) { problem = `The PDF could not be read (${(e as Error).message.slice(0, 120)})`; }
-  const r = readBill(text);
-  const doc = (await c.query('INSERT INTO document (tenant_id, kind, filename, content_type, size, sha256, data, uploaded_by) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id',
+  const r = readBill(text, water ? 'water' : undefined);
+  const doc = prior[0] ? { id: prior[0].doc } : (await c.query('INSERT INTO document (tenant_id, kind, filename, content_type, size, sha256, data, uploaded_by) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id',
     [tenant, 'bill', filename, 'application/pdf', buf.length, hash, buf, by])).rows[0];
-  const meterId = await matchMeter(c, r.account?.value);
+  const meterId = await matchMeter(c, r.account?.value, water);
   const found = { ...r, problem, matchedBy: meterId ? 'account number' : null };
   const b = (await c.query(
     `INSERT INTO bill (tenant_id, document_id, energy, supplier, account_no, bill_no, period_from, period_to, issue_date, quantity, unit, amount, currency, found, text_excerpt, scanned, meter_id, created_by, category)
@@ -77,7 +82,7 @@ export async function createBill(c: Tx, tenant: string, buf: Buffer, filename: s
     [tenant, doc.id, r.quantity?.energy ?? r.supplier?.energy ?? null, r.supplier?.value ?? null, r.account?.value ?? null, r.billNo?.value ?? null,
      r.periodFrom?.value ?? null, r.periodTo?.value ?? null, r.issueDate?.value ?? null, r.quantity?.value ?? null, r.quantity?.unit ?? null,
      r.amount?.value ?? null, r.amount?.currency ?? null, JSON.stringify(found), text.slice(0, 20000), scanned, meterId, by,
-     category ?? categoryOfEnergy(r.quantity?.energy ?? r.supplier?.energy)])).rows[0];
+     water ? 'water_supply' : category ?? categoryOfEnergy(r.quantity?.energy ?? r.supplier?.energy)])).rows[0];
   return { id: b.id, duplicate: false };
 }
 
@@ -131,7 +136,8 @@ export async function billIssues(c: Tx, b: Record<string, any>, tz: string): Pro
     const same = (await c.query(
       `SELECT d.filename, b.status FROM bill b JOIN document d ON d.id = b.document_id
         WHERE b.id <> $1 AND b.status <> 'rejected' AND lower(b.bill_no) = lower($2) AND lower(coalesce(b.supplier,'')) = lower(coalesce($3,''))
-          AND (b.status = 'confirmed' OR (b.created_at, b.id) < ($4::timestamptz, $1::uuid)) ORDER BY b.status = 'confirmed' DESC LIMIT 1`, [b.id, b.bill_no, b.supplier, b.created_at])).rows[0];
+          AND (coalesce(b.category, '') LIKE 'water%') = (coalesce($5, '') LIKE 'water%')   -- a combined bill: its water and its electricity are two bills
+          AND (b.status = 'confirmed' OR (b.created_at, b.id) < ($4::timestamptz, $1::uuid)) ORDER BY b.status = 'confirmed' DESC LIMIT 1`, [b.id, b.bill_no, b.supplier, b.created_at, b.category])).rows[0];
     if (same) out.push({ level: 'block', text: `Same bill number as ${same.filename} (${same.status === 'confirmed' ? 'booked' : same.status === 'checked' ? 'ready' : 'to check'}): a duplicate?` });
   }
   if (b.meter_id && pf && pt) {
@@ -185,13 +191,13 @@ export async function billRoutes(app: FastifyInstance) {
     const q = z.object({ status: z.enum(['to_check', 'checked', 'confirmed', 'rejected']).optional(), category: z.string().max(40).optional() }).parse(req.query);
     return tenantTx(tenant, async (c) => {
       const cat = q.category ?? null;
-      const rows = (await c.query(`${SELECT_BILL} WHERE ($1::text IS NULL OR b.status = $1) AND ($2::text IS NULL OR coalesce(mc.code, b.category) = $2 OR ($2 = 'waste' AND coalesce(mc.code, b.category) LIKE 'waste_%'))
+      const rows = (await c.query(`${SELECT_BILL} WHERE ($1::text IS NULL OR b.status = $1) AND ($2::text IS NULL OR coalesce(mc.code, b.category) = $2 OR ($2 IN ('waste', 'water') AND coalesce(mc.code, b.category) LIKE $2 || '_%'))
                                     ORDER BY b.created_at DESC LIMIT 1000`, [q.status ?? null, cat])).rows;
       const out = [];
       for (const r of rows) if (await visible(c, req, r)) out.push(r);
       const counts = (await c.query(`SELECT b.status, count(*)::int n FROM bill b LEFT JOIN meter m ON m.id = b.meter_id LEFT JOIN item mi ON mi.id = m.item_id
                                        LEFT JOIN subcategory ms ON ms.id = mi.subcategory_id LEFT JOIN category mc ON mc.id = ms.category_id
-                                      WHERE ($1::text IS NULL OR coalesce(mc.code, b.category) = $1 OR ($1 = 'waste' AND coalesce(mc.code, b.category) LIKE 'waste_%')) GROUP BY b.status`, [cat])).rows;
+                                      WHERE ($1::text IS NULL OR coalesce(mc.code, b.category) = $1 OR ($1 IN ('waste', 'water') AND coalesce(mc.code, b.category) LIKE $1 || '_%')) GROUP BY b.status`, [cat])).rows;
       return { bills: out, counts: Object.fromEntries(counts.map((x) => [x.status, x.n])) };
     });
   });
@@ -355,7 +361,7 @@ export async function billRoutes(app: FastifyInstance) {
     const q = z.object({ category: z.string().max(40).optional() }).parse(req.query);
     const t = await tenantSettings(tenant);
     return tenantTx(tenant, async (c) => {
-      const rows = (await c.query(`${SELECT_BILL} WHERE b.status = 'checked' AND ($1::text IS NULL OR coalesce(mc.code, b.category) = $1 OR ($1 = 'waste' AND coalesce(mc.code, b.category) LIKE 'waste_%'))
+      const rows = (await c.query(`${SELECT_BILL} WHERE b.status = 'checked' AND ($1::text IS NULL OR coalesce(mc.code, b.category) = $1 OR ($1 IN ('waste', 'water') AND coalesce(mc.code, b.category) LIKE $1 || '_%'))
                                     ORDER BY m.name, b.period_from`, [q.category ?? null])).rows;
       const { units } = await refdata();
       const out = [];

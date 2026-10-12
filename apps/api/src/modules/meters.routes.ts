@@ -522,7 +522,7 @@ export async function meterRoutes(app: FastifyInstance) {
       const review = (await c.query(`SELECT review_readings FROM tenant WHERE id = $1`, [tenant])).rows[0].review_readings;
       return {
         review,
-        batches: batches.filter((b) => (b.facilities ?? []).some((f: string) => see.has(f)) && (!q.category || (b.categories ?? []).some((x: string) => x === q.category || (q.category === 'waste' && x.startsWith('waste_'))))),
+        batches: batches.filter((b) => (b.facilities ?? []).some((f: string) => see.has(f)) && (!q.category || (b.categories ?? []).some((x: string) => x === q.category || ((q.category === 'waste' || q.category === 'water') && x.startsWith(`${q.category}_`))))),
       };
     });
   });

@@ -7,7 +7,7 @@
  * keeps the line it came from, so the person checking can see why; nothing is booked
  * until a person confirms.
  */
-export type Energy = 'electricity' | 'gas' | 'cooling' | 'heat' | 'fuel';
+export type Energy = 'electricity' | 'gas' | 'cooling' | 'heat' | 'fuel' | 'water';
 export interface Found<T> { value: T; line: string }
 export interface Candidate { energy: Energy; value: number; unit: string; line: string; score: number }
 export interface BillRead {
@@ -57,7 +57,7 @@ export function parseDate(s: string): string | null {
 }
 const num = (s: string) => Number(s.replace(/[,\s]/g, ''));
 
-const UNIT_RE = String.raw`(kWh|KWH|Kwh|kwh|MWh|MWH|TR[\s\-]?h(?:r|rs|ours?)?|RT[\s\-]?h(?:r|rs|ours?)?|Ton[\s\-]?hours?|refrigeration ton[\s\-]?hours?|m3|m³|M3|cubic met(?:er|re)s?|kg|KG|litres?|liters?|Ltrs?)`;
+const UNIT_RE = String.raw`(kWh|KWH|Kwh|kwh|MWh|MWH|TR[\s\-]?h(?:r|rs|ours?)?|RT[\s\-]?h(?:r|rs|ours?)?|Ton[\s\-]?hours?|refrigeration ton[\s\-]?hours?|m3|m³|M3|cubic met(?:er|re)s?|kg|KG|litres?|liters?|Ltrs?|000\s*I\.?G\.?|TIG|I\.?G\.?|imperial gallons?|gallons?|Gallons?|GALLONS?)`;
 const NUM_RE = String.raw`(\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?)`;
 
 function unitOf(u: string, energy: Energy): { unit: string; energy: Energy } | null {
@@ -65,13 +65,16 @@ function unitOf(u: string, energy: Energy): { unit: string; energy: Energy } | n
   if (x === 'kwh') return energy === 'cooling' ? { unit: 'kWh_c', energy } : energy === 'gas' ? { unit: 'kWh', energy } : { unit: 'kWh_e', energy: 'electricity' };
   if (x === 'mwh') return energy === 'cooling' ? { unit: 'MWh_c', energy } : { unit: 'MWh_e', energy: 'electricity' };
   if (/^(trh|rth|tonhour|refrigerationtonhour)/.test(x)) return { unit: 'TRh', energy: 'cooling' };
-  if (/^(m3|m³|cubicmet)/.test(x)) return { unit: 'm3', energy: 'gas' };
+  if (/^(000ig|000i\.g\.?|tig)$/.test(x)) return { unit: 'kgal_uk', energy: 'water' };
+  if (/^(i\.?g\.?|imperialgallons?|gallons?)$/.test(x)) return { unit: 'gal_uk', energy: 'water' };
+  if (/^(m3|m³|cubicmet)/.test(x)) return { unit: 'm3', energy: energy === 'water' ? 'water' : 'gas' };
   if (x === 'kg') return { unit: 'kg', energy: energy === 'fuel' ? 'fuel' : 'gas' };
   if (/^(litre|liter|ltr)/.test(x)) return { unit: 'L', energy: 'fuel' };
   return null;
 }
 
-export function readBill(text: string): BillRead {
+/** `hint`: what the bill was uploaded for (water bills: the water consumption, not the electricity on the same bill). */
+export function readBill(text: string, hint?: Energy): BillRead {
   const lines = text.split(/\n/).map((l) => l.replace(/\s+$/, '')).filter((l) => l.trim());
   const all = lines.join('\n');
   const out: BillRead = { candidates: [], missing: [] };
@@ -85,7 +88,7 @@ export function readBill(text: string): BillRead {
 
   const sup = SUPPLIERS.find((s) => s.re.test(all));
   if (sup) out.supplier = { value: sup.name, energy: sup.energy, region: sup.region, line: lines.find((l) => sup.re.test(l))!.trim() };
-  const energy: Energy = sup?.energy ?? 'electricity';
+  const energy: Energy = hint ?? sup?.energy ?? 'electricity';
 
   out.account = first([
     /(?:contract\s+account|account)\s*(?:no\.?|number|#)?\s*[:\-]?\s*\t?\s*([A-Z0-9][A-Z0-9\-\/]{4,})/i,
@@ -131,7 +134,8 @@ export function readBill(text: string): BillRead {
       if (/total/i.test(line)) score += 1;
       if (/reading|meter\s+no|previous|present|current\s+read|index/i.test(line)) score -= 4;
       if (/rate|tariff|slab|fils|per\s+(?:kwh|unit)|aed\s*\/|\/\s*kwh|price|charge\s+per/i.test(line)) score -= 6;
-      if (/water|imperial|\bIG\b|gallon/i.test(line)) score -= 8;
+      if (energy === 'water') { if (um.energy !== 'water') score -= 10; else if (/water/i.test(line)) score += 3; }
+      else if (/water|imperial|\bIG\b|gallon/i.test(line) || um.energy === 'water') score -= 8;
       if (/average|daily|per\s+day|last\s+year|same\s+period/i.test(line)) score -= 3;
       if (/fuel\s+surcharge|carbon|co2|emission/i.test(line)) score -= 5;
       out.candidates.push({ energy: um.energy, value, unit: um.unit, line: line.trim(), score });
@@ -156,7 +160,7 @@ export function readBill(text: string): BillRead {
   const prevR = first([/previous\s*(?:meter\s*)?reading\s*[:\-]?\s*\t?\s*(\d[\d,]*(?:\.\d+)?)(?!\s*[\/.\-]\d)/i], (m) => num(m[1]!));
   const curR = first([/(?:current|present)\s*(?:meter\s*)?reading\s*[:\-]?\s*\t?\s*(\d[\d,]*(?:\.\d+)?)(?!\s*[\/.\-]\d)/i], (m) => num(m[1]!));
   if (prevR && curR && curR.value > prevR.value && !out.candidates.some((c) => c.score >= 4)) {
-    const um = unitOf(energy === 'cooling' ? 'TRh' : energy === 'gas' ? 'm3' : 'kWh', energy)!;
+    const um = unitOf(energy === 'cooling' ? 'TRh' : energy === 'gas' || energy === 'water' ? 'm3' : 'kWh', energy)!;
     out.candidates.push({ energy: um.energy, value: curR.value - prevR.value, unit: um.unit, line: `${prevR.line} / ${curR.line} (difference)`, score: 3 });
   }
   out.candidates.sort((x, y) => y.score - x.score || y.value - x.value);

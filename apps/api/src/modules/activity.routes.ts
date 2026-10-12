@@ -144,6 +144,8 @@ function recalcInput(a: Record<string, any>, periodStart: string, periodEnd: str
     const count = Number(v.count ?? 1);
     return { ...base, quantity: Number(a.quantity) / count, cv, vehicle: { method: v.method, count: count > 1 ? count : undefined, fuelItemId: v.fuelItemId ?? undefined, charging: v.charging ?? undefined } };
   }
+  if (a.calc_method === 'water') return { ...base, quantity: Number(a.quantity), water: inputs.water ?? undefined };
+  if (a.calc_method === 'waste_disposal') return { ...base, quantity: Number(a.quantity), wasteInfo: inputs.wasteInfo ?? undefined };
   return { ...base, quantity: Number(a.quantity), cv };
 }
 
@@ -352,7 +354,7 @@ export async function activityRoutes(app: FastifyInstance) {
                   cat.scope, cat.ghg_category, ws.name AS waste_site, a.meter_id, mt.name AS meter
              FROM activity a JOIN org_node f ON f.id = a.facility_id JOIN item i ON i.id = a.item_id JOIN category cat ON cat.id = a.category_id
              LEFT JOIN vehicle v ON v.id = a.vehicle_id LEFT JOIN waste_site ws ON ws.id = a.waste_site_id LEFT JOIN meter mt ON mt.id = a.meter_id
-            WHERE a.facility_id = ANY($5) AND ($1::uuid IS NULL OR a.facility_id = $1) AND ($2::int IS NULL OR extract(year FROM a.period_start) = $2) AND ($3::text IS NULL OR cat.code = $3)
+            WHERE a.facility_id = ANY($5) AND ($1::uuid IS NULL OR a.facility_id = $1) AND ($2::int IS NULL OR extract(year FROM a.period_start) = $2) AND ($3::text IS NULL OR cat.code = $3 OR ($3 IN ('waste', 'water') AND cat.code LIKE $3 || '_%'))
             ORDER BY a.period_start DESC, a.created_at DESC LIMIT $4`, [q.facilityId ?? null, q.year ?? null, q.category ?? null, q.limit, see])).rows,
       };
     });

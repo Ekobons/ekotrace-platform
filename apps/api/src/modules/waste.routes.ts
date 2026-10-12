@@ -81,6 +81,15 @@ export async function wasteRoutes(app: FastifyInstance) {
     msw: { composition: MSW_COMPOSITION_DEFAULT, source: MSW_COMPOSITION_SOURCE },
   }));
 
+  /** Contractors already named on waste sent to others (for the entry form's suggestions). */
+  app.get('/api/waste/contractors', async (req) => {
+    const tenant = requireTenant(req);
+    return tenantTx(tenant, async (c) => ({
+      contractors: (await c.query(`SELECT a.inputs->'wasteInfo'->>'contractor' AS n, count(*) FROM activity a WHERE a.inputs->'wasteInfo'->>'contractor' IS NOT NULL
+                                    GROUP BY 1 ORDER BY 2 DESC, 1 LIMIT 200`)).rows.map((r) => r.n as string),
+    }));
+  });
+
   /** Waste sites of a facility (or of every facility the person can see). */
   app.get('/api/waste/sites', async (req) => {
     const tenant = requireTenant(req);

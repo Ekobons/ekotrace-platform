@@ -1328,3 +1328,55 @@ test('employee commuting: once a year per facility — typed in or survey scaled
   // another company cannot see it
   assert.equal((await api('GET', `/api/commuting/record?facilityId=${fac}&year=2025`, undefined, tenantB)).status, 404);
 });
+
+test('water: in by source, reused, out by destination; DESNZ or the utility\'s factor; water bills from a combined DEWA/SEWA bill; dashboard balance. Waste details (hazardous, contractor) for GRI 306', async () => {
+  const id = async (code: string) => (await pq('SELECT id FROM item WHERE code = $1', [code])).rows[0].id as number;
+  const p = { facilityId: facA, periodStart: '2026-02-01', periodEnd: '2026-02-28', dataType: 'actual' };
+  const entries = [
+    { ...p, itemId: await id('water:mains_desal'), unit: 'm3', quantity: 1000 },
+    { ...p, itemId: await id('water:mains_desal'), unit: 'kgal_uk', quantity: 10, water: { ownFactor: 1.2, source: 'utility report' } },
+    { ...p, itemId: await id('water:groundwater'), unit: 'm3', quantity: 500 },
+    { ...p, itemId: await id('water:reuse'), unit: 'm3', quantity: 200 },
+    { ...p, itemId: await id('water:sewer'), unit: 'ML', quantity: 0.8 },
+    { ...p, itemId: await id('waste3:refuse:commercial-and-industrial-waste:landfill'), unit: 't', quantity: 4, wasteInfo: { hazardous: false, contractor: 'Collector A', ref: 'M-1' } },
+    { ...p, itemId: await id('waste3:electrical-items:weee-mixed:open_loop'), unit: 't', quantity: 1.5, wasteInfo: { hazardous: true, contractor: 'E-waste B' } },
+  ];
+  const b = await api('POST', '/api/activities/batch', { entries, dryRun: false }, tenantA);
+  assert.equal(b.status, 200, JSON.stringify(b.body));
+  assert.ok(b.body.results.every((r: { ok: boolean }) => r.ok), JSON.stringify(b.body.results));
+  const [desal, own, well, reuse, sewer] = b.body.results.map((r: { totals: { scope3: number; wtt: number } }) => r.totals);
+  const sup = Number((await pq(`SELECT f.co2e FROM factor f JOIN factor_source s ON s.id = f.source_id WHERE f.item_id = $1 AND s.code = 'DESNZ-2026' AND f.status = 'active'`, [await id('water:mains_desal')])).rows[0].co2e);
+  const trt = Number((await pq(`SELECT f.co2e FROM factor f JOIN factor_source s ON s.id = f.source_id WHERE f.item_id = $1 AND s.code = 'DESNZ-2026' AND f.status = 'active'`, [await id('water:sewer')])).rows[0].co2e);
+  assert.ok(Math.abs(desal.scope3 - 1000 * sup) < 1e-6);
+  assert.ok(Math.abs(own.scope3 - 10 * 4.54609 * 1.2) < 1e-6, 'own factor per m³, 000 IG converted');
+  assert.equal(well.scope3, 0); assert.equal(reuse.scope3, 0);
+  assert.ok(Math.abs(sewer.scope3 - 800 * trt) < 1e-6, 'megalitres converted');
+  assert.ok(b.body.results[0].warnings.some((w: string) => /desalinated/.test(w)));
+  // dashboard: m³, flow and GRI source; waste hazardous and contractor
+  const d = (await api('GET', `/api/dashboard?year=2026&node=${facA}&pend=1`, undefined, tenantA)).body;
+  const w = d.rows.filter((r: { cat: string }) => r.cat.startsWith('water_'));
+  const s = (flow: string) => w.filter((r: { flow: string }) => r.flow === flow).reduce((a: number, r: { m3: number }) => a + r.m3, 0);
+  assert.ok(Math.abs(s('withdrawal') - (1000 + 45.4609 + 500)) < 1e-6 && Math.abs(s('discharge') - 800) < 1e-6 && Math.abs(s('reuse') - 200) < 1e-6, JSON.stringify(w));
+  assert.ok(w.some((r: { gri: string }) => r.gri === 'groundwater'));
+  const ws = d.rows.filter((r: { cat: string }) => r.cat === 'waste_generated');
+  assert.ok(ws.some((r: { haz: boolean; contractor: string }) => r.haz === true && r.contractor === 'E-waste B') && ws.some((r: { haz: boolean; route: string }) => r.haz === false && r.route === 'landfill'));
+  assert.deepEqual((await api('GET', '/api/waste/contractors', undefined, tenantA)).body.contractors.sort(), ['Collector A', 'E-waste B']);
+  // water bill: the combined SEWA bill uploaded for water is a second bill (not a duplicate), read in imperial gallons, matched to the water meter of the same account
+  const { makePdf, SAMPLE_ELECTRICITY } = await import('./helpers/pdf.js');
+  const pdf = Buffer.from(await makePdf(SAMPLE_ELECTRICITY.map((l) => (Array.isArray(l) && l[0] === 'Bill No:' ? ['Bill No:', 'INV-W-1'] as [string, string] : l))));
+  const wm = await api('POST', '/api/meters', { facilityId: facA, name: 'SEWA water', readingType: 'interval', frequency: 'month', unit: 'gal_uk', itemId: await id('water:mains_desal'), template: {}, accountNo: '2001458876' }, tenantA);
+  assert.equal(wm.status, 200, JSON.stringify(wm.body));
+  const up = (cat?: string) => app.inject({ method: 'POST', url: '/api/bills/upload', payload: pdf, headers: { cookie: adminCookie, 'x-tenant-id': tenantA, 'content-type': 'application/octet-stream', 'x-filename': 'sewa-w.pdf', ...(cat ? { 'x-category': cat } : {}) } });
+  const el = (await up('purchased_electricity')).json(), wa = (await up('water')).json();
+  assert.notEqual(el.id, wa.id); assert.equal(wa.duplicate, false);
+  assert.equal(wa.category, 'water_supply'); assert.equal(Number(wa.quantity), 1250); assert.equal(wa.unit, 'gal_uk'); assert.equal(wa.meter_id, wm.body.id);
+  assert.notEqual(el.meter_id, wm.body.id);
+  assert.equal((await up('water')).json().duplicate, true);
+  const ok = await api('POST', `/api/bills/${wa.id}/confirm`, {}, tenantA);
+  assert.equal(ok.status, 200, JSON.stringify(ok.body));
+  const ent = (await api('GET', `/api/bills/${wa.id}`, undefined, tenantA)).body.entries;
+  assert.ok(ent.length >= 1, JSON.stringify(ent));
+  const s3 = (await pq(`SELECT a.co2e_scope3::float8 AS s3, c.code FROM activity a JOIN category c ON c.id = a.category_id WHERE a.id = ANY($1)`, [ent.map((e: { id: string }) => e.id)])).rows;
+  assert.ok(s3.every((r) => r.s3 > 0 && r.code === 'water_supply'), JSON.stringify(s3));
+  assert.equal((await api('GET', '/api/bills?category=water', undefined, tenantA)).body.bills.length, 1);
+});

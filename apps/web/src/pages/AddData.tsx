@@ -18,6 +18,7 @@ import { EnergyEntry } from './EnergyEntry';
 import { WasteEntry } from './WasteEntry';
 import { PurchaseEntry } from './PurchaseEntry';
 import { CommutingEntry } from './CommutingEntry';
+import { WaterEntry } from './WaterEntry';
 import { MonthGrid } from '../components/MonthGrid';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -58,7 +59,7 @@ export function AddData() {
   const via = (sp.get('via') as 'bills' | 'readings' | null) ?? 'enter';
   const setVia = (v: string | null) => { const n = new URLSearchParams(sp); if (v) n.set('via', v); else n.delete('via'); setSp(n, { replace: true }); };
   /** Categories that take bills and meter readings (an account / meter per supply). */
-  const billCat = catCode === 'purchased_electricity' || catCode === 'stationary_combustion' ? catCode : catCode.startsWith('waste_') ? 'waste' : null;
+  const billCat = catCode === 'purchased_electricity' || catCode === 'stationary_combustion' ? catCode : catCode.startsWith('waste_') ? 'waste' : catCode.startsWith('water_') ? 'water' : null;
   const [cat, setCat] = useState<Category | null>(null);
   const [cats, setCats] = useState<Category[]>([]);
   const [facilities, setFacilities] = useState<Facility[]>([]);
@@ -176,7 +177,7 @@ export function AddData() {
 
   const loadRecent = () => {
     if (!facilityId) return;
-    api.activities({ facilityId, category: catCode, limit: 8 }).then((r) => setRecent(r.activities)).catch(() => {});
+    api.activities({ facilityId, category: catCode.startsWith('water_') ? 'water' : catCode.startsWith('waste_') ? 'waste' : catCode, limit: 8 }).then((r) => setRecent(r.activities)).catch(() => {});
   };
   useEffect(loadRecent, [facilityId, catCode]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -209,10 +210,10 @@ export function AddData() {
       </div>
 
       <div className="tabs">
-        {cats.filter((c) => c.code !== 'waste_generated' && (c.calc_method !== 'spend' || c.code === 'purchased_goods')).map((c) => {
-          const waste = c.code === 'waste_treatment';
-          const on = waste ? cat.code.startsWith('waste_') : c.code === cat.code;
-          return <button key={c.code} className={on ? 'on' : ''} onClick={() => navigate(`/data/${c.code}${via !== 'enter' && (c.code === 'purchased_electricity' || c.code === 'stationary_combustion' || c.code.startsWith('waste_')) ? `?via=${via}` : ''}`)}>{waste ? 'Waste' : c.code === 'purchased_goods' ? 'Purchases' : c.name}</button>;
+        {cats.filter((c) => c.code !== 'waste_generated' && c.code !== 'water_discharge' && (c.calc_method !== 'spend' || c.code === 'purchased_goods')).map((c) => {
+          const waste = c.code === 'waste_treatment', water = c.code === 'water_supply';
+          const on = waste ? cat.code.startsWith('waste_') : water ? cat.code.startsWith('water_') : c.code === cat.code;
+          return <button key={c.code} className={on ? 'on' : ''} onClick={() => navigate(`/data/${c.code}${via !== 'enter' && (c.code === 'purchased_electricity' || c.code === 'stationary_combustion' || c.code.startsWith('waste_') || water) ? `?via=${via}` : ''}`)}>{waste ? 'Waste' : water ? 'Water' : c.code === 'purchased_goods' ? 'Purchases' : c.name}</button>;
         })}
       </div>
 
@@ -243,7 +244,7 @@ export function AddData() {
             </select>
           </label>
           <div className="grow" />
-          <span className="chip info">{cat?.calc_method === 'waste' ? 'Method: IPCC 2006 Vol. 5 + 2019 Refinement' : cat?.calc_method === 'spend' ? 'Factors: supplier-specific, else spend-based (EPA, per 2022 USD)' : `Factors: DESNZ ${year <= 2026 ? year : '2026 (latest)'}`} · GWP {tenant?.gwp_set}</span>
+          <span className="chip info">{cat?.calc_method === 'water' ? `Factors: DESNZ ${year <= 2026 ? year : '2026 (latest)'} water supply & treatment, or the utility's` : cat?.calc_method === 'waste' ? 'Method: IPCC 2006 Vol. 5 + 2019 Refinement' : cat?.calc_method === 'spend' ? 'Factors: supplier-specific, else spend-based (EPA, per 2022 USD)' : `Factors: DESNZ ${year <= 2026 ? year : '2026 (latest)'}`} · GWP {tenant?.gwp_set}</span>
         </div>
         {cat.calc_method !== 'travel' && <div className="row" style={{ gap: 6 }}>
           {MONTHS.map((m, i) => (
@@ -254,7 +255,9 @@ export function AddData() {
         </div>}
       </div>
 
-      {cat.calc_method === 'travel' ? (
+      {cat.calc_method === 'water' ? (
+        <WaterEntry cats={cats} facilityId={facilityId} period={period} onSaved={loadRecent} monthly={monthly ? year : undefined} />
+      ) : cat.calc_method === 'travel' ? (
         <CommutingEntry facilityId={facilityId} year={year} onSaved={loadRecent} />
       ) : cat.calc_method === 'spend' ? (
         <PurchaseEntry cat={cat} facilityId={facilityId} period={period} onSaved={loadRecent} />
@@ -403,12 +406,12 @@ export function AddData() {
         <div style={{ padding: '14px 16px 6px' }}><h2>Recent entries · {facilities.find((f) => f.id === facilityId)?.name ?? '—'}</h2></div>
         {recent.length ? (
           <table className="t">
-            <thead><tr><th>Period</th><th>Item</th><th className="num">Quantity</th><th className="num">{cat.calc_method === 'waste_disposal' ? 'Scope 3.5' : cat.calc_method === 'travel' ? 'Scope 3.7' : cat.calc_method === 'spend' ? 'Scope 3' : BASIS_LABEL.direct} tCO₂e</th>{(cat.calc_method === 'vehicle' || cat.calc_method === 'electricity') && <th className="num">Scope 2 loc. tCO₂e</th>}{cat.calc_method === 'electricity' && <th className="num">Scope 2 mkt. tCO₂e</th>}<th className="num">WTT tCO₂e</th><th className="num">Biogenic tCO₂</th><th>Type</th></tr></thead>
+            <thead><tr><th>Period</th><th>Item</th><th className="num">Quantity</th><th className="num">{cat.calc_method === 'waste_disposal' || cat.calc_method === 'waste' ? 'Scope 1 or 3.5' : cat.calc_method === 'water' ? 'Scope 3' : cat.calc_method === 'travel' ? 'Scope 3.7' : cat.calc_method === 'spend' ? 'Scope 3' : BASIS_LABEL.direct} tCO₂e</th>{(cat.calc_method === 'vehicle' || cat.calc_method === 'electricity') && <th className="num">Scope 2 loc. tCO₂e</th>}{cat.calc_method === 'electricity' && <th className="num">Scope 2 mkt. tCO₂e</th>}<th className="num">WTT tCO₂e</th><th className="num">Biogenic tCO₂</th><th>Type</th></tr></thead>
             <tbody>{recent.map((a) => (
               <tr key={a.id}>
                 <td>{a.period_start.slice(0, 7)}{a.period_end.slice(0, 7) !== a.period_start.slice(0, 7) ? ` – ${a.period_end.slice(0, 7)}` : ''}</td>
                 <td>{a.vehicle ? <><b>{a.vehicle}</b> · </> : null}{a.waste_site ? <><b>{a.waste_site}</b> · </> : null}{a.item}</td><td className="num">{num(a.quantity)} {unitLabel(a.unit)}{a.item === 'Landfill methane' ? ' CH₄' : ''}</td>
-                <td className="num">{tco2e(cat.calc_method === 'waste_disposal' || cat.calc_method === 'spend' || cat.calc_method === 'travel' ? Number(a.co2e_scope3 ?? 0) : a.co2e_direct)}</td>{(cat.calc_method === 'vehicle' || cat.calc_method === 'electricity') && <td className="num">{tco2e(Number(a.co2e_scope2 ?? 0))}</td>}{cat.calc_method === 'electricity' && <td className="num">{tco2e(Number(a.co2e_scope2_market ?? 0))}</td>}<td className="num">{tco2e(a.co2e_wtt)}</td><td className="num">{tco2e(a.co2_biogenic)}</td>
+                <td className="num">{tco2e(a.scope === 3 || cat.calc_method === 'spend' ? Number(a.co2e_scope3 ?? 0) : a.co2e_direct)}</td>{(cat.calc_method === 'vehicle' || cat.calc_method === 'electricity') && <td className="num">{tco2e(Number(a.co2e_scope2 ?? 0))}</td>}{cat.calc_method === 'electricity' && <td className="num">{tco2e(Number(a.co2e_scope2_market ?? 0))}</td>}<td className="num">{tco2e(a.co2e_wtt)}</td><td className="num">{tco2e(a.co2_biogenic)}</td>
                 <td><span className="chip grey">{a.data_type}</span>{cat.calc_method === 'spend' && <> <Link className="small" to={`/purchases/published?activity=${a.id}`}>lines</Link></>}</td>
               </tr>))}
             </tbody>

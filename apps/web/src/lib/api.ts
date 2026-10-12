@@ -8,7 +8,7 @@ export interface Item { id: number; subcategory_id: number; code: string; name: 
 /** Vehicle types: class, powertrain, the fuel it burns, electric / plug-in, distance factors or not. */
 export interface VehicleAttrs { vehicle?: string; powertrain?: string; load?: string; fuel?: string | null; electric?: boolean; phev?: boolean; distance?: boolean }
 export interface Subcategory { id: number; category_id: number; code: string; name: string; grp?: string | null; units: string[]; default_unit: string | null; is_bioenergy: boolean; sort: number; active: boolean; hiddenForClient?: boolean; items: Item[] }
-export interface Category { id: number; scope: number; code: string; name: string; calc_method: 'combustion' | 'fugitive' | 'vehicle' | 'electricity' | 'waste' | 'waste_disposal' | 'spend' | 'travel'; ghg_category?: number | null; description: string | null; active: boolean; subcategories: Subcategory[] }
+export interface Category { id: number; scope: number; code: string; name: string; calc_method: 'combustion' | 'fugitive' | 'vehicle' | 'electricity' | 'waste' | 'waste_disposal' | 'spend' | 'travel' | 'water'; ghg_category?: number | null; description: string | null; active: boolean; subcategories: Subcategory[] }
 export interface Unit { code: string; name: string; dimension: string; to_base: number; is_base: boolean; aliases: string[]; active: boolean }
 export interface ResultLine { basis: Basis; gas: string; kgGas: number | null; kgCo2e: number; factorId: number | null; method: 'gas' | 'published' }
 /** CO2e emission factor behind one part of a result: quantity × perEnteredUnit = total. */
@@ -372,6 +372,7 @@ export const api = {
   currencySettings: (b: { fxMethod?: string; currency?: string; priceAdjust?: 'cpi' | 'none' }) => call('PATCH', '/api/currency/settings', b),
   addRates: (rows: { currency: string; kind: string; period: string; perUsd: number; source: string }[], shared = false) => call<{ saved: number }>('POST', '/api/currency/rates', { rows, shared }),
   deleteRate: (id: number) => call<{ ok: true }>('DELETE', `/api/currency/rates/${id}`),
+  wasteContractors: () => call<{ contractors: string[] }>('GET', '/api/waste/contractors'),
   commuteOptions: (year: number) => call<CommuteOptions>('GET', `/api/commuting/options?year=${year}`),
   commuting: (year: number) => call<{ facilities: { id: string; name: string; parent: string | null; employees: number | null; canEnter: boolean; record: { id: string; method: string; headcount: number; kg: number; personKm: number; responseRate: number | null; entries: number; approved: number; updated_at: string; updated_by_name: string | null } | null }[] }>('GET', `/api/commuting?year=${year}`),
   commuteRecord: (facilityId: string, year: number) => call<{ facility: { id: string; name: string; employees: number | null }; record: CommuteRecord | null; answers: CommuteAnswer[]; months: { m: number; t: number; n: number; approved: number }[] }>('GET', `/api/commuting/record?facilityId=${facilityId}&year=${year}`),
@@ -423,7 +424,9 @@ export async function download(path: string, filename: string) {
 }
 
 /** Unit code → short label for tables ("kWh_e" → "kWh", "TRh" → "TRh", "kWh_gcv" → "kWh gross"). */
+const UNIT_NAMES: Record<string, string> = { m3: 'm³', gal_uk: 'imperial gallons', kgal_uk: '000 imperial gallons', ML: 'megalitres', kL: 'kL', pkm: 'passenger-km' };
 export function unitLabel(code: string): string {
+  if (UNIT_NAMES[code]) return UNIT_NAMES[code];
   return code.replace(/_e$/, '').replace(/_th$/, ' heat').replace(/_c$/, ' cooling').replace(/_gcv$/, ' gross');
 }
 

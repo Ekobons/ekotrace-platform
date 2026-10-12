@@ -12,7 +12,7 @@ import { Icon } from '../components/Icon';
 
 const STATUS: Record<string, string> = { to_check: 'To check', checked: 'Ready to publish', confirmed: 'Published', rejected: 'Rejected' };
 const UNITS: [string, string][] = [['kWh_e', 'kWh (electricity)'], ['MWh_e', 'MWh (electricity)'], ['TRh', 'TRh (cooling)'], ['kWh_c', 'kWh (cooling)'], ['kWh_th', 'kWh (heat)'], ['m3', 'm³'], ['kWh', 'kWh (gas, net CV)'], ['kg', 'kg'], ['L', 'litres']];
-const ITEM_FOR: Record<string, string> = { electricity: 'grid:electricity', cooling: 'cooling:district', heat: 'heat:district', gas: 'desnz:natural-gas' };
+const ITEM_FOR: Record<string, string> = { electricity: 'grid:electricity', cooling: 'cooling:district', heat: 'heat:district', gas: 'desnz:natural-gas', water: 'water:mains_desal' };
 
 export function Bills() {
   const { toast } = useApp();
@@ -103,7 +103,7 @@ export function BillReview({ id, onChanged, onClose, category }: { id: string; o
   };
   useEffect(() => {
     load().catch((e) => setErr(e.message));
-    api.meters().then((r) => setMeters(r.meters.filter((m) => m.reading_type === 'interval' && m.active && (!category || m.category === category || (category === 'waste' && m.category.startsWith('waste_'))))));
+    api.meters().then((r) => setMeters(r.meters.filter((m) => m.reading_type === 'interval' && m.active && (!category || m.category === category || ((category === 'waste' || category === 'water') && m.category.startsWith(category + '_') || category === 'waste' && m.category.startsWith('waste_'))))));
     api.facilities().then((r) => setFacilities(r.facilities.filter((x) => x.canEnter)));
   }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { let url: string | null = null; if (b?.document_id) blobUrl(`/api/documents/${b.document_id}`).then((u) => { url = u; setPdf(u); }).catch(() => setPdf(null)); return () => { if (url) URL.revokeObjectURL(url); }; }, [b?.document_id]);
@@ -118,7 +118,7 @@ export function BillReview({ id, onChanged, onClose, category }: { id: string; o
     <label className="field" style={{ width: w }}><span>{label}</span>
       <input className={`input ${type === 'num' ? 'num' : ''}`} type={type === 'date' ? 'date' : 'text'} disabled={locked} value={f[k] ?? ''} onChange={(e) => setF({ ...f, [k]: type === 'num' ? e.target.value.replace(/[^0-9.]/g, '') : e.target.value })} />
       {h && hint(h)}</label>);
-  const energy = b.energy ?? (f.unit === 'TRh' || f.unit === 'kWh_c' ? 'cooling' : f.unit === 'm3' ? 'gas' : 'electricity');
+  const energy = (b.category ?? '').startsWith('water') ? 'water' : b.energy ?? (f.unit === 'TRh' || f.unit === 'kWh_c' ? 'cooling' : f.unit === 'gal_uk' || f.unit === 'kgal_uk' ? 'water' : f.unit === 'm3' ? 'gas' : 'electricity');
   const days = f.periodFrom && f.periodTo ? Math.round((Date.parse(f.periodTo) - Date.parse(f.periodFrom)) / 86400000) + 1 : null;
 
   return (

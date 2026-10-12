@@ -15,7 +15,7 @@ import type { TravelMode } from './desnz.js';
 import { DESNZ_UNIT, slug, type DesnzParsed, type WasteRoute } from './desnz.js';
 
 /** Raise when the importer learns to read more of the file: editions already loaded are read again once. */
-export const IMPORTER_VERSION = 7;
+export const IMPORTER_VERSION = 8;
 
 export interface ImportSummary {
   source: string;
@@ -249,6 +249,13 @@ export async function importDesnz(c: Tx, p: DesnzParsed, opts: { createdBy?: str
       if (r.gasCo2e.N2O != null) split.push(['N2O', r.gasCo2e.N2O / gwp.get('N2O')!]);
     }
     factors.push({ item, basis: r.basis, unit: r.unit, co2e: r.co2e, gases: split });
+  }
+
+  // ---- water supply and treatment (Scope 3.1 / 3.5), per m³ ----------------------------
+  const waterItems = (await c.query(`SELECT i.id, i.attrs->>'factor' AS f FROM item i WHERE i.code LIKE 'water:%' AND i.attrs->>'factor' IN ('supply', 'treatment')`)).rows as { id: number; f: 'supply' | 'treatment' }[];
+  for (const w of waterItems) {
+    const v = p.water[w.f];
+    if (v != null) factors.push({ item: w.id, basis: 'scope3', unit: 'm3', co2e: v, gases: [] });
   }
 
   // ---- bulk insert factors + gas split ------------------------------------------

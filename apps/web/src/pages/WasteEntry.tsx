@@ -369,8 +369,9 @@ function OwnSite({ cat, facilityId, period, onSaved, monthly }: { cat: Category;
 }
 
 // -------------------------------------------------------- sent out (Scope 3.5) --
-interface Row3 { material: string; route: string; tonnes: string; note: string }
-const emptyRow = (): Row3 => ({ material: '', route: 'landfill', tonnes: '', note: '' });
+interface Row3 { material: string; route: string; tonnes: string; haz: boolean; contractor: string; ref: string }
+const emptyRow = (): Row3 => ({ material: '', route: 'landfill', tonnes: '', haz: false, contractor: '', ref: '' });
+const infoOf = (r: { haz: boolean; contractor: string; ref: string }) => ({ hazardous: r.haz, contractor: r.contractor.trim() || undefined, ref: r.ref.trim() || undefined });
 const ROUTE: Record<string, string> = { landfill: 'Landfill', combustion: 'Combustion (energy recovery)', open_loop: 'Open-loop recycling', closed_loop: 'Closed-loop recycling', composting: 'Composting', ad: 'Anaerobic digestion', reuse: 'Re-use' };
 
 function SentOut({ cat, facilityId, period, onSaved, monthly }: { cat: Category; facilityId: string; period: { periodStart: string; periodEnd: string }; onSaved: () => void; monthly?: number }) {
@@ -394,7 +395,9 @@ function SentOut({ cat, facilityId, period, onSaved, monthly }: { cat: Category;
   }, [cat]);
   const groups = [...new Set([...materials.values()].map((m) => m.group))];
   const entries = rows.map((r, i) => ({ r, i, id: materials.get(r.material)?.routes.get(r.route) })).filter((x) => x.r.material && x.r.tonnes !== '');
-  const payload = entries.map(({ r, id }) => ({ itemId: id ?? 0, unit, quantity: Number(r.tonnes), facilityId, ...period, dataType: 'actual', note: r.note || undefined }));
+  const payload = entries.map(({ r, id }) => ({ itemId: id ?? 0, unit, quantity: Number(r.tonnes), facilityId, ...period, dataType: 'actual', wasteInfo: infoOf(r) }));
+  const [contractors, setContractors] = useState<string[]>([]);
+  useEffect(() => { api.wasteContractors().then((r) => setContractors(r.contractors)).catch(() => {}); }, []);
   const key = JSON.stringify(payload);
 
   useEffect(() => {
@@ -418,10 +421,10 @@ function SentOut({ cat, facilityId, period, onSaved, monthly }: { cat: Category;
   }));
   const total = Object.values(res).reduce((s, x) => s + (x.co2e ?? 0), 0);
   // Month by month: one material and route, a reading per month.
-  const [mm, setMm] = useState({ material: '', route: 'landfill' });
+  const [mm, setMm] = useState({ material: '', route: 'landfill', haz: false, contractor: '', ref: '' });
   const mmRoutes = materials.get(mm.material)?.routes;
   const mmItem = mmRoutes?.get(mm.route);
-  const buildMonth = useMemo(() => (q: number, p: { periodStart: string; periodEnd: string }) => (mmItem ? { itemId: mmItem, unit, quantity: q, ...p } : null), [mmItem, unit]);
+  const buildMonth = useMemo(() => (q: number, p: { periodStart: string; periodEnd: string }) => (mmItem ? { itemId: mmItem, unit, quantity: q, ...p, wasteInfo: infoOf(mm) } : null), [mmItem, unit, mm]);
   const okCount = entries.filter((e) => res[e.i]?.co2e !== undefined).length;
 
   const save = async () => {
@@ -443,7 +446,7 @@ function SentOut({ cat, facilityId, period, onSaved, monthly }: { cat: Category;
       <div className="row" style={{ gap: 8, alignItems: 'flex-end' }}>
         <label className="field grow"><span>Material</span><select className="input" value={mm.material} onChange={(e) => {
           const r = materials.get(e.target.value)?.routes;
-          setMm({ material: e.target.value, route: r && !r.has(mm.route) ? (r.has('landfill') ? 'landfill' : [...r.keys()][0]!) : mm.route });
+          setMm({ ...mm, material: e.target.value, route: r && !r.has(mm.route) ? (r.has('landfill') ? 'landfill' : [...r.keys()][0]!) : mm.route });
         }}>
           <option value="">Choose…</option>
           {groups.map((g) => <optgroup key={g} label={g}>{[...materials.entries()].filter(([, m]) => m.group === g).map(([k, m]) => <option key={k} value={k}>{m.name}</option>)}</optgroup>)}
@@ -451,6 +454,11 @@ function SentOut({ cat, facilityId, period, onSaved, monthly }: { cat: Category;
         <label className="field" style={{ width: 260 }}><span>Route</span><select className="input" value={mm.route} disabled={!mmRoutes} onChange={(e) => setMm({ ...mm, route: e.target.value })}>
           {Object.entries(ROUTE).filter(([k]) => !mmRoutes || mmRoutes.has(k)).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></label>
       </div>
+      <div className="row" style={{ gap: 8, alignItems: 'flex-end' }}>
+        <label className="field" style={{ width: 170 }}><span>Hazardous?</span><select className="input" value={mm.haz ? 'y' : 'n'} onChange={(e) => setMm({ ...mm, haz: e.target.value === 'y' })}><option value="n">Non-hazardous</option><option value="y">Hazardous</option></select></label>
+        <label className="field grow"><span>Contractor</span><input className="input" list="waste-contractors" value={mm.contractor} maxLength={120} onChange={(e) => setMm({ ...mm, contractor: e.target.value })} /></label>
+      </div>
+      <datalist id="waste-contractors">{contractors.map((x) => <option key={x} value={x} />)}</datalist>
       <MonthGrid year={monthly} facilityId={facilityId} build={buildMonth} onSaved={onSaved} bases={['scope3']}
         label={mm.material ? `${materials.get(mm.material)?.name} · ${ROUTE[mm.route]}` : 'Waste sent'} unitName={unit === 't' ? 'tonnes' : 'kg'}
         dup={{ category: 'waste_generated', same: (a) => a.item === `${materials.get(mm.material)?.name} · ${ROUTE[mm.route]}` }} />
@@ -462,8 +470,8 @@ function SentOut({ cat, facilityId, period, onSaved, monthly }: { cat: Category;
         <p className="sub">One row per material and route. Factor: DESNZ waste disposal, kg CO₂e per tonne — the end-of-life treatment (for recycling, only up to the recycler), not the material's production.</p></div>
         <div className="seg"><button className={unit === 't' ? 'on' : ''} onClick={() => setUnit('t')}>tonnes</button><button className={unit === 'kg' ? 'on' : ''} onClick={() => setUnit('kg')}>kg</button></div></div>
       <table className="t" style={{ border: '1px solid var(--line)', borderRadius: 12, tableLayout: 'fixed', width: '100%' }}>
-        <colgroup><col style={{ width: '34%' }} /><col style={{ width: '22%' }} /><col style={{ width: 130 }} /><col /><col style={{ width: 100 }} /><col style={{ width: 48 }} /></colgroup>
-        <thead><tr><th>Material</th><th>Route</th><th className="num">{unit === 't' ? 'Tonnes' : 'kg'}</th><th>Note</th><th className="num">tCO₂e</th><th /></tr></thead>
+        <colgroup><col style={{ width: '25%' }} /><col style={{ width: '16%' }} /><col style={{ width: 90 }} /><col style={{ width: 96 }} /><col /><col style={{ width: 120 }} /><col style={{ width: 84 }} /><col style={{ width: 44 }} /></colgroup>
+        <thead><tr><th>Material</th><th>Route</th><th className="num">{unit === 't' ? 'Tonnes' : 'kg'}</th><th>Hazardous?</th><th>Contractor</th><th>Manifest / ticket</th><th className="num">tCO₂e</th><th /></tr></thead>
         <tbody>{rows.map((r, i) => {
           const routes = materials.get(r.material)?.routes;
           const x = res[i];
@@ -476,12 +484,15 @@ function SentOut({ cat, facilityId, period, onSaved, monthly }: { cat: Category;
               <td><select className="input" style={{ height: 32, width: '100%' }} value={r.route} disabled={!routes} onChange={(e) => up(i, { route: e.target.value })}>
                 {Object.entries(ROUTE).filter(([k]) => !routes || routes.has(k)).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></td>
               <td className="num"><input className="input num" style={{ width: '100%', height: 32 }} value={r.tonnes} onChange={(e) => up(i, { tonnes: clean(e.target.value) })} /></td>
-              <td><input className="input" style={{ height: 32, width: '100%' }} value={r.note} maxLength={200} placeholder="Contractor, manifest no." onChange={(e) => up(i, { note: e.target.value })} /></td>
+              <td><select className="input" style={{ height: 32, width: '100%' }} value={r.haz ? 'y' : 'n'} onChange={(e) => up(i, { haz: e.target.value === 'y' })}><option value="n">No</option><option value="y">Yes</option></select></td>
+              <td><input className="input" style={{ height: 32, width: '100%' }} list="waste-contractors" value={r.contractor} maxLength={120} placeholder="Collector or treatment company" onChange={(e) => up(i, { contractor: e.target.value })} /></td>
+              <td><input className="input" style={{ height: 32, width: '100%' }} value={r.ref} maxLength={120} onChange={(e) => up(i, { ref: e.target.value })} /></td>
               <td className="num">{x?.co2e !== undefined ? tco2e(x.co2e) : x?.error ? <span className="chip bad" title={x.error}>problem</span> : ''}</td>
               <td><button className="btn ghost sm" onClick={() => setRows(rows.length > 1 ? rows.filter((_, k) => k !== i) : [emptyRow()])} aria-label="Remove"><Icon name="x" /></button></td>
             </tr>);
         })}</tbody>
       </table>
+      <datalist id="waste-contractors">{contractors.map((x) => <option key={x} value={x} />)}</datalist>
       {Object.entries(res).filter(([, x]) => x.error).map(([i, x]) => <div key={i} className="note bad">Row {Number(i) + 1}: {x.error}</div>)}
       {[...new Set(Object.values(res).flatMap((x) => x.warnings ?? []))].map((w) => <div key={w} className="note warn">{w}</div>)}
       <div className="row">
@@ -490,7 +501,7 @@ function SentOut({ cat, facilityId, period, onSaved, monthly }: { cat: Category;
         {okCount > 0 && <span className="sub">{okCount} row{okCount === 1 ? '' : 's'} · <b>{tco2e(total)} tCO₂e</b> (Scope 3.5)</span>}
         <button className="btn p" disabled={!okCount || busy || !facilityId} onClick={save}>{busy ? 'Saving…' : `Save ${okCount || ''} entr${okCount === 1 ? 'y' : 'ies'}`}</button>
       </div>
-      <div className="note info">DESNZ factors are UK averages (UK landfills capture much of their gas). For waste going to a landfill without gas capture, the real figure is likely higher. Operator-specific factors per tonne are not supported yet: keep any figure the operator gives you in the row's note.</div>
+      <div className="note info">DESNZ factors are UK averages (UK landfills capture much of their gas). For waste going to a landfill without gas capture, the real figure is likely higher. Operator-specific factors per tonne are not supported yet. Hazardous, contractor and manifest are for waste reporting (GRI 306) and do not change the emissions.</div>
     </div>
   );
 }

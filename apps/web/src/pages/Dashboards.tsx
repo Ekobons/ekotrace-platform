@@ -22,6 +22,7 @@ import { Bars, DCard, Donut, Dot, DStat, HBars, Legend, MN, PAL, SC, Treemap, fm
 interface Row {
   f: string; m: number; cat: string; item: string; grp: string; sub: string; unit: string; s1: number; s2: number; s3: number; s33: number; bio: number; memo: number;
   n: number; approved: number; estimated: number; qty: number; rec: number; kind: 'fuel' | 'electricity' | 'cooling' | 'heat' | null; kwh: number | null;
+  m3: number | null; route: string; flow: string; gri: string; haz: boolean | null; contractor: string | null;
 }
 interface Data {
   year: number; years: number[]; group: { id: string; name: string } | null; pend: boolean; consolidation: string; scope2: 'location' | 'market';
@@ -149,7 +150,7 @@ export function Dashboards() {
           : tab === 'scopes' ? <Scopes d={d} c={c} />
           : tab === 'facilities' ? <Facilities d={d} c={c} pick={(id) => set({ node: id, group: null })} />
           : tab === 'energy' ? <Energy d={d} c={c} />
-          : tab === 'water' ? <Water c={c} />
+          : tab === 'water' ? <Water d={d} c={c} />
           : tab === 'waste' ? <Waste d={d} c={c} />
           : tab === 'travel' ? <Travel c={c} />
           : tab === 'chain' ? <Chain d={d} c={c} />
@@ -405,35 +406,86 @@ function Energy({ d, c }: { d: Data; c: Ctx }) {
 }
 
 // ----------------------------------------------------------------- water --
-function Water({ c }: { c: Ctx }) {
+const GRI: Record<string, string> = { third_party: 'Third-party water (utility, tanker, TSE)', groundwater: 'Groundwater', seawater: 'Seawater', surface: 'Surface water' };
+const W_PAL = ['#2E6FB0', '#7FB8D4', '#1F6F5C', '#86CDB4', '#E9B44C', '#9AA7A2', '#6B4FA8'];
+const m3 = (r: Row) => r.m3 ?? 0;
+function Water({ d, c }: { d: Data; c: Ctx }) {
+  const w = c.cur.filter((r) => r.cat.startsWith('water_'));
+  if (!w.length) return <div className="card muted">No water entered for this selection. Add it under Add data → Water: what each facility takes in by source, reuses, and lets out, typed in or from water bills and meters.</div>;
+  const inn = w.filter((r) => r.flow === 'withdrawal'), out = w.filter((r) => r.flow === 'discharge'), re = w.filter((r) => r.flow === 'reuse');
+  const W = sum(inn, m3), D = sum(out, m3), R = sum(re, m3), cons = W - D, em = sum(w, tot);
+  const by = (rs: Row[], key: (r: Row) => string) => { const m = new Map<string, number>(); for (const r of rs) m.set(key(r), (m.get(key(r)) ?? 0) + m3(r)); return [...m.entries()].filter(([, v]) => v).sort((a, b) => b[1] - a[1]); };
+  const src = by(inn, (r) => r.item), col = new Map(src.map(([n], i) => [n, W_PAL[i % W_PAL.length]!]));
+  const srcParts = src.map(([n, v]) => ({ n, v, c: col.get(n)! }));
+  const rows = monthRows(c, (rs) => src.map(([n]) => ({ v: sum(rs.filter((r) => r.flow === 'withdrawal' && r.item === n), m3), c: col.get(n)!, n })));
+  rows.forEach((r, i) => { if (c.months.includes(i + 1)) r.line2 = sum(out.filter((x) => x.m === i + 1), m3); });
+  const gIn = by(inn, (r) => r.gri), gOut = by(out, (r) => r.gri), ML = (v: number) => fmt(v / 1000, v < 10000 ? 2 : 1);
+  const facs = d.facilities.map((f) => { const a = sum(inn.filter((r) => r.f === f.id), m3), b = sum(out.filter((r) => r.f === f.id), m3); return { f, w: a, d: b, per: f.employees ? (a * c.k) / f.employees : null }; }).filter((x) => x.w || x.d).sort((a, b) => b.w - a.w);
+  const emBy = new Map<string, number>(); for (const r of w) if (tot(r)) emBy.set(r.item, (emBy.get(r.item) ?? 0) + tot(r));
   return <>
-    <DStat cells={[['Water used', <>— <small>m³</small></>, c.periodLabel], ['Per employee', '—', 'for the period'], ['Water emissions', '—', 'supply and treatment'], ['Monthly average', '—', '']]} />
-    <div className="dgrid"><DCard title="Water" span={3}><div className="muted" style={{ fontSize: 13, lineHeight: 1.55 }}>Water withdrawal, consumption and discharge are not captured in Ekotrace yet. When the water module is added, this tab shows water by month, by type and by facility, per employee, and the emissions from supply and treatment.</div></DCard></div>
+    <DStat cells={[['Water withdrawn', <>{fmt0(W)} <small>m³</small></>, `${c.periodLabel} · ${ML(W)} ML`], ['Discharged', `${fmt0(D)} m³`, `${pc(D, W)} of withdrawal`],
+      ['Consumption', `${fmt0(cons)} m³`, 'withdrawn − discharged', cons < 0 ? 'var(--bad)' : undefined], ['Recycled or reused', `${fmt0(R)} m³`, `${pc(R, W + R)} of water used`, R ? 'var(--ok)' : undefined],
+      ['Water emissions', T(em), 'supply 3.1 · treatment 3.5'], ['Per employee', c.staff ? `${fmt(W / c.staff, 1)} m³` : '—', c.staff ? 'withdrawn, in the period' : 'add employees']]} />
+    <div className="dgrid">
+      <DCard title="Water withdrawn by month and source (m³)" span={2}><Bars rows={rows} unit="m³" h={175} label="Water by month" />
+        <div className="lgd">{srcParts.map((p) => <span key={p.n}><i style={{ background: p.c }} />{p.n}</span>)}<span><i className="ln dash" style={{ borderColor: '#D99A1E' }} />Discharged</span><span className="muted">pale = month still filling</span></div></DCard>
+      <DCard title="By source"><div className="dsplit"><Donut parts={srcParts} center={fmt0(W)} sub="m³" size={130} /><Legend parts={srcParts} unit="m³" /></div></DCard>
+      <DCard title="Water balance · GRI 303 (megalitres)" span={2}>
+        <table className="t dt"><thead><tr><th /><th className="num">Withdrawal</th><th className="num">Discharge</th></tr></thead>
+          <tbody>{Object.keys(GRI).filter((k) => gIn.some(([g]) => g === k) || gOut.some(([g]) => g === k)).map((k) => (
+            <tr key={k}><td>{GRI[k]}</td><td className="num">{ML(gIn.find(([g]) => g === k)?.[1] ?? 0)}</td><td className="num">{ML(gOut.find(([g]) => g === k)?.[1] ?? 0)}</td></tr>))}
+            <tr><td><b>Total</b></td><td className="num"><b>{ML(W)}</b></td><td className="num"><b>{ML(D)}</b></td></tr>
+            <tr><td>Consumption (withdrawal − discharge)</td><td className="num" colSpan={2}><b>{ML(cons)}</b></td></tr>
+            <tr><td>Recycled or reused on site</td><td className="num" colSpan={2}>{ML(R)}</td></tr></tbody></table>
+        <div className="muted" style={{ fontSize: 11.5 }}>Water lost by evaporation, in products or to irrigation counts as consumption. Water stress areas are not assessed.</div></DCard>
+      <DCard title="Emissions by source (tCO₂e)"><HBars unit="t" c="var(--s3)" items={[...emBy.entries()].sort((a, b) => b[1] - a[1]).map(([n, v]) => ({ n, v, d: 2 }))} />
+        <div className="muted" style={{ fontSize: 11.5 }}>Own wells, sea intake and rain: no Scope 3 (their energy is in your electricity and fuel). Mains water uses DESNZ's UK water supply factor unless the utility's own factor was entered.</div></DCard>
+      <DCard title="By facility (m³)" span={2}><HBars unit="m³" c="#2E6FB0" items={facs.map((x) => ({ n: x.f.name, v: x.w, p: W ? (x.w / W) * 100 : 0 }))} /></DCard>
+      <DCard title="Withdrawn per employee (m³ / year)"><HBars unit="m³" c="#7FB8D4" items={facs.filter((x) => x.per !== null).map((x) => ({ n: x.f.name, v: x.per!, d: 1 })).sort((a, b) => b.v - a.v)} /></DCard>
+    </div>
   </>;
 }
 
 // ----------------------------------------------------------------- waste --
-const route = (r: Row) => { const t = `${r.item} ${r.sub}`.toLowerCase();
-  return /recycl|reuse|re-use/.test(t) ? 'Recycling' : /compost|anaerobic|digest/.test(t) ? 'Composting / AD' : /clinical|hazard|medical/.test(t) ? 'Clinical / hazardous'
-    : /incinerat|energy recovery|waste-to-energy|combust/.test(t) ? 'Waste-to-energy' : /wastewater|sewage/.test(t) ? 'Wastewater' : /landfill/.test(t) ? 'Landfill' : 'Other'; };
-const ROUTE_C: Record<string, string> = { Landfill: '#C2523C', Recycling: '#2BA38A', 'Composting / AD': '#86CDB4', 'Waste-to-energy': '#E9B44C', 'Clinical / hazardous': '#6B4FA8', Wastewater: '#2E6FB0', Other: '#9AA7A2' };
-const DIVERT = new Set(['Recycling', 'Composting / AD', 'Waste-to-energy']);
+/** Route of waste sent out: from the factor's treatment route, else from its name. */
+const ROUTE_NAME: Record<string, string> = { reuse: 'Re-use', open_loop: 'Recycling', closed_loop: 'Recycling', composting: 'Composting / digestion', ad: 'Composting / digestion', combustion: 'Waste-to-energy', landfill: 'Landfill' };
+const route = (r: Row) => { if (r.route && ROUTE_NAME[r.route]) return ROUTE_NAME[r.route]!; const t = `${r.item} ${r.sub}`.toLowerCase();
+  return /re-?use/.test(t) ? 'Re-use' : /recycl/.test(t) ? 'Recycling' : /compost|anaerobic|digest/.test(t) ? 'Composting / digestion'
+    : /incinerat|energy recovery|waste-to-energy|combust/.test(t) ? 'Waste-to-energy' : /landfill/.test(t) ? 'Landfill' : 'Other'; };
+const ROUTE_C: Record<string, string> = { Landfill: '#C2523C', Recycling: '#2BA38A', 'Re-use': '#1F6F5C', 'Composting / digestion': '#86CDB4', 'Waste-to-energy': '#E9B44C', Other: '#9AA7A2' };
+/** diverted from landfill (common UAE measure: waste-to-energy counts) */
+const DIVERT = new Set(['Re-use', 'Recycling', 'Composting / digestion', 'Waste-to-energy']);
+/** GRI 306-4 / 306-5: recovery is diverted from disposal; incineration with energy recovery is disposal */
+const GRI306: [string, string, string[]][] = [['Diverted from disposal', 'Preparation for re-use', ['Re-use']], ['Diverted from disposal', 'Recycling', ['Recycling']], ['Diverted from disposal', 'Other recovery (composting, digestion)', ['Composting / digestion']],
+  ['Directed to disposal', 'Incineration with energy recovery', ['Waste-to-energy']], ['Directed to disposal', 'Landfilling', ['Landfill']], ['Directed to disposal', 'Other disposal', ['Other']]];
 const tonnes = (r: Row) => (r.unit === 't' ? r.qty : r.unit === 'kg' ? r.qty / 1000 : 0);
 function Waste({ d, c }: { d: Data; c: Ctx }) {
   const own = c.cur.filter((r) => r.cat === 'waste_generated'), site = c.cur.filter((r) => r.cat === 'waste_treatment');
-  const total = sum(own, tonnes), div = sum(own.filter((r) => DIVERT.has(route(r))), tonnes), haz = sum(own.filter((r) => route(r) === 'Clinical / hazardous'), tonnes);
+  const total = sum(own, tonnes), div = sum(own.filter((r) => DIVERT.has(route(r))), tonnes), haz = sum(own.filter((r) => r.haz), tonnes);
+  const recov = sum(own.filter((r) => ['Re-use', 'Recycling', 'Composting / digestion'].includes(route(r))), tonnes);
   const by = new Map<string, number>(); for (const r of own) by.set(route(r), (by.get(route(r)) ?? 0) + tonnes(r));
-  const parts = [...by.entries()].filter(([, v]) => v).sort((a, b) => b[1] - a[1]).map(([n, v]) => ({ n, v, c: ROUTE_C[n]! }));
+  const parts = [...by.entries()].filter(([, v]) => v).sort((a, b) => b[1] - a[1]).map(([n, v]) => ({ n, v, c: ROUTE_C[n] ?? '#9AA7A2' }));
   const rows = monthRows(c, (rs) => parts.map((p) => ({ v: sum(rs.filter((r) => r.cat === 'waste_generated' && route(r) === p.n), tonnes), c: p.c, n: p.n })));
-  const rate: BarRow[] = MN.map((lbl, i) => { const ls = own.filter((r) => r.m === i + 1), t = sum(ls, tonnes), dv = sum(ls.filter((r) => DIVERT.has(route(r))), tonnes); return { lbl, parts: t ? [{ v: (dv / t) * 100, c: '#2BA38A', n: 'Diverted %' }] : [] }; });
+  const rate: BarRow[] = MN.map((lbl, i) => { const ls = own.filter((r) => r.m === i + 1), t = sum(ls, tonnes), dv = sum(ls.filter((r) => DIVERT.has(route(r))), tonnes); return { lbl, parts: t ? [{ v: (dv / t) * 100, c: '#2BA38A', n: 'Diverted from landfill %' }] : [] }; });
   const siteBy = new Map<string, number>(); for (const r of site) siteBy.set(r.item, (siteBy.get(r.item) ?? 0) + tot(r));
+  const cons = new Map<string, number>(); for (const r of own) { const k = r.contractor || 'Not given'; cons.set(k, (cons.get(k) ?? 0) + tonnes(r)); }
+  const cell = (h: boolean | null, names: string[]) => sum(own.filter((r) => !!r.haz === !!h && names.includes(route(r))), tonnes);
+  const t1 = (v: number) => (v ? fmt(v, v < 10 ? 2 : 1) : '—');
   return <>
-    <DStat cells={[['Waste sent out', <>{fmt(total, 1)} <small>t</small></>, 'all streams'], ['Diverted from landfill', pc(div, total), 'recycled, composted or waste-to-energy', 'var(--ok)'],
-      ['Hazardous / clinical', `${fmt(haz, 1)} t`, 'incinerated'], ['Waste emissions', `${fmt(sum(own, tot), 1)} t`, 'Scope 3 category 5'], ['Treated at own sites', T(sum(site, tot)), 'Scope 1']]} />
+    <DStat cells={[['Waste generated', <>{fmt(total, 1)} <small>t</small></>, 'sent to others, all streams'], ['Diverted from landfill', pc(div, total), 're-use, recycling, composting, waste-to-energy', 'var(--ok)'],
+      ['Recovered (GRI 306-4)', pc(recov, total), 're-use, recycling, composting'], ['Hazardous', `${fmt(haz, 1)} t`, `${pc(haz, total)} of waste`, haz ? 'var(--warn)' : undefined],
+      ['Waste emissions', `${fmt(sum(own, tot), 1)} t`, 'Scope 3 category 5'], ['Treated at own sites', T(sum(site, tot)), 'Scope 1']]} />
     <div className="dgrid">
       <DCard title="Waste by month and route (t)" span={2}><Bars rows={rows} unit="t" h={175} label="Waste by month" /><div className="lgd">{parts.map((p) => <span key={p.n}><i style={{ background: p.c }} />{p.n}</span>)}</div></DCard>
       <DCard title="By route"><div className="dsplit"><Donut parts={parts} center={pc(div, total)} sub="diverted" size={130} /><Legend parts={parts} unit="t" /></div></DCard>
-      <DCard title="Diversion rate by month (%)" span={2}><Bars rows={rate} unit="%" h={150} label="Diversion rate" /></DCard>
+      <DCard title="Waste by disposal method · GRI 306 (t)" span={2}>
+        <table className="t dt"><thead><tr><th /><th>Operation</th><th className="num">Hazardous</th><th className="num">Non-hazardous</th><th className="num">Total</th></tr></thead>
+          <tbody>{GRI306.map(([g, n, names], i) => { const h = cell(true, names), nh = cell(false, names); return (
+            <tr key={n}><td className="muted small">{i === 0 || GRI306[i - 1]![0] !== g ? g : ''}</td><td>{n}</td><td className="num">{t1(h)}</td><td className="num">{t1(nh)}</td><td className="num"><b>{t1(h + nh)}</b></td></tr>); })}
+            <tr><td /><td><b>Waste generated</b></td><td className="num"><b>{t1(haz)}</b></td><td className="num"><b>{t1(total - haz)}</b></td><td className="num"><b>{t1(total)}</b></td></tr></tbody></table>
+        <div className="muted" style={{ fontSize: 11.5 }}>All off-site (sent to other companies). Waste the company treats for others at its own sites is operations, not waste generated: shown separately below.</div></DCard>
+      <DCard title="By contractor (t)"><HBars unit="t" c="var(--s3)" items={[...cons.entries()].sort((a, b) => b[1] - a[1]).map(([n, v]) => ({ n, v, d: 1, p: total ? (v / total) * 100 : 0 }))} /></DCard>
+      <DCard title="Diverted from landfill by month (%)" span={2}><Bars rows={rate} unit="%" h={150} label="Diversion rate" /></DCard>
       <DCard title="By facility (t)"><HBars unit="t" c="var(--s3)" items={d.facilities.map((f) => ({ n: f.name, v: sum(own.filter((r) => r.f === f.id), tonnes), d: 1 })).filter((x) => x.v).sort((a, b) => b.v - a.v)} /></DCard>
       {site.length > 0 && <DCard title="Treatment at own sites (tCO₂e)" span={3}><HBars unit="t" c="var(--s1)" items={[...siteBy.entries()].sort((a, b) => b[1] - a[1]).map(([n, v]) => ({ n, v, d: 1 }))} /></DCard>}
     </div>

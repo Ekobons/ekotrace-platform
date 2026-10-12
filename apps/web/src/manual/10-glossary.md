@@ -41,3 +41,9 @@
 | Commuting survey | One answer per employee about how they travel to work; scaled up to all employees of the facility (employees ÷ answers) |
 | Response rate | Survey answers ÷ employees of the facility; below 30% a warning is shown |
 | Working days | Weekdays of the year minus public holidays and annual leave; used for commuting distances and to split the year into months |
+| Water withdrawal | All water a facility takes in: from a utility, tanker, TSE, own wells, the sea or rain (GRI 303-3) |
+| Water discharge | Water a facility lets out: to a sewer, tanker for treatment, land, sea or surface water (GRI 303-4) |
+| Water consumption | Withdrawal minus discharge: water evaporated, in products or kept in the ground (GRI 303-5) |
+| TSE | Treated sewage effluent: treated wastewater reused, mostly for irrigation and district cooling |
+| Diverted from disposal | GRI 306-4: waste prepared for re-use, recycled or otherwise recovered (composting, digestion); incineration with energy recovery is disposal in GRI, but counts as diverted from landfill |
+| Hazardous waste | Waste marked hazardous on its entry (e.g. electronic waste, batteries, clinical, oily waste), reported separately in GRI 306 |

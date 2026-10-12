@@ -106,11 +106,15 @@ export const calcInputSchema = z.object({
   vehicle: vehicleSchema.optional(),
   energy: energySchema.optional(),
   waste: wasteSchema.optional(),
+  /** water: the utility's own factor per m³ (replaces the default) */
+  water: z.object({ ownFactor: z.number().finite().min(0).max(100).optional(), source: z.string().max(200).optional() }).optional(),
+  /** waste sent to others: details for ESG reporting (no effect on the emissions) */
+  wasteInfo: z.object({ hazardous: z.boolean().optional(), contractor: z.string().max(120).optional(), ref: z.string().max(120).optional() }).optional(),
 });
 export type CalcInput = z.infer<typeof calcInputSchema>;
 
 interface ItemRow {
-  id: number; name: string; active: boolean; category_id: number; category: string; calc_method: 'combustion' | 'fugitive' | 'vehicle' | 'electricity' | 'waste' | 'waste_disposal' | 'travel';
+  id: number; name: string; active: boolean; category_id: number; category: string; calc_method: 'combustion' | 'fugitive' | 'vehicle' | 'electricity' | 'waste' | 'waste_disposal' | 'travel' | 'water';
   sub_units: string[]; gas_code: string | null; sub_active: boolean; code: string;
   attrs: { vehicle?: string; powertrain?: string; fuel?: string | null; electric?: boolean; phev?: boolean; distance?: boolean };
 }
@@ -190,7 +194,24 @@ export async function calculate(input: CalcInput, ctx: CalcContext): Promise<{ r
   } else if (item.calc_method === 'waste_disposal') {
     if (input.quantity === undefined) throw new AppError('Enter the tonnes of waste');
     result = calcCombustion({ itemName: item.name, quantity: input.quantity, unit: input.unit, date, region, factors: await loadFactors(item.id), gwp, units: ref.units });
-    stored = { quantity: input.quantity, unit: input.unit, inputs: {} };
+    stored = { quantity: input.quantity, unit: input.unit, inputs: input.wasteInfo && Object.values(input.wasteInfo).some((v) => v !== undefined && v !== '') ? { wasteInfo: input.wasteInfo } : {} };
+  } else if (item.calc_method === 'water') {
+    if (input.quantity === undefined) throw new AppError('Enter the volume of water');
+    const m3 = convert(ref.units, input.quantity, input.unit, 'm3');
+    const zero = { direct: 0, wtt: 0, outside_scopes: 0, memo: 0, scope2: 0, scope2_market: 0, td_loss: 0, scope3: 0 };
+    const own = input.water?.ownFactor;
+    const factors = await loadFactors(item.id);
+    if (own !== undefined) {
+      const kg = m3 * own;
+      result = { totals: { ...zero, scope3: kg }, lines: [{ basis: 'scope3', gas: 'CO2e', kgGas: null, kgCo2e: kg, factorId: null, method: 'published' }], factors: [],
+        steps: [`${fmtN(m3)} m³ × ${own} kg CO₂e/m³ (${input.water?.source || 'factor entered'}) = ${fmtN(kg)} kg CO₂e`], warnings: [] } as unknown as CalcResult;
+    } else if (factors.length) {
+      result = calcCombustion({ itemName: item.name, quantity: m3, unit: 'm3', date, region, factors, gwp, units: ref.units });
+      if (item.attrs && (item.attrs as { desal?: boolean }).desal) result.warnings.push('DESNZ water supply factor (UK average) used: desalinated water takes much more energy. Enter the utility\'s factor per m³ when you have it.');
+    } else {
+      result = { totals: zero, lines: [], factors: [], steps: [`${item.name}: ${fmtN(m3)} m³, no Scope 3 emissions`], warnings: [] } as unknown as CalcResult;
+    }
+    stored = { quantity: input.quantity, unit: input.unit, inputs: input.water && own !== undefined ? { water: input.water } : {} };
   } else if (item.calc_method === 'travel') {
     if (input.quantity === undefined) throw new AppError('Enter the distance');
     const factors = await loadFactors(item.id);
@@ -472,3 +493,5 @@ async function wasteCalc(input: CalcInput, item: ItemRow, ctx: CalcContext, gwp:
   result.steps.splice(1, 0, ...steps);
   return { result, stored };
 }
+
+const fmtN = (x: number) => Number(x.toPrecision(6)).toLocaleString('en', { maximumFractionDigits: 3 });

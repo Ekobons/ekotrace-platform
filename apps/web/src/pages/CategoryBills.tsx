@@ -18,7 +18,7 @@ import { BillReview } from './Bills';
 
 const when = (s: string) => new Date(s).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 
-const KIND: Record<string, string> = { purchased_electricity: 'electricity, cooling and heat bills', stationary_combustion: 'fuel and gas invoices', waste: 'waste collection invoices and hauler tickets' };
+const KIND: Record<string, string> = { purchased_electricity: 'electricity, cooling and heat bills', stationary_combustion: 'fuel and gas invoices', waste: 'waste collection invoices and hauler tickets', water: 'water bills (a combined electricity & water bill can be dropped here too: the water part is read)' };
 type Tab = 'to_check' | 'checked' | 'confirmed' | 'rejected';
 const TABS: [Tab, string][] = [['to_check', 'To check'], ['checked', 'Ready to publish'], ['confirmed', 'Published'], ['rejected', 'Rejected']];
 

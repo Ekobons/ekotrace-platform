@@ -2,6 +2,16 @@
 
 Newest first.
 
+## 2026-10-12 (21) — Water category; waste details for ESG reporting
+
+- **Water** (migration 021): categories `water_supply` (Scope 3.1, "Water withdrawn") and `water_discharge` (Scope 3.5), calc method `water`; items by source (mains desalinated / other, tanker, TSE bought, own well, seawater, rain) and destination (public sewer, tanker for treatment, irrigation / soak-away, sea, surface water), plus "recycled or reused on site"; item attrs `flow`, `gri` (GRI 303 source type), `factor`. Units m³, L, kL, ML (new), imperial gallons, thousand imperial gallons (new `kgal_uk`).
+- Factors: DESNZ "Water supply" and "Water treatment" per m³, 2022–2026 (importer v8); utility's own factor per m³ on the entry (`water.ownFactor`, with its source); desalinated mains water warned (UK factor). Own wells, sea, rain, irrigation, sea and surface discharge: no Scope 3.
+- **Water bills:** reader hint `water` (m³, IG, 000 IG; kWh lines ignored); a combined DEWA / SEWA bill uploaded under Water and under Electricity is one document, two bills (no duplicate, same bill number allowed across kinds), each matched to its own meter of the same account. Bills, meter batches and recent entries filter `water` like `waste`.
+- **Waste sent to others:** hazardous, contractor (suggestions from `GET /api/waste/contractors`) and manifest / ticket per row (`wasteInfo` in the entry's inputs; no effect on emissions).
+- **Dashboards:** rows carry `m3`, `route`, `flow`, `gri`, `haz`, `contractor`. Water tab: withdrawn, discharged, consumption, recycled, emissions, per employee; monthly by source with discharge line; GRI 303 balance in megalitres; by facility. Waste tab: GRI 306 table (hazardous / non-hazardous by operation), diverted from landfill and recovered (GRI 306-4), by contractor.
+- Demo: water in and out for six facilities (DEMO volumes), waste sent out with DEMO contractors, hazardous e-waste and batteries.
+- Tests: 52 API (+1 water and waste details, water bill), bills reader (+1 water). Manual: Data categories (Water; waste reporting), Bills, Dashboards, Glossary.
+
 ## 2026-10-12 (20) — Employee commuting (Scope 3.7)
 
 - **Once a year per facility** (migration 020: `commute_record` unique per facility and year, `commute_response` for the survey answers, `activity.commute_record_id`; category `employee_commuting`, calc method `travel`, unit `pkm`). Saving again replaces; any approved monthly entry locks the record (409 `LOCKED`).

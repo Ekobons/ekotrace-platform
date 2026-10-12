@@ -85,8 +85,13 @@ export async function dashboardRoutes(app: FastifyInstance) {
                 ${t1('a.co2_biogenic')} AS bio, ${t1('a.co2e_memo')} AS memo, count(*)::int AS n, count(*) FILTER (WHERE a.status = 'approved')::int AS approved,
                 count(*) FILTER (WHERE a.data_type <> 'actual')::int AS estimated,
                 CASE WHEN cat.calc_method = 'spend' THEN 0 ELSE sum(a.quantity * ${W})::float8 END AS qty,
+                CASE WHEN cat.calc_method = 'water' THEN sum(a.quantity * u.to_base / 1000 * ${W})::float8 END AS m3,
+                coalesce(i.attrs->>'route', '') AS route, coalesce(i.attrs->>'flow', '') AS flow, coalesce(i.attrs->>'gri', '') AS gri,
+                CASE WHEN cat.code = 'waste_generated' THEN coalesce((a.inputs->'wasteInfo'->>'hazardous')::boolean, false) END AS haz,
+                CASE WHEN cat.code = 'waste_generated' THEN nullif(a.inputs->'wasteInfo'->>'contractor', '') END AS contractor,
                 coalesce(sum((SELECT sum(k.kwh) FROM certificate_claim k WHERE k.activity_id = a.id) * ${W}), 0)::float8 AS rec
-           ${FROM.replace('JOIN item i ON i.id = a.item_id', 'JOIN item i ON i.id = a.item_id JOIN subcategory sc ON sc.id = i.subcategory_id')} GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, cat.calc_method`;
+           ${FROM.replace('JOIN item i ON i.id = a.item_id', 'JOIN item i ON i.id = a.item_id JOIN subcategory sc ON sc.id = i.subcategory_id JOIN unit u ON u.code = a.unit')}
+           GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, cat.calc_method, cat.code, i.attrs, haz, contractor`;
       const ref = await refdata();
       const units = new Map(ref.unitList.map((u) => [u.code, { dimension: u.dimension, to_base: Number(u.toBase) }]));
       const shape = async (y: number) => {

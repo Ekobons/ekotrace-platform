@@ -58,6 +58,28 @@ The scope follows **who runs the treatment site**: one Waste tab with a switch.
 
 **Sent to others (Scope 3.5):** rows of material, route (landfill, combustion, recycling, composting, digestion) and tonnes × the DESNZ factor. These are UK averages — landfills without gas capture are likely higher.
 
+**Waste reporting (GRI 306).** Each row of waste sent to others also records whether it is **hazardous**, the **contractor** (collector or treatment company; earlier names are suggested) and the **manifest or ticket** number. These do not change the emissions; they feed the Waste dashboard: waste generated, hazardous and non-hazardous, diverted from disposal (re-use, recycling, composting / digestion) or directed to disposal (incineration with energy recovery, landfill), by contractor and by facility.
+
+- *Diverted from landfill* (the usual UAE measure) counts waste-to-energy as diverted; GRI 306 counts incineration with energy recovery as disposal. The dashboard shows both.
+- Waste the company treats **for others** at its own sites (landfill, waste-to-energy plant) is operations, not waste it generated: its emissions are Scope 1, and its tonnes are not in "waste generated".
+
+## Water — Scope 3.1 and 3.5, and water accounting
+
+**What:** all water a facility takes in (by source), recycles on site, and lets out (by destination), in m³ — or litres, kL, megalitres, imperial gallons or thousand imperial gallons as on the bill.
+**Enter:** Add data → **Water**, with the same three ways as electricity: **Type in** (a month, the whole year or month by month), **Bills** (water bills; a combined electricity & water bill from DEWA or SEWA can be dropped under both — under Water its water consumption is read, under Electricity its kWh — and the two are separate bills, each matched to its own meter of the same account), **Meter readings** (water meters through the API).
+
+| | Sources / destinations | Scope 3 |
+|---|---|---|
+| **Water in** | mains water (desalinated or other), tanker water, treated wastewater (TSE) bought | 3.1 — DESNZ water supply factor per m³, or the utility's own factor |
+| | groundwater (own well), seawater (own intake or desalination), rainwater or surface water | none — the pumping and desalination energy is already in the facility's electricity and fuel |
+| **Recycled on site** | greywater, own TSE for irrigation, reused process water | none; reported as recycled water |
+| **Water out** | public sewer / municipal treatment, removed by tanker for treatment | 3.5 — DESNZ water treatment factor per m³, or the utility's own |
+| | irrigation or soak-away, to sea, to surface water | none |
+
+- **Desalinated water** takes much more energy than the UK water behind the DESNZ factor. Enter the utility's factor per m³ (and where it comes from) on the row when you have it; until then the entry carries a warning.
+- **Consumption** = water in − water out (evaporation, water in products, irrigation that stays in the ground). Water that goes to the company's own treatment plant is not "out": record where the plant discharges it.
+- The Water dashboard follows GRI 303: withdrawal and discharge by source type (third-party water, groundwater, seawater, surface water) in megalitres, consumption, recycled water, by facility and per employee. Water-stress areas are not assessed.
+
 ## Electricity, heat & cooling — Scope 2 (and 3.3)
 
 **What:** electricity, district heat or steam, and district cooling bought.

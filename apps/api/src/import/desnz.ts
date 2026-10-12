@@ -103,6 +103,8 @@ export type VehicleGroup = 'cars_by_size' | 'cars_by_segment' | 'vans' | 'hgv' |
 export interface DesnzParsed {
   vehicles: DesnzVehicleRow[];
   travel: DesnzTravelRow[];
+  /** Scope 3 water supply and treatment, kg CO2e per m³ */
+  water: { supply: number | null; treatment: number | null };
   evEnergy: DesnzEvEnergyRow[];
   /** UK grid electricity (Scope 2, location-based), kg CO2e per kWh and its gas split */
   ukGrid: { co2e: number | null; gasCo2e: { CO2?: number; CH4?: number; N2O?: number } } | null;
@@ -190,6 +192,7 @@ export async function parseDesnz(path: string): Promise<DesnzParsed> {
   const gases = new Map<string, DesnzGasRow>();
   const vehicles = new Map<string, DesnzVehicleRow>();
   const travel = new Map<string, DesnzTravelRow>();
+  const water: DesnzParsed['water'] = { supply: null, treatment: null };
   const evEnergy: DesnzEvEnergyRow[] = [];
   const waste: DesnzWasteRow[] = [];
   let ukGrid: DesnzParsed['ukGrid'] = null;
@@ -205,6 +208,10 @@ export async function parseDesnz(path: string): Promise<DesnzParsed> {
     if (scope === 'Scope 3' && l1 === 'Waste disposal' && uom === 'tonnes') {
       const route = wasteRoute(colText);
       if (route && v != null && ghg.startsWith('kg co2e')) waste.push({ group: l2, material: l3, route, co2e: v });
+      return;
+    }
+    if (scope === 'Scope 3' && (l1 === 'Water supply' || l1 === 'Water treatment') && uom === 'cubic metres' && ghg.startsWith('kg co2e') && v != null) {
+      water[l1 === 'Water supply' ? 'supply' : 'treatment'] = v;
       return;
     }
     // Land travel by passengers (employee commuting): per km or passenger-km, and well-to-tank.
@@ -298,6 +305,7 @@ export async function parseDesnz(path: string): Promise<DesnzParsed> {
     gases: [...gases.values()],
     vehicles: [...vehicles.values()].filter((r) => r.co2e != null),
     travel: [...travel.values()].filter((r) => r.co2e != null),
+    water,
     evEnergy, ukGrid, ukEnergy, waste,
     sha256: createHash('sha256').update(buf).digest('hex'),
   };

@@ -71,7 +71,7 @@ async function main() {
         'DELETE FROM job WHERE tenant_id = $1', 'UPDATE purchase_line SET activity_id = NULL WHERE tenant_id = $1', 'DELETE FROM activity_result WHERE tenant_id = $1', 'DELETE FROM activity WHERE tenant_id = $1',
         'DELETE FROM purchase_batch WHERE tenant_id = $1', 'DELETE FROM purchase_rule WHERE tenant_id = $1', 'DELETE FROM purchase_profile WHERE tenant_id = $1', 'DELETE FROM supplier_ef WHERE tenant_id = $1', 'DELETE FROM supplier WHERE tenant_id = $1', 'DELETE FROM fx_rate WHERE tenant_id = $1', 'DELETE FROM vehicle WHERE tenant_id = $1',
         'DELETE FROM bill WHERE tenant_id = $1', 'DELETE FROM document WHERE tenant_id = $1', 'DELETE FROM meter_reading WHERE tenant_id = $1', 'DELETE FROM meter WHERE tenant_id = $1', 'DELETE FROM api_key WHERE tenant_id = $1',
-        'DELETE FROM waste_deposit WHERE tenant_id = $1', 'DELETE FROM waste_site WHERE tenant_id = $1',
+        'DELETE FROM commute_record WHERE tenant_id = $1', 'DELETE FROM waste_deposit WHERE tenant_id = $1', 'DELETE FROM waste_site WHERE tenant_id = $1',
         'DELETE FROM price WHERE tenant_id = $1', 'DELETE FROM user_facility WHERE tenant_id = $1',
         'DELETE FROM session WHERE user_id IN (SELECT id FROM app_user WHERE tenant_id = $1)', 'DELETE FROM audit_log WHERE tenant_id = $1',
         'UPDATE org_node SET manager_user_id = NULL WHERE tenant_id = $1', 'DELETE FROM app_user WHERE tenant_id = $1', 'DELETE FROM tenant_catalogue WHERE tenant_id = $1',
@@ -230,7 +230,8 @@ async function main() {
       await c.query(`INSERT INTO waste_deposit (tenant_id, site_id, year, waste_type, tonnes, source, estimated) VALUES ($1,$2,$3,'msw',$4,$5,true)`,
         [t, site, y, y <= 2020 ? 800000 : 800000 - (y - 2020) * 90000, DEMO_W]);
     }
-    const wItems = Object.fromEntries((await c.query(`SELECT code, id FROM item WHERE code LIKE 'waste:%' OR code IN ('waste3:refuse:commercial-and-industrial-waste:landfill','waste3:paper:paper-and-board-mixed:closed_loop')`)).rows.map((r) => [r.code, r.id]));
+    const wItems = Object.fromEntries((await c.query(`SELECT code, id FROM item WHERE code LIKE 'waste:%' OR code LIKE 'water:%' OR code IN ('waste3:refuse:commercial-and-industrial-waste:landfill','waste3:paper:paper-and-board-mixed:closed_loop',
+  'waste3:electrical-items:weee-mixed:open_loop','waste3:refuse:organic-food-and-drink-waste:composting','waste3:electrical-items:batteries:open_loop')`)).rows.map((r) => [r.code, r.id]));
     const put = async (fac: string, input: Record<string, unknown>) => {
       const f = (await c.query('SELECT id, country, grid_region FROM org_node WHERE id = $1', [ids.get(fac)])).rows[0];
       const { result, item: it, gwpSet, stored } = await calculate(input as never, contextFor(c, 'AR5', 'AE', f));
@@ -266,9 +267,32 @@ async function main() {
           waste: { process: 'composting', tonnes: Math.round(3000 * k), basis: 'wet' } });
         await put('Al Zahia Community', { itemId: wItems['waste:wastewater'], unit: 'kg', periodStart: ps, periodEnd: pe,
           waste: { process: 'wastewater', kind: 'domestic', system: 'centralised_aerobic', measure: 'BOD', flowM3: Math.round(60000 * k), mgPerL: 250, nInfluentKg: Math.round(2400 * k), nEffluentKg: Math.round(600 * k), recovery: [] } });
-        await put('BEEAH Headquarters', { itemId: wItems['waste3:refuse:commercial-and-industrial-waste:landfill'], unit: 't', quantity: Math.round(8 * k * 10) / 10, periodStart: ps, periodEnd: pe });
-        if (wItems['waste3:paper:paper-and-board-mixed:closed_loop']) await put('BEEAH Headquarters', { itemId: wItems['waste3:paper:paper-and-board-mixed:closed_loop'], unit: 't', quantity: Math.round(1.5 * k * 10) / 10, periodStart: ps, periodEnd: pe });
-        nw += 5;
+        // waste sent to others, with the details asked for in waste reporting (DEMO contractors, not real)
+        await put('BEEAH Headquarters', { itemId: wItems['waste3:refuse:commercial-and-industrial-waste:landfill'], unit: 't', quantity: Math.round(8 * k * 10) / 10, periodStart: ps, periodEnd: pe,
+          wasteInfo: { hazardous: false, contractor: 'DEMO Waste Collector LLC', ref: `DEMO-WC-${y}${m + 1}` } });
+        if (wItems['waste3:paper:paper-and-board-mixed:closed_loop']) await put('BEEAH Headquarters', { itemId: wItems['waste3:paper:paper-and-board-mixed:closed_loop'], unit: 't', quantity: Math.round(1.5 * k * 10) / 10, periodStart: ps, periodEnd: pe,
+          wasteInfo: { hazardous: false, contractor: 'DEMO Paper Recycler' } });
+        if (wItems['waste3:refuse:organic-food-and-drink-waste:composting']) await put('Al Zahia Community', { itemId: wItems['waste3:refuse:organic-food-and-drink-waste:composting'], unit: 't', quantity: Math.round(4 * k * 10) / 10, periodStart: ps, periodEnd: pe,
+          wasteInfo: { hazardous: false, contractor: 'DEMO Waste Collector LLC' } });
+        if (m % 3 === 2 && wItems['waste3:electrical-items:weee-mixed:open_loop']) {
+          await put('Data Centre Dubai', { itemId: wItems['waste3:electrical-items:weee-mixed:open_loop'], unit: 't', quantity: Math.round(1.2 * k * 10) / 10, periodStart: ps, periodEnd: pe,
+            wasteInfo: { hazardous: true, contractor: 'DEMO E-waste Recycler', ref: `DEMO-HZ-${y}Q${Math.floor(m / 3) + 1}` } });
+          await put('Fleet Depot Sharjah', { itemId: wItems['waste3:electrical-items:batteries:open_loop'], unit: 't', quantity: Math.round(0.4 * k * 100) / 100, periodStart: ps, periodEnd: pe,
+            wasteInfo: { hazardous: true, contractor: 'DEMO E-waste Recycler' } });
+          nw += 2;
+        }
+        // water (DEMO volumes, not real): in by source, reused, out by destination, m³
+        const wv: [string, string, number][] = [
+          ['BEEAH Headquarters', 'water:mains_desal', 1400], ['BEEAH Headquarters', 'water:sewer', 1150],
+          ['Data Centre Dubai', 'water:mains_desal', 6200], ['Data Centre Dubai', 'water:sewer', 1600], ['Data Centre Dubai', 'water:reuse', 700],
+          ['Al Zahia Community', 'water:mains_desal', 26000], ['Al Zahia Community', 'water:tse', 7000], ['Al Zahia Community', 'water:sewer', 20500], ['Al Zahia Community', 'water:irrigation', 7000],
+          ['Fleet Depot Sharjah', 'water:tanker', 450], ['Fleet Depot Sharjah', 'water:tanker_out', 320],
+          ["Al Saja'a Recycling Complex", 'water:groundwater', 2100], ["Al Saja'a Recycling Complex", 'water:mains_desal', 900], ["Al Saja'a Recycling Complex", 'water:irrigation', 600], ["Al Saja'a Recycling Complex", 'water:tanker_out', 1500],
+          ['Sharjah Waste-to-Energy', 'water:mains_desal', 9000], ['Sharjah Waste-to-Energy', 'water:tanker_out', 2500], ['Sharjah Waste-to-Energy', 'water:reuse', 3000],
+        ];
+        const hot = 1 + 0.35 * Math.max(0, Math.sin(((m - 3) / 12) * 2 * Math.PI)); // more water in the hot months
+        for (const [fac, code, v] of wv) if (wItems[code]) { await put(fac, { itemId: wItems[code], unit: 'm3', quantity: Math.round(v * k * hot), periodStart: ps, periodEnd: pe }); nw++; }
+        nw += 6;
       }
     }
     // ------------------------------------------------------------ meters & bills --
@@ -337,7 +361,7 @@ async function main() {
       nb++;
     }
     console.log(`Meters: ${nr.toLocaleString('en')} DEMO readings (hourly, daily register, weekly), ${ns} monthly entries; ${nb} DEMO SEWA bills (7 booked, 1 to check).`);
-    console.log(`Waste: a landfill with a DEMO tonnage history 2000–2025, ${nw} waste entries (landfill, waste-to-energy, composting, wastewater, office waste sent out).`);
+    console.log(`Waste: a landfill with a DEMO tonnage history 2000–2025, ${nw} waste and water entries (landfill, waste-to-energy, composting, wastewater, waste sent out with contractors, water in and out by facility).`);
     console.log(`\nDemo company "${NAME}" created: ${TREE.length} sub-groups, ${[...ids.keys()].length - TREE.length} facilities, ${n} fuel entries (Jan 2025 – Sep 2026).`);
   });
   // purchases run after the company exists (the pipeline commits in chunks, like a real upload)

@@ -53,3 +53,12 @@ test('a scan (no text) is recognised', async () => {
   const doc = await PDFDocument.create(); doc.addPage([595, 842]);
   assert.equal((await pdfText(await doc.save())).scanned, true);
 });
+
+test('water bill: the same combined electricity & water PDF read for water gives the water consumption (imperial gallons), not the kWh', async () => {
+  const pdf = await makePdf(SAMPLE_ELECTRICITY);
+  const t = await pdfText(pdf);
+  const w = readBill(t.text, 'water');
+  assert.deepEqual([w.quantity?.value, w.quantity?.unit, w.quantity?.energy], [1250, 'gal_uk', 'water']);
+  assert.deepEqual([readBill(t.text).quantity?.value, readBill(t.text).quantity?.unit], [45500, 'kWh_e']);
+  assert.deepEqual([readBill('Water consumption: 3,410 m3\nTotal due 1,000.00', 'water').quantity?.unit, readBill('Water consumption 12 000 IG\n', 'water').quantity?.unit], ['m3', 'kgal_uk']);
+});
