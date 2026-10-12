@@ -1,20 +1,21 @@
 /**
- * Month by month: the same entry for every month of a year — only the reading
- * (quantity, distance, kWh, tonnes…) changes. Everything else is set once in the
- * form above.
+ * The months picked in Add data, entered side by side — one row per month, as in the prototype.
  *
- *  - Type the 12 values, or paste a row or a column from Excel into any month
- *    (it fills from that month onwards).
- *  - Each month is calculated as you type; months that already have the same
- *    entry are flagged, so nothing is entered twice by mistake.
- *  - Save stores one entry per filled month; a month with a problem stays on
- *    screen and the others are saved.
+ *  - Month · Type (when the form offers several) · Quantity · Note / reference and data type ·
+ *    Emissions (calculated as you type) · Check (against this entry's usual months) · + line
+ *  - Paste a column of numbers from Excel into the first quantity: it fills the next rows.
+ *  - Months that already have the same entry are marked "entered", so nothing goes in twice.
+ *  - Save as draft, or Submit for approval (goes to the facility's approver). A row with a
+ *    problem stays on screen; the others are saved.
+ *
+ * The other inputs (fuel, supplier, vehicle, factor…) are set once in the form above.
  */
 import { useEffect, useMemo, useState } from 'react';
-import { api, BASIS_SHORT, tco2e, type Activity, type Basis } from '../lib/api';
+import { api, BASIS_SHORT, num, tco2e, type Activity, type Basis } from '../lib/api';
 import { useApp } from '../App';
 import { useNavigate } from 'react-router-dom';
 import { saveDraft } from './MeterForm';
+import { useEntry } from './EntryContext';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const pad = (n: number) => String(n).padStart(2, '0');
@@ -25,45 +26,64 @@ export const monthPeriod = (year: number, m: number) => ({
 /** "12,345.6" → "12345.6"; empty or not a number → '' */
 const cleanNum = (s: string) => { const x = s.replace(/[\s,]/g, ''); return x === '' || !Number.isFinite(Number(x)) ? '' : x; };
 
-export function MonthGrid({ year, facilityId, label, unitName, build, bases = ['direct'], dup, onSaved, hint, meterUnit }: {
+type Row = { k: number; m: number; v: string; note: string; dt: string; type: string };
+let K = 1;
+const blank = (m: number, type = ''): Row => ({ k: K++, m, v: '', note: '', dt: 'actual', type });
+
+export function MonthGrid({ year, facilityId, label, unitName, build, bases = ['direct'], dup, onSaved, hint, meterUnit, types, factorText }: {
   year: number;
   facilityId: string;
   /** what is entered each month, e.g. "Diesel used" */
   label: string;
   unitName: string;
-  /** the entry for one month, from the reading and the month's period; null while the form above is incomplete */
-  build: (value: number, period: { periodStart: string; periodEnd: string }) => Record<string, unknown> | null;
-  /** totals shown per month */
+  /** the entry for one row; null while the form above is incomplete. `type` is the row's choice from `types`. */
+  build: (value: number, period: { periodStart: string; periodEnd: string }, type?: string) => Record<string, unknown> | null;
+  /** totals shown per row */
   bases?: Basis[];
   /** flag months that already have this entry: category code and how to recognise the same entry */
-  dup?: { category: string; same: (a: Activity) => boolean };
+  dup?: { category: string; same: (a: Activity, type?: string) => boolean };
   onSaved: () => void;
   hint?: string;
   /** unit of a meter set up from these inputs (default: the entry's unit) */
   meterUnit?: string;
+  /** a type per row (e.g. the fuel), when the form offers several */
+  types?: { id: string; name: string }[];
+  /** the factor line under the rows */
+  factorText?: string;
 }) {
   const { toast, role } = useApp();
+  const { months, approver, changed } = useEntry();
   const navigate = useNavigate();
-  /** "Set up a meter with these inputs": the readings will then come from the meter. */
+  const picked = useMemo(() => months ?? MONTHS.map((_, i) => i), [months]);
+  const firstType = types?.[0]?.id ?? '';
+  const [rows, setRows] = useState<Row[]>(() => picked.map((m) => blank(m, firstType)));
+  // Rows follow the months picked above: keep what was typed for months still picked.
+  useEffect(() => {
+    setRows((old) => {
+      const keep = old.filter((r) => picked.includes(r.m));
+      const add = picked.filter((m) => !keep.some((r) => r.m === m)).map((m) => blank(m, firstType));
+      return [...keep, ...add].sort((a, b) => a.m - b.m || a.k - b.k);
+    });
+  }, [picked.join(',')]); // eslint-disable-line react-hooks/exhaustive-deps
+  // A new list of types (another fuel class): rows take its first type.
+  useEffect(() => { setRows((old) => old.map((r) => (types?.some((t) => t.id === r.type) ? r : { ...r, type: firstType }))); }, [types?.map((t) => t.id).join(',')]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const toMeter = () => {
-    const p = build(1, monthPeriod(year, 0));
+    const p = build(1, monthPeriod(year, 0), firstType || undefined);
     if (!p) return;
     const { itemId, unit, quantity: _q, periodStart: _s, periodEnd: _e, facilityId: _f, ...template } = p as Record<string, unknown>;
     void _q; void _s; void _e; void _f;
     saveDraft({ facilityId, itemId: Number(itemId), unit: meterUnit ?? String(unit), template, label, readingType: 'interval', frequency: 'day' });
     navigate('/meters?new=1');
   };
-  const [vals, setVals] = useState<string[]>(() => Array(12).fill(''));
-  const [dataType, setDataType] = useState('actual');
-  const [note, setNote] = useState('');
   const [res, setRes] = useState<Record<number, { totals?: Record<Basis, number>; error?: string; warnings?: string[] }>>({});
   const [existing, setExisting] = useState<Activity[]>([]);
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState<'draft' | 'submit' | null>(null);
 
-  const entries = useMemo(() => vals.map((v, m) => ({ m, v })).filter((x) => x.v !== '').map(({ m, v }) => {
-    const body = build(Number(v), monthPeriod(year, m));
-    return { m, body: body ? { ...body, facilityId, dataType, note: note || undefined } : null };
-  }), [vals, build, year, facilityId, dataType, note]);
+  const entries = useMemo(() => rows.filter((r) => r.v !== '').map((r) => {
+    const body = build(Number(r.v), monthPeriod(year, r.m), r.type || undefined);
+    return { k: r.k, m: r.m, body: body ? { ...body, facilityId, dataType: r.dt, note: r.note || undefined } : null };
+  }), [rows, build, year, facilityId]);
   const ready = entries.length > 0 && entries.every((e) => e.body);
   const key = JSON.stringify(entries);
 
@@ -72,80 +92,102 @@ export function MonthGrid({ year, facilityId, label, unitName, build, bases = ['
     const t = window.setTimeout(() => {
       api.batch(entries.map((e) => e.body), true).then((b) => {
         const r: typeof res = {};
-        b.results.forEach((x, k) => { r[entries[k]!.m] = x.ok ? { totals: x.totals, warnings: x.warnings } : { error: x.error }; });
+        b.results.forEach((x, i) => { r[entries[i]!.k] = x.ok ? { totals: x.totals, warnings: x.warnings } : { error: x.error }; });
         setRes(r);
       }).catch(() => {});
-    }, 400);
+    }, 350);
     return () => window.clearTimeout(t);
   }, [key]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const loadExisting = () => { if (dup && facilityId) api.activities({ facilityId, year, category: dup.category, limit: 1000 }).then((r) => setExisting(r.activities)).catch(() => {}); };
+  const loadExisting = () => { if (dup && facilityId) api.activities({ facilityId, category: dup.category, limit: 1000 }).then((r) => setExisting(r.activities)).catch(() => {}); };
   useEffect(loadExisting, [facilityId, year, dup?.category]); // eslint-disable-line react-hooks/exhaustive-deps
-  const taken = useMemo(() => {
-    const s = new Set<number>();
-    if (!dup) return s;
-    for (const a of existing) {
-      if (!dup.same(a) || a.period_start.slice(0, 7) !== a.period_end.slice(0, 7)) continue;
-      if (Number(a.period_start.slice(0, 4)) === year) s.add(Number(a.period_start.slice(5, 7)) - 1);
-    }
-    return s;
-  }, [existing, dup, year]);
-
-  // Paste a row or a column of numbers: fills from the month pasted into.
-  const paste = (m: number, text: string) => {
-    const cells = text.split(/[\t\r\n]+/).map((c) => c.trim()).filter((c) => c !== '');
-    if (cells.length < 2) return false;
-    setVals((v) => { const n = [...v]; cells.forEach((c, i) => { if (m + i < 12) n[m + i] = cleanNum(c); }); return n; });
-    return true;
+  /** months of this year that already have the same entry (per type) */
+  const taken = (m: number, type: string) => !!dup && existing.some((a) => dup.same(a, type || undefined) && a.period_start.slice(0, 7) === `${year}-${pad(m + 1)}` && a.period_end.slice(0, 7) === a.period_start.slice(0, 7));
+  /** the usual monthly quantity of the same entry (median of saved months) */
+  const usual = (type: string) => {
+    if (!dup) return null;
+    const q = existing.filter((a) => dup.same(a, type || undefined) && a.period_start.slice(0, 7) === a.period_end.slice(0, 7)).map((a) => Number(a.quantity)).filter((x) => x > 0).sort((a, b) => a - b);
+    return q.length >= 2 ? q[Math.floor(q.length / 2)]! : null;
+  };
+  const check = (r: Row) => {
+    if (r.v === '') return { cls: 'muted', t: 'Checked when you type' };
+    const x = res[r.k];
+    if (x?.error) return { cls: 'bad', t: x.error };
+    if (taken(r.m, r.type)) return { cls: 'warn', t: `! ${MONTHS[r.m]} already has this entry` };
+    const u = usual(r.type), v = Number(r.v);
+    if (u && (v > u * 1.6 || v < u * 0.4)) return { cls: 'warn', t: `! ${v > u ? Math.round((v / u - 1) * 100) + '% above' : Math.round((1 - v / u) * 100) + '% below'} the usual ${num(u)}` };
+    if (u) return { cls: 'ok', t: `✓ In line with the usual ${num(u)}` };
+    return { cls: 'ok', t: '✓ Looks fine' };
   };
 
+  // Paste a column (or row) of numbers: fills this row and the rows below.
+  const paste = (k: number, text: string) => {
+    const cells = text.split(/[\t\r\n]+/).map((c) => c.trim()).filter((c) => c !== '');
+    if (cells.length < 2) return false;
+    setRows((rs) => { const i = rs.findIndex((r) => r.k === k); return rs.map((r, j) => (j >= i && j - i < cells.length ? { ...r, v: cleanNum(cells[j - i]!) } : r)); });
+    return true;
+  };
+  const set = (k: number, p: Partial<Row>) => setRows((rs) => rs.map((r) => (r.k === k ? { ...r, ...p } : r)));
+
+  const main = bases[0]!;
   const total = (b: Basis) => Object.values(res).reduce((s, x) => s + (x.totals?.[b] ?? 0), 0);
-  const okMonths = entries.filter((e) => res[e.m]?.totals).length;
+  const okRows = entries.filter((e) => res[e.k]?.totals).length;
   const shown = bases.filter((b, i) => i === 0 || total(b) !== 0);
 
-  const save = async () => {
-    setBusy(true);
+  const save = async (submit: boolean) => {
+    setBusy(submit ? 'submit' : 'draft');
     try {
       const b = await api.batch(entries.map((e) => e.body), false);
-      const failed = new Set(b.results.filter((x) => !x.ok).map((x) => entries[x.index]!.m));
-      toast(`${b.saved} month${b.saved === 1 ? '' : 's'} saved${b.failed ? `, ${b.failed} with problems (still on screen)` : ''}`);
-      setVals((v) => v.map((x, m) => (failed.has(m) ? x : '')));
-      loadExisting(); onSaved();
-    } finally { setBusy(false); }
+      const failed = new Set(b.results.filter((x) => !x.ok).map((x) => entries[x.index]!.k));
+      const ids = b.results.filter((x) => x.ok && x.id).map((x) => x.id!);
+      if (submit && ids.length) await api.reviewAction(ids, 'submit');
+      toast(`${b.saved} row${b.saved === 1 ? '' : 's'} ${submit ? `submitted to ${approver || 'the approver'}` : 'saved as draft'}${b.failed ? `, ${b.failed} with problems (still on screen)` : ''}`);
+      setRows((rs) => rs.map((r) => (failed.has(r.k) || r.v === '' ? r : { ...blank(r.m, r.type) })).filter((r, i, all) => failed.has(r.k) || all.findIndex((x) => x.m === r.m) === i));
+      loadExisting(); onSaved(); changed();
+    } finally { setBusy(null); }
   };
 
   return (
-    <div style={{ display: 'grid', gap: 10 }}>
-      <div className="row"><b className="grow">{label} · {year}, month by month</b>
-        {['platform_admin', 'super_admin', 'admin', 'manager'].includes(role) && <button className="btn ghost sm" title="Readings arrive from a system or from bills: set up a meter with the inputs above" disabled={!build(1, monthPeriod(year, 0))} onClick={toMeter}>Set up a meter with these inputs →</button>}
-        <button className="btn ghost sm" onClick={() => setVals(Array(12).fill(''))}>Clear</button></div>
-      <div className="sub">{hint ?? 'Paste 12 values from Excel (a row or a column) into January to fill all months.'}</div>
-      <div className="monthgrid">
-        {MONTHS.map((name, m) => {
-          const r = res[m];
+    <div style={{ display: 'grid', gap: 12 }}>
+      <div className="row"><b className="grow" style={{ fontSize: 15 }}>{label}</b>
+        {['platform_admin', 'super_admin', 'admin', 'manager'].includes(role) && <button className="btn ghost sm" title="Readings arrive from a system or from bills: set up a meter with the inputs above" disabled={!build(1, monthPeriod(year, 0), firstType || undefined)} onClick={toMeter}>Set up a meter with these inputs →</button>}
+      </div>
+      {hint && <div className="sub">{hint}</div>}
+      <div className="scrollx"><table className="t rows">
+        <thead><tr><th>Month</th>{types && <th>Type</th>}<th>Quantity</th><th>Note / reference</th><th className="num">Emissions</th><th>Check</th><th /></tr></thead>
+        <tbody>{rows.map((r, i) => {
+          const x = res[r.k], c = check(r), again = i > 0 && rows[i - 1]!.m === r.m;
           return (
-            <label key={m} className={`mcell ${taken.has(m) ? 'taken' : ''} ${r?.error ? 'bad' : ''}`}>
-              <span>{name}{taken.has(m) && <i title="This month already has the same entry"> · entered</i>}</span>
-              <input className="input num" inputMode="decimal" value={vals[m]} placeholder="—"
-                onPaste={(e) => { if (paste(m, e.clipboardData.getData('text'))) e.preventDefault(); }}
-                onChange={(e) => { const x = e.target.value.replace(/[^0-9.]/g, ''); setVals((v) => v.map((y, k) => (k === m ? x : y))); }} />
-              <small>{r?.totals ? `${tco2e(r.totals[bases[0]!] ?? 0)} t` : r?.error ? 'problem' : unitName}</small>
-            </label>
-          );
-        })}
-      </div>
-      {entries.length > 0 && !ready && <div className="note warn">Complete the inputs above first: they apply to every month.</div>}
-      {[...taken].some((m) => vals[m] !== '') && <div className="note warn">Months marked “entered” already have this entry: saving adds a second one. Leave them empty unless that is intended.</div>}
-      {Object.entries(res).filter(([, x]) => x.error).map(([m, x]) => <div key={m} className="note bad">{MONTHS[Number(m)]}: {x.error}</div>)}
+            <tr key={r.k} className={x?.error ? 'bad' : ''}>
+              <td style={{ width: 90 }}>{again ? <span className="muted small">+ line</span> : <b>{MONTHS[r.m]}<br />{year}</b>}</td>
+              {types && <td style={{ minWidth: 200 }}><select className="input" value={r.type} onChange={(e) => set(r.k, { type: e.target.value })}>{types.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}</select></td>}
+              <td style={{ minWidth: 170 }}><div className="row" style={{ gap: 6, flexWrap: 'nowrap' }}>
+                <input className="input num" style={{ width: 120 }} inputMode="decimal" value={r.v} placeholder="0" aria-label={`${MONTHS[r.m]} quantity`}
+                  onPaste={(e) => { if (paste(r.k, e.clipboardData.getData('text'))) e.preventDefault(); }}
+                  onChange={(e) => set(r.k, { v: e.target.value.replace(/[^0-9.]/g, '') })} />
+                <span className="muted small" style={{ whiteSpace: 'nowrap' }}>{unitName}</span></div></td>
+              <td style={{ minWidth: 220 }}><div style={{ display: 'grid', gap: 4 }}>
+                <input className="input" value={r.note} maxLength={1000} placeholder="Meter, invoice no." onChange={(e) => set(r.k, { note: e.target.value })} />
+                <select className="input" value={r.dt} onChange={(e) => set(r.k, { dt: e.target.value })}><option value="actual">Actual</option><option value="estimated">Estimated</option><option value="proxy">Proxy</option></select></div></td>
+              <td className="num" style={{ minWidth: 100 }}><b style={{ fontSize: 14 }}>{x?.totals ? tco2e(x.totals[main] ?? 0) : '—'}</b><div className="muted small">tCO₂e{bases.length > 1 && x?.totals && (x.totals[bases[1]!] ?? 0) !== 0 ? ` · ${BASIS_SHORT[bases[1]!]} ${tco2e(x.totals[bases[1]!] ?? 0)}` : ''}</div></td>
+              <td className={`small ${c.cls}`} style={{ minWidth: 150, maxWidth: 240 }}>{c.t}</td>
+              <td style={{ whiteSpace: 'nowrap' }}>
+                <button className="btn ghost sm" title="Another line for this month" onClick={() => setRows((rs) => { const j = rs.findIndex((y) => y.k === r.k); const n = [...rs]; n.splice(j + 1, 0, blank(r.m, r.type)); return n; })}>+ line</button>
+                {again && <button className="btn ghost sm" aria-label="Remove line" onClick={() => setRows((rs) => rs.filter((y) => y.k !== r.k))}>×</button>}
+              </td>
+            </tr>);
+        })}</tbody>
+      </table></div>
+      {entries.length > 0 && !ready && <div className="note warn">Complete the inputs above first: they apply to every row.</div>}
       {[...new Set(Object.values(res).flatMap((x) => x.warnings ?? []).map((w) => w.replace(/\d{4}-\d{2}-\d{2}/g, '…')))].slice(0, 3).map((w) => <div key={w} className="note warn">{w}</div>)}
-      <div className="row">
-        <label className="field" style={{ width: 160 }}><span>Data type</span>
-          <select className="input" value={dataType} onChange={(e) => setDataType(e.target.value)}><option value="actual">Actual</option><option value="estimated">Estimated</option><option value="proxy">Proxy</option></select></label>
-        <label className="field grow"><span>Note / reference (all months)</span><input className="input" value={note} maxLength={1000} onChange={(e) => setNote(e.target.value)} /></label>
+      <div className="softbar">
+        <span className="muted small">{factorText ?? 'Paste a column from Excel into the first quantity to fill the rows below.'}</span><span className="grow" />
+        <b>{okRows} row{okRows === 1 ? '' : 's'} · {shown.map((b, i) => <span key={b}>{i ? ' · ' : ''}{tco2e(total(b))} tCO₂e{shown.length > 1 ? ` ${BASIS_SHORT[b]}` : ''}</span>)}</b>
       </div>
       <div className="row">
-        <span className="sub grow">{okMonths > 0 && <>{okMonths} month{okMonths === 1 ? '' : 's'} · {shown.map((b) => <span key={b}><b>{tco2e(total(b))} tCO₂e</b> {BASIS_SHORT[b]} </span>)}</>}</span>
-        <button className="btn p" disabled={!ready || busy || !okMonths || !facilityId} onClick={save}>{busy ? 'Saving…' : `Save ${entries.length || ''} month${entries.length === 1 ? '' : 's'}`}</button>
+        <span className="muted small">Goes to <b>{approver || 'the approver'}</b> for approval.</span><span className="grow" />
+        <button className="btn" disabled={!ready || !!busy || !okRows || !facilityId} onClick={() => void save(false)}>{busy === 'draft' ? 'Saving…' : 'Save as draft'}</button>
+        <button className="btn p" disabled={!ready || !!busy || !okRows || !facilityId} onClick={() => void save(true)}>{busy === 'submit' ? 'Submitting…' : 'Submit for approval'}</button>
       </div>
     </div>
   );

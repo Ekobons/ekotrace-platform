@@ -34,6 +34,15 @@ const P: Record<string, string> = {
   building: 'M4 21V4h10v17M14 9h6v12M3 21h18M7 8h4M7 12h4M7 16h4',
   chevron: 'M9 6l6 6-6 6',
   down: 'M6 9l6 6 6-6',
+  drop: 'M12 3s6 6.5 6 11a6 6 0 0 1-12 0c0-4.5 6-11 6-11z',
+  truck: 'M3 6h11v10H3zM14 10h4l3 3v3h-7M7 19a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM17 19a2 2 0 1 0 0-4 2 2 0 0 0 0 4z',
+  bin: 'M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6',
+  cart: 'M3 4h2l2.5 11h10l2-8H6.2M9 20a1 1 0 1 0 0-2 1 1 0 0 0 0 2zM17 20a1 1 0 1 0 0-2 1 1 0 0 0 0 2z',
+  bus: 'M5 4h14v12H5zM5 11h14M8 19v-3M16 19v-3M8 14h.01M16 14h.01',
+  plane: 'M10 4l2 0 3 7 5 1v2l-5 1-3 7h-2l1-7-4-1-2 2H4l1-3-1-3h1l2 2 4-1z',
+  download: 'M12 3v12M7 10l5 5 5-5M4 19h16',
+  paste: 'M8 4h8v4H8zM6 6H4v14h16V6h-2',
+  feed: 'M6 9V3M18 9V3M4 9h16v3a8 8 0 0 1-16 0zM12 20v2',
 };
 export function Icon({ name, size = 18 }: { name: keyof typeof P | string; size?: number }) {
   return (

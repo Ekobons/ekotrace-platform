@@ -392,6 +392,13 @@ async function main() {
         nsa++;
       }
     }
+    // Enter → Review → Approved (DEMO): September 2026 waiting for approval, one August entry sent back, an October draft.
+    await c.query(`UPDATE org_node SET manager_user_id = $1 WHERE id = $2`, [users.get('manager'), ids.get('BEEAH Headquarters')]);
+    const prep = String(users.get('preparer')), mgrU = String(users.get('manager'));
+    await c.query(`UPDATE activity SET status = 'submitted', submitted_by = $2, submitted_at = now() - interval '2 days', created_by = $2 WHERE tenant_id = $1 AND period_start = '2026-09-01'`, [t, prep]);
+    await c.query(`UPDATE activity SET status = 'rejected', reviewed_by = $3, reviewed_at = now() - interval '1 day', created_by = $2, submitted_by = $2,
+                          review_note = 'DEMO: the quantity does not match the delivery note — please check'
+                    WHERE id = (SELECT a.id FROM activity a JOIN category k ON k.id = a.category_id WHERE a.tenant_id = $1 AND a.period_start = '2026-08-01' AND k.code = 'stationary_combustion' ORDER BY a.created_at LIMIT 1)`, [t, prep, mgrU]);
     console.log(`Survey: "Employee commuting 2026", ${nsp} DEMO people, ${nsa} answers (open).`);
     console.log(`Meters: ${nr.toLocaleString('en')} DEMO readings (hourly, daily register, weekly), ${ns} monthly entries; ${nb} DEMO SEWA bills (7 booked, 1 to check).`);
     console.log(`Waste: a landfill with a DEMO tonnage history 2000–2025, ${nw} waste and water entries (landfill, waste-to-energy, composting, wastewater, waste sent out with contractors, water in and out by facility).`);

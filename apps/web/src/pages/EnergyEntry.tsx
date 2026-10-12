@@ -92,10 +92,11 @@ export function EnergyEntry({ cat, facilityId, facilityRegion, country, period, 
     return () => window.clearTimeout(t);
   }, [payload]);
 
-  const save = async () => {
+  const save = async (submit = false) => {
     if (!payload) return;
     try {
       const r = await api.saveActivity({ ...payload, dataType, note: note || undefined });
+      if (submit) await api.reviewAction([r.id], 'submit');
       toast(`Saved: ${tco2e(r.totals.scope2)} tCO₂e location-based · ${tco2e(r.totals.scope2_market)} tCO₂e market-based`);
       setQuantity(''); setNote(''); setClaims({}); onSaved();
       if (energy === 'electricity') api.certificates({ facilityId, usable: true }).then((x) => setCerts(x.certificates));
@@ -220,7 +221,7 @@ export function EnergyEntry({ cat, facilityId, facilityRegion, country, period, 
         {error && <div className="note bad">{error}</div>}
         {result ? <Result r={result} energy /> : !error && <div className="note info">Enter the {energy === 'cooling' ? 'cooling' : energy === 'heat' ? 'heat' : 'electricity'} used to see both Scope 2 figures and how they were calculated.</div>}
         <div className="row" style={{ justifyContent: 'flex-end' }}>
-          <button className="btn p" disabled={!result || !facilityId} onClick={save}>Save entry</button>
+          <button className="btn" disabled={!result || !facilityId} onClick={() => void save(false)}>Save as draft</button><button className="btn p" disabled={!result || !facilityId} onClick={() => void save(true)}>Submit for approval</button>
         </div></>}
       </div>
     </div>

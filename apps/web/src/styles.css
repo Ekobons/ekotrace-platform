@@ -17,7 +17,9 @@ html, body, #root { height: 100%; }
 body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--f-ui); font-size: 14px; line-height: 1.45; }
 button, input, select, textarea { font: inherit; color: inherit; }
 a { color: var(--primary); }
-.mono, .num { font-family: var(--f-mono); font-size: 12.5px; font-variant-numeric: tabular-nums; }
+.mono { font-family: var(--f-mono); font-size: 12.5px; font-variant-numeric: tabular-nums; }
+/* Numbers in the UI font with tabular figures, as in the prototype; mono only for codes. */
+.num { font-variant-numeric: tabular-nums; }
 .num { text-align: right; white-space: nowrap; }
 
 /* ---- shell ---- */
@@ -66,7 +68,7 @@ h3 { font-size: 14px; margin: 0; }
 .field > span { font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
 .input, select.input { height: 38px; border: 1px solid var(--line2); border-radius: 10px; padding: 0 10px; background: var(--surface); min-width: 0; }
 .input:focus { outline: 2px solid var(--primary-soft); border-color: var(--primary); }
-.input.num { font-family: var(--f-mono); }
+.input.num { font-variant-numeric: tabular-nums; }
 .chip { display: inline-flex; align-items: center; gap: 4px; border-radius: 99px; padding: 2px 9px; font-size: 11.5px; font-weight: 600; background: var(--primary-soft); color: var(--ok); white-space: nowrap; }
 .chip.warn { background: var(--warn-bg); color: var(--warn); }
 .chip.bad { background: var(--bad-bg); color: var(--bad); }
@@ -99,7 +101,7 @@ table.t { width: 100%; border-collapse: collapse; }
 /* result panel */
 .total { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
 .stat { border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; }
-.stat b { display: block; font-size: 20px; font-family: var(--f-mono); }
+.stat b { display: block; font-size: 20px; font-variant-numeric: tabular-nums; }
 .stat small { color: var(--muted); font-size: 11.5px; }
 .stat.s1 { border-left: 4px solid var(--s1); }
 .stat.s3 { border-left: 4px solid var(--s3); }
@@ -131,7 +133,7 @@ dialog.drawer::backdrop { background: #0B2A2533; }
 .cards3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
 .choice { text-align: left; border: 2px solid var(--line); border-radius: 14px; padding: 14px; background: var(--surface); cursor: pointer; display: grid; gap: 6px; }
 .choice.on { border-color: var(--primary); background: var(--primary-soft); }
-.choice b.big { font-family: var(--f-mono); font-size: 22px; }
+.choice b.big { font-size: 22px; font-variant-numeric: tabular-nums; }
 .modal { border: 0; border-radius: 16px; padding: 0; width: min(560px, 94vw); box-shadow: 0 20px 50px #0003; }
 .modal::backdrop { background: #0B2A2544; }
 .modal .in { padding: 20px; display: grid; gap: 12px; }
@@ -350,7 +352,7 @@ pre.code { background: #F4F7F5; border: 1px solid var(--line); border-radius: 10
 .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; }
 .stats .stat { background: var(--surface); }
 .stat .lbl { color: var(--muted); font-size: 11.5px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
-.stat .v { font-family: var(--f-mono); font-size: 22px; font-weight: 700; margin: 2px 0; }
+.stat .v { font-variant-numeric: tabular-nums; font-size: 22px; font-weight: 700; margin: 2px 0; }
 .stat.warnb { border-color: #E9C46A; background: #FFF9EC; }
 .t.compact td, .t.compact th { padding: 6px 8px; font-size: 12.5px; }
 .t.groups td { vertical-align: top; }
@@ -653,3 +655,74 @@ a.btn { text-decoration: none; }
 .svitem small { display: block; color: var(--muted); font-size: 12.5px; margin-top: 2px; }
 .sv-overlay { position: fixed; inset: 0; background: #0B2A2566; display: grid; place-items: start center; overflow: auto; padding: 40px 16px; z-index: 60; }
 .sv-sheet { width: min(680px, 100%); background: var(--bg); border-radius: 18px; padding: 20px; display: grid; gap: 12px; }
+
+/* ------------------------------------------------------------------ prototype type & weights --
+ * Labels, chips and table heads are bold and dark enough to scan, as in the prototype. */
+.muted { color: var(--muted); }
+.small { font-size: 12px; }
+.field > span { font-weight: 700; letter-spacing: .06em; }
+.chip { font-weight: 700; font-size: 11px; padding: 3px 9px; }
+.c-ok { background: var(--ok-bg); color: var(--ok); }
+.c-warn { background: var(--warn-bg); color: var(--warn); }
+.c-bad { background: var(--bad-bg); color: var(--bad); }
+.c-info { background: var(--info-bg); color: var(--info); }
+.c-n { background: var(--soft); color: var(--fg2); border: 1px solid var(--line); }
+.chip.s1 { background: var(--s1); color: #fff; } .chip.s2 { background: var(--s2); color: #06231C; } .chip.s3 { background: var(--s3); color: #2A1D05; }
+td.ok, small.ok, div.ok { color: var(--ok); font-weight: 600; }
+td.warn, small.warn { color: var(--warn); font-weight: 600; }
+td.bad, small.bad, div.small.bad, span.small.bad { color: var(--bad); font-weight: 600; }
+small.muted, td.muted { color: var(--muted); }
+.btn.danger { color: var(--bad); }
+.h1big { font-size: 28px; letter-spacing: -.02em; }
+.input, select.input { color: var(--fg); }
+.input:focus, .bigsel:focus { outline: 2px solid var(--primary); outline-offset: 1px; border-color: var(--primary); }
+
+/* ------------------------------------------------------------------ Add data (prototype) -- */
+.band { display: flex; flex-direction: column; gap: 14px; position: sticky; top: 0; z-index: 4; box-shadow: 0 6px 18px rgba(11, 42, 37, .06); }
+.pick { display: flex; flex-direction: column; gap: 4px; }
+.bigsel { height: 44px; border-radius: 10px; border: 1.5px solid var(--line2); background: var(--surface); padding: 0 12px; font-weight: 700; font-size: 15px; min-width: 260px; max-width: 100%; color: var(--fg); }
+.bandval { font-size: 15px; line-height: 44px; white-space: nowrap; }
+.months { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 6px; }
+.mbtn { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px 2px; border-radius: 10px; border: 1px solid var(--line2); background: var(--surface); cursor: pointer; color: var(--fg); font: inherit; }
+.mbtn b { font-size: 14px; }
+.mbtn small { font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 6px; white-space: nowrap; }
+.mbtn:hover:not(:disabled) { border-color: var(--primary); }
+.mbtn.on { background: var(--ink); border-color: var(--ink); color: #fff; }
+.mbtn.on small { background: var(--lime); color: var(--ink); }
+.mbtn.yr { border-color: var(--primary); background: var(--primary-soft); }
+.mbtn.off { border-style: dashed; background: var(--soft); color: var(--muted); cursor: default; }
+@media (max-width: 900px) { .months { grid-template-columns: repeat(6, minmax(0, 1fr)); } .band { position: static; } .bigsel { min-width: 0; } }
+
+.catgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(214px, 1fr)); gap: 8px; }
+.catcard { display: flex; gap: 10px; align-items: center; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); text-align: left; cursor: pointer; font: inherit; color: var(--fg); min-width: 0; }
+.catcard:hover { border-color: var(--line2); background: #FBFDFC; }
+.catcard.on { background: var(--primary-soft); border-color: var(--primary); box-shadow: inset 3px 0 0 var(--primary); }
+.catcard b { display: block; font-size: 14px; font-weight: 700; line-height: 1.25; }
+.catcard small { display: block; font-size: 11px; font-weight: 700; }
+.ic { width: 32px; height: 32px; border-radius: 9px; background: var(--primary-soft); color: var(--primary); display: flex; align-items: center; justify-content: center; flex: none; }
+.catcard.on .ic { background: var(--surface); }
+.ic.lg { width: 40px; height: 40px; border-radius: 11px; }
+
+.entrycard { display: flex; flex-direction: column; }
+.entryhead { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 16px 18px 14px; border-bottom: 1px solid var(--line); }
+.entryhead h2 { font-size: 20px; letter-spacing: -.01em; }
+.entrybody { padding: 16px 18px 18px; display: flex; flex-direction: column; gap: 14px; }
+.entrybody .card { border: 0; padding: 0; border-radius: 0; background: transparent; }
+.entrybody .card.flush { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.stg { display: flex; align-items: center; gap: 8px; height: 38px; padding: 0 14px 0 6px; border-radius: 99px; border: 1px solid var(--line2); background: var(--surface); font-weight: 700; font-size: 13.5px; cursor: pointer; color: var(--fg2); }
+.stg i { width: 24px; height: 24px; border-radius: 99px; background: var(--soft); border: 1px solid var(--line); display: flex; align-items: center; justify-content: center; font-style: normal; font-size: 12px; }
+.stg.on { background: var(--ink); color: #fff; border-color: var(--ink); }
+.stg.on i { background: var(--lime); color: var(--ink); border-color: var(--lime); }
+.methods { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; }
+.meth { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 11px 13px; border-radius: 12px; border: 1px solid var(--line2); background: var(--surface); cursor: pointer; text-align: left; color: var(--fg); font: inherit; }
+.meth b { font-size: 14px; }
+.meth svg { color: var(--primary); }
+.meth small { font-size: 11.5px; color: var(--ok); font-weight: 600; }
+.meth:hover { border-color: var(--primary); }
+.meth.on { border: 2px solid var(--primary); background: var(--primary-soft); padding: 10px 12px; }
+.softbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 11px 14px; border-radius: 12px; background: var(--soft); border: 1px solid var(--line); }
+.soft { display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; border-radius: 12px; background: var(--soft); }
+.kgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+table.t.rows td { vertical-align: middle; }
+table.t.rows tr.bad td { background: #FDF3F1; }
+table.t.rows .input { height: 36px; }

@@ -30,6 +30,7 @@ import { groupRoutes } from './modules/groups.routes.js';
 import { dashboardRoutes } from './modules/dashboard.routes.js';
 import { commuteRoutes } from './modules/commute.routes.js';
 import { surveyPublicRoutes, surveyRoutes } from './modules/survey.routes.js';
+import { reviewRoutes } from './modules/review.routes.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const BRANDS = join(HERE, '../../../brands');
@@ -46,7 +47,7 @@ export async function buildApp(opts: { logger?: boolean } = {}): Promise<Fastify
     reply.header('X-Content-Type-Options', 'nosniff');
     reply.header('X-Frame-Options', 'DENY');
     reply.header('Referrer-Policy', 'strict-origin-when-cross-origin');
-    reply.header('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; frame-src 'self' blob:; object-src 'none'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'");
+    reply.header('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob:; frame-src 'self' blob:; object-src 'none'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'");
     if (config.https) reply.header('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
   });
 
@@ -68,6 +69,7 @@ export async function buildApp(opts: { logger?: boolean } = {}): Promise<Fastify
   await app.register(surveyPublicRoutes);
   await app.register(async (secured) => {
     secured.addHook('onRequest', authenticate);
+    await secured.register(reviewRoutes);
     await secured.register(orgRoutes);
     await secured.register(peopleRoutes);
     await secured.register(platformRoutes);

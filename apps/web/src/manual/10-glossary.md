@@ -52,3 +52,7 @@
 | TSE | Treated sewage effluent: treated wastewater reused, mostly for irrigation and district cooling |
 | Diverted from disposal | GRI 306-4: waste prepared for re-use, recycled or otherwise recovered (composting, digestion); incineration with energy recovery is disposal in GRI, but counts as diverted from landfill |
 | Hazardous waste | Waste marked hazardous on its entry (e.g. electronic waste, batteries, clinical, oily waste), reported separately in GRI 306 |
+| Draft | An entry saved but not submitted; counts only in views that include pending data |
+| Submitted / In review | Waiting for approval by someone who may approve the facility (not the person who entered it) |
+| Sent back | Returned by an approver with a note; fix and submit again |
+| Approved | Checked by an approver; counts in the dashboards and reports |

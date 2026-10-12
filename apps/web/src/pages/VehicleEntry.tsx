@@ -22,14 +22,18 @@ const methodsFor = (it?: { attrs?: Item['attrs'] } | null): VehicleMethod[] =>
   it?.attrs?.electric ? (it.attrs.distance === false ? ['electricity', 'spend'] : ['distance', 'electricity', 'spend'])
     : it?.attrs?.distance === false ? ['fuel', 'spend'] : ['distance', 'fuel', 'spend'];
 
-type Mode = 'one' | 'fleet' | 'paste' | 'upload';
+export type VehicleMode = 'one' | 'fleet' | 'paste' | 'upload';
+type Mode = VehicleMode;
 
-export function VehicleEntry({ cat, facilityId, period, onSaved, monthly }: {
+export function VehicleEntry({ cat, facilityId, period, onSaved, monthly, mode: fixed }: {
   cat: Category; facilityId: string; period: { periodStart: string; periodEnd: string }; onSaved: () => void;
   /** month by month for this year */
   monthly?: number;
+  /** chosen outside (Add data's ways in): no switch shown here */
+  mode?: Mode;
 }) {
-  const [mode, setMode] = useState<Mode>('one');
+  const [own, setMode] = useState<Mode>('one');
+  const mode = fixed ?? own;
   const types = useVehicleTypes();
   const [fleet, setFleet] = useState<Vehicle[]>([]);
   useEffect(() => {
@@ -39,12 +43,12 @@ export function VehicleEntry({ cat, facilityId, period, onSaved, monthly }: {
 
   return (
     <div style={{ display: 'grid', gap: 12 }}>
-      <div className="seg" style={{ justifySelf: 'start' }}>
+      {!fixed && <div className="seg" style={{ justifySelf: 'start' }}>
         <button className={mode === 'one' ? 'on' : ''} onClick={() => setMode('one')}>One entry</button>
         <button className={mode === 'fleet' ? 'on' : ''} onClick={() => setMode('fleet')}>{monthly ? `Fleet × 12 months (${fleet.length})` : `Fleet this period (${fleet.length})`}</button>
         <button className={mode === 'paste' ? 'on' : ''} onClick={() => setMode('paste')}>Paste or type rows</button>
         <button className={mode === 'upload' ? 'on' : ''} onClick={() => setMode('upload')}>Upload Excel file</button>
-      </div>
+      </div>}
       {mode === 'one' && <OneEntry cat={cat} facilityId={facilityId} period={period} fleet={fleet} onSaved={onSaved} monthly={monthly} />}
       {mode === 'fleet' && (monthly ? <FleetYearGrid facilityId={facilityId} year={monthly} fleet={fleet} onSaved={onSaved} /> : <FleetGrid facilityId={facilityId} period={period} fleet={fleet} onSaved={onSaved} />)}
       {mode === 'paste' && <PasteGrid facilityId={facilityId} types={types} onSaved={onSaved}
@@ -113,10 +117,11 @@ function OneEntry({ cat, facilityId, period, fleet, onSaved, monthly }: { cat: C
     return () => window.clearTimeout(t);
   }, [payload]);
 
-  const save = async () => {
+  const save = async (submit = false) => {
     if (!payload) return;
     try {
       const r = await api.saveActivity({ ...payload, dataType, note: note || undefined });
+      if (submit) await api.reviewAction([r.id], 'submit');
       toast(`Saved: ${veh?.name ?? item?.name} · ${tco2e(r.totals.direct)} tCO₂e${r.totals.scope2 ? ` + ${tco2e(r.totals.scope2)} tCO₂e Scope 2` : ''}`);
       setQuantity(''); setNote(''); setPrice(''); setCount('1'); onSaved();
     } catch (e) { setError((e as Error).message); }
@@ -214,7 +219,7 @@ function OneEntry({ cat, facilityId, period, fleet, onSaved, monthly }: { cat: C
         {error && <div className="note bad">{error}</div>}
         {result ? <Result r={result} /> : !error && <div className="note info">Enter the {method === 'spend' ? 'amount' : method === 'distance' ? 'distance' : 'quantity'} to see the emissions and how they were calculated.</div>}
         <div className="row" style={{ justifyContent: 'flex-end' }}>
-          <button className="btn p" disabled={!result || !facilityId} onClick={save}>Save entry</button>
+          <button className="btn" disabled={!result || !facilityId} onClick={() => void save(false)}>Save as draft</button><button className="btn p" disabled={!result || !facilityId} onClick={() => void save(true)}>Submit for approval</button>
         </div></>}
       </div>
     </div>

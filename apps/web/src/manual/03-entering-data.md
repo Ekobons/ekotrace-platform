@@ -1,28 +1,51 @@
 # Entering data
 
-## Choose the period
-
-On every Add data tab, pick the facility and the year, then:
-
-- **a month** (Jan … Dec) — one entry for that month;
-- **Whole year** — one entry for the year (e.g. a yearly service record);
-- **Month by month** — the same entry for all twelve months, only the reading changes.
-
-## Month by month
-
-Set the inputs once (fuel, unit, supplier, vehicle, waste process…), then type the twelve readings — or copy a row or a column of twelve numbers from Excel and paste it into January.
+## The Add data screen
 
 ```flow
-> Inputs set once | fuel, unit, supplier, method — whatever the form asks
-> Twelve readings | typed, or pasted from Excel into January (a row or a column)
-> Each month calculated | as you type; the month's tCO₂e shows under its value
-! Already entered? | months that already have the same entry are marked “entered” and flagged
-> Save | one entry per month; a month with a problem stays on screen, the others are saved
+> Facility and year | at the top: the facility (with its type and manager) and how its categories stand for the months picked — approved, in review, missing
+> Months | the twelve months with their status for the category open (Approved, In review, Draft, Sent back, Missing, Open, Future). Pick one or several; they are entered side by side
+> Category | the cards under the months, each with its status for the months picked and its scope
+> Enter → Review → Approved | the three steps of the category, with how many entries wait and how many are approved
 ```
 
-Available for fuels, refrigerants refilled, vehicles (one vehicle, or the **fleet × 12 months** grid), electricity / heat / cooling, waste-to-energy, composting, digestion, wastewater and waste sent to others. Where one reading per month does not fit (landfill methane, screening and mass balance, measured stack CO₂ or biogas, certificate claims) the screen says so.
+**Status of a month** (for the category open): *Approved* — every entry approved; *In review* — something waits for approval; *Draft* — saved, not submitted; *Sent back* — an approver returned an entry with a note; *Missing* — a past month with nothing, for a category the facility reports (it had data this year or last year); *Open* — the current month; *Future* — not yet (cannot be picked). A category the facility has never reported shows *Optional · nothing yet*.
 
-From the month-by-month view, **“Set up a meter with these inputs”** turns the same set-up into a meter, so the readings can arrive automatically instead.
+**Picking months:** click months to add or remove them; **All open months** picks every month still to do; **Whole year** makes one entry for the year (refrigerant screening and mass balance, landfill methane, a yearly service record); **Clear** empties the choice. Purchases take one month at a time; employee commuting is entered once a year.
+
+## Step 1 · Enter
+
+The **ways in** are shown as cards: *Type it in*, *Upload bills* and *Meter readings* (electricity, fuels, waste, water), *Whole fleet*, *Paste a table* and *Excel / CSV* (vehicles), and *Automatic feed* (connected systems, under Integrations).
+
+**Type it in:** set what applies to every row once (fuel class and unit, supplier, vehicle, waste process…), then one row per month picked:
+
+```flow
+> Month · Type | the month; the type (e.g. the fuel) can differ per row
+> Quantity | typed, or a column pasted from Excel into the first row (fills the rows below)
+> Note / reference · data type | invoice or meter number; actual, estimated or proxy
+> Emissions | calculated as you type
+> Check | against the usual months of the same entry (✓ in line, ! far above or below); a month that already has the same entry is flagged
+> + line | a second row for the same month (e.g. two fuels)
+```
+
+Then **Save as draft** (to finish later) or **Submit for approval** — the line above the buttons says who approves. A row with a problem stays on screen; the others are saved. Electricity for **one** month opens the full form, so certificates and contracts can be claimed; picking several months gives the rows.
+
+From the rows, **“Set up a meter with these inputs”** turns the same set-up into a meter, so readings can arrive automatically instead.
+
+## Step 2 · Review
+
+Everything not yet approved for the category and months picked, with who entered it and its status.
+
+| Who | Can |
+|---|---|
+| Anyone who can enter the facility's data | **Submit** drafts (one by one or *Submit n drafts*), **Withdraw** their own submission, **Delete** a draft or a sent-back entry |
+| Managers of the facility, admins of its sub-group, super admins | **Approve** (one by one or *Approve all*) and **Send back** with a note — never an entry they entered or submitted themselves |
+
+A sent-back entry shows the approver's note in red; fix it (delete and enter again) and submit. Entries made by the commuting record or from purchases are changed there, not deleted here. Every step is in the audit log.
+
+## Step 3 · Approved
+
+What counts in the dashboards and reports for these months, by scope. An approver can still send an approved entry back with a note (it then stops counting until approved again).
 
 ## Other ways in
 

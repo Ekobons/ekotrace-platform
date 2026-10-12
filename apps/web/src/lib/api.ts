@@ -200,6 +200,15 @@ export interface SurveyRead {
   sites: { value: string; count: number }[]; unrecognised: { value: string; count: number }[];
 }
 
+// ------------------------------------------------------------- review --
+export interface StatusCell { cat: string; m: number; draft: number; submitted: number; approved: number; rejected: number }
+export interface DataStatus { facility: { id: string; name: string; type: string | null; manager: string | null }; approver: string; canEnter: boolean; canApprove: boolean; usual: string[]; cells: StatusCell[] }
+export interface ReviewEntry {
+  id: string; period_start: string; period_end: string; item: string; quantity: number; unit: string; data_type: string; note: string | null; status: 'draft' | 'submitted' | 'approved' | 'rejected';
+  kg: number; scope: number; category: string; review_note: string | null; submitted_at: string | null; reviewed_at: string | null; entered_by: string | null; reviewed_by_name: string | null;
+  vehicle: string | null; meter: string | null; waste_site: string | null; mine: boolean; canApprove: boolean; canReturn: boolean; canSubmit: boolean; canWithdraw: boolean; canDelete: boolean;
+}
+
 // ------------------------------------------------------------------ surveys --
 export interface SurveyAnswerBody { days: number; wfh: number; legs: { mode: string; km: number }[]; fuel: string; occ: number }
 export interface Survey {
@@ -397,6 +406,11 @@ export const api = {
   deleteRate: (id: number) => call<{ ok: true }>('DELETE', `/api/currency/rates/${id}`),
   wasteContractors: () => call<{ contractors: string[] }>('GET', '/api/waste/contractors'),
   surveyOptions: () => call<SurveyOptions>('GET', '/api/surveys/options'),
+  dataStatus: (facilityId: string, year: number) => call<DataStatus>('GET', `/api/data/status?facilityId=${facilityId}&year=${year}`),
+  review: (q: { facilityId: string; category: string; from: string; to: string; stage: 'open' | 'approved' }) =>
+    call<{ entries: ReviewEntry[]; canEnter: boolean; canApprove: boolean }>('GET', `/api/review?${new URLSearchParams(q as Record<string, string>)}`),
+  reviewAction: (ids: string[], action: 'submit' | 'withdraw' | 'approve' | 'return', note?: string) => call<{ done: number; skipped: { id: string; reason: string }[] }>('POST', '/api/activities/review', { ids, action, note }),
+  deleteActivity: (id: string) => call<{ ok: true }>('DELETE', `/api/activities/${id}`),
   surveys: () => call<{ surveys: Survey[]; canCreate: boolean }>('GET', '/api/surveys'),
   createSurvey: (b: { name: string; year: number; closeAt: string | null; weeks: number; facilityIds: string[]; wfh: boolean }) => call<{ id: string }>('POST', '/api/surveys', b),
   survey: (id: string) => call<SurveyDetail>('GET', `/api/surveys/${id}`),

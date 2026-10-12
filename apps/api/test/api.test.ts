@@ -1456,3 +1456,58 @@ test('surveys: people with personal codes answer without signing in; results sca
   for (let i = 0; i < 22; i++) last = (await pub('POST', '/api/public/survey/lookup', { code: 'AAAAAAAA' }, '10.9.9.9')).status;
   assert.equal(last, 429);
 });
+
+test('Enter → Review → Approved: drafts submitted, approved by someone else (never their own), sent back with a note, withdrawn, deleted; month status per category', async () => {
+  const sa = await login(superA.email, superA.temporaryPassword);
+  const group = (await call(sa, 'GET', '/api/org')).body.nodes.find((n: { kind: string }) => n.kind === 'group').id;
+  const fac = (await call(sa, 'POST', '/api/org/nodes', { parentId: group, kind: 'facility', name: 'Review depot', facilityType: 'Depot' })).body.id as string;
+  const mk = async (email: string, role: string, extra: object = {}) => {
+    const r = await call(sa, 'POST', '/api/users', { name: email, email, role, ...extra });
+    assert.equal(r.status, 200, JSON.stringify(r.body));
+    const ck = await login(email, r.body.temporaryPassword);
+    await call(ck, 'POST', '/api/auth/password', { current: r.body.temporaryPassword, next: 'a long enough pass' });
+    return ck;
+  };
+  const prep = await mk('rprep@a.test', 'preparer', { facilityIds: [fac] });
+  const mgr = await mk('rmgr@a.test', 'manager', { facilityIds: [fac] });
+  const id = await diesel();
+  const e = (m: string, q = 10) => ({ facilityId: fac, itemId: id, quantity: q, unit: 'L', periodStart: `2025-${m}-01`, periodEnd: `2025-${m}-${m === '02' ? 28 : 30}` });
+  const a1 = (await call(prep, 'POST', '/api/activities', e('04'))).body.id, a2 = (await call(prep, 'POST', '/api/activities', e('04', 20))).body.id, a3 = (await call(prep, 'POST', '/api/activities', e('06'))).body.id;
+  const st = async (ck: string) => (await call(ck, 'GET', `/api/data/status?facilityId=${fac}&year=2025`)).body;
+  let s = await st(prep);
+  assert.ok(s.facility, JSON.stringify(s));
+  assert.equal(s.facility.type, 'Depot'); assert.equal(s.canApprove, false); assert.deepEqual(s.usual, ['stationary_combustion']);
+  assert.deepEqual(s.cells.map((x: { m: number; draft: number }) => [x.m, x.draft]), [[4, 2], [6, 1]]);
+  const rv = async (ck: string, stage = 'open') => (await call(ck, 'GET', `/api/review?facilityId=${fac}&category=stationary_combustion&from=2025-01-01&to=2025-12-31&stage=${stage}`)).body;
+  let r = await rv(prep);
+  assert.equal(r.entries.length, 3); assert.ok(r.entries.every((x: { canSubmit: boolean; canApprove: boolean; mine: boolean; entered_by: string }) => x.canSubmit && !x.canApprove && x.mine && x.entered_by === 'rprep@a.test'));
+  const act = (ck: string, ids: string[], action: string, note?: string) => call(ck, 'POST', '/api/activities/review', { ids, action, note });
+  assert.equal((await act(prep, [a1, a2, a3], 'submit')).body.done, 3);
+  // the preparer cannot approve; the super admin who did not enter it can; nobody approves their own entry
+  assert.equal((await act(prep, [a1], 'approve')).body.skipped[0].reason, 'you cannot approve data for this facility');
+  assert.equal((await act(mgr, [a1], 'approve')).body.done, 1);
+  const own = (await call(mgr, 'POST', '/api/activities', e('09'))).body.id;
+  await act(mgr, [own], 'submit');
+  assert.equal((await act(mgr, [own], 'approve')).body.skipped[0].reason, 'nobody approves their own entry');
+  // sent back needs a note; the preparer sees it, fixes (deletes) and resubmits
+  assert.equal((await act(mgr, [a2], 'return')).status, 400);
+  assert.equal((await act(mgr, [a2], 'return', 'Quantity looks doubled — check the delivery note')).body.done, 1);
+  r = await rv(prep);
+  const back = r.entries.find((x: { id: string }) => x.id === a2);
+  assert.equal(back.status, 'rejected'); assert.match(back.review_note, /doubled/); assert.equal(back.reviewed_by_name, 'rmgr@a.test'); assert.ok(back.canDelete);
+  // withdraw, and a waiting or approved entry cannot be deleted
+  assert.equal((await act(prep, [a3], 'withdraw')).body.done, 1);
+  assert.equal((await call(prep, 'DELETE', `/api/activities/${a1}`)).status, 409);
+  assert.equal((await call(prep, 'DELETE', `/api/activities/${a2}`)).status, 200);
+  s = await st(mgr);
+  assert.equal(s.canApprove, true);
+  const apr = s.cells.find((x: { m: number }) => x.m === 4);
+  assert.equal(apr.approved, 1); assert.equal(apr.rejected, 0); assert.equal(s.cells.find((x: { m: number }) => x.m === 6).draft, 1);
+  assert.equal((await rv(prep, 'approved')).entries.length, 1);
+  // approved counts in the dashboard; an approver can still send it back
+  assert.equal((await act(sa, [a1], 'return', 'Wrong month')).body.done, 1);
+  // another company sees none of it
+  assert.equal((await api('GET', `/api/data/status?facilityId=${fac}&year=2025`, undefined, tenantB)).status, 403);
+  const audits = (await pq(`SELECT action FROM audit_log WHERE action LIKE 'activity.%' AND detail::text LIKE $1`, [`%${a1}%`])).rows.map((x) => x.action);
+  assert.ok(['activity.submit', 'activity.approve', 'activity.return'].every((x) => audits.includes(x)), JSON.stringify(audits));
+});

@@ -191,11 +191,12 @@ function OwnSite({ cat, facilityId, period, onSaved, monthly }: { cat: Category;
     return () => window.clearTimeout(t);
   }, [payload]);
 
-  async function save() {
+  async function save(submit = false) {
     if (!payload || !facilityId) return;
     setSaving(true);
     try {
       const r = await api.saveActivity({ ...payload, facilityId, dataType, note: note || undefined });
+      if (submit) await api.reviewAction([r.id], 'submit');
       toast(`Saved: ${PROCESSES.find((p) => p[0] === proc)![1]} · ${tco2e(r.totals.direct)} tCO₂e`);
       setNote(''); onSaved();
     } catch (e) { setError((e as Error).message); } finally { setSaving(false); }
@@ -362,7 +363,7 @@ function OwnSite({ cat, facilityId, period, onSaved, monthly }: { cat: Category;
       </div>
       {error && <div className="note bad">{error}</div>}
       {result ? <Result r={result} /> : !error && <div className="note info">Enter the {proc === 'landfill' ? 'landfill and any gas recovered' : proc === 'wastewater' ? 'organics load' : 'tonnes'} to see the emissions and how they were calculated.</div>}
-      <div className="row" style={{ justifyContent: 'flex-end' }}><button className="btn p" disabled={!result || !facilityId || saving} onClick={save}>{saving ? 'Saving…' : 'Save entry'}</button></div>
+      <div className="row" style={{ justifyContent: 'flex-end' }}><button className="btn" disabled={!result || !facilityId || saving} onClick={() => void save(false)}>Save as draft</button><button className="btn p" disabled={!result || !facilityId || saving} onClick={() => void save(true)}>Submit for approval</button></div>
       </>}
     </div>
   );
