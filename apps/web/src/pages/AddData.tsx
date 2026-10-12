@@ -37,6 +37,11 @@ const ICON: Record<string, string> = {
   purchased_goods: 'cart', employee_commuting: 'bus', business_travel: 'plane',
 };
 
+const SHORT: Record<string, string> = {
+  stationary_combustion: 'Fuels', mobile_combustion: 'Vehicles', fugitive: 'Refrigerants', waste: 'Waste', purchased_electricity: 'Electricity',
+  purchased_goods: 'Purchases', employee_commuting: 'Commuting', water: 'Water',
+};
+const catName = (c: Category) => (c.code.startsWith('waste_') ? 'Waste' : c.code.startsWith('water_') ? 'Water' : c.code === 'purchased_goods' ? 'Purchases' : c.name);
 type MState = 'approved' | 'review' | 'draft' | 'returned' | 'missing' | 'none' | 'open' | 'future';
 const MSTYLE: Record<MState, [string, string]> = {
   approved: ['Approved', 'c-ok'], review: ['In review', 'c-warn'], draft: ['Draft', 'c-n'], returned: ['Sent back', 'c-bad'],
@@ -220,24 +225,26 @@ export function AddData() {
         </div>}
       </section>
 
-      <div className="catgrid" role="tablist" aria-label="Data categories">
+      <EntryContext.Provider value={ctx}>
+      <div className="entrylayout">
+      <nav className="card catrail" aria-label="Data categories">
+        <div className="lbl" style={{ padding: '6px 10px 8px' }}>Data categories · {yearly || whole ? year : picked.length ? picked.map((m) => MONTHS[m]).join(', ') : 'pick months'}</div>
         {tabs.map((c) => {
           const g = groupOf(c.code), st = catState(g), on = g === group;
-          const label = g === 'waste' ? 'Waste' : g === 'water' ? 'Water' : c.code === 'purchased_goods' ? 'Purchases' : c.name;
           return (
-            <button key={c.code} role="tab" aria-selected={on} className={`catcard${on ? ' on' : ''}`} onClick={() => navigate(`/data/${c.code}${sp.get('stage') ? `?stage=${sp.get('stage')}` : ''}`)}>
+            <button key={c.code} className={`catbtn${on ? ' on' : ''}`} aria-current={on ? 'page' : undefined}
+              onClick={() => navigate(`/data/${c.code}${sp.get('stage') ? `?stage=${sp.get('stage')}` : ''}`)}>
               <span className="ic"><Icon name={ICON[g] ?? 'list'} /></span>
-              <span className="grow" style={{ minWidth: 0 }}><b>{label}</b><small className={st.cls}>{st.label}</small></span>
-              <span className="chip c-n">S{g === 'waste' ? '1/3' : g === 'water' ? '3' : c.scope}</span>
+              <span className="grow" style={{ minWidth: 0 }}><b>{catName(c)}</b><small className={st.cls}>{st.label}</small></span>
+              <span className="chip c-n">S{g === 'waste' ? '1/3' : c.scope}</span>
             </button>);
         })}
-      </div>
-
-      <EntryContext.Provider value={ctx}>
+        <div className="muted small" style={{ padding: '10px 10px 4px', lineHeight: 1.5 }}>Missing = a past month with nothing, for a category this facility reports.</div>
+      </nav>
       <section className="card flush entrycard">
         <div className="entryhead">
           <span className="ic lg"><Icon name={ICON[group] ?? 'list'} size={20} /></span>
-          <div><h2>{group === 'waste' ? 'Waste' : group === 'water' ? 'Water' : cat.name}</h2><div className="sub">{fac?.name ?? '—'} · {periodLabel}</div></div>
+          <div><div className="row" style={{ gap: 8 }}><h2>{catName(cat)}</h2><span className="chip c-n">S{group === 'waste' ? '1 / 3' : cat.scope}</span><span className={`chip ${{ ok: 'c-ok', warn: 'c-warn', bad: 'c-bad', muted: 'c-n' }[catState(group).cls] ?? 'c-n'}`}>{catState(group).label}</span></div><div className="sub">{fac?.name ?? '—'} · {periodLabel}</div></div>
           <span className="grow" />
           <div className="row" style={{ gap: 4 }}>
             {([['enter', '1', 'Enter'], ['review', '2', `Review${counts.open ? ` · ${counts.open}` : ''}`], ['approved', '3', `Approved${counts.approved ? ` · ${counts.approved}` : ''}`]] as const).map(([k, n, t], i) => (
@@ -272,6 +279,7 @@ export function AddData() {
             </>}
         </div>
       </section>
+      </div>
       </EntryContext.Provider>
     </div>
   );

@@ -129,28 +129,19 @@ function OneEntry({ cat, facilityId, period, fleet, onSaved, monthly }: { cat: C
 
   const groups = [...new Set(cat.subcategories.map((s) => s.grp ?? ''))];
   return (
-    <div className="grid2">
-      <div className="card" style={{ padding: 12 }}>
+    <div style={{ display: 'grid', gap: 14 }}>
+      <div className="row" style={{ alignItems: 'flex-end', gap: 12 }}>
         {fleet.length > 0 && (
-          <label className="field" style={{ padding: '4px 8px 12px' }}>
-            <span>Fleet vehicle</span>
+          <label className="field" style={{ minWidth: 260 }}><span>Fleet vehicle</span>
             <select className="input" value={vehicleId} onChange={(e) => setVehicleId(e.target.value)}>
               <option value="">— Not from the fleet: choose a type —</option>
               {fleet.map((v) => <option key={v.id} value={v.id}>{v.name}{v.registration ? ` (${v.registration})` : ''} · {v.type}</option>)}
-            </select>
-          </label>
-        )}
-        {!veh && groups.map((g) => (
-          <div key={g}>
-            <div className="eyebrow" style={{ padding: '8px 8px 6px' }}>{g || 'Vehicles'}</div>
-            <div className="list">
-              {cat.subcategories.filter((s) => (s.grp ?? '') === g).map((s) => (
-                <button key={s.id} className={s.id === subId ? 'on' : ''} onClick={() => setSubId(s.id)}><span>{s.name}</span><span className="meta">{s.items.length}</span></button>
-              ))}
-            </div>
-          </div>
-        ))}
-        {veh && <div className="sub" style={{ padding: '0 8px' }}>{veh.type}<br />{veh.class}{veh.fuel ? ` · runs on ${veh.fuel}` : ''}. Choose “not from the fleet” to pick another type.</div>}
+            </select></label>)}
+        {!veh && <label className="field" style={{ minWidth: 240 }}><span>Vehicle group</span>
+          <select className="input" value={subId ?? ''} onChange={(e) => setSubId(Number(e.target.value))}>
+            {groups.map((g) => <optgroup key={g} label={g || 'Vehicles'}>{cat.subcategories.filter((s) => (s.grp ?? '') === g).map((s) => <option key={s.id} value={s.id}>{s.name} ({s.items.length})</option>)}</optgroup>)}
+          </select></label>}
+        {veh && <div className="sub" style={{ paddingBottom: 8 }}>{veh.type} · {veh.class}{veh.fuel ? ` · runs on ${veh.fuel}` : ''}. Choose “not from the fleet” to pick another type.</div>}
       </div>
 
       <div className="card" style={{ display: 'grid', gap: 14 }}>

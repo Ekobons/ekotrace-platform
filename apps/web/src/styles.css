@@ -678,7 +678,7 @@ small.muted, td.muted { color: var(--muted); }
 .input:focus, .bigsel:focus { outline: 2px solid var(--primary); outline-offset: 1px; border-color: var(--primary); }
 
 /* ------------------------------------------------------------------ Add data (prototype) -- */
-.band { display: flex; flex-direction: column; gap: 14px; position: sticky; top: 0; z-index: 4; box-shadow: 0 6px 18px rgba(11, 42, 37, .06); }
+.band { display: flex; flex-direction: column; gap: 14px; box-shadow: 0 6px 18px rgba(11, 42, 37, .06); }
 .pick { display: flex; flex-direction: column; gap: 4px; }
 .bigsel { height: 44px; border-radius: 10px; border: 1.5px solid var(--line2); background: var(--surface); padding: 0 12px; font-weight: 700; font-size: 15px; min-width: 260px; max-width: 100%; color: var(--fg); }
 .bandval { font-size: 15px; line-height: 44px; white-space: nowrap; }
@@ -726,3 +726,20 @@ small.muted, td.muted { color: var(--muted); }
 table.t.rows td { vertical-align: middle; }
 table.t.rows tr.bad td { background: #FDF3F1; }
 table.t.rows .input { height: 36px; }
+
+/* Categories on the left of the entry card, as in the prototype. */
+.entrylayout { display: grid; grid-template-columns: 270px minmax(0, 1fr); gap: 14px; align-items: start; }
+.catrail { padding: 8px; display: flex; flex-direction: column; gap: 2px; position: sticky; top: 12px; }
+.catbtn { display: flex; gap: 10px; align-items: center; width: 100%; padding: 9px 10px; border: 0; border-radius: 10px; background: transparent; text-align: left; cursor: pointer; font: inherit; color: var(--fg); }
+.catbtn:hover { background: var(--soft); }
+.catbtn.on { background: var(--primary-soft); box-shadow: inset 3px 0 0 var(--primary); }
+.catbtn b { display: block; font-size: 14px; font-weight: 600; line-height: 1.25; }
+.catbtn.on b { font-weight: 700; }
+.catbtn small { display: block; font-size: 11px; font-weight: 700; margin-top: 1px; }
+.catbtn.on .ic { background: var(--surface); }
+@media (max-width: 1100px) {
+  .entrylayout { grid-template-columns: minmax(0, 1fr); }
+  .catrail { position: static; flex-direction: row; overflow-x: auto; }
+  .catrail > .lbl, .catrail > .muted { display: none; }
+  .catbtn { width: auto; flex: none; }
+}

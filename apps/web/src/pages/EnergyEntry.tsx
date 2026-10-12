@@ -107,13 +107,11 @@ export function EnergyEntry({ cat, facilityId, facilityRegion, country, period, 
   const claimed = Object.values(claims).reduce((s, v) => s + (Number(v) || 0), 0);
 
   return (
-    <div className="grid2">
-      <div className="card" style={{ padding: 12 }}>
-        <div className="eyebrow" style={{ padding: '4px 8px 8px' }}>Energy bought</div>
-        <div className="list">
-          {cat.subcategories.map((s) => <button key={s.id} className={s.code === subCode ? 'on' : ''} onClick={() => setSubCode(s.code)}><span>{s.name}</span></button>)}
-        </div>
-        <p className="sub" style={{ padding: '10px 8px 0', fontSize: 12 }}>
+    <div style={{ display: 'grid', gap: 14 }}>
+      <div className="row" style={{ alignItems: 'flex-end', gap: 12 }}>
+        <label className="field" style={{ minWidth: 240 }}><span>Energy bought</span>
+          <select className="input" value={subCode} onChange={(e) => setSubCode(e.target.value)}>{cat.subcategories.map((s) => <option key={s.id} value={s.code}>{s.name}</option>)}</select></label>
+        <p className="sub grow" style={{ margin: 0, fontSize: 12, maxWidth: 640 }}>
           Both Scope 2 figures are reported: <b>location-based</b> (grid average of the region) and <b>market-based</b> (what you buy: certificates, contracts, supplier).
           T&D losses and upstream emissions go to Scope 3.3.
         </p>
