@@ -20,7 +20,7 @@ import { fileURLToPath } from 'node:url';
 import { pool, platformTx, type Tx } from './pool.js';
 import { parseDesnz } from '../import/desnz.js';
 import { importDesnz } from '../import/desnzWrite.js';
-import { importEpa, importOldProducts, parseEpa, refreshAverages, type OldProduct } from '../import/epa.js';
+import { importEpa, importOldProducts, parseEpa, refreshAverages, versionRank, type OldProduct } from '../import/epa.js';
 import { csvObjects } from '../lib/csv.js';
 
 const DATA = join(dirname(fileURLToPath(import.meta.url)), '../../../../data');
@@ -151,10 +151,12 @@ export async function seed(log = console.log) {
   }
   await platformTx(async (c) => log(`[seed] IPCC coals: ${await seedIpccCoals(c)}`));
   // US EPA supply chain factors (purchased goods & services), when the file is in data/epa/
-  for (const f of readdirSync(join(DATA, 'epa')).filter((x) => /^SupplyChainGHGEmissionFactors.*\.csv$/i.test(x)).sort()) {
-    const parsed = parseEpa(readFileSync(join(DATA, 'epa', f), 'utf8'), f);
+  // oldest version first, so the newest ends up in use (each supersedes the one before; history kept)
+  const epaFiles = readdirSync(join(DATA, 'epa')).filter((x) => /^SupplyChainGHGEmissionFactors.*\.csv$/i.test(x))
+    .map((f) => parseEpa(readFileSync(join(DATA, 'epa', f), 'utf8'), f)).sort((a, b) => versionRank(a.version) - versionRank(b.version));
+  for (const parsed of epaFiles) {
     const s = await platformTx((c) => importEpa(c, parsed, { createdBy: 'seed' }));
-    log(`[seed] ${s.source}: ${s.skipped ? 'already imported' : `${s.factors} spend factors (${parsed.priceYear} USD)`}`);
+    log(`[seed] ${s.source}: ${s.skipped ? `skipped (${s.reason})` : `${s.factors} spend factors (${parsed.priceYear} USD)${s.superseded ? `, ${s.superseded} earlier factors superseded` : ''}${s.products ? `, ${s.products} products of the previous list updated` : ''}`}`);
   }
   await platformTx((c) => refreshAverages(c));   // average services / goods factors (fallback)
   // products of the previous Ekotrace list, on top of the EPA codes

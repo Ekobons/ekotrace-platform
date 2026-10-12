@@ -1,12 +1,15 @@
 /**
  * Spend-based factors for purchased goods & services.
  *
- * 1. US EPA "Supply Chain Greenhouse Gas Emission Factors for US Industries and Commodities"
- *    v1.3 (the file the old Ekotrace used): SupplyChainGHGEmissionFactors_v1.3.0_NAICS_CO2e_USD2022.csv
- *    One row per NAICS-6 commodity: kg CO2e per USD (2022, purchaser price) with and without margins.
+ * 1. "Supply Chain Greenhouse Gas Emission Factors for US Industries and Commodities" (USEEIO):
+ *    v1.3 (US EPA, 2022 USD, AR5 — the file the old Ekotrace used) and v1.4 (Cornerstone Sustainability
+ *    Data Initiative, same authors, AR6; v1.4.0-rc.1 in 2023 USD). The CSV, or the .xlsx (sheet "CO2e").
+ *    One row per NAICS-6 commodity: kg CO2e per USD (purchaser price) with and without margins.
  *    We use the factor WITH margins (purchaser price: what the company actually pays, incl. transport,
  *    wholesale and retail margins). The price year is read from the unit / file name.
  *    → items "epa:naics:322230" under the NAICS sector, one factor each (basis scope3, unit USD).
+ *    A newer version supersedes the older one item by item (history kept); an older version than the
+ *    one in use is not loaded. The products of the previous Ekotrace list follow the new factors.
  *
  * 2. The old Ekotrace list (exported from its MySQL): purchase_goods_categories_ef with
  *    purchase_category / purchase_subcategory / typesofpurchase. Products with a NAICS code are
@@ -14,6 +17,7 @@
  *    the others become items of their own under "Other (company list)" with their factors.
  */
 import { createHash } from 'node:crypto';
+import ExcelJS from 'exceljs';
 import type { Tx } from '../db/pool.js';
 import { csvObjects } from '../lib/csv.js';
 import { capitalOf } from './capitalList.js';
@@ -24,7 +28,30 @@ export interface EpaParsed { version: string; priceYear: number; rows: EpaRow[];
 const col = (keys: string[], ...res: RegExp[]) => keys.find((k) => res.every((r) => r.test(k)));
 
 export function parseEpa(text: string, filename = ''): EpaParsed {
-  const rows = csvObjects(text);
+  return parseEpaRows(csvObjects(text), filename);
+}
+
+/** The .xlsx as published (sheets "CO2e" and "byGHG"): the CO2e sheet. */
+export async function parseEpaXlsx(buf: Buffer, filename = ''): Promise<EpaParsed> {
+  const wb = new ExcelJS.Workbook();
+  await wb.xlsx.load(buf as unknown as ArrayBuffer);
+  const ws = wb.worksheets.find((w) => /^co2e$/i.test(w.name.trim())) ?? wb.worksheets[0];
+  if (!ws) throw new Error('The workbook has no sheets');
+  const text = (v: ExcelJS.CellValue) => (v == null ? '' : typeof v === 'object' && 'result' in v ? String(v.result ?? '') : typeof v === 'object' && 'richText' in v ? v.richText.map((t) => t.text).join('') : String(v));
+  const head = (ws.getRow(1).values as ExcelJS.CellValue[]).map(text);
+  const rows: Record<string, string>[] = [];
+  ws.eachRow((r, i) => { if (i === 1) return; const v = r.values as ExcelJS.CellValue[]; const o: Record<string, string> = {}; head.forEach((h, k) => { if (h) o[h] = text(v[k]).trim(); }); rows.push(o); });
+  return parseEpaRows(rows, filename);
+}
+
+/** "1.4.0-rc.1" → comparable number (release candidates just below the release). */
+export function versionRank(v: string): number {
+  const m = /^(\d+)\.(\d+)(?:\.(\d+))?(?:-rc\.?(\d+))?/i.exec(v);
+  if (!m) return 0;
+  return Number(m[1]) * 1e6 + Number(m[2]) * 1e3 + Number(m[3] ?? 0) + (m[4] ? Number(m[4]) / 100 - 1 : 0);
+}
+
+function parseEpaRows(rows: Record<string, string>[], filename: string): EpaParsed {
   if (!rows.length) throw new Error('The file is empty');
   const keys = Object.keys(rows[0]!);
   const kCode = col(keys, /naics/i, /code/i), kTitle = col(keys, /naics/i, /title|name|description/i);
@@ -35,7 +62,7 @@ export function parseEpa(text: string, filename = ''): EpaParsed {
   const unitText = (kUnit && rows[0]![kUnit]) || filename;
   const priceYear = Number(/(20\d\d)\s*USD|USD\s*(20\d\d)/i.exec(unitText)?.slice(1).find(Boolean) ?? /USD(20\d\d)/i.exec(filename)?.[1] ?? NaN);
   if (!Number.isFinite(priceYear)) throw new Error('Price year not found (expected a unit like "kg CO2e/2022 USD, purchaser price")');
-  const version = /v(\d+\.\d+(\.\d+)?)/i.exec(filename)?.[1] ?? (priceYear === 2022 ? '1.3' : priceYear === 2021 ? '1.2' : '?');
+  const version = /v(\d+\.\d+(?:\.\d+)?(?:-rc\.?\d+)?)/i.exec(filename)?.[1] ?? (priceYear === 2022 ? '1.3' : priceYear === 2021 ? '1.2' : '?');
   const out: EpaRow[] = [];
   let skipped = 0, gasRowsIgnored = 0;
   for (const r of rows) {
@@ -47,7 +74,9 @@ export function parseEpa(text: string, filename = ''): EpaParsed {
     out.push({ naics, title: (r[kTitle] ?? '').trim(), withMargins: v, withoutMargins: num(kWithout), margins: num(kMargins), useeio: kUse ? r[kUse] || null : null });
   }
   if (!out.length) throw new Error('No factor rows found');
-  return { version, priceYear, rows: out, sha256: createHash('sha256').update(text).digest('hex'), skipped, gasRowsIgnored };
+  // fingerprint of the factors themselves, so the same data as CSV or .xlsx is recognised
+  const sha256 = createHash('sha256').update(JSON.stringify([priceYear, out.map((r) => [r.naics, r.withMargins])])).digest('hex');
+  return { version, priceYear, rows: out, sha256, skipped, gasRowsIgnored };
 }
 
 /** NAICS sector → subcategory code (manufacturing 31-33, retail 44-45, transport 48-49 share one). */
@@ -59,20 +88,38 @@ export function sectorOf(naics: string): string {
 /** "Hotels (except Casino Hotels) and Motels" → "Hotels (except casino hotels) and motels" */
 const tidy = (t: string) => t.replace(/\s+/g, ' ').trim().replace(/(?<=\S\s)([A-Z])([a-z])/g, (_m, a: string, b: string) => a.toLowerCase() + b).replace(/\bTv\b/g, 'TV');
 
-export interface EpaImport { source: string; skipped: boolean; items: number; factors: number; superseded: number }
+export interface EpaImport { source: string; skipped: boolean; reason?: string; items: number; factors: number; superseded: number; products?: number }
+
+/** Who publishes which version: v1.3 and before US EPA (AR5); v1.4 on Zenodo by the same authors (AR6). */
+function publication(version: string) {
+  if (versionRank(version) >= versionRank('1.4.0-rc.1')) {
+    const rc = /rc/i.test(version);
+    return { publisher: 'Cornerstone Sustainability Data Initiative (W. Ingwersen, Stanford; B. Young, ERG)', gwp: 'AR6',
+      url: rc ? 'https://doi.org/10.5281/zenodo.17080881' : 'https://zenodo.org/records/17202747', licence: 'CC BY 4.0 (attribution required)' };
+  }
+  return { publisher: 'US EPA', gwp: 'AR5', url: 'https://catalog.data.gov/dataset/supply-chain-greenhouse-gas-emission-factors-for-us-industries-and-commodities', licence: 'US Government work (public domain)' };
+}
 
 export const DEMO_SOURCE = 'DEMO-SPEND';
 /** `demo`: the made-up placeholder file for the demo company (never on a real deployment). */
 export async function importEpa(c: Tx, p: EpaParsed, opts: { createdBy?: string; demo?: boolean } = {}): Promise<EpaImport> {
   const code = opts.demo ? DEMO_SOURCE : `EPA-SC-${p.version}`;
   const existing = (await c.query('SELECT id, file_sha256 FROM factor_source WHERE code = $1', [code])).rows[0];
-  if (existing?.file_sha256 === p.sha256) return { source: code, skipped: true, items: 0, factors: 0, superseded: 0 };
+  if (!opts.demo) {
+    // never step back: a newer version in use stays in use
+    const inUse = (await c.query(`SELECT DISTINCT s.version FROM factor f JOIN factor_source s ON s.id = f.source_id WHERE f.status = 'active' AND s.code LIKE 'EPA-SC-%'`)).rows.map((r) => String(r.version));
+    const newer = inUse.find((v) => versionRank(v) > versionRank(p.version));
+    if (newer) return { source: code, skipped: true, reason: `version ${newer} is in use (newer than ${p.version})`, items: 0, factors: 0, superseded: 0 };
+  }
+  if (existing?.file_sha256 === p.sha256) return { source: code, skipped: true, reason: 'already loaded', items: 0, factors: 0, superseded: 0 };
+  const pub = publication(p.version);
   const sourceId: number = existing
     ? (await c.query('UPDATE factor_source SET file_sha256 = $2, imported_at = now() WHERE id = $1 RETURNING id', [existing.id, p.sha256])).rows[0].id
     : (await c.query(
       `INSERT INTO factor_source (code, publisher, title, year, version, gwp_set, url, licence, file_sha256)
-       VALUES ($1,'US EPA',$2,$3,$4,'AR5','https://catalog.data.gov/dataset/supply-chain-greenhouse-gas-emission-factors-for-us-industries-and-commodities','US Government work (public domain)',$5) RETURNING id`,
-      [code, opts.demo ? `DEMO placeholder spend factors (made-up values, NOT EPA) — load the EPA v1.3 file` : `Supply Chain GHG Emission Factors for US Industries and Commodities v${p.version} (NAICS, kg CO2e per ${p.priceYear} USD, purchaser price)`, p.priceYear, p.version, p.sha256])).rows[0].id;
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id`,
+      [code, opts.demo ? 'US EPA' : pub.publisher, opts.demo ? `DEMO placeholder spend factors (made-up values, NOT EPA) — load the EPA supply chain factor file` : `Supply Chain GHG Emission Factors for US Industries and Commodities v${p.version} (NAICS, kg CO2e per ${p.priceYear} USD, purchaser price)`,
+       p.priceYear, p.version, opts.demo ? 'AR5' : pub.gwp, pub.url, opts.demo ? 'demo only' : pub.licence, p.sha256])).rows[0].id;
   // Real EPA factors replace the demo placeholders.
   if (!opts.demo) await c.query(`UPDATE factor SET status = 'retired' WHERE status = 'active' AND source_id = (SELECT id FROM factor_source WHERE code = $1)`, [DEMO_SOURCE]);
   const subs = new Map<string, number>((await c.query(`SELECT s.code, s.id FROM subcategory s JOIN category c ON c.id = s.category_id WHERE c.code = 'purchased_goods'`)).rows.map((r) => [r.code, r.id]));
@@ -86,8 +133,10 @@ export async function importEpa(c: Tx, p: EpaParsed, opts: { createdBy?: string;
     [rows.map((r) => r.sub), rows.map((r) => r.naics), rows.map((r) => tidy(r.title)), rows.map((r) => r.useeio)]);
   const idOf = new Map<string, number>(items.rows.map((r) => [r.code, r.id]));
   // factors: one per item, valid for any purchase year (spend is brought to the price year with the CPI)
+  // the factor in use for each item (this version reloaded, or an earlier EPA version) is superseded
   const old = await c.query(
-    `UPDATE factor SET status = 'superseded' WHERE source_id = $1 AND status = 'active' RETURNING id, item_id`, [sourceId]);
+    `UPDATE factor SET status = 'superseded' WHERE status = 'active' AND item_id = ANY($2::int[])
+        AND (source_id = $1 OR source_id IN (SELECT id FROM factor_source WHERE code LIKE 'EPA-SC-%')) RETURNING id, item_id`, [sourceId, [...idOf.values()]]);
   const prev = new Map<number, number>(old.rows.map((r) => [r.item_id, r.id]));
   const ins = await c.query(
     `INSERT INTO factor (item_id, source_id, region, basis, unit, co2e, valid_from, valid_to, price_year, version, supersedes_id, note, created_by)
@@ -97,7 +146,27 @@ export async function importEpa(c: Tx, p: EpaParsed, opts: { createdBy?: string;
      rows.map((r) => idOf.get(`epa:naics:${r.naics}`)!), rows.map((r) => r.withMargins), rows.map((r) => prev.get(idOf.get(`epa:naics:${r.naics}`)!) ?? null),
      rows.map((r) => `NAICS ${r.naics}. With margins (purchaser price)${r.withoutMargins != null ? `; without margins ${r.withoutMargins}, margins ${r.margins ?? '—'}` : ''}.`)]);
   await refreshAverages(c);
-  return { source: code, skipped: false, items: items.rowCount ?? 0, factors: ins.rowCount ?? 0, superseded: old.rowCount ?? 0 };
+  const products = opts.demo ? 0 : await relinkProducts(c, opts.createdBy);
+  return { source: code, skipped: false, items: items.rowCount ?? 0, factors: ins.rowCount ?? 0, superseded: old.rowCount ?? 0, products };
+}
+
+/** Products of the previous Ekotrace list take the EPA factor now in use for their NAICS code. */
+export async function relinkProducts(c: Tx, createdBy = 'importer'): Promise<number> {
+  const rows = (await c.query(
+    `SELECT i.id, e.co2e, e.source_id, e.price_year, i.attrs->>'naics' AS naics, cur.id AS cur
+       FROM item i
+       JOIN item ei ON ei.code = 'epa:naics:' || (i.attrs->>'naics')
+       JOIN factor e ON e.item_id = ei.id AND e.status = 'active'
+       LEFT JOIN factor cur ON cur.item_id = i.id AND cur.status = 'active'
+      WHERE i.code LIKE 'old:%' AND (cur.id IS NULL OR cur.co2e <> e.co2e OR cur.source_id <> e.source_id)`)).rows;
+  if (!rows.length) return 0;
+  await c.query(`UPDATE factor SET status = 'superseded' WHERE id = ANY($1::bigint[])`, [rows.filter((r) => r.cur).map((r) => r.cur)]);
+  await c.query(
+    `INSERT INTO factor (item_id, source_id, region, basis, unit, co2e, valid_from, valid_to, price_year, version, supersedes_id, note, created_by)
+     SELECT i, s, 'US', 'scope3', 'USD', v, '2000-01-01', '2100-12-31', y, CASE WHEN p IS NULL THEN 1 ELSE 2 END, p, 'EPA factor of NAICS ' || n || ' (product of the previous Ekotrace list)', $1
+       FROM unnest($2::int[], $3::int[], $4::numeric[], $5::int[], $6::bigint[], $7::text[]) AS x(i, s, v, y, p, n)`,
+    [createdBy, rows.map((r) => r.id), rows.map((r) => r.source_id), rows.map((r) => r.co2e), rows.map((r) => r.price_year), rows.map((r) => r.cur ?? null), rows.map((r) => r.naics)]);
+  return rows.length;
 }
 
 /**

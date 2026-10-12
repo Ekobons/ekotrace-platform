@@ -94,6 +94,8 @@ An account can also move its lines (e.g. account “Travel” → business trave
 
 Spend categories: the 1,016 EPA commodities (NAICS codes) and the 1,639 products of the previous Ekotrace list (e.g. “Cereal - Barley grain”, “LPG”, “Office Products”) with their old category › subcategory — each product uses the EPA factor of its NAICS code. Products listed as capital goods in the old list show the capital-goods hint. Government administration (NAICS 92) has no EPA factor.
 
+**Newer versions of the spend factors.** The platform admin loads them under Factor library → Sources & import, as the published .xlsx (sheet "CO2e") or as a CSV. The preview shows the version, its price year (e.g. 2024 USD), how many commodities match and the typical change against the factors in use. On loading, each commodity's factor is replaced by the new one, the old one is kept in its history, and the products of the previous Ekotrace list move to the new factor of their NAICS code. An older version than the one in use is refused. v1.3 is US EPA's (AR5); v1.4 is published by the same authors through the Cornerstone Sustainability Data Initiative (AR6). Open batches pick up the new factors when recalculated; published entries keep theirs until reopened.
+
 A factor written in the file (vendor-specific EF and its unit) counts as a supplier factor for that line. Suppliers' factors are kept under Value chain → Suppliers, for everything bought from them or for one spend category; adding one recalculates their open lines.
 
 ## Currencies and inflation

@@ -2,6 +2,14 @@
 
 Newest first.
 
+## 2026-10-12 (19) — Spend factors: newer versions (v1.4) can be loaded
+
+- Importer reads the published **.xlsx** (sheet "CO2e") as well as the CSV; version taken from the file name, including release candidates (`1.4.0-rc.1` ranks just below `1.4.0`); price year from the unit; publisher, GWP set and licence by version (v1.3 US EPA, AR5, public domain; v1.4 Cornerstone Sustainability Data Initiative, AR6, CC BY 4.0). The fingerprint is of the factors, so the same data as CSV or .xlsx is recognised.
+- A newer version supersedes the factor in use **item by item** (history kept, `supersedes_id`); the products of the previous Ekotrace list are relinked to the new factor of their NAICS code; an older version than the one in use is refused (409 `OLDER_VERSION`). Seed loads files oldest first.
+- Preview (`POST /api/admin/import/epa?preview=1`) also returns the version in use, commodities matched / added, and the median, 10th and 90th percentile change of the factors.
+- **Not loaded:** the v1.4.0-rc.1 file received is the release candidate (12 Sep 2025, 2023 USD), superseded by the final v1.4.0 (14 Oct 2025, 2024 USD). Dry run on the test database: 1,016 commodities and 1,639 products moved, v1.3 kept as history; typical change for the same 2026 spend −2.2 % (10th–90th percentile −8.2 % to +9.8 %). The library still uses v1.3.
+- Tests: 47 API + 2 new (versions in order; .xlsx read like the CSV, same fingerprint). Manual: Purchases → Factors.
+
 ## 2026-10-12 (18) — Dashboards as in the Ekotrace prototype
 
 - **Dashboards rebuilt to the prototype's design:** top bar with **VIEWING** (company / sub-group / facility / dashboard group, facility count; opens the organisation tree and the dashboard groups) and **PERIOD** (year with the base year marked; year to date / quarters / one month; same months last year or no comparison; Scope 2 method). Header: what is viewed · period · consolidation · approved data or approved + waiting · % of required data in; **Include waiting**; nine tabs: Overview · Scopes & categories · Facilities · Energy · Water · Waste · Mobility & travel · Value chain · Net zero.

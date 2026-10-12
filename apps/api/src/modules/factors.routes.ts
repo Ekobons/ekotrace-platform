@@ -16,7 +16,7 @@ import { requirePlatformAdmin } from '../lib/auth.js';
 import { AppError, notFound } from '../lib/errors.js';
 import { parseDesnz } from '../import/desnz.js';
 import { importDesnz } from '../import/desnzWrite.js';
-import { importEpa, importOldProducts, oldProducts, parseEpa } from '../import/epa.js';
+import { importEpa, importOldProducts, oldProducts, parseEpa, parseEpaXlsx, versionRank } from '../import/epa.js';
 import { csvObjects } from '../lib/csv.js';
 
 export async function factorRoutes(app: FastifyInstance) {
@@ -104,13 +104,26 @@ export async function factorRoutes(app: FastifyInstance) {
   app.post('/api/admin/import/epa', { bodyLimit: 20 * 1024 * 1024 }, async (req) => {
     requirePlatformAdmin(req);
     const preview = z.object({ preview: z.coerce.boolean().optional() }).parse(req.query).preview;
-    if (!Buffer.isBuffer(req.body) || req.body.length < 100) throw new AppError('Send the EPA .csv file as the request body (Content-Type: application/octet-stream)');
+    if (!Buffer.isBuffer(req.body) || req.body.length < 100) throw new AppError('Send the supply chain factor file (.csv or .xlsx) as the request body (Content-Type: application/octet-stream)');
     const filename = String(req.headers['x-filename'] ?? '');
+    const isXlsx = req.body[0] === 0x50 && req.body[1] === 0x4b; // zip: an .xlsx
     let parsed;
-    try { parsed = parseEpa(req.body.toString('utf8'), filename); } catch (e) { throw new AppError((e as Error).message); }
+    try { parsed = isXlsx ? await parseEpaXlsx(req.body, filename) : parseEpa(req.body.toString('utf8'), filename); } catch (e) { throw new AppError((e as Error).message); }
     const summary = { version: parsed.version, priceYear: parsed.priceYear, rows: parsed.rows.length, skipped: parsed.skipped, sample: parsed.rows.slice(0, 5) };
-    if (preview) return { preview: true, ...summary };
-    return { preview: false, ...summary, ...(await platformTx((c) => importEpa(c, parsed, { createdBy: req.user.id }))) };
+    if (preview) {
+      // what changes against the factors in use, item by item
+      const cur = new Map<string, number>((await query<{ naics: string; co2e: number }>(
+        `SELECT i.attrs->>'naics' AS naics, f.co2e::float8 AS co2e FROM factor f JOIN item i ON i.id = f.item_id JOIN factor_source s ON s.id = f.source_id
+          WHERE f.status = 'active' AND s.code LIKE 'EPA-SC-%' AND i.code LIKE 'epa:naics:%'`)).map((r) => [r.naics, r.co2e]));
+      const inUse = (await query<{ version: string; year: number }>(`SELECT DISTINCT s.version, s.year FROM factor f JOIN factor_source s ON s.id = f.source_id WHERE f.status = 'active' AND s.code LIKE 'EPA-SC-%'`))[0] ?? null;
+      const ch = parsed.rows.filter((r) => cur.has(r.naics) && cur.get(r.naics)! > 0).map((r) => r.withMargins / cur.get(r.naics)! - 1).sort((a, b) => a - b);
+      const q = (f: number) => (ch.length ? Math.round(ch[Math.floor(f * (ch.length - 1))]! * 1000) / 10 : null);
+      return { preview: true, ...summary, inUse, compare: { matched: ch.length, added: parsed.rows.filter((r) => !cur.has(r.naics)).length, medianChangePct: q(0.5), p10: q(0.1), p90: q(0.9) },
+        older: inUse ? versionRank(inUse.version) > versionRank(parsed.version) : false };
+    }
+    const r = await platformTx((c) => importEpa(c, parsed, { createdBy: req.user.id }));
+    if (r.skipped && r.reason !== 'already loaded') throw new AppError(`Not loaded: ${r.reason}`, 409, 'OLDER_VERSION');
+    return { preview: false, ...summary, ...r };
   });
 
   /**
