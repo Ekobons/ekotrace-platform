@@ -1380,3 +1380,79 @@ test('water: in by source, reused, out by destination; DESNZ or the utility\'s f
   assert.ok(s3.every((r) => r.s3 > 0 && r.code === 'water_supply'), JSON.stringify(s3));
   assert.equal((await api('GET', '/api/bills?category=water', undefined, tenantA)).body.bills.length, 1);
 });
+
+test('surveys: people with personal codes answer without signing in; results scaled to the headcount per facility with a 95% range; publishing writes Scope 3.7 commuting (once a year per facility)', async () => {
+  const groupOf = async (tt: string) => (await api('GET', '/api/org', undefined, tt)).body.nodes.find((n: { kind: string }) => n.kind === 'group').id;
+  const g = await groupOf(tenantA);
+  const f1 = (await api('POST', '/api/org/nodes', { parentId: g, kind: 'facility', name: 'Survey HQ', employees: 100 }, tenantA)).body.id as string;
+  const f2 = (await api('POST', '/api/org/nodes', { parentId: g, kind: 'facility', name: 'Survey Depot', employees: 40 }, tenantA)).body.id as string;
+  const cr = await api('POST', '/api/surveys', { name: 'Commuting 2025', year: 2025, closeAt: '2025-12-15', weeks: 46, facilityIds: [f1, f2], wfh: true }, tenantA);
+  assert.equal(cr.status, 200, JSON.stringify(cr.body));
+  const id = cr.body.id as string;
+  assert.equal((await api('POST', `/api/surveys/${id}/status`, { status: 'open' }, tenantA)).status, 400, 'needs people first');
+  const ppl = await api('POST', `/api/surveys/${id}/participants`, { text: 'name, email, facility, department\nAisha Khan, aisha@x.ae, Survey HQ, Finance\nOmar Ali, omar@x.ae, survey hq, Ops\nSara Noor, sara@x.ae, Depot, Ops\nBad Mail, nope, Survey HQ,\nAisha again, AISHA@x.ae, Survey HQ,' }, tenantA);
+  assert.equal(ppl.status, 200, JSON.stringify(ppl.body));
+  assert.equal(ppl.body.added, 3); assert.equal(ppl.body.skipped, 1); assert.equal(ppl.body.problems.length, 1);
+  let d = (await api('GET', `/api/surveys/${id}`, undefined, tenantA)).body;
+  const by = (n: string) => d.people.find((p: { name: string }) => p.name === n);
+  assert.match(by('Aisha Khan').code, /^[A-HJ-NP-Z2-9]{8}$/); assert.equal(by('Sara Noor').facility_id, f2);
+  // public: closed while draft, then answered with the code (lowercase and spaced is fine)
+  const pub = (method: string, url: string, payload: object, ip = '10.0.0.1') => app.inject({ method: method as 'POST', url, payload, remoteAddress: ip }).then((r) => ({ status: r.statusCode, body: r.json() }));
+  assert.equal((await pub('POST', '/api/public/survey/lookup', { code: by('Aisha Khan').code })).status, 409);
+  assert.equal((await api('POST', `/api/surveys/${id}/status`, { status: 'open' }, tenantA)).status, 200);
+  const spaced = by('Aisha Khan').code.toLowerCase().replace(/(....)/, '$1 ');
+  const lk = await pub('POST', '/api/public/survey/lookup', { code: spaced });
+  assert.equal(lk.status, 200, JSON.stringify(lk.body));
+  assert.equal(lk.body.firstName, 'Aisha'); assert.equal(lk.body.facilityId, f1); assert.equal(lk.body.survey.wfh, true); assert.equal(lk.body.answers, null);
+  assert.equal(lk.body.email, undefined, 'no personal data beyond the first name');
+  const a1 = await pub('PUT', '/api/public/survey', { code: spaced, facilityId: f1, answers: { days: 4, wfh: 1, legs: [{ mode: 'car', km: 20 }], fuel: 'petrol', occ: 1 } });
+  assert.equal(a1.status, 200, JSON.stringify(a1.body)); assert.ok(a1.body.kg > 0);
+  // the same code changes the answer, it does not add one
+  const a1b = await pub('PUT', '/api/public/survey', { code: spaced, facilityId: f1, answers: { days: 5, wfh: 0, legs: [{ mode: 'car', km: 20 }], fuel: 'petrol', occ: 1 } });
+  assert.ok(a1b.body.kg > a1.body.kg);
+  await pub('PUT', '/api/public/survey', { code: by('Omar Ali').code, facilityId: f1, answers: { days: 4, wfh: 1, legs: [{ mode: 'metro', km: 15 }, { mode: 'walk', km: 1 }], fuel: 'unknown', occ: 1 } });
+  assert.equal((await pub('PUT', '/api/public/survey', { code: by('Omar Ali').code, facilityId: f1, answers: { days: 5, wfh: 0, legs: [{ mode: 'car', km: 900 }], fuel: 'petrol', occ: 1 } })).status, 400);
+  assert.equal((await pub('POST', '/api/public/survey/lookup', { code: 'ZZZZZZZZ' })).status, 404);
+  // on behalf (an admin types in a paper answer)
+  const ob = await api('PUT', `/api/surveys/${id}/participants/${by('Sara Noor').id}/answer`, { facilityId: f2, answers: { days: 5, wfh: 0, legs: [{ mode: 'carpool', km: 30 }], fuel: 'diesel', occ: 3 } }, tenantA);
+  assert.equal(ob.status, 200, JSON.stringify(ob.body));
+  // results: mean per respondent × headcount, per facility; answered people cannot be removed
+  d = (await api('GET', `/api/surveys/${id}`, undefined, tenantA)).body;
+  assert.equal(d.results.n, 3); assert.equal(d.results.N, 140);
+  const hq = d.results.facs.find((x: { id: string }) => x.id === f1), dep = d.results.facs.find((x: { id: string }) => x.id === f2);
+  assert.equal(hq.n, 2); assert.ok(Math.abs(hq.t - (hq.mean * 100) / 1000) < 1e-9); assert.equal(hq.low, true);
+  assert.ok(hq.moe > 0 && d.results.totLo < d.results.tot && d.results.totHi > d.results.tot);
+  assert.equal(dep.n, 1); assert.ok(Math.abs(dep.t - (dep.mean * 40) / 1000) < 1e-9);
+  assert.equal(d.results.modes.car, 1); assert.equal(d.results.modes.metro, 1);
+  assert.equal((await api('DELETE', `/api/surveys/${id}/participants/${by('Omar Ali').id}`, undefined, tenantA)).status, 400);
+  const inv = await app.inject({ method: 'GET', url: `/api/surveys/${id}/invitations`, headers: { cookie: adminCookie, 'x-tenant-id': tenantA } });
+  assert.equal(inv.statusCode, 200); assert.ok(inv.body.includes(by('Sara Noor').code));
+  // typed-in figures already in Add data for the depot: the dry run says publishing replaces them
+  await api('PUT', '/api/commuting', { facilityId: f2, year: 2025, method: 'typed', headcount: 40, workingDays: 220, weekend: 'sat_sun', rows: [{ mode: 'car', fuel: 'petrol', employees: 40, oneWayKm: 5, daysPerWeek: 5 }] }, tenantA);
+  const dry = await api('POST', `/api/surveys/${id}/publish`, { dryRun: true }, tenantA);
+  assert.equal(dry.status, 200, JSON.stringify(dry.body));
+  assert.match(dry.body.facilities.find((x: { facilityId: string }) => x.facilityId === f2).replaces, /typed in/);
+  assert.equal(Number((await pq('SELECT count(*) FROM commute_record WHERE facility_id = ANY($1) AND survey_id IS NOT NULL', [[f1, f2]])).rows[0].count), 0, 'dry run writes nothing');
+  const p = await api('POST', `/api/surveys/${id}/publish`, {}, tenantA);
+  assert.equal(p.status, 200, JSON.stringify(p.body));
+  assert.ok(p.body.facilities.every((x: { status: string }) => x.status === 'ok'), JSON.stringify(p.body));
+  const rec = (await api('GET', `/api/commuting/record?facilityId=${f1}&year=2025`, undefined, tenantA)).body.record;
+  assert.equal(rec.survey_id, id); assert.equal(rec.survey_name, 'Commuting 2025'); assert.equal(rec.method, 'survey'); assert.equal(rec.headcount, 100); assert.equal(rec.working_days, 230);
+  assert.ok(Math.abs(rec.result.kg / 1000 - hq.t) / hq.t < 0.02, `${rec.result.kg / 1000} vs ${hq.t}`);
+  const acts = (await pq(`SELECT i.code, count(*)::int AS n FROM activity a JOIN item i ON i.id = a.item_id WHERE a.commute_record_id = $1 GROUP BY 1`, [rec.id])).rows;
+  assert.ok(acts.every((a) => a.n === 12), JSON.stringify(acts));
+  assert.ok(acts.some((a) => a.code === 'commute:home:office-equipment'), 'home working counted when asked');
+  assert.equal(Number((await pq('SELECT count(*) FROM commute_record WHERE facility_id = $1 AND year = 2025', [f2])).rows[0].count), 1, 'once a year per facility: replaced');
+  // published: fixed until reopened; not answerable; another company sees nothing
+  d = (await api('GET', `/api/surveys/${id}`, undefined, tenantA)).body;
+  assert.equal(d.survey.status, 'published');
+  assert.equal((await api('DELETE', `/api/surveys/${id}`, undefined, tenantA)).status, 400);
+  assert.equal((await pub('POST', '/api/public/survey/lookup', { code: by('Omar Ali').code })).status, 409);
+  assert.equal((await api('GET', `/api/surveys/${id}`, undefined, tenantB)).status, 404);
+  assert.equal((await api('GET', '/api/surveys', undefined, tenantB)).body.surveys.length, 0);
+  assert.equal((await api('POST', `/api/surveys/${id}/reopen`, {}, tenantA)).status, 200);
+  // codes are rate-limited per address
+  let last = 0;
+  for (let i = 0; i < 22; i++) last = (await pub('POST', '/api/public/survey/lookup', { code: 'AAAAAAAA' }, '10.9.9.9')).status;
+  assert.equal(last, 429);
+});

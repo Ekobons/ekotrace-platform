@@ -102,11 +102,13 @@ export interface TypedRow {
   /** the year's total (vehicle-km for cars and motorbikes, passenger-km otherwise), when known */
   annualKm?: number;
 }
-export interface SurveyAnswer { mode: CommuteMode; km?: number | null; days?: number | null; occupants?: number | null; fuel?: CarFuel; mode2?: CommuteMode | null; km2?: number | null }
-export interface CommuteSettings { year: number; workingDays: number; weekend: Weekend }
+export interface SurveyAnswer { mode: CommuteMode; km?: number | null; days?: number | null; occupants?: number | null; fuel?: CarFuel; mode2?: CommuteMode | null; km2?: number | null; /** days a week working from home */ wfhDays?: number | null }
+export interface CommuteSettings { year: number; workingDays: number; weekend: Weekend; /** count home working (office equipment per FTE hour, 8 h a day) */ homeworking?: boolean }
+export const HOME_ITEM = 'commute:home:office-equipment';
+export const HOURS_PER_DAY = 8;
 
 /** One line of the result: a catalogue item and the year's quantity in its unit. */
-export interface CommuteLine { item: string; mode: CommuteMode; fuel?: CarFuel; unit: 'km' | 'pkm'; quantity: number; personKm: number; people: number; measured: boolean }
+export interface CommuteLine { item: string; mode: CommuteMode; fuel?: CarFuel; unit: 'km' | 'pkm' | 'fte_h'; quantity: number; personKm: number; people: number; measured: boolean }
 export interface CommuteResult {
   lines: CommuteLine[];
   personKm: number;
@@ -181,6 +183,11 @@ export function commuteSurvey(answers: SurveyAnswer[], s: CommuteSettings, headc
       add(lines, { item: itemFor(mode, a.fuel), mode, fuel: m.perVehicle && mode !== 'motorbike' ? a.fuel ?? 'unknown' : undefined, unit: m.unit,
         quantity: (m.perVehicle ? pkm / occ : pkm) * scale, personKm: pkm * scale, people: mode === a.mode ? scale : 0, measured: false });
     }
+  }
+  if (s.homeworking) {
+    const h = answers.reduce((t, a) => t + Math.min(per, Math.max(0, a.wfhDays ?? 0)) * (s.workingDays / per) * HOURS_PER_DAY, 0) * scale;
+    if (h > 0) { add(lines, { item: HOME_ITEM, mode: 'wfh', unit: 'fte_h', quantity: h, personKm: 0, people: 0, measured: false });
+      steps.push(`Home working: days at home a week × ${fmt(s.workingDays / per)} working weeks × ${HOURS_PER_DAY} h (office equipment per FTE hour)`); }
   }
   if (noKm) warnings.push(`${noKm} answers have no distance: they count as respondents but add no travel.`);
   steps.push(`${n} answers for ${headcount} employees (response rate ${Math.round(rate * 100)}%): each answer stands for ${fmt(scale)} employees`);

@@ -105,6 +105,8 @@ export interface DesnzParsed {
   travel: DesnzTravelRow[];
   /** Scope 3 water supply and treatment, kg CO2e per m³ */
   water: { supply: number | null; treatment: number | null };
+  /** home working, kg CO2e per FTE working hour: office equipment, heating, both */
+  homeworking: { kind: string; co2e: number }[];
   evEnergy: DesnzEvEnergyRow[];
   /** UK grid electricity (Scope 2, location-based), kg CO2e per kWh and its gas split */
   ukGrid: { co2e: number | null; gasCo2e: { CO2?: number; CH4?: number; N2O?: number } } | null;
@@ -193,6 +195,7 @@ export async function parseDesnz(path: string): Promise<DesnzParsed> {
   const vehicles = new Map<string, DesnzVehicleRow>();
   const travel = new Map<string, DesnzTravelRow>();
   const water: DesnzParsed['water'] = { supply: null, treatment: null };
+  const homeworking: DesnzParsed['homeworking'] = [];
   const evEnergy: DesnzEvEnergyRow[] = [];
   const waste: DesnzWasteRow[] = [];
   let ukGrid: DesnzParsed['ukGrid'] = null;
@@ -203,6 +206,10 @@ export async function parseDesnz(path: string): Promise<DesnzParsed> {
     const scope = text(g('Scope')), l1 = text(g('Level 1')), l2 = text(g('Level 2')), l3 = text(g('Level 3'));
     const uom = text(g('UOM')), ghg = text(g('GHG/Unit')).toLowerCase(), colText = col['Column Text'] ? text(g('Column Text')) : '';
     const v = num(row.getCell(col[valueCol]!).value);
+    if (scope === 'Scope 3' && l1 === 'Homeworking' && /fte working hour/i.test(uom) && ghg.startsWith('kg co2e') && v != null) {
+      homeworking.push({ kind: l2, co2e: v });
+      return;
+    }
     if (!l3) return;
 
     if (scope === 'Scope 3' && l1 === 'Waste disposal' && uom === 'tonnes') {
@@ -305,7 +312,7 @@ export async function parseDesnz(path: string): Promise<DesnzParsed> {
     gases: [...gases.values()],
     vehicles: [...vehicles.values()].filter((r) => r.co2e != null),
     travel: [...travel.values()].filter((r) => r.co2e != null),
-    water,
+    water, homeworking,
     evEnergy, ukGrid, ukEnergy, waste,
     sha256: createHash('sha256').update(buf).digest('hex'),
   };

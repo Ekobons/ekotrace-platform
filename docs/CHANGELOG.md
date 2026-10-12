@@ -2,6 +2,17 @@
 
 Newest first.
 
+## 2026-10-13 (22) — Surveys (Capture → Surveys), connected to employee commuting
+
+- **Surveys** (migration 022): `survey` (year, due date, working weeks, facilities, headcount per facility, home-working on/off, status draft → open → closed → published, what was published), `survey_participant` (name, email, facility, department, personal 8-character code unique across companies, sent), `survey_response` (one per person; answers; entered on behalf by). Row-level security on all three. `commute_record.survey_id`.
+- API `/api/surveys`: list (answers / invited, estimate, headcount), create, detail (results, people — names, emails, codes and answers for admins only), edit, open / close / reopen, delete (not when published), add people (pasted CSV text or rows; facility matched by name; duplicates by email skipped), remove (not when answered), mark sent, invitations CSV (link, code, text), answer on behalf, publish (`dryRun` plan per facility: new / replaces typed-in / file / earlier publish; skipped without access, with approved entries, or headcount 0).
+- Public `/api/public/survey/lookup` and `PUT /api/public/survey` (no session; code normalised; open surveys only; rate-limited per address; audit as "survey respondent"); page `/survey` with the code and a link from the sign-in page.
+- Results: per facility mean kg per respondent × headcount; 95% range with finite-population correction; company average for facilities without answers; small-sample flag; by mode and by department. Publishing calls the same save as Add data (`saveCommute`), so a facility keeps one commuting record per year with monthly entries.
+- **Home working** (optional): DESNZ "Homeworking" per FTE working hour (office equipment / heating / both, 2022–2026; importer v11 — the rows have no Level 3), items `commute:home:*`, unit `fte_h`; engine adds home days × 8 h.
+- Web: Surveys list with cards and the new-survey form; survey tabs Overview, People, Questionnaire, Responses, Results & publish, Actions (as in the prototype). Add data → Employee commuting → From a survey lists the Ekotrace surveys of the facility and year and shows when a record was published from one.
+- Demo: "Employee commuting 2026" for BEEAH Headquarters and Data Centre Dubai, 72 DEMO people, ~45 answers, open.
+- Tests: API 53 (new: surveys end to end), calc 52.
+
 ## 2026-10-12 (21) — Water category; waste details for ESG reporting
 
 - **Water** (migration 021): categories `water_supply` (Scope 3.1, "Water withdrawn") and `water_discharge` (Scope 3.5), calc method `water`; items by source (mains desalinated / other, tanker, TSE bought, own well, seawater, rain) and destination (public sewer, tanker for treatment, irrigation / soak-away, sea, surface water), plus "recycled or reused on site"; item attrs `flow`, `gri` (GRI 303 source type), `factor`. Units m³, L, kL, ML (new), imperial gallons, thousand imperial gallons (new `kgal_uk`).

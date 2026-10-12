@@ -24,6 +24,8 @@ import { Bills } from './pages/Bills';
 import { Integrations } from './pages/Integrations';
 import { Manual } from './pages/Manual';
 import { Console } from './pages/Console';
+import { SurveyAnswerPage } from './pages/SurveyAnswer';
+import { Surveys } from './pages/Surveys';
 
 interface Ctx {
   me: Me;
@@ -44,6 +46,7 @@ const NAV: { group?: string; items: NavItem[] }[] = [
   { group: 'Capture', items: [
     { to: '/data/stationary_combustion', label: 'Add data', icon: 'plus', roles: ['super_admin', 'admin', 'manager', 'preparer'] },
     { to: '/entries', label: 'Entries & results', icon: 'list' },
+    { to: '/surveys', label: 'Surveys', icon: 'users', roles: ['super_admin', 'admin', 'manager', 'verifier'] },
     { label: 'Approvals', icon: 'check', stage: 2 }, { label: 'Data progress', icon: 'grid', stage: 2 }, { label: 'Collection calendar', icon: 'calendar', stage: 2 },
     { label: 'Inbox & to-dos', icon: 'inbox', stage: 2 }, { label: 'Document vault', icon: 'folder', stage: 2 }, { label: 'Batch runs', icon: 'upload', stage: 4 },
     { label: 'QR & field app', icon: 'qr', stage: 4 },
@@ -79,6 +82,8 @@ export function App() {
   }, []);
 
   const toast = (m: string) => { setMsg(m); window.setTimeout(() => setMsg(null), 3500); };
+  // employees answering a survey: no sign-in
+  if (window.location.pathname === '/survey') return <SurveyAnswerPage />;
   if (me === 'loading') return <div className="empty">Loading…</div>;
   if (me === null) return <Login onDone={reload} />;
   if (me.user.mustChangePassword || mustChange) return <ChangePassword forced onDone={reload} />;
@@ -153,6 +158,8 @@ function Shell() {
           <Route path="/data/:category" element={<NeedCo><AddData /></NeedCo>} />
           <Route path="/dashboards" element={<NeedCo><Dashboards /></NeedCo>} />
           <Route path="/entries" element={<NeedCo><Entries /></NeedCo>} />
+          <Route path="/surveys" element={<NeedCo><Surveys /></NeedCo>} />
+          <Route path="/surveys/:id" element={<NeedCo><Surveys /></NeedCo>} />
           <Route path="/organisation" element={<NeedCo><Organisation /></NeedCo>} />
           <Route path="/people" element={<NeedCo><People /></NeedCo>} />
           <Route path="/methodology" element={<NeedCo><Methodology /></NeedCo>} />

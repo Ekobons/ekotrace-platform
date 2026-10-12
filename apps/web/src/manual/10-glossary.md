@@ -40,6 +40,11 @@
 | Passenger-km | One person travelling one km; buses, rail and taxis are counted this way. Cars are counted per car-km (shared cars divided by the people in them) |
 | Commuting survey | One answer per employee about how they travel to work; scaled up to all employees of the facility (employees ÷ answers) |
 | Response rate | Survey answers ÷ employees of the facility; below 30% a warning is shown |
+| Ekotrace survey | A survey run in Ekotrace (Capture → Surveys): people answer with a personal code, without an account; results are published into Employee commuting |
+| Personal code | 8 letters and digits (no 0/O or 1/I) given to each person asked; it finds their survey and lets them change their answer until it closes |
+| 95% range | How far a survey estimate could move with a different sample: ± 1.96 × standard deviation ÷ √answers × finite-population correction × headcount |
+| Small sample | Fewer than 30 answers or fewer than 10% of the facility's headcount |
+| FTE working hour | One full-time employee working one hour; DESNZ home-working factors are per FTE working hour |
 | Working days | Weekdays of the year minus public holidays and annual leave; used for commuting distances and to split the year into months |
 | Water withdrawal | All water a facility takes in: from a utility, tanker, TSE, own wells, the sea or rain (GRI 303-3) |
 | Water discharge | Water a facility lets out: to a sewer, tanker for treatment, land, sea or surface water (GRI 303-4) |

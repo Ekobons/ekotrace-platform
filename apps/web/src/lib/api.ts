@@ -193,11 +193,34 @@ export interface CommuteRecord {
   id: string; facility_id: string; facility: string; year: number; method: 'typed' | 'survey'; headcount: number; working_days: number; weekend: Weekend;
   rows: CommuteTypedRow[]; survey: CommuteBody['survey'] | null; result: CommuteResult & { settings?: { holidays: number | null; leave: number | null } }; note: string | null;
   updated_at: string; updated_by_name: string | null; entries: number; approved: number; answers: number;
+  survey_id: string | null; survey_name: string | null;
 }
 export interface SurveyRead {
   file: string; headers: string[]; columns: Record<string, string>; answers: CommuteAnswer[]; blank: number; otherSite: number; site: string | null;
   sites: { value: string; count: number }[]; unrecognised: { value: string; count: number }[];
 }
+
+// ------------------------------------------------------------------ surveys --
+export interface SurveyAnswerBody { days: number; wfh: number; legs: { mode: string; km: number }[]; fuel: string; occ: number }
+export interface Survey {
+  id: string; name: string; year: number; close_at: string | null; weeks: number; wfh: boolean; facility_ids: string[]; headcount: Record<string, number>;
+  status: 'draft' | 'open' | 'closed' | 'published'; created_at: string; published_at: string | null; published_by_name?: string | null;
+  published?: { facilityId: string; name: string; t: number; entries?: number; status: string; reason?: string }[] | null;
+  invited?: number; answered?: number; est?: number; N?: number; canManage?: boolean;
+}
+export interface SurveyFacResult { id: string; name: string; N: number; n: number; invited: number; rate: number; mean: number; t: number; moe: number | null; useG: boolean; low: boolean; fromFacility: boolean }
+export interface SurveyResults {
+  facs: SurveyFacResult[]; tot: number; totLo: number; totHi: number; n: number; N: number; gMean: number; modes: Record<string, number>;
+  byItem: Record<string, { name: string; q: number; unit: string; t: number }>; byDept: Record<string, { n: number; kg: number }>;
+}
+export interface SurveyPerson { id: string; name?: string; email?: string | null; facility_id: string; facility: string; department: string | null; code?: string; sent_at?: string | null; answered_at: string | null; entered_by?: string | null }
+export interface SurveyDetail {
+  survey: Survey; facilities: { id: string; name: string; employees: number | null }[]; results: SurveyResults; people: SurveyPerson[];
+  answers: { id: string; participant_id: string; facility_id: string; facility: string; answers: SurveyAnswerBody; updated_at: string; entered_by: string | null; kg: number }[];
+  canManage: boolean; canPublish: boolean; link: string;
+}
+export interface SurveyOptions { modes: { key: string; label: string }[]; fuels: { key: string; label: string }[]; statuses: Record<string, string> }
+export interface PublishRow { facilityId: string; name: string; t: number; entries?: number; status: 'ok' | 'skipped'; reason?: string; replaces?: string | null }
 
 export const api = {
   brand: () => call<{ name: string; productName?: string; colors?: Record<string, string> }>('GET', '/api/brand'),
@@ -373,6 +396,21 @@ export const api = {
   addRates: (rows: { currency: string; kind: string; period: string; perUsd: number; source: string }[], shared = false) => call<{ saved: number }>('POST', '/api/currency/rates', { rows, shared }),
   deleteRate: (id: number) => call<{ ok: true }>('DELETE', `/api/currency/rates/${id}`),
   wasteContractors: () => call<{ contractors: string[] }>('GET', '/api/waste/contractors'),
+  surveyOptions: () => call<SurveyOptions>('GET', '/api/surveys/options'),
+  surveys: () => call<{ surveys: Survey[]; canCreate: boolean }>('GET', '/api/surveys'),
+  createSurvey: (b: { name: string; year: number; closeAt: string | null; weeks: number; facilityIds: string[]; wfh: boolean }) => call<{ id: string }>('POST', '/api/surveys', b),
+  survey: (id: string) => call<SurveyDetail>('GET', `/api/surveys/${id}`),
+  patchSurvey: (id: string, b: { name?: string; closeAt?: string | null; weeks?: number; wfh?: boolean; headcount?: Record<string, number> }) => call<{ ok: true }>('PATCH', `/api/surveys/${id}`, b),
+  surveyStatus: (id: string, status: 'open' | 'closed') => call<{ ok: true }>('POST', `/api/surveys/${id}/status`, { status }),
+  reopenSurvey: (id: string) => call<{ ok: true }>('POST', `/api/surveys/${id}/reopen`),
+  deleteSurvey: (id: string) => call<{ ok: true }>('DELETE', `/api/surveys/${id}`),
+  addSurveyPeople: (id: string, b: { text: string; defaultFacilityId?: string }) => call<{ added: number; skipped: number; problems: string[] }>('POST', `/api/surveys/${id}/participants`, b),
+  removeSurveyPerson: (id: string, pid: string) => call<{ ok: true }>('DELETE', `/api/surveys/${id}/participants/${pid}`),
+  surveySent: (id: string, ids: string[]) => call<{ marked: number }>('POST', `/api/surveys/${id}/sent`, { ids }),
+  answerOnBehalf: (id: string, pid: string, b: { facilityId: string; answers: SurveyAnswerBody }) => call<{ kg: number }>('PUT', `/api/surveys/${id}/participants/${pid}/answer`, b),
+  publishSurvey: (id: string, dryRun: boolean) => call<{ dryRun: boolean; facilities: PublishRow[] }>('POST', `/api/surveys/${id}/publish`, { dryRun }),
+  surveyLookup: (code: string) => call<{ company: string; survey: { name: string; year: number; wfh: boolean; closeAt: string | null }; firstName: string; facilities: { id: string; name: string }[]; facilityId: string; answers: SurveyAnswerBody | null; modes: { key: string; label: string }[]; fuels: { key: string; label: string }[] }>('POST', '/api/public/survey/lookup', { code }),
+  surveyAnswer: (code: string, facilityId: string, answers: SurveyAnswerBody) => call<{ ok: true; kg: number }>('PUT', '/api/public/survey', { code, facilityId, answers }),
   commuteOptions: (year: number) => call<CommuteOptions>('GET', `/api/commuting/options?year=${year}`),
   commuting: (year: number) => call<{ facilities: { id: string; name: string; parent: string | null; employees: number | null; canEnter: boolean; record: { id: string; method: string; headcount: number; kg: number; personKm: number; responseRate: number | null; entries: number; approved: number; updated_at: string; updated_by_name: string | null } | null }[] }>('GET', `/api/commuting?year=${year}`),
   commuteRecord: (facilityId: string, year: number) => call<{ facility: { id: string; name: string; employees: number | null }; record: CommuteRecord | null; answers: CommuteAnswer[]; months: { m: number; t: number; n: number; approved: number }[] }>('GET', `/api/commuting/record?facilityId=${facilityId}&year=${year}`),

@@ -29,6 +29,7 @@ import { publishedLineRoutes } from './modules/purchases/publishedLines.routes.j
 import { groupRoutes } from './modules/groups.routes.js';
 import { dashboardRoutes } from './modules/dashboard.routes.js';
 import { commuteRoutes } from './modules/commute.routes.js';
+import { surveyPublicRoutes, surveyRoutes } from './modules/survey.routes.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const BRANDS = join(HERE, '../../../brands');
@@ -63,6 +64,8 @@ export async function buildApp(opts: { logger?: boolean } = {}): Promise<Fastify
   // Machine API for systems that send meter readings: API key, no session.
   await app.register(meterIngestRoutes);
   await app.register(purchaseIngestRoutes);
+  // Employees answering a survey with their personal code: no session.
+  await app.register(surveyPublicRoutes);
   await app.register(async (secured) => {
     secured.addHook('onRequest', authenticate);
     await secured.register(orgRoutes);
@@ -85,6 +88,7 @@ export async function buildApp(opts: { logger?: boolean } = {}): Promise<Fastify
     await secured.register(groupRoutes);
     await secured.register(dashboardRoutes);
     await secured.register(commuteRoutes);
+    await secured.register(surveyRoutes);
   });
 
   // The screens (apps/web, after `npm run build`) are served from the same

@@ -22,6 +22,7 @@ export function Login({ onDone }: { onDone: () => void }) {
         {err && <div className="note bad">{err}</div>}
         <button className="btn p" disabled={busy} style={{ height: 42 }}>{busy ? 'Checking…' : 'Log in'}</button>
         <p className="sub">Forgot your password? Ask your company's Super admin or Admin to reset it.</p>
+        <a className="btn ghost" href="/survey" style={{ justifySelf: 'start' }}>Answering a survey? Enter your code →</a>
       </form>
     </div>
   );

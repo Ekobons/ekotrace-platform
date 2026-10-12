@@ -8,10 +8,11 @@
  * split by the working days of each month.
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useApp } from '../App';
 import {
   api, download, num, tco2e, type CommuteAnswer, type CommuteBody, type CommuteMode, type CommuteOptions, type CommuteRecord, type CommuteResult,
-  type CommuteTypedRow, type SurveyRead, type Weekend,
+  type CommuteTypedRow, type Survey, type SurveyRead, type Weekend,
 } from '../lib/api';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -43,6 +44,9 @@ export function CommutingEntry({ facilityId, year, onSaved }: { facilityId: stri
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const [surveys, setSurveys] = useState<{ list: Survey[]; canCreate: boolean } | null>(null);
+  useEffect(() => { api.surveys().then((r) => setSurveys({ list: r.surveys, canCreate: r.canCreate })).catch(() => setSurveys(null)); }, []);
+  const mine = (surveys?.list ?? []).filter((x) => x.year === year && x.facility_ids.includes(facilityId));
 
   useEffect(() => { api.commuteOptions(year).then(setOpt).catch(() => {}); }, [year]);
   const load = () => {
@@ -113,7 +117,7 @@ export function CommutingEntry({ facilityId, year, onSaved }: { facilityId: stri
       <div className="card" style={{ display: 'grid', gap: 10 }}>
         <div className="row" style={{ gap: 10, flexWrap: 'wrap' }}>
           <b>{facName} · {year}</b>
-          {rec ? <span className="chip">{rec.method === 'survey' ? `Survey · ${rec.answers} answers` : 'Typed in'} · {tco2e(rec.result.kg)} tCO₂e · saved {rec.updated_at.slice(0, 10)}{rec.updated_by_name ? ` by ${rec.updated_by_name}` : ''}</span>
+          {rec ? <span className="chip">{rec.survey_id ? `From survey “${rec.survey_name ?? 'Ekotrace survey'}” · ${rec.answers} answers` : rec.method === 'survey' ? `Survey file · ${rec.answers} answers` : 'Typed in'} · {tco2e(rec.result.kg)} tCO₂e · saved {rec.updated_at.slice(0, 10)}{rec.updated_by_name ? ` by ${rec.updated_by_name}` : ''}</span>
             : <span className="chip grey">Not entered for {year} yet</span>}
           {locked && <span className="chip warn">{rec!.approved} of {rec!.entries} monthly entries approved: locked</span>}
           <span className="grow" />
@@ -163,7 +167,24 @@ export function CommutingEntry({ facilityId, year, onSaved }: { facilityId: stri
           </div>
         </div>
       ) : (
+        <>
         <div className="card" style={{ display: 'grid', gap: 10 }}>
+          <div className="row" style={{ gap: 10 }}><b>Ekotrace surveys</b><span className="muted small">Employees answer with a personal code; results are scaled up to the headcount and published here.</span><span className="grow" />
+            {surveys?.canCreate && <Link className="btn sm" to="/surveys?new=1">+ New survey</Link>}</div>
+          {rec?.survey_id && <div className="note info" style={{ margin: 0 }}>{year} for {facName} was published from the survey <Link to={`/surveys/${rec.survey_id}?tab=results`}>{rec.survey_name ?? 'Ekotrace survey'}</Link>. To change it, reopen that survey and publish again — or save other data here, which replaces it.</div>}
+          {mine.length ? mine.map((x) => { const inv = x.invited ?? 0, ans = x.answered ?? 0; return (
+            <div key={x.id} className="row" style={{ gap: 10, flexWrap: 'wrap', borderTop: '1px solid var(--line)', paddingTop: 10 }}>
+              <span className="gic">🚌</span><b>{x.name}</b>
+              <span className={`chip ${x.status === 'published' ? '' : x.status === 'open' ? 'info' : x.status === 'closed' ? 'warn' : 'grey'}`}>{({ draft: 'Draft', open: 'Collecting answers', closed: 'Closed', published: 'Published to Scope 3' } as const)[x.status]}</span>
+              <span className="muted small">{ans} / {inv} answered{x.close_at ? ` · answers by ${x.close_at.slice(0, 10)}` : ''}</span>
+              <span className="grow" />
+              <Link className="btn sm" to={`/surveys/${x.id}`}>Open</Link>
+              {x.status !== 'published' && x.status !== 'draft' && <Link className="btn p sm" to={`/surveys/${x.id}?tab=results`}>Results & publish</Link>}
+            </div>); })
+            : <span className="muted small">{surveys ? `No Ekotrace survey covers ${facName} in ${year}.` : 'Surveys are run by admins and managers.'}</span>}
+        </div>
+        <div className="card" style={{ display: 'grid', gap: 10 }}>
+          <div className="row" style={{ gap: 10 }}><b>Or use answers collected elsewhere</b></div>
           <div className="row" style={{ gap: 10, flexWrap: 'wrap' }}>
             <button className="btn sm" onClick={() => download('/api/commuting/survey-template', 'Ekotrace commuting survey.xlsx')}>Download the survey file</button>
             <input ref={fileRef} type="file" accept=".xlsx,.csv,.txt" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) { setFile(f); void read(f); } e.target.value = ''; }} />
@@ -190,13 +211,14 @@ export function CommutingEntry({ facilityId, year, onSaved }: { facilityId: stri
                 <button className="btn sm" style={{ alignSelf: 'flex-end' }} onClick={() => file && void read(file, { map: Object.fromEntries(Object.entries(map).filter(([, v]) => v)), site: sv.site ?? undefined })}>Read again</button>
               </div></details>
           </>}
-          {!sv && rec?.method === 'survey' && <span className="muted small">Saved from {rec.survey?.file ?? 'a survey file'}: {rec.answers} answers. Upload the file again to change them.</span>}
+          {!sv && rec?.method === 'survey' && !rec.survey_id && <span className="muted small">Saved from {rec.survey?.file ?? 'a survey file'}: {rec.answers} answers. Upload the file again to change them.</span>}
           {answers.length > 0 && (
             <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
               <span className="small"><b>{answers.length}</b> answers for <b>{headcount || '—'}</b> employees{headcount ? ` · response rate ${Math.round((answers.length / Number(headcount)) * 100)}%` : ''}:</span>
               {opt?.modes.filter((m) => modeCount.get(m.key)).map((m) => <span key={m.key} className="chip grey">{m.label} {Math.round(((modeCount.get(m.key) ?? 0) / answers.length) * 100)}%</span>)}
             </div>)}
         </div>
+        </>
       )}
 
       <div className="row" style={{ gap: 8 }}>

@@ -42,6 +42,7 @@ const typedRow = z.object({
 const answer = z.object({
   row: z.number().int().optional(), mode: z.enum(MODE_KEYS), km: num.min(0).max(500).nullable().optional(), days: num.min(0).max(7).nullable().optional(),
   occupants: num.min(1).max(60).nullable().optional(), fuel: z.enum(FUEL_KEYS).optional(), mode2: z.enum(MODE_KEYS).nullable().optional(), km2: num.min(0).max(500).nullable().optional(),
+  wfhDays: num.min(0).max(7).nullable().optional(),
 });
 const body = z.object({
   facilityId: z.string().uuid(),
@@ -50,6 +51,7 @@ const body = z.object({
   headcount: z.number().int().min(0).max(1e6),
   workingDays: num.positive().max(366),
   weekend: WEEKEND.default('sat_sun'),
+  homeworking: z.boolean().optional(),
   holidays: num.min(0).max(100).optional(),
   leave: num.min(0).max(100).optional(),
   rows: z.array(typedRow).max(200).default([]),
@@ -58,10 +60,11 @@ const body = z.object({
     unrecognised: z.number().int().optional() }).optional(),
   note: z.string().max(1000).optional().nullable(),
 });
-type Body = z.infer<typeof body>;
+export type Body = z.infer<typeof body>;
+export { body as commuteBody, compute as commuteCompute, priced as commutePriced };
 
 function compute(b: Body): CommuteResult {
-  const s = { year: b.year, workingDays: b.workingDays, weekend: b.weekend };
+  const s = { year: b.year, workingDays: b.workingDays, weekend: b.weekend, homeworking: b.homeworking };
   try {
     return b.method === 'survey' ? commuteSurvey(b.answers as SurveyAnswer[], s, b.headcount) : commuteTyped(b.rows as Parameters<typeof commuteTyped>[0], s, b.headcount || undefined);
   } catch (e) { throw new AppError((e as Error).message); }
@@ -91,12 +94,12 @@ async function priced(c: Tx, tenant: { gwp_set: string }, fac: { id: string; cou
   return { ...r, lines, warnings, kg: lines.reduce((a, l) => a + l.kg, 0) };
 }
 
-const RECORD = `SELECT r.id, r.facility_id, f.name AS facility, r.year, r.method, r.headcount, r.working_days::float8 AS working_days, r.weekend, r.rows, r.survey, r.result, r.note,
+const RECORD = `SELECT r.id, r.facility_id, f.name AS facility, r.year, r.method, r.survey_id, sv.name AS survey_name, r.headcount, r.working_days::float8 AS working_days, r.weekend, r.rows, r.survey, r.result, r.note,
                        r.created_by, r.created_at, r.updated_by, r.updated_at, u.name AS updated_by_name,
                        (SELECT count(*)::int FROM activity a WHERE a.commute_record_id = r.id) AS entries,
                        (SELECT count(*)::int FROM activity a WHERE a.commute_record_id = r.id AND a.status = 'approved') AS approved,
                        (SELECT count(*)::int FROM commute_response x WHERE x.record_id = r.id) AS answers
-                  FROM commute_record r JOIN org_node f ON f.id = r.facility_id LEFT JOIN app_user u ON u.id::text = r.updated_by`;
+                  FROM commute_record r JOIN org_node f ON f.id = r.facility_id LEFT JOIN app_user u ON u.id::text = r.updated_by LEFT JOIN survey sv ON sv.id = r.survey_id`;
 
 // ------------------------------------------------------------------ survey file --
 const COLS: [key: string, test: (h: string) => boolean][] = [
@@ -179,6 +182,59 @@ async function readSurvey(buf: Buffer, filename: string, opts: { map?: Record<st
   };
 }
 
+/**
+ * Save a facility's commuting for a year: the record (typed in, a survey file, or an Ekotrace survey),
+ * its answers, and one entry per mode and month split by working days. Replaces the earlier record;
+ * refused once any of its monthly entries is approved.
+ */
+export async function saveCommute(c: Tx, req: FastifyRequest, b: Body, opts: { surveyId?: string } = {}) {
+  const tenant = requireTenant(req);
+  const fac = await facilityFor(c, req, b.facilityId, true);
+  const t = await tenantSettings(tenant);
+  const old = (await c.query(`${RECORD} WHERE r.facility_id = $1 AND r.year = $2 FOR UPDATE OF r`, [b.facilityId, b.year])).rows[0];
+  if (old?.approved) throw new AppError(`${old.approved} of this record's monthly entries are approved: it can no longer be changed. Ask an approver to reject them first.`, 409, 'LOCKED');
+  const r = await priced(c, t, fac, b, compute(b));
+  const result = { ...r, settings: { holidays: b.holidays ?? null, leave: b.leave ?? null } };
+  const rec = old
+    ? (await c.query(`UPDATE commute_record SET method=$2, headcount=$3, working_days=$4, weekend=$5, rows=$6, survey=$7, result=$8, note=$9, updated_by=$10, survey_id=$11, updated_at=now() WHERE id=$1 RETURNING id`,
+        [old.id, b.method, b.headcount, b.workingDays, b.weekend, JSON.stringify(b.method === 'typed' ? b.rows : []), b.method === 'survey' ? JSON.stringify(b.survey ?? {}) : null, JSON.stringify(result), b.note ?? null, req.user.id, opts.surveyId ?? null])).rows[0]
+    : (await c.query(`INSERT INTO commute_record (tenant_id, facility_id, year, method, headcount, working_days, weekend, rows, survey, result, note, created_by, updated_by, survey_id)
+                      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$12,$13) RETURNING id`,
+        [tenant, fac.id, b.year, b.method, b.headcount, b.workingDays, b.weekend, JSON.stringify(b.method === 'typed' ? b.rows : []), b.method === 'survey' ? JSON.stringify(b.survey ?? {}) : null,
+         JSON.stringify(result), b.note ?? null, req.user.id, opts.surveyId ?? null])).rows[0];
+  // answers kept for audit
+  await c.query('DELETE FROM commute_response WHERE record_id = $1', [rec.id]);
+  if (b.method === 'survey' && b.answers.length) {
+    const A = b.answers;
+    await c.query(
+      `INSERT INTO commute_response (tenant_id, record_id, row_no, mode, km, days, occupants, fuel, mode2, km2)
+       SELECT $1, $2, * FROM unnest($3::int[], $4::text[], $5::numeric[], $6::numeric[], $7::numeric[], $8::text[], $9::text[], $10::numeric[])`,
+      [tenant, rec.id, A.map((a, i) => a.row ?? i + 1), A.map((a) => a.mode), A.map((a) => a.km ?? null), A.map((a) => a.days ?? null), A.map((a) => a.occupants ?? null),
+       A.map((a) => a.fuel ?? null), A.map((a) => a.mode2 ?? null), A.map((a) => a.km2 ?? null)]);
+  }
+  // the year as monthly entries (working days of each month), replacing the previous ones
+  await c.query('DELETE FROM activity_result WHERE activity_id IN (SELECT id FROM activity WHERE commute_record_id = $1)', [rec.id]);
+  await c.query('DELETE FROM activity WHERE commute_record_id = $1', [rec.id]);
+  const shares = monthShares(b.year, b.weekend);
+  const note = `Employee commuting ${b.year}, ${b.method === 'survey' ? `survey (${b.answers.length} answers for ${b.headcount} employees)` : 'typed in'}; split by working days per month`;
+  let entries = 0;
+  for (const l of r.lines) {
+    const parts = splitByMonth(l.quantity, shares);
+    for (let m = 0; m < 12; m++) {
+      if (!(parts[m]! > 0)) continue;
+      const last = new Date(Date.UTC(b.year, m + 1, 0)).getUTCDate();
+      const mm = String(m + 1).padStart(2, '0');
+      const e = await saveEntry(c, req, t, { facilityId: fac.id, itemId: l.itemId, quantity: parts[m]!, unit: l.unit, periodStart: `${b.year}-${mm}-01`, periodEnd: `${b.year}-${mm}-${last}`,
+        dataType: l.measured ? 'actual' : 'estimated', note }, { quiet: true });
+      await c.query('UPDATE activity SET commute_record_id = $2 WHERE id = $1', [e.id, rec.id]);
+      entries++;
+    }
+  }
+  await audit(c, req, old ? 'commute.update' : 'commute.create', 'commute_record', rec.id,
+    { facility: fac.name, year: b.year, method: b.method, headcount: b.headcount, workingDays: b.workingDays, answers: b.answers.length || undefined, kgCo2e: Math.round(r.kg), entries });
+  return { id: rec.id, entries, ...result };
+}
+
 // ------------------------------------------------------------------------ routes --
 export async function commuteRoutes(app: FastifyInstance) {
   app.get('/api/commuting/options', async (req) => {
@@ -258,52 +314,7 @@ export async function commuteRoutes(app: FastifyInstance) {
     const tenant = requireTenant(req);
     requireRole(req, 'super_admin', 'admin', 'manager', 'preparer');
     const b = body.parse(req.body);
-    return tenantTx(tenant, async (c) => {
-      const fac = await facilityFor(c, req, b.facilityId, true);
-      const t = await tenantSettings(tenant);
-      const old = (await c.query(`${RECORD} WHERE r.facility_id = $1 AND r.year = $2 FOR UPDATE OF r`, [b.facilityId, b.year])).rows[0];
-      if (old?.approved) throw new AppError(`${old.approved} of this record's monthly entries are approved: it can no longer be changed. Ask an approver to reject them first.`, 409, 'LOCKED');
-      const r = await priced(c, t, fac, b, compute(b));
-      const result = { ...r, settings: { holidays: b.holidays ?? null, leave: b.leave ?? null } };
-      const rec = old
-        ? (await c.query(`UPDATE commute_record SET method=$2, headcount=$3, working_days=$4, weekend=$5, rows=$6, survey=$7, result=$8, note=$9, updated_by=$10, updated_at=now() WHERE id=$1 RETURNING id`,
-            [old.id, b.method, b.headcount, b.workingDays, b.weekend, JSON.stringify(b.method === 'typed' ? b.rows : []), b.method === 'survey' ? JSON.stringify(b.survey ?? {}) : null, JSON.stringify(result), b.note ?? null, req.user.id])).rows[0]
-        : (await c.query(`INSERT INTO commute_record (tenant_id, facility_id, year, method, headcount, working_days, weekend, rows, survey, result, note, created_by, updated_by)
-                          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$12) RETURNING id`,
-            [tenant, fac.id, b.year, b.method, b.headcount, b.workingDays, b.weekend, JSON.stringify(b.method === 'typed' ? b.rows : []), b.method === 'survey' ? JSON.stringify(b.survey ?? {}) : null,
-             JSON.stringify(result), b.note ?? null, req.user.id])).rows[0];
-      // answers kept for audit
-      await c.query('DELETE FROM commute_response WHERE record_id = $1', [rec.id]);
-      if (b.method === 'survey' && b.answers.length) {
-        const A = b.answers;
-        await c.query(
-          `INSERT INTO commute_response (tenant_id, record_id, row_no, mode, km, days, occupants, fuel, mode2, km2)
-           SELECT $1, $2, * FROM unnest($3::int[], $4::text[], $5::numeric[], $6::numeric[], $7::numeric[], $8::text[], $9::text[], $10::numeric[])`,
-          [tenant, rec.id, A.map((a, i) => a.row ?? i + 1), A.map((a) => a.mode), A.map((a) => a.km ?? null), A.map((a) => a.days ?? null), A.map((a) => a.occupants ?? null),
-           A.map((a) => a.fuel ?? null), A.map((a) => a.mode2 ?? null), A.map((a) => a.km2 ?? null)]);
-      }
-      // the year as monthly entries (working days of each month), replacing the previous ones
-      await c.query('DELETE FROM activity_result WHERE activity_id IN (SELECT id FROM activity WHERE commute_record_id = $1)', [rec.id]);
-      await c.query('DELETE FROM activity WHERE commute_record_id = $1', [rec.id]);
-      const shares = monthShares(b.year, b.weekend);
-      const note = `Employee commuting ${b.year}, ${b.method === 'survey' ? `survey (${b.answers.length} answers for ${b.headcount} employees)` : 'typed in'}; split by working days per month`;
-      let entries = 0;
-      for (const l of r.lines) {
-        const parts = splitByMonth(l.quantity, shares);
-        for (let m = 0; m < 12; m++) {
-          if (!(parts[m]! > 0)) continue;
-          const last = new Date(Date.UTC(b.year, m + 1, 0)).getUTCDate();
-          const mm = String(m + 1).padStart(2, '0');
-          const e = await saveEntry(c, req, t, { facilityId: fac.id, itemId: l.itemId, quantity: parts[m]!, unit: l.unit, periodStart: `${b.year}-${mm}-01`, periodEnd: `${b.year}-${mm}-${last}`,
-            dataType: l.measured ? 'actual' : 'estimated', note }, { quiet: true });
-          await c.query('UPDATE activity SET commute_record_id = $2 WHERE id = $1', [e.id, rec.id]);
-          entries++;
-        }
-      }
-      await audit(c, req, old ? 'commute.update' : 'commute.create', 'commute_record', rec.id,
-        { facility: fac.name, year: b.year, method: b.method, headcount: b.headcount, workingDays: b.workingDays, answers: b.answers.length || undefined, kgCo2e: Math.round(r.kg), entries });
-      return { id: rec.id, entries, ...result };
-    });
+    return tenantTx(tenant, (c) => saveCommute(c, req, b));
   });
 
   app.delete('/api/commuting/:id', async (req) => {

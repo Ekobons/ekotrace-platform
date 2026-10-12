@@ -71,7 +71,7 @@ async function main() {
         'DELETE FROM job WHERE tenant_id = $1', 'UPDATE purchase_line SET activity_id = NULL WHERE tenant_id = $1', 'DELETE FROM activity_result WHERE tenant_id = $1', 'DELETE FROM activity WHERE tenant_id = $1',
         'DELETE FROM purchase_batch WHERE tenant_id = $1', 'DELETE FROM purchase_rule WHERE tenant_id = $1', 'DELETE FROM purchase_profile WHERE tenant_id = $1', 'DELETE FROM supplier_ef WHERE tenant_id = $1', 'DELETE FROM supplier WHERE tenant_id = $1', 'DELETE FROM fx_rate WHERE tenant_id = $1', 'DELETE FROM vehicle WHERE tenant_id = $1',
         'DELETE FROM bill WHERE tenant_id = $1', 'DELETE FROM document WHERE tenant_id = $1', 'DELETE FROM meter_reading WHERE tenant_id = $1', 'DELETE FROM meter WHERE tenant_id = $1', 'DELETE FROM api_key WHERE tenant_id = $1',
-        'DELETE FROM commute_record WHERE tenant_id = $1', 'DELETE FROM waste_deposit WHERE tenant_id = $1', 'DELETE FROM waste_site WHERE tenant_id = $1',
+        'DELETE FROM commute_record WHERE tenant_id = $1', 'DELETE FROM survey WHERE tenant_id = $1', 'DELETE FROM waste_deposit WHERE tenant_id = $1', 'DELETE FROM waste_site WHERE tenant_id = $1',
         'DELETE FROM price WHERE tenant_id = $1', 'DELETE FROM user_facility WHERE tenant_id = $1',
         'DELETE FROM session WHERE user_id IN (SELECT id FROM app_user WHERE tenant_id = $1)', 'DELETE FROM audit_log WHERE tenant_id = $1',
         'UPDATE org_node SET manager_user_id = NULL WHERE tenant_id = $1', 'DELETE FROM app_user WHERE tenant_id = $1', 'DELETE FROM tenant_catalogue WHERE tenant_id = $1',
@@ -360,6 +360,39 @@ async function main() {
       if (k < 7) await bookBill(c, tset, b.id, actor);
       nb++;
     }
+    // ------------------------------------------------------------ survey --
+    // An employee commuting survey collecting answers (DEMO people and answers, not real).
+    const svFacs = ['BEEAH Headquarters', 'Data Centre Dubai'].map((f) => ids.get(f)!).filter(Boolean);
+    const head = Object.fromEntries((await c.query('SELECT id, employees FROM org_node WHERE id = ANY($1)', [svFacs])).rows.map((r) => [r.id, Number(r.employees)]));
+    const sv = (await c.query(`INSERT INTO survey (tenant_id, name, year, close_at, weeks, wfh, facility_ids, headcount, status, created_by, opened_at)
+                               VALUES ($1,'Employee commuting 2026',2026,'2026-11-20',46,true,$2,$3,'open',$4,now() - interval '9 days') RETURNING id`,
+      [t, svFacs, JSON.stringify(head), String(users.get('admin') ?? users.get('super_admin'))])).rows[0].id as string;
+    const AL = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    const FIRST = ['Aisha', 'Omar', 'Fatima', 'Rashid', 'Mariam', 'Khalid', 'Noura', 'Yousef', 'Layla', 'Hamad', 'Sara', 'Ahmed', 'Priya', 'Arjun', 'Maria', 'John', 'Hessa', 'Faisal'];
+    const LAST = ['Al Mansoori', 'Khan', 'Haddad', 'Nair', 'Al Suwaidi', 'Fernandes', 'Rahman', 'Al Ali', 'Menon', 'Saleh'];
+    const DEPTS = ['Finance', 'Operations', 'IT', 'HR', 'Sustainability', 'Engineering'];
+    const MODES: [string, number, number][] = [['car', 0.46, 24], ['carpool', 0.12, 28], ['shuttle', 0.18, 22], ['metro', 0.1, 16], ['taxi', 0.06, 12], ['bus', 0.05, 18], ['walk', 0.03, 1]];
+    let rnd = 7; const r = () => ((rnd = (rnd * 16807) % 2147483647) / 2147483647);
+    const pick = () => { let x = r(); for (const m of MODES) { if ((x -= m[1]) <= 0) return m; } return MODES[0]!; };
+    let nsp = 0, nsa = 0;
+    for (let i = 0; i < 72; i++) {
+      const name = `${FIRST[i % FIRST.length]} ${LAST[(i * 7) % LAST.length]}`;
+      const fac = svFacs[i % 5 === 4 && svFacs[1] ? 1 : 0]!;
+      const code = Array.from({ length: 8 }, () => AL[Math.floor(r() * AL.length)]).join('');
+      const pid = (await c.query(`INSERT INTO survey_participant (tenant_id, survey_id, name, email, facility_id, department, code, sent_at) VALUES ($1,$2,$3,$4,$5,$6,$7, now() - interval '9 days') RETURNING id`,
+        [t, sv, `${name} (DEMO)`, `demo.${i + 1}@example.com`, fac, DEPTS[i % DEPTS.length], code])).rows[0].id;
+      nsp++;
+      if (r() < 0.62) {
+        const [mode, , km] = pick();
+        const wfh = r() < 0.3 ? 1 : 0;
+        const legs = [{ mode, km: Math.max(1, Math.round(km * (0.4 + r() * 1.3))) }];
+        if (mode === 'shuttle' && r() < 0.3) legs.push({ mode: 'metro', km: 6 });
+        await c.query('INSERT INTO survey_response (tenant_id, survey_id, participant_id, facility_id, answers) VALUES ($1,$2,$3,$4,$5)',
+          [t, sv, pid, fac, JSON.stringify({ days: 5 - wfh, wfh, legs, fuel: mode === 'car' ? (r() < 0.8 ? 'petrol' : 'hybrid') : mode === 'carpool' ? 'petrol' : 'unknown', occ: mode === 'carpool' ? 3 : 1 })]);
+        nsa++;
+      }
+    }
+    console.log(`Survey: "Employee commuting 2026", ${nsp} DEMO people, ${nsa} answers (open).`);
     console.log(`Meters: ${nr.toLocaleString('en')} DEMO readings (hourly, daily register, weekly), ${ns} monthly entries; ${nb} DEMO SEWA bills (7 booked, 1 to check).`);
     console.log(`Waste: a landfill with a DEMO tonnage history 2000–2025, ${nw} waste and water entries (landfill, waste-to-energy, composting, wastewater, waste sent out with contractors, water in and out by facility).`);
     console.log(`\nDemo company "${NAME}" created: ${TREE.length} sub-groups, ${[...ids.keys()].length - TREE.length} facilities, ${n} fuel entries (Jan 2025 – Sep 2026).`);

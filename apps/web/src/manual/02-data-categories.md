@@ -120,7 +120,9 @@ The scope follows **who runs the treatment site**: one Waste tab with a switch.
 | | What you give | Good for |
 |---|---|---|
 | **Type in** | per way of travelling: employees, average one-way distance, days at the workplace per week (and people per car for cars); or the year's total distance when it is known (e.g. the shuttle contractor's passenger-km) | small sites, or when HR already knows the split |
-| **From a survey** | one answer per employee, uploaded as Excel or CSV — the Ekotrace survey file (Download the survey file) or an export of Microsoft Forms / Google Forms | larger sites; the better method |
+| **From a survey** | an **Ekotrace survey** (Capture → Surveys, below) published into the record; or one answer per employee uploaded as Excel or CSV — the Ekotrace survey file (Download the survey file) or an export of Microsoft Forms / Google Forms | larger sites; the better method |
+
+Under *From a survey*, Add data lists the Ekotrace surveys that cover the facility and year (status, answers, **Open**, **Results & publish**) and a **+ New survey** link. A record published from a survey shows *From survey "…"*; to change it, reopen the survey and publish again — saving other figures in Add data replaces it.
 
 **The survey.** Questions: main way to work; one-way distance (km); days at the workplace per week; people in the car (including the driver); car fuel; optionally a second way and its distance (e.g. bus then metro) and the site. Columns are recognised by their names (you can change the choice under *Columns*), and so are everyday answers ("Dubai Metro", "Careem", "drive my car", "work from home"). Answers that cannot be read are listed and left out. When one file covers several sites, only the rows of the facility are used (choose the site value if the name differs).
 
@@ -133,6 +135,30 @@ The scope follows **who runs the treatment site**: one Waste tab with a switch.
 > Factors | DESNZ land travel of the year (cars by fuel, average size), with well-to-tank, all in 3.7
 > Months | the year split by the working days of each month → one entry per mode and month
 ```
+
+### Ekotrace surveys (Capture → Surveys)
+
+Ask employees directly, without a separate form tool. Admins and super admins create and run surveys; managers can publish; verifiers can view results. People answering do not need an account.
+
+```flow
+> 1 · New survey | name, reporting year, answers due by, working weeks per year (46 by default), facilities covered (with their staff counts), optionally home-working days
+> 2 · Add people | paste "name, email, facility, department" or upload a CSV; each person gets a personal 8-character code
+> 3 · Open & send | Email (opens your mail app with the invitation), Copy text, or Download invitations (CSV for a mail merge); "Send to unanswered" for reminders
+> 4 · Collect answers | people go to the sign-in page → "Answering a survey? Enter your code" (or the link with the code) and answer in about 2 minutes; the same code changes the answer until the survey closes; admins can enter a paper answer on someone's behalf
+> 5 · Results & publish | average per respondent × headcount, per facility, with a 95% range → one commuting record per facility and year in Scope 3 · Employee commuting
+```
+
+**The questions:** where you usually work (site); days a week you travel to work; days a week you work from home (if asked); main way you travel and one-way km; an optional second way (e.g. bus then metro) and its km; car fuel and people in the car (for cars and car pools).
+
+**Scaling up.** Per facility: average kg CO₂e per respondent × headcount. The headcount comes from the facility's details and can be changed for the survey on the Results tab. A facility with no answers uses the company average (flagged). *Small sample* = fewer than 30 answers or fewer than 10% of the headcount. The 95% range is 1.96 × standard deviation ÷ √answers, with the finite-population correction √((N − n) ÷ (N − 1)), × headcount — how far the estimate could move with a different sample.
+
+**Working days for a survey** = working weeks × 5 (46 weeks → 230 days; holidays and leave are in the weeks left out). Home working, when asked: home days × 8 hours × DESNZ "Homeworking" per FTE working hour (office equipment; heating is not used for the UAE climate) — indicative.
+
+**Publishing** writes the same record as Add data: one entry per mode and month (the year split by working days), waiting for the usual approver. The publish plan shows per facility whether it is new or replaces typed-in figures, an uploaded file or an earlier publish. A facility with approved entries for the year, or outside your access, is skipped. Publishing again (after *Reopen*) replaces the records. Published surveys cannot be deleted.
+
+**Privacy.** People answering see only their own first name, the company and the sites. Inside Ekotrace, names, emails, codes and individual answers are shown to admins only; others see counts and averages. Results are reported as averages. Code lookups are limited per network address.
+
+**Actions tab:** ways to reduce commuting emissions with an indicative size from your results (staff shuttle, car-pooling, hybrid working, EV charging) and guides.
 
 **Working days.** Weekdays of the year (by the facility's weekend: Saturday–Sunday, Friday–Saturday or Sunday only) − public holidays (12 by default) − annual leave (22 by default), or typed over. Holidays and leave come off the **year's total**; the year is then spread over the months by each month's working days.
 

@@ -15,7 +15,7 @@ import type { TravelMode } from './desnz.js';
 import { DESNZ_UNIT, slug, type DesnzParsed, type WasteRoute } from './desnz.js';
 
 /** Raise when the importer learns to read more of the file: editions already loaded are read again once. */
-export const IMPORTER_VERSION = 8;
+export const IMPORTER_VERSION = 11;
 
 export interface ImportSummary {
   source: string;
@@ -249,6 +249,17 @@ export async function importDesnz(c: Tx, p: DesnzParsed, opts: { createdBy?: str
       if (r.gasCo2e.N2O != null) split.push(['N2O', r.gasCo2e.N2O / gwp.get('N2O')!]);
     }
     factors.push({ item, basis: r.basis, unit: r.unit, co2e: r.co2e, gases: split });
+  }
+
+  // ---- home working (Scope 3.7, optional), per FTE working hour ------------------------
+  if (subId.has('commute_home')) {
+    for (const h of p.homeworking) {
+      const key = /office/i.test(h.kind) && !/heating/i.test(h.kind) ? 'office-equipment' : /^heating$/i.test(h.kind.trim()) ? 'heating' : 'office-equipment-and-heating';
+      const name = key === 'office-equipment' ? 'Home working · office equipment' : key === 'heating' ? 'Home working · heating' : 'Home working · office equipment and heating';
+      const item = itemIds.get(`commute:home:${key}`) ?? (await upsertItem(`commute:home:${key}`, 'commute_home', name, { defaultUnit: 'fte_h', sort: key === 'office-equipment' ? 0 : 5,
+        note: 'Per FTE working hour at home. In hot climates heating does not apply; home cooling is not covered by DESNZ.' }));
+      factors.push({ item, basis: 'scope3', unit: 'fte_h', co2e: h.co2e, gases: [] });
+    }
   }
 
   // ---- water supply and treatment (Scope 3.1 / 3.5), per m³ ----------------------------

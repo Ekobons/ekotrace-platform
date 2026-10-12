@@ -33,6 +33,7 @@ From the month-by-month view, **“Set up a meter with these inputs”** turns t
 | Excel upload | Vehicles (template per fleet and month) | fleet data kept in spreadsheets |
 | Purchases | Add data → Purchases (upload or by hand), or the ERP API | purchase lines from the ERP or finance system, any layout |
 | Bills | Add data → Electricity, Stationary combustion or Waste → **Bills** | PDF bills and invoices: checked, previewed, then published |
+| Surveys | Capture → **Surveys** | employee commuting asked of employees with personal codes, scaled up and published into Add data → Employee commuting |
 | Meter readings | Add data → the same tabs → **Meter readings**; meters themselves on the facility's Meters tab | batches sent by another system (hourly to monthly), previewed before they count |
 
 ## What is saved with an entry

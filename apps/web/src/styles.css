@@ -626,3 +626,30 @@ a.btn { text-decoration: none; }
 .dtabs { overflow-x: auto; flex-wrap: nowrap; } .dtabs button { white-space: nowrap; }
 .vc b { white-space: nowrap; }
 .lgd { row-gap: 4px; }
+
+/* Surveys (Capture → Surveys) */
+.ggrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px; }
+.gcard { display: grid; gap: 10px; align-content: start; text-align: left; background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 16px; font: inherit; color: inherit; cursor: pointer; min-height: 150px; }
+.gcard:hover { border-color: var(--primary); }
+.gic { display: inline-grid; place-items: center; width: 30px; height: 30px; border-radius: 9px; background: var(--primary-soft); font-size: 15px; flex: none; }
+.gpick { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+.gpick label { display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--line2); border-radius: 99px; padding: 7px 14px; cursor: pointer; font-size: 14px; }
+.gpick label.on { border-color: var(--primary); background: var(--primary-soft); }
+.mbar { height: 8px; border-radius: 99px; background: #E6ECE8; overflow: hidden; }
+.mbar > span { display: block; height: 100%; border-radius: 99px; background: var(--primary); }
+.flow { display: flex; align-items: stretch; gap: 8px; flex-wrap: wrap; }
+.fstep { flex: 1 1 180px; display: grid; gap: 4px; align-content: start; text-align: left; font: inherit; color: inherit; background: var(--bg); border: 1px solid var(--line); border-radius: 12px; padding: 12px; cursor: pointer; }
+.fstep.ok { background: var(--primary-soft); border-color: var(--primary); }
+.fn { display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 99px; background: var(--surface); border: 1px solid var(--line2); font-size: 12px; font-weight: 700; }
+.fstep.ok .fn { background: var(--primary); color: var(--primary-ink); border-color: var(--primary); }
+.farr { align-self: center; color: var(--muted); }
+.svk { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.svk .card { display: grid; gap: 4px; }
+.svk b { font-size: 26px; line-height: 1.1; }
+.svk small { color: var(--muted); font-size: 12px; }
+@media (max-width: 900px) { .svk { grid-template-columns: repeat(2, minmax(0, 1fr)); } .farr { display: none; } }
+.svitem { display: flex; gap: 10px; align-items: flex-start; padding: 10px 0; border-top: 1px solid var(--line); }
+.svitem:first-of-type { border-top: 0; }
+.svitem small { display: block; color: var(--muted); font-size: 12.5px; margin-top: 2px; }
+.sv-overlay { position: fixed; inset: 0; background: #0B2A2566; display: grid; place-items: start center; overflow: auto; padding: 40px 16px; z-index: 60; }
+.sv-sheet { width: min(680px, 100%); background: var(--bg); border-radius: 18px; padding: 20px; display: grid; gap: 12px; }
