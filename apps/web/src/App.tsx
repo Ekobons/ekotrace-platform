@@ -1,7 +1,7 @@
 /**
  * App shell: login gate, prototype sidebar (by role), company context, routes.
  */
-import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useState, type CSSProperties, type ReactNode } from 'react';
 import { NavLink, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { api, currentTenant, setTenant, whenLoggedOut, ROLE_LABEL, type Company, type Me, type Role } from './lib/api';
 import { Icon } from './components/Icon';
@@ -41,6 +41,8 @@ const AppCtx = createContext<Ctx>(null as unknown as Ctx);
 export const useApp = () => useContext(AppCtx);
 
 type NavItem = { to?: string; label: string; icon: string; roles?: Role[]; stage?: number };
+/** Section colours of the side menu, as in the prototype. */
+const SEC_C: Record<string, string> = { '': 'var(--lime)', Capture: '#7FD3B9', Analyse: '#8EC5FF', 'Value chain': '#F2C46D', 'Net zero': '#B6E36B', Disclose: '#C9A7F5', Setup: '#E7ECEA', Help: '#F7A8B8' };
 const NAV: { group?: string; items: NavItem[] }[] = [
   { items: [
     { to: '/home', label: 'Home', icon: 'home' }, { to: '/dashboards', label: 'Dashboards', icon: 'chart' }, { to: '/kpis', label: 'KPI dashboard', icon: 'gauge' },
@@ -109,6 +111,8 @@ function Shell() {
 
   const choose = async (id: string) => { setTenant(id || null); await reload(); nav('/'); };
   const logout = async () => { await api.logout().catch(() => {}); setTenant(null); location.href = '/'; };
+  const [folded, setFolded] = useState<Set<string>>(() => { try { return new Set(JSON.parse(localStorage.getItem('eko_nav') ?? '[]') as string[]); } catch { return new Set(); } });
+  const fold = (g: string) => setFolded((f) => { const n = new Set(f); if (n.has(g)) n.delete(g); else n.add(g); try { localStorage.setItem('eko_nav', JSON.stringify([...n])); } catch { /* not kept */ } return n; });
   const visible = (i: NavItem) => !i.roles || (i.roles.length === 0 ? role === 'platform_admin' : can(...i.roles));
 
   return (
@@ -133,12 +137,16 @@ function Shell() {
           {tenant && NAV.map((g, gi) => {
             const items = g.items.filter(visible);
             if (!items.length) return null;
+            const sc = SEC_C[g.group ?? ''] ?? '#fff';
+            const on = items.some((i) => i.to && (path === i.to || (i.to.startsWith('/data/') && path.startsWith('/data/'))));
+            const open = !g.group || !folded.has(g.group) || on;
             return (
-              <div key={gi}>
-                {g.group && <div className="navgrp">{g.group}</div>}
-                {items.map((i) => i.to
+              <div key={gi} className="navsec" style={{ '--sc': sc } as CSSProperties}>
+                {g.group && <button type="button" className={`sech${open ? ' open' : ''}${on ? ' has' : ''}`} aria-expanded={open} onClick={() => fold(g.group!)}>
+                  <i className="sdot" /><span>{g.group.toUpperCase()}</span><span className="chev">{open ? '▾' : '▸'}</span></button>}
+                {open && <div className="secitems">{items.map((i) => i.to
                   ? <NavLink key={i.label} to={i.to} className={({ isActive }) => (isActive || (i.to?.startsWith('/data/') && path.startsWith('/data/')) ? 'active' : '')}><Icon name={i.icon} />{i.label}</NavLink>
-                  : <a key={i.label} className="soon" aria-disabled="true" title={`Coming in stage ${i.stage}`}><Icon name={i.icon} />{i.label}<span className="soonchip">S{i.stage}</span></a>)}
+                  : <a key={i.label} className="soon" aria-disabled="true" title={`Coming in stage ${i.stage}`}><Icon name={i.icon} />{i.label}<span className="soonchip">S{i.stage}</span></a>)}</div>}
               </div>
             );
           })}

@@ -90,7 +90,10 @@ A facility or a person above the limit cannot be added (or brought back); what t
 
 ## Moving around
 
-- **Add data** — one tab per category; facility and period on top; the result is calculated as you type.
+The menu on the left is grouped into coloured sections — Capture, Value chain, Net zero, Disclose, Setup and Help. Click a section title to fold or open it (the section of the page you are on always stays open). Greyed items with a stage label (S2, S3, S4) are coming later.
+
+- **Home** — what needs your attention, for your role. **KPI dashboard** — the indicators you track against targets.
+- **Add data** — categories on the left; facility and months on top; the result is calculated as you type.
 - **Entries & results** — everything saved for the year, totals per scope, per gas, and the detail of each entry.
 - **Meters** and **Bills** — data that arrives from other systems or as PDF bills.
 - **User manual** — this guide. It is updated with every release.

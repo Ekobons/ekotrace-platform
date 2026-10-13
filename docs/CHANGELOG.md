@@ -2,6 +2,11 @@
 
 Newest first.
 
+## 2026-10-13 · Side menu colours and full-width pages
+
+- Side menu as in the prototype: each section has its own colour (Capture mint, Value chain amber, Net zero green, Disclose lilac, Setup grey, Help pink) — a coloured dot and title, a coloured line along its items, coloured icons and the current page highlighted in the section colour. Sections fold with ▾/▸ (remembered on this browser); the section of the open page always shows.
+- Pages now use the full width of wide screens (no empty band on the right).
+
 ## 2026-10-13 · Home and KPI dashboard (as in the prototype)
 
 - **Home by role** (replaces the old landing page): the month's data strip (due date, submissions in, overdue, escalated); super admin/admin — emissions, Scope 1+2 vs target path, data approved, monthly chart with last year and target path, Needs your decision, Facilities table, Biggest sources; manager — approval queue with Approve N clean; preparer — checklist and To fix; verifier — sample to test and assurance readiness; one-user companies — three steps, entries marked self-reviewed.

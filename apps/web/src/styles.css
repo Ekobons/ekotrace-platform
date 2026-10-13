@@ -809,3 +809,22 @@ table.t.rows input.input:not(.num), table.t.rows select.input { width: 100%; min
 .sdrawer { position: fixed; top: 0; right: 0; bottom: 0; width: min(620px, 100%); background: var(--surface); z-index: 41; padding: 18px; overflow: auto; display: flex; flex-direction: column; gap: 14px; box-shadow: -10px 0 30px rgba(0, 0, 0, .15); }
 .sdrawer h2 { font-size: 16px; margin: 0; }
 .nowrap{white-space:nowrap}
+/* side menu: coloured sections, as in the prototype */
+.nav { display: flex; flex-direction: column; gap: 6px; }
+.navsec { display: flex; flex-direction: column; gap: 1px; }
+.sech { display: flex; align-items: center; gap: 8px; width: 100%; height: 30px; padding: 0 10px; border: 0; background: transparent; color: var(--side-fg); cursor: pointer; font: 700 11px/1 var(--f-ui, inherit); letter-spacing: .09em; border-radius: 8px; }
+.sech:hover { background: #ffffff10; }
+.sech .sdot { width: 8px; height: 8px; border-radius: 3px; background: var(--sc); flex: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--sc) 22%, transparent); }
+.sech span:not(.chev) { color: var(--sc); }
+.sech .chev { margin-left: auto; color: var(--side-dim); font-size: 11px; }
+.sech.has:not(.open) { background: #ffffff0f; }
+.secitems { display: flex; flex-direction: column; gap: 1px; margin: 2px 0 4px 6px; padding-left: 6px; border-left: 2px solid color-mix(in srgb, var(--sc) 45%, transparent); }
+.navsec:first-child .secitems, .navsec:first-of-type:not(:has(.sech)) .secitems { border-left: 0; margin-left: 0; padding-left: 0; }
+.nav .secitems a { height: 36px; padding: 0 10px; }
+.nav .secitems a svg { color: var(--sc); opacity: .9; }
+.nav .secitems a.active { background: color-mix(in srgb, var(--sc) 22%, var(--side-on)); box-shadow: inset 3px 0 0 var(--sc); color: #fff; }
+.nav .secitems a.active svg { opacity: 1; }
+.nav .secitems a.soon svg { opacity: .6; }
+/* pages use the full width of the screen */
+.page { max-width: none; }
+.db { max-width: none; }
