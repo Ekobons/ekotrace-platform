@@ -160,17 +160,17 @@ export function MonthGrid({ year, facilityId, label, unitName, build, bases = ['
           return (
             <tr key={r.k} className={x?.error ? 'bad' : ''}>
               <td style={{ width: 90 }}>{again ? <span className="muted small">+ line</span> : <b>{MONTHS[r.m]}<br />{year}</b>}</td>
-              {types && <td style={{ minWidth: 200 }}><select className="input" value={r.type} onChange={(e) => set(r.k, { type: e.target.value })}>{types.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}</select></td>}
+              {types && <td style={{ minWidth: 170 }}><select className="input" value={r.type} onChange={(e) => set(r.k, { type: e.target.value })}>{types.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}</select></td>}
               <td style={{ minWidth: 170 }}><div className="row" style={{ gap: 6, flexWrap: 'nowrap' }}>
                 <input className="input num" style={{ width: 120 }} inputMode="decimal" value={r.v} placeholder="0" aria-label={`${MONTHS[r.m]} quantity`}
                   onPaste={(e) => { if (paste(r.k, e.clipboardData.getData('text'))) e.preventDefault(); }}
                   onChange={(e) => set(r.k, { v: e.target.value.replace(/[^0-9.]/g, '') })} />
                 <span className="muted small" style={{ whiteSpace: 'nowrap' }}>{unitName}</span></div></td>
-              <td style={{ minWidth: 220 }}><div style={{ display: 'grid', gap: 4 }}>
+              <td style={{ minWidth: 160 }}><div style={{ display: 'grid', gap: 4 }}>
                 <input className="input" value={r.note} maxLength={1000} placeholder="Meter, invoice no." onChange={(e) => set(r.k, { note: e.target.value })} />
                 <select className="input" value={r.dt} onChange={(e) => set(r.k, { dt: e.target.value })}><option value="actual">Actual</option><option value="estimated">Estimated</option><option value="proxy">Proxy</option></select></div></td>
               <td className="num" style={{ minWidth: 100 }}><b style={{ fontSize: 14 }}>{x?.totals ? tco2e(x.totals[main] ?? 0) : '—'}</b><div className="muted small">tCO₂e{bases.length > 1 && x?.totals && (x.totals[bases[1]!] ?? 0) !== 0 ? ` · ${BASIS_SHORT[bases[1]!]} ${tco2e(x.totals[bases[1]!] ?? 0)}` : ''}</div></td>
-              <td className={`small ${c.cls}`} style={{ minWidth: 150, maxWidth: 240 }}>{c.t}</td>
+              <td className={`small ${c.cls}`} style={{ minWidth: 110, maxWidth: 220 }}>{c.t}</td>
               <td style={{ whiteSpace: 'nowrap' }}>
                 <button className="btn ghost sm" title="Another line for this month" onClick={() => setRows((rs) => { const j = rs.findIndex((y) => y.k === r.k); const n = [...rs]; n.splice(j + 1, 0, blank(r.m, r.type)); return n; })}>+ line</button>
                 {again && <button className="btn ghost sm" aria-label="Remove line" onClick={() => setRows((rs) => rs.filter((y) => y.k !== r.k))}>×</button>}

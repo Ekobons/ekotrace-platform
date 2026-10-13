@@ -2,6 +2,18 @@
 
 Newest first.
 
+## 2026-10-13 (24) — Business travel (Scope 3.6): flights, hotel stays, other transport, spend
+
+- Migration 024: `business_travel` gets calc method `trip` and sub-categories Flights, Hotel stays, Rail, Bus and coach, Taxi, Car hire and own car, Ferry; unit `room_night`; `tenant.flight_rf` (default with radiative forcing). Purchases still move spend lines into 3.6 (spend categories now include business travel by code).
+- DESNZ importer v12: Business travel – air (haul × class × with/without RF, per passenger-km, gas split) and its well-to-tank; hotel stay per room-night by country (ISO code kept); business travel – sea; land travel as business-travel items (rail, bus, taxi, cars by size and fuel). 2022–2026.
+- Airports: OurAirports (public domain) medium and large airports with IATA codes in `data/airports/` (+ countries); `lib/airports.ts`: search, great-circle distance, +8% uplift, haul (same country → domestic; to/from GB → short < 3,700 km / long; else international).
+- Calculation (`trip` input): flights from / to airports or haul + one-way km (typical distance when empty, with a warning); class mapped to what DESNZ publishes for the haul; return × 2; trips; RF as the company chose (Methodology) unless given; hotel rooms × nights (latest earlier year's factor when the year has none; hotel's own factor); ground one-way km × return × trips. Well-to-tank counted in 3.6. Steps explain distance, haul and passenger-km; inputs kept on the entry; recalculation keeps the passenger-km.
+- API: `GET /api/trips/airports`, `/api/trips/distance`, `/api/trips/options`; `PATCH /api/tenant {flightRf}`.
+- Web: Add data → Business travel with Flights / Hotel stays / Other transport / By spend: one row per trip (month, from / to with airport search and the distance shown, or flight type and km; class; return · trips; traveller / ref.; emissions as you type), Save as draft / Submit for approval. By spend reuses the purchases grid with lines going to 3.6. Methodology: flights with or without radiative forcing.
+- Add data polish: ways in as compact pills; row tables fit the card (inputs fill their column).
+- Demo: DEMO flights (SHJ–RUH, DXB–LHR/FRA, DXB–BOM), hotel stays and taxis Jan–Sep 2026.
+- Tests: API 55 (new: business travel), calc 52.
+
 ## 2026-10-13 (23) — Add data as in the prototype; Enter → Review → Approved
 
 - **Approval workflow** (migration 023: `activity.submitted_at/by`, `reviewed_at/by`, `review_note`). `GET /api/data/status` (per category and month: drafts, waiting, approved, sent back; facility type and manager; who approves; categories the facility reports = data this year or last), `GET /api/review` (entries of a facility, category or group, months; stage open / approved; what the person may do with each), `POST /api/activities/review` (submit, withdraw, approve, return with a note — nobody approves an entry they entered or submitted; approvers = the facility's approve scope), `DELETE /api/activities/:id` (draft or sent back; not commuting-record or purchase entries). Audit log for each.

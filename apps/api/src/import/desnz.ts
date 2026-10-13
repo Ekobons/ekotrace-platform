@@ -98,6 +98,13 @@ function travelMode(l2: string): TravelMode | null {
   return null;
 }
 
+/** Air travel: haul as DESNZ names it, simplified; class; radiative forcing. */
+export type AirHaul = 'domestic' | 'short' | 'long' | 'intl';
+export type AirClass = 'average' | 'economy' | 'premium' | 'business' | 'first';
+export interface DesnzAirRow { haul: AirHaul; cls: AirClass; rf: boolean; basis: 'scope3' | 'wtt'; co2e: number | null; gasCo2e: { CO2?: number; CH4?: number; N2O?: number } }
+const airHaul = (l3: string): AirHaul | null => (/^domestic/i.test(l3) ? 'domestic' : /^short-haul/i.test(l3) ? 'short' : /^long-haul/i.test(l3) ? 'long' : /^international/i.test(l3) ? 'intl' : null);
+const airClass = (l4: string): AirClass | null => (/^average/i.test(l4) ? 'average' : /^economy/i.test(l4) ? 'economy' : /^premium/i.test(l4) ? 'premium' : /^business/i.test(l4) ? 'business' : /^first/i.test(l4) ? 'first' : null);
+
 export type VehicleGroup = 'cars_by_size' | 'cars_by_segment' | 'vans' | 'hgv' | 'hgv_refrigerated' | 'motorbikes';
 
 export interface DesnzParsed {
@@ -107,6 +114,12 @@ export interface DesnzParsed {
   water: { supply: number | null; treatment: number | null };
   /** home working, kg CO2e per FTE working hour: office equipment, heating, both */
   homeworking: { kind: string; co2e: number }[];
+  /** business travel by air, per passenger-km: haul, class, with or without RF; Scope 3 and well-to-tank */
+  air: DesnzAirRow[];
+  /** hotel stays, kg CO2e per room per night, by country */
+  hotels: { country: string; co2e: number }[];
+  /** ferry, per passenger-km: foot / car / average passenger; Scope 3 and well-to-tank */
+  sea: { kind: string; basis: 'scope3' | 'wtt'; co2e: number | null; gasCo2e: { CO2?: number; CH4?: number; N2O?: number } }[];
   evEnergy: DesnzEvEnergyRow[];
   /** UK grid electricity (Scope 2, location-based), kg CO2e per kWh and its gas split */
   ukGrid: { co2e: number | null; gasCo2e: { CO2?: number; CH4?: number; N2O?: number } } | null;
@@ -196,6 +209,9 @@ export async function parseDesnz(path: string): Promise<DesnzParsed> {
   const travel = new Map<string, DesnzTravelRow>();
   const water: DesnzParsed['water'] = { supply: null, treatment: null };
   const homeworking: DesnzParsed['homeworking'] = [];
+  const air = new Map<string, DesnzAirRow>();
+  const hotels: DesnzParsed['hotels'] = [];
+  const sea = new Map<string, DesnzParsed['sea'][number]>();
   const evEnergy: DesnzEvEnergyRow[] = [];
   const waste: DesnzWasteRow[] = [];
   let ukGrid: DesnzParsed['ukGrid'] = null;
@@ -211,6 +227,31 @@ export async function parseDesnz(path: string): Promise<DesnzParsed> {
       return;
     }
     if (!l3) return;
+    // Business travel by air and sea (per passenger-km), and hotel stays (per room-night).
+    const pkm = uom === 'passenger.km';
+    if (scope === 'Scope 3' && pkm && (l1 === 'Business travel- air' || l1 === 'WTT- business travel- air')) {
+      const l4 = col['Level 4'] ? text(g('Level 4')) : '';
+      const haul = airHaul(l3), cls = airClass(l4), rf = !/without/i.test(colText);
+      if (haul && cls) {
+        const basis = l1.startsWith('WTT') ? 'wtt' : 'scope3';
+        const key = `${haul}|${cls}|${rf}|${basis}`;
+        const r = air.get(key) ?? { haul, cls, rf, basis, co2e: null, gasCo2e: {} };
+        if (/of co2/.test(ghg)) r.gasCo2e.CO2 = v ?? undefined; else if (/of ch4/.test(ghg)) r.gasCo2e.CH4 = v ?? undefined; else if (/of n2o/.test(ghg)) r.gasCo2e.N2O = v ?? undefined; else if (ghg.startsWith('kg co2e')) r.co2e = v;
+        air.set(key, r);
+      }
+      return;
+    }
+    if (scope === 'Scope 3' && pkm && (l1 === 'Business travel- sea' || l1 === 'WTT- business travel- sea')) {
+      const basis = l1.startsWith('WTT') ? 'wtt' : 'scope3', key = `${l3}|${basis}`;
+      const r = sea.get(key) ?? { kind: l3, basis, co2e: null, gasCo2e: {} };
+      if (/of co2/.test(ghg)) r.gasCo2e.CO2 = v ?? undefined; else if (/of ch4/.test(ghg)) r.gasCo2e.CH4 = v ?? undefined; else if (/of n2o/.test(ghg)) r.gasCo2e.N2O = v ?? undefined; else if (ghg.startsWith('kg co2e')) r.co2e = v;
+      sea.set(key, r);
+      return;
+    }
+    if (scope === 'Scope 3' && l1 === 'Hotel stay' && /room per night/i.test(uom)) {
+      if (ghg.startsWith('kg co2e') && !/ of /.test(ghg) && v != null) hotels.push({ country: l3, co2e: v });
+      return;
+    }
 
     if (scope === 'Scope 3' && l1 === 'Waste disposal' && uom === 'tonnes') {
       const route = wasteRoute(colText);
@@ -312,7 +353,8 @@ export async function parseDesnz(path: string): Promise<DesnzParsed> {
     gases: [...gases.values()],
     vehicles: [...vehicles.values()].filter((r) => r.co2e != null),
     travel: [...travel.values()].filter((r) => r.co2e != null),
-    water, homeworking,
+    water, homeworking, hotels,
+    air: [...air.values()].filter((r) => r.co2e != null), sea: [...sea.values()].filter((r) => r.co2e != null),
     evEnergy, ukGrid, ukEnergy, waste,
     sha256: createHash('sha256').update(buf).digest('hex'),
   };

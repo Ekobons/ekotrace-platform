@@ -295,6 +295,27 @@ async function main() {
         nw += 6;
       }
     }
+    // ------------------------------------------------------------ business travel --
+    // DEMO trips (not real): flights from airports, by type, hotel stays and taxis, Jan–Sep 2026.
+    const hotelUae = (await c.query(`SELECT id FROM item WHERE code = 'bt:hotel:united-arab-emirates'`)).rows[0]?.id;
+    const hotelSa = (await c.query(`SELECT id FROM item WHERE code = 'bt:hotel:saudi-arabia'`)).rows[0]?.id;
+    const hotelUk = (await c.query(`SELECT id FROM item WHERE code = 'bt:hotel:uk-london'`)).rows[0]?.id;
+    const taxi = (await c.query(`SELECT id FROM item WHERE code LIKE 'bt:taxi:%' ORDER BY sort LIMIT 1`)).rows[0]?.id;
+    let nt = 0;
+    if (hotelUae) for (let m = 0; m < 9; m++) {
+      const ps = `2026-${String(m + 1).padStart(2, '0')}-01`, pe = new Date(Date.UTC(2026, m + 1, 0)).toISOString().slice(0, 10), per = { periodStart: ps, periodEnd: pe, unit: 'pkm' };
+      const trips: [string, Record<string, unknown>][] = [
+        ['BEEAH Headquarters', { ...per, trip: { kind: 'flight', from: 'SHJ', to: 'RUH', cls: 'economy', ret: true, trips: 2 + (m % 3) } }],
+        ['BEEAH Headquarters', { ...per, trip: { kind: 'flight', from: 'DXB', to: m % 2 ? 'LHR' : 'FRA', cls: m % 4 === 0 ? 'business' : 'economy', ret: true, trips: 1 } }],
+        ['Data Centre Dubai', { ...per, trip: { kind: 'flight', from: 'DXB', to: 'BOM', cls: 'economy', ret: true, trips: 1 + (m % 2) } }],
+        ['BEEAH Headquarters', { ...per, itemId: hotelSa ?? hotelUae, unit: 'room_night', trip: { kind: 'hotel', rooms: 2, nights: 3 } }],
+        ['BEEAH Headquarters', { ...per, itemId: m % 2 && hotelUk ? hotelUk : hotelUae, unit: 'room_night', trip: { kind: 'hotel', rooms: 1, nights: 4 } }],
+      ];
+      if (taxi) trips.push(['BEEAH Headquarters', { ...per, itemId: taxi, unit: 'pkm', trip: { kind: 'ground', km: 28, ret: true, trips: 6 } }]);
+      for (const [fac, input] of trips) { await put(fac, input); nt++; }
+    }
+    console.log(`Business travel: ${nt} DEMO trips (flights, hotels, taxis).`);
+
     // ------------------------------------------------------------ meters & bills --
     // DEMO readings (not real): BMS hourly electricity at the data centre, a daily register gas
     // meter at the WtE plant, a weekly weighbridge at the composting plant, SEWA bills at HQ.

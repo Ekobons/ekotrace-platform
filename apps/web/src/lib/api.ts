@@ -8,7 +8,7 @@ export interface Item { id: number; subcategory_id: number; code: string; name: 
 /** Vehicle types: class, powertrain, the fuel it burns, electric / plug-in, distance factors or not. */
 export interface VehicleAttrs { vehicle?: string; powertrain?: string; load?: string; fuel?: string | null; electric?: boolean; phev?: boolean; distance?: boolean }
 export interface Subcategory { id: number; category_id: number; code: string; name: string; grp?: string | null; units: string[]; default_unit: string | null; is_bioenergy: boolean; sort: number; active: boolean; hiddenForClient?: boolean; items: Item[] }
-export interface Category { id: number; scope: number; code: string; name: string; calc_method: 'combustion' | 'fugitive' | 'vehicle' | 'electricity' | 'waste' | 'waste_disposal' | 'spend' | 'travel' | 'water'; ghg_category?: number | null; description: string | null; active: boolean; subcategories: Subcategory[] }
+export interface Category { id: number; scope: number; code: string; name: string; calc_method: 'combustion' | 'fugitive' | 'vehicle' | 'electricity' | 'waste' | 'waste_disposal' | 'spend' | 'travel' | 'water' | 'trip'; ghg_category?: number | null; description: string | null; active: boolean; subcategories: Subcategory[] }
 export interface Unit { code: string; name: string; dimension: string; to_base: number; is_base: boolean; aliases: string[]; active: boolean }
 export interface ResultLine { basis: Basis; gas: string; kgGas: number | null; kgCo2e: number; factorId: number | null; method: 'gas' | 'published' }
 /** CO2e emission factor behind one part of a result: quantity × perEnteredUnit = total. */
@@ -21,7 +21,7 @@ export interface FactorUsed {
 export interface CvUsed { value: number; energyUnit: string; perUnit: string; energyUnitName: string; perUnitName: string; basis: 'net' | 'gross'; convertedQuantity: number; convertedUnit: string; convertedUnitName: string }
 export interface CalcResponse { cv?: CvUsed; stored?: { quantity: number; unit: string; inputs: Record<string, unknown> }; item: { id: number; name: string; category: string }; gwpSet: string; lines: ResultLine[]; factors: FactorUsed[]; totals: Record<Basis, number>; steps: string[]; warnings: string[] }
 export interface PlanLimits { code: string; name: string; facilities: number | null; users: number | null; ai: boolean; export: boolean; groups: boolean; note: string }
-export interface Tenant { id: string; name: string; country: string; gwp_set: string; timezone?: string; consolidation?: string; base_year?: number; plan?: string; status?: string; access_expiry?: string; planLimits?: PlanLimits | null }
+export interface Tenant { id: string; name: string; country: string; gwp_set: string; timezone?: string; consolidation?: string; base_year?: number; plan?: string; status?: string; access_expiry?: string; planLimits?: PlanLimits | null; flight_rf?: boolean }
 export type Role = 'platform_admin' | 'super_admin' | 'admin' | 'manager' | 'preparer' | 'verifier';
 export interface Me { user: { id: string; name: string; email: string; role: Role; tenantId: string | null; scopeNodeId: string | null; mustChangePassword: boolean }; company: (Tenant & { scope_name: string | null }) | null }
 export interface OrgNode { id: string; parent_id: string | null; kind: 'group' | 'subgroup' | 'facility'; name: string; facility_type: string | null; location: string | null; country: string; floor_area_m2: number | null; employees: number | null; ownership_pct: number; operational_control: boolean; financial_control: boolean; active: boolean; sort: number; manager_user_id: string | null; manager_name: string | null; grid_region?: string | null; entries: number; canEdit: boolean; canSee: boolean; canEnter: boolean }
@@ -199,6 +199,14 @@ export interface SurveyRead {
   file: string; headers: string[]; columns: Record<string, string>; answers: CommuteAnswer[]; blank: number; otherSite: number; site: string | null;
   sites: { value: string; count: number }[]; unrecognised: { value: string; count: number }[];
 }
+
+// ------------------------------------------------------------- business travel --
+export interface TripOptions {
+  rf: boolean; classes: { key: string; label: string }[]; hauls: { key: string; label: string }[]; typicalKm: Record<string, number>; uplift: number; shortHaulMaxKm: number; country: string;
+  hotels: { itemId: number; country: string; iso: string | null; co2e: number | null; factorYear: number | null }[];
+  ground: { itemId: number; code: string; name: string; group: string; sub: string; unit: string; note: string | null }[];
+}
+export interface AirportHit { iata: string; name: string; city: string; country: string; countryName: string }
 
 // ------------------------------------------------------------- review --
 export interface StatusCell { cat: string; m: number; draft: number; submitted: number; approved: number; rejected: number }
@@ -406,6 +414,9 @@ export const api = {
   deleteRate: (id: number) => call<{ ok: true }>('DELETE', `/api/currency/rates/${id}`),
   wasteContractors: () => call<{ contractors: string[] }>('GET', '/api/waste/contractors'),
   surveyOptions: () => call<SurveyOptions>('GET', '/api/surveys/options'),
+  tripOptions: (year: number) => call<TripOptions>('GET', `/api/trips/options?year=${year}`),
+  airports: (q: string) => call<{ airports: AirportHit[] }>('GET', `/api/trips/airports?q=${encodeURIComponent(q)}`),
+  flightDistance: (from: string, to: string) => call<{ from: string; to: string; gcKm: number; km: number; haul: string }>('GET', `/api/trips/distance?from=${from}&to=${to}`),
   dataStatus: (facilityId: string, year: number) => call<DataStatus>('GET', `/api/data/status?facilityId=${facilityId}&year=${year}`),
   review: (q: { facilityId: string; category: string; from: string; to: string; stage: 'open' | 'approved' }) =>
     call<{ entries: ReviewEntry[]; canEnter: boolean; canApprove: boolean }>('GET', `/api/review?${new URLSearchParams(q as Record<string, string>)}`),

@@ -16,7 +16,7 @@ import { PublishedLinesView } from './PublishedPurchases';
 import { BatchList, ColumnSetup, FactorBanner, TARGETS, UploadBox } from './Purchases';
 
 interface Row extends ManualLine { itemName: string | null; cands: { itemId: number; name: string }[] }
-const blank = (date: string, currency: string): Row => ({ date, description: '', itemId: null, itemName: null, cands: [], target: 'purchased_goods', amount: null, currency, supplier: '', supplierEf: null, supplierEfUnit: null, quantity: null, unit: null });
+const blank = (date: string, currency: string, target = 'purchased_goods'): Row => ({ date, description: '', itemId: null, itemName: null, cands: [], target, amount: null, currency, supplier: '', supplierEf: null, supplierEfUnit: null, quantity: null, unit: null });
 
 export function PurchaseEntry(props: { cat: Category; facilityId: string; period: { periodStart: string; periodEnd: string }; onSaved: () => void }) {
   const [mode, setMode] = useState<'upload' | 'hand' | 'published' | 'capital'>('upload');
@@ -47,10 +47,11 @@ export function PurchaseEntry(props: { cat: Category; facilityId: string; period
   );
 }
 
-function ManualGrid({ facilityId, period, onSaved }: { cat: Category; facilityId: string; period: { periodStart: string; periodEnd: string }; onSaved: () => void }) {
+/** Purchases typed by hand. `target`: the Scope 3 category new rows go to (e.g. business travel paid by card). */
+export function ManualGrid({ facilityId, period, onSaved, target = 'purchased_goods', title = 'Purchases typed by hand' }: { cat?: Category; facilityId: string; period: { periodStart: string; periodEnd: string }; onSaved: () => void; target?: string; title?: string }) {
   const { toast } = useApp();
   const [currency, setCurrency] = useState('AED');
-  const [rows, setRows] = useState<Row[]>(() => [blank(period.periodStart, 'AED')]);
+  const [rows, setRows] = useState<Row[]>(() => [blank(period.periodStart, 'AED', target)]);
   const [res, setRes] = useState<ManualResult | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -70,14 +71,14 @@ function ManualGrid({ facilityId, period, onSaved }: { cat: Category; facilityId
         supplierEf: r.supplierEf ?? null, supplierEfUnit: r.supplierEf != null ? r.supplierEfUnit || (r.unit || currency) : null }));
       const r = await api.manualPurchases({ facilityId, dryRun, lines });
       setRes(r);
-      if (r.saved) { toast(`Saved: ${r.entries} entr${r.entries === 1 ? 'y' : 'ies'}, ${tco2e(r.co2e ?? 0)} tCO₂e`); setRows([blank(period.periodStart, currency)]); setRes(null); onSaved(); }
+      if (r.saved) { toast(`Saved: ${r.entries} entr${r.entries === 1 ? 'y' : 'ies'}, ${tco2e(r.co2e ?? 0)} tCO₂e`); setRows([blank(period.periodStart, currency, target)]); setRes(null); onSaved(); }
     } catch (e) { setErr((e as Error).message); } finally { setBusy(false); }
   };
   const total = res?.lines.reduce((s, l) => s + (l.co2e ?? 0), 0) ?? 0;
 
   return (
     <div className="card" style={{ display: 'grid', gap: 10 }}>
-      <div className="row"><div className="grow"><h3>Purchases typed by hand</h3>
+      <div className="row"><div className="grow"><h3>{title}</h3>
         <div className="sub">For a few purchases, at the facility chosen above. Larger volumes: upload a file, or connect the ERP through the API.</div></div></div>
       <div className="scrollx"><table className="t compact entrygrid">
         <thead><tr><th>Date</th><th style={{ minWidth: 220 }}>Description</th><th style={{ minWidth: 240 }}>Spend category</th><th>Scope 3</th><th className="num">Amount</th><th>Cur.</th><th>Supplier</th><th>Supplier factor</th><th className="num">kg CO₂e</th><th /></tr></thead>
@@ -105,7 +106,7 @@ function ManualGrid({ facilityId, period, onSaved }: { cat: Category; facilityId
             </tr>);
         })}</tbody>
       </table></div>
-      <div className="row"><button className="btn sm" onClick={() => setRows((r) => [...r, blank(r[r.length - 1]?.date ?? period.periodStart, currency)])}><Icon name="plus" />Row</button>
+      <div className="row"><button className="btn sm" onClick={() => setRows((r) => [...r, blank(r[r.length - 1]?.date ?? period.periodStart, currency, target)])}><Icon name="plus" />Row</button>
         <div className="grow" />{res && <span className="sub">Total {tco2e(total)} tCO₂e</span>}</div>
       {res?.lines.some((l) => l.steps.length) && (
         <details><summary className="small">How each row was calculated</summary>

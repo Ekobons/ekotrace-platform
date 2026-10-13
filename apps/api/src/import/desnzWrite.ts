@@ -15,7 +15,7 @@ import type { TravelMode } from './desnz.js';
 import { DESNZ_UNIT, slug, type DesnzParsed, type WasteRoute } from './desnz.js';
 
 /** Raise when the importer learns to read more of the file: editions already loaded are read again once. */
-export const IMPORTER_VERSION = 11;
+export const IMPORTER_VERSION = 12;
 
 export interface ImportSummary {
   source: string;
@@ -251,6 +251,57 @@ export async function importDesnz(c: Tx, p: DesnzParsed, opts: { createdBy?: str
     factors.push({ item, basis: r.basis, unit: r.unit, co2e: r.co2e, gases: split });
   }
 
+  // ---- business travel (Scope 3.6): flights, hotel stays, land and sea ------------------------
+  if (subId.has('bt_air')) {
+    const split = (g: { CO2?: number; CH4?: number; N2O?: number }): [string, number][] => {
+      const out: [string, number][] = [];
+      if (g.CO2 != null) out.push(['CO2', g.CO2]);
+      if (g.CH4 != null) out.push(['CH4_fossil', g.CH4 / gwp.get('CH4_fossil')!]);
+      if (g.N2O != null) out.push(['N2O', g.N2O / gwp.get('N2O')!]);
+      return out;
+    };
+    // Flights: one item per haul, class and radiative forcing; the well-to-tank goes with each.
+    for (const r of p.air) {
+      const code = `bt:air:${r.haul}:${r.cls}:${r.rf ? 'rf' : 'norf'}`;
+      let item = itemIds.get(code);
+      if (!item) {
+        item = await upsertItem(code, 'bt_air', `Flight · ${AIR_HAUL_NAME[r.haul]} · ${AIR_CLASS_NAME[r.cls]}${r.rf ? '' : ' · without RF'}`,
+          { defaultUnit: 'pkm', sort: (AIR_HAUL_SORT[r.haul] ?? 0) * 10 + (AIR_CLASS_SORT[r.cls] ?? 0) + (r.rf ? 0 : 100), note: AIR_HAUL_NOTE[r.haul] });
+        await c.query('UPDATE item SET attrs = $2 WHERE id = $1', [item, JSON.stringify({ haul: r.haul, cls: r.cls, rf: r.rf })]);
+      }
+      factors.push({ item, basis: r.basis, unit: 'pkm', co2e: r.co2e, gases: r.basis === 'scope3' ? split(r.gasCo2e) : [] });
+    }
+    // Hotel stays, per room-night, by country.
+    for (const h of p.hotels) {
+      const code = `bt:hotel:${slug(h.country)}`;
+      let item = itemIds.get(code);
+      if (!item) {
+        item = await upsertItem(code, 'bt_hotel', `Hotel · ${h.country}`, { defaultUnit: 'room_night', sort: h.country.startsWith('UK') ? 900 : 100 });
+        await c.query('UPDATE item SET attrs = $2 WHERE id = $1', [item, JSON.stringify({ country: h.country, iso: HOTEL_ISO[h.country] ?? null })]);
+      }
+      factors.push({ item, basis: 'scope3', unit: 'room_night', co2e: h.co2e, gases: [] });
+    }
+    // Ferry, per passenger-km.
+    for (const r of p.sea) {
+      const k = /foot/i.test(r.kind) ? 'foot' : /car/i.test(r.kind) ? 'car' : 'average';
+      const code = `bt:sea:${k}`;
+      const item = itemIds.get(code) ?? (await upsertItem(code, 'bt_sea', `Ferry · ${k === 'foot' ? 'foot passenger' : k === 'car' ? 'car passenger' : 'average passenger'}`, { defaultUnit: 'pkm', sort: k === 'average' ? 0 : 5 }));
+      factors.push({ item, basis: r.basis, unit: 'pkm', co2e: r.co2e, gases: r.basis === 'scope3' ? split(r.gasCo2e) : [] });
+    }
+    // Rail, bus, taxi and cars: the same DESNZ land factors as commuting, as business travel items.
+    const BT_SUB: Record<string, string> = { car: 'bt_car', motorbike: 'bt_car', taxi: 'bt_taxi', bus: 'bt_bus', rail: 'bt_rail' };
+    for (const r of p.travel) {
+      const t = travelItem(r.mode, r.vehicle, r.variant);
+      const code = t.code.replace(/^commute:/, 'bt:');
+      let item = itemIds.get(code);
+      if (!item) {
+        item = await upsertItem(code, BT_SUB[r.mode]!, r.mode === 'car' ? `Car · ${t.name}` : t.name, { defaultUnit: r.unit, sort: t.sort, note: r.mode === 'car' ? 'Per vehicle-km: hire cars, or own cars paid by mileage. Shared cars count once.' : t.note });
+        await c.query('UPDATE item SET attrs = $2 WHERE id = $1', [item, JSON.stringify(t.attrs)]);
+      }
+      factors.push({ item, basis: r.basis, unit: r.unit, co2e: r.co2e, gases: r.basis === 'scope3' ? split(r.gasCo2e) : [] });
+    }
+  }
+
   // ---- home working (Scope 3.7, optional), per FTE working hour ------------------------
   if (subId.has('commute_home')) {
     for (const h of p.homeworking) {
@@ -366,3 +417,23 @@ export function travelItem(mode: TravelMode, vehicle: string, variant: string) {
   return { code: `commute:${mode}:${slug(vehicle)}`, sub, name, sort: first ? 0 : vehicle === 'Coach' || vehicle === 'National rail' ? 1 : 10, attrs: { mode },
     note: mode === 'motorbike' ? 'Per vehicle-km.' : 'Per passenger-km.' };
 }
+
+const AIR_HAUL_NAME: Record<string, string> = { domestic: 'domestic', short: 'short-haul, to/from UK', long: 'long-haul, to/from UK', intl: 'international' };
+const AIR_HAUL_SORT: Record<string, number> = { intl: 0, domestic: 1, short: 2, long: 3 };
+const AIR_CLASS_NAME: Record<string, string> = { average: 'average passenger', economy: 'economy', premium: 'premium economy', business: 'business class', first: 'first class' };
+const AIR_CLASS_SORT: Record<string, number> = { economy: 0, premium: 1, business: 2, first: 3, average: 4 };
+const AIR_HAUL_NOTE: Record<string, string> = {
+  domestic: 'Flights within one country. Per passenger-km.',
+  short: 'Flights to or from the UK under 3,700 km. Per passenger-km.',
+  long: 'Flights to or from the UK of 3,700 km or more. Per passenger-km.',
+  intl: 'Flights between two countries, not to or from the UK (DESNZ "International, to/from non-UK"). Per passenger-km.',
+};
+/** DESNZ hotel-stay country names → ISO codes (to suggest the country of a trip). */
+const HOTEL_ISO: Record<string, string> = {
+  UK: 'GB', 'UK (London)': 'GB', Argentina: 'AR', Australia: 'AU', Austria: 'AT', Belgium: 'BE', Brazil: 'BR', Canada: 'CA', Chile: 'CL', China: 'CN', Colombia: 'CO',
+  'Costa Rica': 'CR', 'Czech Republic': 'CZ', Egypt: 'EG', Fiji: 'FJ', Finland: 'FI', France: 'FR', Germany: 'DE', Greece: 'GR', 'Hong Kong, China': 'HK', India: 'IN',
+  Indonesia: 'ID', Ireland: 'IE', Israel: 'IL', Italy: 'IT', Japan: 'JP', Jordan: 'JO', Kazakhstan: 'KZ', Korea: 'KR', 'Macau, China': 'MO', Malaysia: 'MY', Maldives: 'MV',
+  Mexico: 'MX', Netherlands: 'NL', 'New Zealand': 'NZ', Oman: 'OM', Panama: 'PA', Peru: 'PE', Philippines: 'PH', Poland: 'PL', Portugal: 'PT', Qatar: 'QA', Romania: 'RO',
+  'Russian Federation': 'RU', 'Saudi Arabia': 'SA', Singapore: 'SG', 'South Africa': 'ZA', Spain: 'ES', Switzerland: 'CH', 'Taiwan, China': 'TW', Thailand: 'TH', Turkey: 'TR',
+  'United Arab Emirates': 'AE', 'United States': 'US', Vietnam: 'VN', Bahrain: 'BH', Kuwait: 'KW', Pakistan: 'PK', Bangladesh: 'BD', 'Sri Lanka': 'LK', Nepal: 'NP', Kenya: 'KE', Nigeria: 'NG', Morocco: 'MA',
+};

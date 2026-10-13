@@ -110,6 +110,32 @@ The scope follows **who runs the treatment site**: one Waste tab with a switch.
 - **Other categories:** air tickets, hotels and taxis belong to business travel (3.6); freight and couriers to upstream transport (3.4); rent to upstream leased assets (3.8); capitalised assets to capital goods (3.2). Fuel, electricity and waste are usually already counted from activity data — those lines are **excluded** to avoid counting twice. The tool flags them; a person decides.
 - Spend-based factors are averages: supplier-specific factors are better and are shown separately in the data-quality split.
 
+## Business travel — Scope 3.6
+
+**What:** travel for work in vehicles the company does not own or control: flights, hotel stays, trains, buses, taxis, hire cars and ferries. Company vehicles are under Vehicles; the journey to and from work is Employee commuting.
+**Enter:** Add data → Business travel, one row per trip, for the months picked. Four ways in:
+
+| Way | What you give | How it is counted |
+|---|---|---|
+| **Flights** | from / to airports (code or city, e.g. DXB, Riyadh) — or the flight type and the one-way km; class; return; trips (journeys × people) | distance × trips × the DESNZ air factor for the haul and class, per passenger-km |
+| **Hotel stays** | country, rooms, nights (or the hotel's own factor per room-night) | room-nights × the DESNZ hotel-stay factor of the country |
+| **Other transport** | train, metro, bus, coach, taxi, hire car (by size and fuel) or ferry; one-way km; return; trips | DESNZ business travel – land and sea, per passenger-km (hire cars per km) |
+| **By spend** | the amount, when only the cost is known (e.g. a card statement) | EPA spend factor for air, hotel or ground travel; expense or travel-agency exports go through Purchases |
+
+```flow
+> Distance | great-circle distance between the airports + 8% for routing, stacking and delays (DESNZ)
+> Haul | both airports in one country → domestic; to or from the UK → short-haul (under 3,700 km) or long-haul; otherwise international (DESNZ "to/from non-UK")
+> Class | economy, premium economy, business, first, or not known (average); DESNZ has only the average for domestic flights and economy / business for short-haul — the nearest is used and the steps say so
+> Passenger-km | one-way km × 2 when return × trips
+> Factor | DESNZ business travel – air, with radiative forcing (the company can choose without, under Methodology); its well-to-tank is counted in 3.6
+```
+
+**Flight type and distance:** when the airports are not known, choose domestic, international or (to/from the UK) short- or long-haul and type the one-way km; left empty, a typical distance is used (domestic 450 km, international 3,000 km, short-haul 1,500 km, long-haul 6,500 km) and the entry says so.
+
+**Radiative forcing** adds the warming effect of aircraft emissions at altitude (contrails, NOx) — DESNZ recommends including it; GHG Protocol leaves it optional. The company's choice is under Methodology and shows on every flight entry.
+
+**Hotels:** DESNZ publishes a factor per room per night for about 50 countries; when a country has no value in the year, the latest earlier year is used. For other countries choose a nearby one or enter the hotel's own factor.
+
 ## Employee commuting — Scope 3.7
 
 **What:** travel between home and the workplace by employees, in vehicles the company does not own or control (own cars, car-pools, taxis, public transport, a contracted staff shuttle). A shuttle the company owns or leases and runs itself is fleet (Scope 1) instead.

@@ -70,8 +70,10 @@ export type SaveInput = z.infer<typeof saveSchema>;
  * Calculate and save one entry inside the caller's transaction (used by the form,
  * the fleet grid and Excel uploads). With dryRun, calculates only.
  */
-export async function saveEntry(c: Tx, req: FastifyRequest, t: { id: string; gwp_set: string }, b: SaveInput, opts: { dryRun?: boolean; quiet?: boolean } = {}) {
+export async function saveEntry(c: Tx, req: FastifyRequest, t: { id: string; gwp_set: string; flight_rf?: boolean }, b: SaveInput, opts: { dryRun?: boolean; quiet?: boolean } = {}) {
   const tenant = t.id;
+  // Flights: with or without radiative forcing as the company chose (Methodology), unless given.
+  if (b.trip?.kind === 'flight' && b.trip.rf === undefined) b.trip.rf = t.flight_rf ?? true;
   const fac = (await c.query(`SELECT id, name, country, grid_region FROM org_node WHERE id = $1 AND kind = 'facility' AND active`, [b.facilityId])).rows[0];
   if (!fac) throw notFound('Facility');
   assertCan((await scopeOf(c, req.user)).enter, fac.id, 'enter data for this facility');
@@ -146,13 +148,15 @@ function recalcInput(a: Record<string, any>, periodStart: string, periodEnd: str
   }
   if (a.calc_method === 'water') return { ...base, quantity: Number(a.quantity), water: inputs.water ?? undefined };
   if (a.calc_method === 'waste_disposal') return { ...base, quantity: Number(a.quantity), wasteInfo: inputs.wasteInfo ?? undefined };
+  // Trips: the passenger-km / room-nights worked out when saved; only an own factor is kept.
+  if (a.calc_method === 'trip') return { ...base, quantity: Number(a.quantity), trip: inputs.trip?.ownFactor !== undefined ? { kind: 'ground', ownFactor: Number(inputs.trip.ownFactor), ownSource: inputs.trip.ownSource } : undefined };
   return { ...base, quantity: Number(a.quantity), cv };
 }
 
 export async function tenantSettings(tenantId: string) {
-  const [t] = await query('SELECT id, name, country, gwp_set, consolidation, base_year, plan, status, access_expiry, timezone FROM tenant WHERE id = $1', [tenantId]);
+  const [t] = await query('SELECT id, name, country, gwp_set, consolidation, base_year, plan, status, access_expiry, timezone, flight_rf FROM tenant WHERE id = $1', [tenantId]);
   if (!t) throw notFound('Company');
-  return t as { id: string; name: string; country: string; gwp_set: string; consolidation: string; base_year: number; timezone: string };
+  return t as { id: string; name: string; country: string; gwp_set: string; consolidation: string; base_year: number; timezone: string; flight_rf: boolean };
 }
 
 export async function activityRoutes(app: FastifyInstance) {
@@ -166,12 +170,13 @@ export async function activityRoutes(app: FastifyInstance) {
     const b = z.object({
       gwpSet: z.enum(['AR4', 'AR5', 'AR6']).optional(), country: z.string().length(2).optional(),
       consolidation: z.enum(['operational', 'financial', 'equity']).optional(), baseYear: z.number().int().min(2000).max(2100).optional(),
+      flightRf: z.boolean().optional(),
     }).parse(req.body);
     return tenantTx(tenant, async (c) => {
       const r = (await c.query(`UPDATE tenant SET gwp_set = COALESCE($2, gwp_set), country = COALESCE($3, country),
-                                  consolidation = COALESCE($4, consolidation), base_year = COALESCE($5, base_year)
-                                WHERE id = $1 RETURNING id, name, country, gwp_set, consolidation, base_year`,
-        [tenant, b.gwpSet ?? null, b.country?.toUpperCase() ?? null, b.consolidation ?? null, b.baseYear ?? null])).rows[0];
+                                  consolidation = COALESCE($4, consolidation), base_year = COALESCE($5, base_year), flight_rf = COALESCE($6, flight_rf)
+                                WHERE id = $1 RETURNING id, name, country, gwp_set, consolidation, base_year, flight_rf`,
+        [tenant, b.gwpSet ?? null, b.country?.toUpperCase() ?? null, b.consolidation ?? null, b.baseYear ?? null, b.flightRf ?? null])).rows[0];
       await audit(c, req, 'methodology.update', 'tenant', tenant, b);
       return r;
     });
@@ -231,6 +236,7 @@ export async function activityRoutes(app: FastifyInstance) {
       return { item: { id: item.id, name: item.name, category: item.category }, gwpSet, ...result };
     }
     const t = await tenantSettings(req.user.tenantId);
+    if (input.trip?.kind === 'flight' && input.trip.rf === undefined) input.trip.rf = t.flight_rf;
     return tenantTx(t.id, async (c) => {
       let region = t.country;
       let fac: { id: string; grid_region: string | null } | undefined;
@@ -278,7 +284,7 @@ export async function activityRoutes(app: FastifyInstance) {
     return tenantTx(tenant, async (c) => {
       const enter = (await scopeOf(c, req.user)).enter;
       const rows = (await c.query(
-        `SELECT a.*, cat.calc_method FROM activity a JOIN category cat ON cat.id = a.category_id
+        `SELECT a.*, ic.calc_method FROM activity a JOIN item i ON i.id = a.item_id JOIN subcategory isub ON isub.id = i.subcategory_id JOIN category ic ON ic.id = isub.category_id
           WHERE ($1::uuid[] IS NULL OR a.id = ANY($1)) AND ($2::int IS NULL OR extract(year FROM a.period_start) = $2)
             AND (NOT $3 OR jsonb_array_length(a.warnings) > 0)
           ORDER BY a.period_start`, [b.ids ?? null, b.year ?? null, b.onlyWithWarnings])).rows.filter((a) => enter.has(a.facility_id));

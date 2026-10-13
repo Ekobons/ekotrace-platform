@@ -713,21 +713,16 @@ small.muted, td.muted { color: var(--muted); }
 .stg i { width: 24px; height: 24px; border-radius: 99px; background: var(--soft); border: 1px solid var(--line); display: flex; align-items: center; justify-content: center; font-style: normal; font-size: 12px; }
 .stg.on { background: var(--ink); color: #fff; border-color: var(--ink); }
 .stg.on i { background: var(--lime); color: var(--ink); border-color: var(--lime); }
-.methods { display: flex; flex-wrap: wrap; gap: 6px; }
-.meth { display: inline-flex; align-items: center; gap: 7px; height: 36px; padding: 0 13px; border-radius: 10px; border: 1px solid var(--line2); background: var(--surface); cursor: pointer; color: var(--fg2); font: inherit; font-size: 13px; font-weight: 600; white-space: nowrap; }
-.meth svg { color: var(--primary); width: 16px; height: 16px; }
-.meth small { font-size: 11px; color: var(--muted); font-weight: 500; }
-.meth:hover { border-color: var(--primary); color: var(--fg); }
-.meth.on { border-color: var(--primary); background: var(--primary-soft); color: var(--fg); font-weight: 700; box-shadow: inset 0 0 0 1px var(--primary); }
 .softbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 11px 14px; border-radius: 12px; background: var(--soft); border: 1px solid var(--line); }
 .soft { display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; border-radius: 12px; background: var(--soft); }
 .kgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
-table.t.rows td { vertical-align: middle; }
+table.t.rows td { vertical-align: middle; padding-left: 8px; padding-right: 8px; }
+table.t.rows th { padding-left: 8px; padding-right: 8px; }
 table.t.rows tr.bad td { background: #FDF3F1; }
 table.t.rows .input { height: 36px; }
 
 /* Categories on the left of the entry card, as in the prototype. */
-.entrylayout { display: grid; grid-template-columns: 270px minmax(0, 1fr); gap: 14px; align-items: start; }
+.entrylayout { display: grid; grid-template-columns: 248px minmax(0, 1fr); gap: 14px; align-items: start; }
 .catrail { padding: 8px; display: flex; flex-direction: column; gap: 2px; position: sticky; top: 12px; }
 .catbtn { display: flex; gap: 10px; align-items: center; width: 100%; padding: 9px 10px; border: 0; border-radius: 10px; background: transparent; text-align: left; cursor: pointer; font: inherit; color: var(--fg); }
 .catbtn:hover { background: var(--soft); }
@@ -742,3 +737,14 @@ table.t.rows .input { height: 36px; }
   .catrail > .lbl, .catrail > .muted { display: none; }
   .catbtn { width: auto; flex: none; }
 }
+
+/* Ways in: one row of compact pills. */
+.methods { display: flex; flex-wrap: wrap; gap: 6px; }
+.meth { display: inline-flex; align-items: center; gap: 7px; height: 34px; padding: 0 13px; border-radius: 99px; border: 1px solid var(--line2); background: var(--surface); cursor: pointer; color: var(--fg2); font: inherit; font-size: 13px; font-weight: 600; white-space: nowrap; }
+.meth svg { color: var(--primary); }
+.meth small { font-size: 11px; color: var(--muted); font-weight: 600; }
+.meth:hover { border-color: var(--primary); color: var(--fg); }
+.meth.on { background: var(--ink); border-color: var(--ink); color: #fff; }
+.meth.on svg { color: var(--lime); }
+/* Row tables: text inputs and selects fill their column instead of their default 20-character width. */
+table.t.rows input.input:not(.num), table.t.rows select.input { width: 100%; min-width: 0; }

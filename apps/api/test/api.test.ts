@@ -1511,3 +1511,55 @@ test('Enter → Review → Approved: drafts submitted, approved by someone else 
   const audits = (await pq(`SELECT action FROM audit_log WHERE action LIKE 'activity.%' AND detail::text LIKE $1`, [`%${a1}%`])).rows.map((x) => x.action);
   assert.ok(['activity.submit', 'activity.approve', 'activity.return'].every((x) => audits.includes(x)), JSON.stringify(audits));
 });
+
+test('business travel: flights from airports (great-circle + 8%, haul, class, return, trips, RF as the company chose), by flight type, hotel stays by country, rail; spend lines still go to 3.6', async () => {
+  const p = { facilityId: facA, periodStart: '2026-03-01', periodEnd: '2026-03-31' };
+  const f = (code: string) => pq(`SELECT f.basis, f.co2e::float8 AS v FROM factor f JOIN item i ON i.id = f.item_id JOIN factor_source s ON s.id = f.source_id WHERE i.code = $1 AND s.code = 'DESNZ-2026' AND f.status = 'active'`, [code]).then((r) => r.rows as { basis: string; v: number }[]);
+  const sum = (rows: { v: number }[]) => rows.reduce((a, r) => a + r.v, 0);
+  // DXB → LHR return, economy, 2 people: to/from the UK, over 3,700 km → long-haul
+  const fl = await api('POST', '/api/activities/batch', { dryRun: false, entries: [
+    { ...p, unit: 'pkm', note: 'A. Khan', trip: { kind: 'flight', from: 'dxb', to: 'LHR', cls: 'economy', ret: true, trips: 2 } },
+    { ...p, unit: 'pkm', trip: { kind: 'flight', from: 'DXB', to: 'RUH', cls: 'business', ret: false } },
+    { ...p, unit: 'pkm', trip: { kind: 'flight', from: 'AUH', to: 'DXB', cls: 'first' } },
+    { ...p, unit: 'pkm', trip: { kind: 'flight', haul: 'intl', cls: 'premium', trips: 1 } },
+  ] }, tenantA);
+  assert.equal(fl.status, 200, JSON.stringify(fl.body));
+  assert.ok(fl.body.results.every((r: { ok: boolean }) => r.ok), JSON.stringify(fl.body.results));
+  const rows = (await pq(`SELECT a.quantity::float8 AS q, a.co2e_scope3::float8 AS s3, a.co2e_wtt::float8 AS wtt, i.code, a.inputs, c.code AS cat FROM activity a JOIN item i ON i.id = a.item_id JOIN category c ON c.id = a.category_id
+                          WHERE a.id = ANY($1) ORDER BY a.created_at`, [fl.body.results.map((r: { id: string }) => r.id)])).rows;
+  const { airport, greatCircleKm } = await import('../src/lib/airports.js');
+  const gc = greatCircleKm(airport('DXB')!, airport('LHR')!);
+  assert.ok(gc > 5400 && gc < 5550, String(gc));
+  assert.equal(rows[0].code, 'bt:air:long:economy:rf'); assert.equal(rows[0].cat, 'business_travel');
+  assert.ok(Math.abs(rows[0].q - gc * 1.08 * 2 * 2) < 0.01, `${rows[0].q} vs ${gc * 1.08 * 4}`);
+  assert.ok(Math.abs(rows[0].s3 - rows[0].q * sum(await f('bt:air:long:economy:rf'))) < 1e-3, 'Scope 3 incl. well-to-tank, with RF');
+  assert.equal(rows[0].wtt, 0); assert.equal(rows[0].inputs.trip.haul, 'long'); assert.equal(rows[0].inputs.trip.from, 'DXB');
+  assert.equal(rows[1].code, 'bt:air:intl:business:rf', 'DXB–RUH: not the UK → international');
+  assert.equal(rows[2].code, 'bt:air:domestic:average:rf', 'AUH–DXB: one country → domestic, average (DESNZ has no first class for domestic)');
+  assert.equal(rows[3].code, 'bt:air:intl:premium:rf'); assert.equal(rows[3].q, 3000, 'typical distance when only the type is known');
+  assert.ok(fl.body.results[3].warnings.some((w: string) => /Typical international distance/.test(w)));
+  // the company chooses without radiative forcing
+  await api('PATCH', '/api/tenant', { flightRf: false }, tenantA);
+  const norf = await api('POST', '/api/calculate', { ...p, unit: 'pkm', trip: { kind: 'flight', from: 'DXB', to: 'LHR', cls: 'economy' } }, tenantA);
+  assert.equal(norf.status, 200, JSON.stringify(norf.body));
+  assert.match(norf.body.steps.join(' '), /without radiative forcing/);
+  await api('PATCH', '/api/tenant', { flightRf: true }, tenantA);
+  // hotel: 2 rooms × 3 nights in the UAE; and with the hotel's own factor
+  const uae = (await pq(`SELECT id FROM item WHERE code = 'bt:hotel:united-arab-emirates'`)).rows[0].id;
+  const h = await api('POST', '/api/activities/batch', { dryRun: true, entries: [
+    { ...p, itemId: uae, unit: 'room_night', trip: { kind: 'hotel', rooms: 2, nights: 3 } },
+    { ...p, itemId: uae, unit: 'room_night', trip: { kind: 'hotel', rooms: 1, nights: 4, ownFactor: 20, ownSource: 'hotel' } },
+  ] }, tenantA);
+  assert.ok(Math.abs(h.body.results[0].totals.scope3 - 6 * sum(await f('bt:hotel:united-arab-emirates'))) < 1e-6, JSON.stringify(h.body.results[0]));
+  assert.equal(h.body.results[1].totals.scope3, 80);
+  // rail: 120 km one way, return, 3 trips
+  const rail = (await pq(`SELECT id FROM item WHERE code = 'bt:rail:national-rail'`)).rows[0];
+  assert.ok(rail, 'national rail item');
+  const r = await api('POST', '/api/calculate', { ...p, itemId: rail.id, unit: 'pkm', trip: { kind: 'ground', km: 120, ret: true, trips: 3 } }, tenantA);
+  assert.ok(Math.abs(r.body.totals.scope3 - 720 * sum(await f('bt:rail:national-rail'))) < 1e-6, JSON.stringify(r.body));
+  // airport search and distance
+  assert.equal((await api('GET', '/api/trips/airports?q=riyadh', undefined, tenantA)).body.airports[0].iata, 'RUH');
+  const opt = (await api('GET', '/api/trips/options?year=2026', undefined, tenantA)).body;
+  assert.ok(opt.hotels.some((x: { iso: string; co2e: number }) => x.iso === 'AE' && x.co2e > 0) && opt.ground.length > 5 && opt.rf === true);
+  assert.equal((await api('POST', '/api/calculate', { ...p, unit: 'pkm', trip: { kind: 'flight', from: 'XXX', to: 'LHR' } }, tenantA)).status, 400);
+});

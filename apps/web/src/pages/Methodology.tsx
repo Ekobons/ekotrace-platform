@@ -87,6 +87,13 @@ export function Methodology() {
           </select>
           <p className="sub">The year targets are measured from. Restatements (when the base year must be recalculated) come with the targets module.</p>
         </div>
+        <div className="card" style={{ display: 'grid', gap: 10 }}>
+          <h2>Flights · radiative forcing</h2>
+          <select className="input" disabled={!edit} value={tenant?.flight_rf === false ? 'no' : 'yes'} onChange={(e) => save({ flightRf: e.target.value === 'yes' }, e.target.value === 'yes' ? 'Flights now include radiative forcing' : 'Flights now exclude radiative forcing')}>
+            <option value="yes">With radiative forcing — DESNZ recommendation</option><option value="no">Without radiative forcing (CO₂, CH₄, N₂O only)</option>
+          </select>
+          <p className="sub">Radiative forcing adds the warming effect of aircraft emissions at altitude (contrails, NOx), about 70% more than the fuel's CO₂e. Applies to new flight entries; each entry shows which was used.</p>
+        </div>
       </div>
       <Prices canEdit={['platform_admin', 'super_admin', 'admin'].includes(role)} />
       <div className="note info">Standards: GHG Protocol Corporate Standard; factors DESNZ (UK) 2022–2026 and IPCC 2006 where DESNZ has none; kWh on net calorific value unless entered as gross. Vehicles: DESNZ per km / mile by class and powertrain, or by fuel used; electricity for electric vehicles in Scope 2 (location-based grid factor of the facility's country).</div>

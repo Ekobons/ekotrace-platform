@@ -25,6 +25,7 @@ import { WasteEntry } from './WasteEntry';
 import { PurchaseEntry } from './PurchaseEntry';
 import { CommutingEntry } from './CommutingEntry';
 import { WaterEntry } from './WaterEntry';
+import { TripEntry, type TripKind } from './TripEntry';
 import { MonthGrid } from '../components/MonthGrid';
 import { EntryContext } from '../components/EntryContext';
 
@@ -76,7 +77,7 @@ const METHOD_HELP: Record<Method, string> = {
 };
 
 /** Ways in, shown as cards. */
-type Way = 'form' | 'bills' | 'readings' | 'fleet' | 'paste' | 'upload' | 'auto';
+type Way = 'form' | 'bills' | 'readings' | 'fleet' | 'paste' | 'upload' | 'auto' | 'flights' | 'hotels' | 'ground' | 'spend';
 const WAYS: Record<Way, [string, string, string]> = {
   form: ['Type it in', 'edit', 'One row per month. Units are fixed per type, so nobody mixes litres and gallons.'],
   bills: ['Upload bills', 'doc', 'PDF bills are read, matched to the meter of the account, checked and previewed, then published as the months’ entries.'],
@@ -85,6 +86,10 @@ const WAYS: Record<Way, [string, string, string]> = {
   paste: ['Paste a table', 'paste', 'Paste rows from a spreadsheet in everyday words, e.g. “car petrol | 2 | 34 km”.'],
   upload: ['Excel / CSV', 'download', 'Download a template for this facility and these months, fill it in, then upload it here.'],
   auto: ['Automatic feed', 'feed', 'Connected systems post data straight into Ekotrace.'],
+  flights: ['Flights', 'plane', 'One row per trip: airports or flight type, class, return and how many trips.'],
+  hotels: ['Hotel stays', 'building', 'One row per stay: country, rooms and nights.'],
+  ground: ['Other transport', 'bus', 'Trains, buses, taxis, hire cars and ferries: one-way km, return, trips.'],
+  spend: ['By spend', 'cart', 'Fares, hotels and taxis known only by the amount paid: spend-based factors (EPA). Expense or travel-agency files go through Purchases.'],
 };
 
 export function AddData() {
@@ -112,9 +117,9 @@ export function AddData() {
 
   const yearly = cat?.calc_method === 'travel';
   const single = cat?.calc_method === 'spend';
-  const ways: Way[] = !cat ? [] : cat.calc_method === 'vehicle' ? ['form', 'fleet', 'paste', 'upload'] : billCat ? ['form', 'bills', 'readings', 'auto'] : ['form'];
+  const ways: Way[] = !cat ? [] : cat.calc_method === 'trip' ? ['flights', 'hotels', 'ground', 'spend'] : cat.calc_method === 'vehicle' ? ['form', 'fleet', 'paste', 'upload'] : billCat ? ['form', 'bills', 'readings', 'auto'] : ['form'];
   const way = ((sp.get('via') as Way | null) ?? 'form');
-  const wayOk: Way = ways.includes(way) ? way : 'form';
+  const wayOk: Way = ways.includes(way) ? way : ways[0] ?? 'form';
 
   // Load catalogue for this category and the company's facilities.
   useEffect(() => {
@@ -260,13 +265,13 @@ export function AddData() {
             : <>
               {ways.length > 1 && <>
                 <div className="methods">{ways.map((w) => (
-                  <button key={w} className={`meth${wayOk === w ? ' on' : ''}`} onClick={() => (w === 'auto' ? navigate('/integrations') : setParam('via', w === 'form' ? null : w))}>
+                  <button key={w} className={`meth${wayOk === w ? ' on' : ''}`} onClick={() => (w === 'auto' ? navigate('/integrations') : setParam('via', w === ways[0] ? null : w))}>
                     <Icon name={WAYS[w][1]} size={16} />{WAYS[w][0]}{w === 'auto' && <small>→ Integrations</small>}
                   </button>))}
                 </div>
                 <div className="sub" style={{ marginTop: -4 }}>{WAYS[wayOk][2]}</div>
               </>}
-              {cat.description && <div className="sub" style={{ marginTop: ways.length > 1 ? -6 : 0 }}>{cat.description}</div>}
+              {cat.description && ways.length <= 1 && <div className="sub">{cat.description}</div>}
               {!facilityId ? <div className="note info">No facility to enter data for.</div>
                 : !rows && !whole && !yearly ? <div className="note info">Pick one or more months above.</div>
                 : billCat && wayOk === 'bills' ? <CategoryBills category={billCat} />
@@ -294,6 +299,7 @@ function CategoryForm({ cat, cats, facilityId, year, period, rows, picked, fac, 
   switch (cat.calc_method) {
     case 'water': return <WaterEntry cats={cats} facilityId={facilityId} period={period} onSaved={onSaved} monthly={monthly} />;
     case 'travel': return <CommutingEntry facilityId={facilityId} year={year} onSaved={onSaved} />;
+    case 'trip': return <TripEntry kind={way as TripKind} facilityId={facilityId} year={year} onSaved={onSaved} />;
     case 'spend': return <PurchaseEntry cat={cat} facilityId={facilityId} period={period} onSaved={onSaved} />;
     case 'waste': case 'waste_disposal': return <WasteEntry cat={cat} cats={cats} facilityId={facilityId} period={period} onSaved={onSaved} monthly={monthly} />;
     // Certificates and contracts are claimed one month at a time: one month → the full form.
