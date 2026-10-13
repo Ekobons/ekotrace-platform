@@ -105,7 +105,7 @@ export function AddData() {
   const [cat, setCat] = useState<Category | null>(null);
   const [cats, setCats] = useState<Category[]>([]);
   const [facilities, setFacilities] = useState<Facility[]>([]);
-  const [facilityId, setFacilityId] = useState('');
+  const [facilityId, setFacilityId] = useState(() => new URLSearchParams(window.location.search).get('facility') ?? '');
   const now = new Date(), nowY = now.getFullYear(), nowM = now.getMonth();
   const [year, setYear] = useState(nowY);
   /** months picked (0–11); `whole` = one entry for the whole year */

@@ -1563,3 +1563,24 @@ test('business travel: flights from airports (great-circle + 8%, haul, class, re
   assert.ok(opt.hotels.some((x: { iso: string; co2e: number }) => x.iso === 'AE' && x.co2e > 0) && opt.ground.length > 5 && opt.rf === true);
   assert.equal((await api('POST', '/api/calculate', { ...p, unit: 'pkm', trip: { kind: 'flight', from: 'XXX', to: 'LHR' } }, tenantA)).status, 400);
 });
+
+test('home and KPIs: facility status by category and month, approvals waiting for me (with the usual-month check), my drafts; KPI list and targets per selection; targets and collection rules on the company; one-user company approves its own', async () => {
+  const sa = await login(superA.email, superA.temporaryPassword);
+  const h = await call(sa, 'GET', '/api/home?year=2025');
+  assert.equal(h.status, 200, JSON.stringify(h.body));
+  assert.ok(h.body.facilities.length > 0 && Array.isArray(h.body.cells) && h.body.settings.target.year === 2030 && h.body.settings.dueDay === 10);
+  // the review test left one entry in the depot: approvals list it with who entered it
+  assert.ok(h.body.approvals.every((a: { by: string | null; kg: number }) => a.kg >= 0));
+  const k0 = (await call(sa, 'GET', '/api/kpis')).body;
+  assert.deepEqual(k0.list, ['tot', 'purch', 'div', 'ren', 'fleet', 'pemp']); assert.equal(k0.canTarget, true);
+  const k1 = await call(sa, 'PUT', '/api/kpis', { list: ['tot', 's12', 'water'], key: 'company', targets: { tot: 120, water: 900 } });
+  assert.equal(k1.status, 200, JSON.stringify(k1.body));
+  assert.deepEqual(k1.body.targets.company, { tot: 120, water: 900 });
+  assert.equal((await call(sa, 'PUT', '/api/kpis', { list: ['nope'] })).status, 400);
+  const tn = await call(sa, 'PATCH', '/api/tenant', { targetYear: 2035, targetS12: 50, targetS3: 30, dueDay: 15 });
+  assert.equal(tn.body.target_year, 2035); assert.equal(tn.body.due_day, 15);
+  assert.equal((await call(sa, 'GET', '/api/home')).body.settings.target.s12, 50);
+  await call(sa, 'PATCH', '/api/tenant', { targetYear: 2030, targetS12: 42, targetS3: 25, dueDay: 10 });
+  // another company: its own KPI settings
+  assert.deepEqual((await api('GET', '/api/kpis', undefined, tenantB)).body.list, ['tot', 'purch', 'div', 'ren', 'fleet', 'pemp']);
+});

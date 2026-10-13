@@ -110,6 +110,9 @@ export async function dashboardRoutes(app: FastifyInstance) {
       const prevRows = cmpYear !== year ? await shape(cmpYear) : [];
       const prevMonthly = (await c.query(
         `SELECT ${M} AS m, ${t1('a.co2e_direct')} AS s1, ${t1(S2)} AS s2, ${t1('a.co2e_scope3 + a.co2e_wtt + a.co2e_td')} AS s3 ${FROM} GROUP BY 1`, [facs, cmpYear])).rows;
+      // the base year by month and scope: the target path (base-year month × the straight-line reduction)
+      const baseMonthly = t.base_year ? (await c.query(
+        `SELECT ${M} AS m, ${t1('a.co2e_direct')} AS s1, ${t1(S2)} AS s2, ${t1('a.co2e_scope3 + a.co2e_wtt + a.co2e_td')} AS s3 ${FROM} GROUP BY 1`, [facs, t.base_year])).rows : [];
       const base = t.base_year && t.base_year !== year
         ? (await c.query(`SELECT ${t1(`a.co2e_direct + ${S2} + a.co2e_scope3 + a.co2e_wtt + a.co2e_td`)} AS total ${FROM}`, [facs, t.base_year])).rows[0]?.total ?? null : null;
       const facilities = (await c.query(
@@ -132,13 +135,13 @@ export async function dashboardRoutes(app: FastifyInstance) {
       };
       // which facility-months have activity data in (anything not rejected; purchases come in files, not monthly), and which still wait for approval
       const months = (await c.query(
-        `SELECT a.facility_id AS f, extract(month FROM a.period_start)::int AS m, bool_and(a.status = 'approved') AS ok
+        `SELECT a.facility_id AS f, extract(month FROM a.period_start)::int AS m, bool_and(a.status = 'approved') AS ok, bool_or(a.status = 'approved') AS any_ok
            FROM activity a JOIN category cat ON cat.id = a.category_id WHERE a.facility_id = ANY($1) AND a.status <> 'rejected' AND extract(year FROM a.period_start) = $2
-            AND a.period_end - a.period_start < 40 AND cat.calc_method NOT IN ('spend', 'travel', 'trip') GROUP BY 1, 2`, [facs, year])).rows as { f: string; m: number; ok: boolean }[];
+            AND a.period_end - a.period_start < 40 AND cat.calc_method NOT IN ('spend', 'travel', 'trip') GROUP BY 1, 2`, [facs, year])).rows as { f: string; m: number; ok: boolean; any_ok: boolean }[];
       return {
-        filled: months.map((r) => [r.f, r.m]), waiting: months.filter((r) => !r.ok).map((r) => [r.f, r.m]),
+        filled: months.map((r) => [r.f, r.m]), waiting: months.filter((r) => !r.ok).map((r) => [r.f, r.m]), approvedIn: months.filter((r) => r.any_ok).map((r) => [r.f, r.m]),
         year, years, group, pend: q.pend === '1', consolidation: t.consolidation, scope2: q.scope2, baseYear: t.base_year && t.base_year !== year ? { year: t.base_year, total: base } : null,
-        rows, cmpYear, prevRows, prevMonthly, facilities, categories, s3Names: S3_NAME, purchases,
+        rows, cmpYear, prevRows, prevMonthly, baseMonthly, facilities, categories, s3Names: S3_NAME, purchases,
       };
     });
   });

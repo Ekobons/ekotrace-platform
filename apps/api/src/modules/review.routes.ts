@@ -93,6 +93,8 @@ export async function reviewRoutes(app: FastifyInstance) {
       const me = String(req.user.id);
       const rows = (await c.query('SELECT id, facility_id, status, created_by, submitted_by FROM activity WHERE id = ANY($1) FOR UPDATE', [b.ids])).rows;
       const done: string[] = [], skipped: { id: string; reason: string }[] = [];
+      // A company whose only user (verifiers aside) is its super admin approves its own entries: marked self-reviewed.
+      const solo = req.user.role === 'super_admin' && Number((await c.query(`SELECT count(*)::int AS n FROM app_user WHERE NOT disabled AND role <> 'verifier'`)).rows[0].n) === 1;
       for (const a of rows) {
         const mine = a.created_by === me || a.submitted_by === me;
         let why: string | null = null, sql = '';
@@ -107,11 +109,11 @@ export async function reviewRoutes(app: FastifyInstance) {
           else sql = `UPDATE activity SET status = 'draft', submitted_at = NULL, submitted_by = NULL, updated_at = now() WHERE id = $1`;
         } else {
           if (!s.approve.has(a.facility_id)) why = 'you cannot approve data for this facility';
-          else if (mine) why = 'nobody approves their own entry';
+          else if (mine && !solo) why = 'nobody approves their own entry';
           else if (b.action === 'approve' && a.status !== 'submitted') why = a.status === 'approved' ? 'already approved' : 'not submitted yet';
           else if (b.action === 'return' && a.status !== 'submitted' && a.status !== 'approved') why = 'not submitted';
           else sql = b.action === 'approve'
-            ? `UPDATE activity SET status = 'approved', reviewed_at = now(), reviewed_by = $2, review_note = NULL, updated_at = now() WHERE id = $1`
+            ? `UPDATE activity SET status = 'approved', reviewed_at = now(), reviewed_by = $2, review_note = NULL, self_reviewed = ${mine ? 'true' : 'false'}, updated_at = now() WHERE id = $1`
             : `UPDATE activity SET status = 'rejected', reviewed_at = now(), reviewed_by = $2, review_note = $3, updated_at = now() WHERE id = $1`;
         }
         if (why) { skipped.push({ id: a.id, reason: why }); continue; }

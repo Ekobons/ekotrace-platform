@@ -16,6 +16,8 @@ import { EnergyRegister } from './pages/EnergyRegister';
 import { PurchaseBatchPage, Purchases } from './pages/Purchases';
 import { PublishedPurchasesPage } from './pages/PublishedPurchases';
 import { Suppliers } from './pages/Suppliers';
+import { Home } from './pages/Home';
+import { Kpis } from './pages/Kpis';
 import { Dashboards } from './pages/Dashboards';
 import { Currencies } from './pages/Currencies';
 import { AuditLog } from './pages/AuditLog';
@@ -41,7 +43,7 @@ export const useApp = () => useContext(AppCtx);
 type NavItem = { to?: string; label: string; icon: string; roles?: Role[]; stage?: number };
 const NAV: { group?: string; items: NavItem[] }[] = [
   { items: [
-    { label: 'Home', icon: 'home', stage: 3 }, { to: '/dashboards', label: 'Dashboards', icon: 'chart' }, { label: 'KPI dashboard', icon: 'gauge', stage: 3 },
+    { to: '/home', label: 'Home', icon: 'home' }, { to: '/dashboards', label: 'Dashboards', icon: 'chart' }, { to: '/kpis', label: 'KPI dashboard', icon: 'gauge' },
   ] },
   { group: 'Capture', items: [
     { to: '/data/stationary_combustion', label: 'Add data', icon: 'plus', roles: ['super_admin', 'admin', 'manager', 'preparer'] },
@@ -151,11 +153,13 @@ function Shell() {
       </aside>
       <main className="main">
         <Routes>
-          <Route path="/" element={<Navigate to={role === 'platform_admin' && !tenant ? '/console' : role === 'verifier' ? '/entries' : '/data/stationary_combustion'} replace />} />
+          <Route path="/" element={<Navigate to={role === 'platform_admin' && !tenant ? '/console' : '/home'} replace />} />
           <Route path="/console" element={<Gate ok={role === 'platform_admin'}><Console /></Gate>} />
           <Route path="/account" element={<div className="page"><ChangePassword onDone={() => nav('/')} /></div>} />
           <Route path="/library/*" element={<Gate ok={role === 'platform_admin'}><Library /></Gate>} />
           <Route path="/data/:category" element={<NeedCo><AddData /></NeedCo>} />
+          <Route path="/home" element={<NeedCo><Home /></NeedCo>} />
+          <Route path="/kpis" element={<NeedCo><Kpis /></NeedCo>} />
           <Route path="/dashboards" element={<NeedCo><Dashboards /></NeedCo>} />
           <Route path="/entries" element={<NeedCo><Entries /></NeedCo>} />
           <Route path="/surveys" element={<NeedCo><Surveys /></NeedCo>} />

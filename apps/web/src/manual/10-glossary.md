@@ -60,3 +60,9 @@
 | Great-circle distance | The shortest distance between two airports over the Earth's surface; DESNZ adds 8% for real routes |
 | Haul | DESNZ flight groups: domestic, short-haul and long-haul (to/from the UK, split at 3,700 km) and international (not to/from the UK) |
 | Room-night | One hotel room for one night; 2 rooms for 3 nights = 6 room-nights |
+| Target path | The straight-line route from base-year emissions to the reduction target in the target year; each month is compared with the same base-year month cut by the share due by then |
+| Due day | Day of the next month by which a month's data should be submitted (Methodology → Collection rules) |
+| Overdue / escalated | A submission past its due day; escalated once it is more than the escalation days late |
+| Submission | One facility × one category it reports × one month |
+| Self-reviewed | An entry approved by the person who entered it — only allowed when the company has a single user |
+| KPI target | A level set for a KPI and a selection (company, sub-group, facility or group); bars turn green when met |

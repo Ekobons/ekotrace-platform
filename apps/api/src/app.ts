@@ -32,6 +32,7 @@ import { commuteRoutes } from './modules/commute.routes.js';
 import { surveyPublicRoutes, surveyRoutes } from './modules/survey.routes.js';
 import { reviewRoutes } from './modules/review.routes.js';
 import { tripRoutes } from './modules/trip.routes.js';
+import { homeRoutes } from './modules/home.routes.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const BRANDS = join(HERE, '../../../brands');
@@ -72,6 +73,7 @@ export async function buildApp(opts: { logger?: boolean } = {}): Promise<Fastify
     secured.addHook('onRequest', authenticate);
     await secured.register(reviewRoutes);
     await secured.register(tripRoutes);
+    await secured.register(homeRoutes);
     await secured.register(orgRoutes);
     await secured.register(peopleRoutes);
     await secured.register(platformRoutes);

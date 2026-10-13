@@ -2,6 +2,14 @@
 
 Newest first.
 
+## 2026-10-13 · Home and KPI dashboard (as in the prototype)
+
+- **Home by role** (replaces the old landing page): the month's data strip (due date, submissions in, overdue, escalated); super admin/admin — emissions, Scope 1+2 vs target path, data approved, monthly chart with last year and target path, Needs your decision, Facilities table, Biggest sources; manager — approval queue with Approve N clean; preparer — checklist and To fix; verifier — sample to test and assurance readiness; one-user companies — three steps, entries marked self-reviewed.
+- **KPI dashboard**: 19 KPIs, monthly/quarterly/semi-annual/annual, aggregate or compare facilities, choose KPIs and set targets per selection (green/amber bars, dashed target line), Emissions vs target, Benchmarks.
+- **Methodology**: reduction targets (target year, Scope 1+2 %, Scope 3 %) and collection rules (due day, due-soon days, escalation days).
+- Dashboards count a month as in once it has approved data; a one-user company's super admin can approve their own entries (self-reviewed).
+- Not yet: "Reductions delivered" waits for Targets & actions; reminders are not sent yet.
+
 ## 2026-10-13 (24) — Business travel (Scope 3.6): flights, hotel stays, other transport, spend
 
 - Migration 024: `business_travel` gets calc method `trip` and sub-categories Flights, Hotel stays, Rail, Bus and coach, Taxi, Car hire and own car, Ferry; unit `room_night`; `tenant.flight_rf` (default with radiative forcing). Purchases still move spend lines into 3.6 (spend categories now include business travel by code).

@@ -95,6 +95,26 @@ export function Methodology() {
           <p className="sub">Radiative forcing adds the warming effect of aircraft emissions at altitude (contrails, NOx), about 70% more than the fuel's CO₂e. Applies to new flight entries; each entry shows which was used.</p>
         </div>
       </div>
+      <div className="grid2" style={{ gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr)' }}>
+        <div className="card" style={{ display: 'grid', gap: 10 }}>
+          <h2>Reduction targets</h2>
+          <div className="row" style={{ gap: 10 }}>
+            <label className="field" style={{ width: 120 }}><span>Target year</span><input className="input num" inputMode="numeric" disabled={!edit} defaultValue={tenant?.target_year ?? 2030} key={`ty${tenant?.target_year}`} onBlur={(e) => Number(e.target.value) !== tenant?.target_year && void save({ targetYear: Number(e.target.value) }, `Target year ${e.target.value}`)} /></label>
+            <label className="field" style={{ width: 140 }}><span>Scope 1+2 · % below base</span><input className="input num" inputMode="decimal" disabled={!edit} defaultValue={tenant?.target_s12 ?? 42} key={`t12${tenant?.target_s12}`} onBlur={(e) => Number(e.target.value) !== tenant?.target_s12 && void save({ targetS12: Number(e.target.value) }, `Scope 1+2 target −${e.target.value}%`)} /></label>
+            <label className="field" style={{ width: 140 }}><span>Scope 3 · % below base</span><input className="input num" inputMode="decimal" disabled={!edit} defaultValue={tenant?.target_s3 ?? 25} key={`t3${tenant?.target_s3}`} onBlur={(e) => Number(e.target.value) !== tenant?.target_s3 && void save({ targetS3: Number(e.target.value) }, `Scope 3 target −${e.target.value}%`)} /></label>
+          </div>
+          <p className="sub">From the base year {tenant?.base_year ?? ''} along a straight line to the target year (SBTi 1.5 °C: about −42% Scope 1+2 by 2030 from a recent base year). Home and the KPI dashboard compare each month with this path.</p>
+        </div>
+        <div className="card" style={{ display: 'grid', gap: 10 }}>
+          <h2>Collection rules</h2>
+          <div className="row" style={{ gap: 10 }}>
+            <label className="field" style={{ width: 150 }}><span>Due day of next month</span><input className="input num" inputMode="numeric" disabled={!edit} defaultValue={tenant?.due_day ?? 10} key={`dd${tenant?.due_day}`} onBlur={(e) => Number(e.target.value) !== tenant?.due_day && void save({ dueDay: Number(e.target.value) }, `Data due on day ${e.target.value}`)} /></label>
+            <label className="field" style={{ width: 150 }}><span>“Due soon” days before</span><input className="input num" inputMode="numeric" disabled={!edit} defaultValue={tenant?.remind_days ?? 3} key={`rd${tenant?.remind_days}`} onBlur={(e) => Number(e.target.value) !== tenant?.remind_days && void save({ remindDays: Number(e.target.value) }, 'Saved')} /></label>
+            <label className="field" style={{ width: 150 }}><span>Escalated after days late</span><input className="input num" inputMode="numeric" disabled={!edit} defaultValue={tenant?.escalate_days ?? 7} key={`ed${tenant?.escalate_days}`} onBlur={(e) => Number(e.target.value) !== tenant?.escalate_days && void save({ escalateDays: Number(e.target.value) }, 'Saved')} /></label>
+          </div>
+          <p className="sub">A month’s data is due on this day of the following month. Home shows what is due, overdue and escalated for the categories each facility reports.</p>
+        </div>
+      </div>
       <Prices canEdit={['platform_admin', 'super_admin', 'admin'].includes(role)} />
       <div className="note info">Standards: GHG Protocol Corporate Standard; factors DESNZ (UK) 2022–2026 and IPCC 2006 where DESNZ has none; kWh on net calorific value unless entered as gross. Vehicles: DESNZ per km / mile by class and powertrain, or by fuel used; electricity for electric vehicles in Scope 2 (location-based grid factor of the facility's country).</div>
     </div>

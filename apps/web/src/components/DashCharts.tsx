@@ -15,8 +15,8 @@ export const fmtT = (v: number) => (Math.abs(v) < 10 ? fmt(v, Math.abs(v) < 1 ? 
 export interface Part { v: number; c: string; n: string }
 export interface BarRow { lbl: string; parts: Part[]; line?: number | null; line2?: number | null; dim?: boolean }
 
-export function Bars({ rows, unit = 't', h = 170, label = 'Chart' }: { rows: BarRow[]; unit?: string; h?: number; label?: string }) {
-  const W = 640, H = h, L = 40, B = 20, T = 8, n = rows.length, bw = (W - L) / Math.max(1, n);
+export function Bars({ rows, unit = 't', h = 170, w = 640, label = 'Chart' }: { rows: BarRow[]; unit?: string; h?: number; w?: number; label?: string }) {
+  const W = w, H = h, L = 40, B = 20, T = 8, n = rows.length, bw = (W - L) / Math.max(1, n);
   const tot = (r: BarRow) => r.parts.reduce((a, p) => a + (p.v || 0), 0);
   const mx = Math.max(1e-9, ...rows.map((r) => Math.max(tot(r), r.line ?? 0, r.line2 ?? 0))) * 1.1;
   const yy = (v: number) => T + (1 - v / mx) * (H - T - B);
