@@ -92,7 +92,8 @@ export async function reviewRoutes(app: FastifyInstance) {
     return tenantTx(tenant, async (c) => {
       const s = await scopeOf(c, req.user);
       const me = String(req.user.id);
-      const rows = (await c.query(`SELECT a.id, a.facility_id, a.status, a.created_by, a.submitted_by, a.approval_stage, a.l1_by, cat.code AS cat, (a.co2e_direct + a.co2e_scope2 + a.co2e_scope3)::float8 AS kg
+      const rows = (await c.query(`SELECT a.id, a.facility_id, a.status, a.created_by, a.submitted_by, a.approval_stage, a.l1_by, cat.code AS cat, (a.co2e_direct + a.co2e_scope2 + a.co2e_scope3)::float8 AS kg,
+                                          coalesce((a.inputs->'wasteInfo'->>'hazardous')::boolean, false) AS haz, nullif(trim(a.inputs->'wasteInfo'->>'ref'), '') AS manifest
                                      FROM activity a JOIN category cat ON cat.id = a.category_id WHERE a.id = ANY($1) FOR UPDATE OF a`, [b.ids])).rows;
       const done: string[] = [], skipped: { id: string; reason: string }[] = [], toL2: string[] = [];
       const set = await approvalSettings(c, tenant), canL2 = ['super_admin', 'admin', 'platform_admin'].includes(req.user.role);
@@ -105,6 +106,8 @@ export async function reviewRoutes(app: FastifyInstance) {
         else if (b.action === 'submit') {
           if (!s.enter.has(a.facility_id)) why = 'you cannot enter data for this facility';
           else if (a.status !== 'draft' && a.status !== 'rejected') why = `already ${a.status === 'approved' ? 'approved' : 'waiting for approval'}`;
+          // hazardous waste always travels with a manifest (UAE): no manifest number, no submission
+          else if (a.cat === 'waste_generated' && a.haz && !a.manifest) why = 'hazardous waste needs its manifest number';
           else sql = `UPDATE activity SET status = 'submitted', submitted_at = now(), submitted_by = $2, approval_stage = NULL, l1_by = NULL, l1_at = NULL, updated_at = now() WHERE id = $1`;
         } else if (b.action === 'withdraw') {
           if (a.status !== 'submitted') why = 'not waiting for approval';

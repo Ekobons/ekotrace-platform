@@ -287,6 +287,15 @@ export interface SurveyDetail {
 export interface SurveyOptions { modes: { key: string; label: string }[]; fuels: { key: string; label: string }[]; statuses: Record<string, string> }
 export interface PublishRow { facilityId: string; name: string; t: number; entries?: number; status: 'ok' | 'skipped'; reason?: string; replaces?: string | null }
 
+// ------------------------------------------------------------- QR & field app --
+export interface Bin { id: string; code: string; facilityId: string; facility: string; name: string; location: string | null; itemId: number; item: string; material: string | null; route: string | null;
+  gri: string | null; hazardous: boolean; contractor: string | null; capacityL: number | null; density: number | null; active: boolean; lastScan?: string | null; monthKg?: number; openScans?: number }
+export interface Scan { id: string; bin?: string; item?: string; kind: 'weigh' | 'fill' | 'collection'; kg: number; fillPct?: number | null; estimated: boolean; manifest: string | null; note?: string | null; flags: string[]; at: string; by: string | null; status: 'open' | 'rolled' | 'void'; activityId?: string | null }
+export interface Rollup { start: string; end: string; rolled: number;
+  perBin: { bin: string; item: string; basis: string; actualKg: number; estimatedKg: number; scans: number; manifests: string[] }[];
+  groups: { itemId: number; item: string; gri: string | null; hazardous: boolean; contractor: string | null; actual: number; estimated: number; manifests: string[]; bins: string[]; scans: number }[] }
+export type BinInput = { facilityId: string; name: string; location?: string; itemId: number; gri?: string; hazardous: boolean; contractor?: string; capacityL?: number; density?: number };
+
 const qs = (q: Record<string, unknown>) => new URLSearchParams(Object.entries(q).filter(([, v]) => v !== undefined && v !== '' && v !== null).map(([k, v]) => [k, String(v)]));
 export const api = {
   brand: () => call<{ name: string; productName?: string; colors?: Record<string, string> }>('GET', '/api/brand'),
@@ -494,6 +503,16 @@ export const api = {
   saveVersion: (b: { name: string; label: string; period: string; scope2: 'location' | 'market'; s: [number, number, number]; byCode: Record<string, number> }) => call<{ id: string }>('POST', '/api/reports/versions', b),
   removeVersion: (id: string) => call<{ ok: true }>('DELETE', `/api/reports/versions/${id}`),
   approvals: () => call<ApprovalsData>('GET', '/api/approvals'),
+  bins: (facilityId?: string) => call<{ bins: Bin[] }>('GET', `/api/qr/bins?${qs({ facilityId })}`),
+  addBin: (b: BinInput) => call<Bin>('POST', '/api/qr/bins', b),
+  updateBin: (id: string, b: Partial<Omit<BinInput, 'facilityId'>>) => call<Bin>('PATCH', `/api/qr/bins/${id}`, b),
+  removeBin: (id: string) => call<{ ok: true }>('DELETE', `/api/qr/bins/${id}`),
+  binByCode: (code: string) => call<{ bin: Bin; recent: Scan[]; canScan: boolean }>('GET', `/api/qr/scan/${encodeURIComponent(code)}`),
+  addScan: (binId: string, b: { kind: Scan['kind']; kg?: number; fillPct?: number; manifest?: string; note?: string; lat?: number; lon?: number }) => call<Scan>('POST', `/api/qr/bins/${binId}/scans`, b),
+  scans: (q: { facilityId: string; year: number; month: number }) => call<{ scans: Scan[] }>('GET', `/api/qr/scans?${qs(q)}`),
+  voidScan: (id: string) => call<{ ok: true }>('POST', `/api/qr/scans/${id}/void`, {}),
+  rollup: (q: { facilityId: string; year: number; month: number }) => call<Rollup>('GET', `/api/qr/rollup?${qs(q)}`),
+  makeRollup: (q: { facilityId: string; year: number; month: number }) => call<{ made: { item: string; kg: number; dataType: string; id: string | null; warnings: string[] }[] }>('POST', '/api/qr/rollup', q),
   saveApprovalSettings: (b: ApprovalSettings) => call<ApprovalSettings>('PUT', '/api/approvals/settings', b),
   reviewAction: (ids: string[], action: 'submit' | 'withdraw' | 'approve' | 'return', note?: string) => call<{ done: number; skipped: { id: string; reason: string }[]; toLevel2?: number }>('POST', '/api/activities/review', { ids, action, note }),
   deleteActivity: (id: string) => call<{ ok: true }>('DELETE', `/api/activities/${id}`),

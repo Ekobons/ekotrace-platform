@@ -145,7 +145,7 @@ function CapitalList() {
       <div className="row" style={{ gap: 10, flexWrap: 'wrap' }}>
         <div className="grow"><h3>Capital goods list</h3>
           <div className="sub">{nCap} products count as capital goods: machinery, vehicles, IT and electrical equipment, buildings and construction. {items.length - nCap} products of the old list are parts, materials or consumables and count as purchased goods. An account marked “capital” on a batch's Accounts tab still makes its purchases capital goods.</div></div>
-        <div className="seg">{(['all', 'capital', 'not'] as const).map((k) => <button key={k} className={show === k ? 'on' : ''} onClick={() => setShow(k)}>{k === 'all' ? 'All' : k === 'capital' ? 'Capital' : 'Not capital'}</button>)}</div>
+        <div className="seg mini">{(['all', 'capital', 'not'] as const).map((k) => <button key={k} className={show === k ? 'on' : ''} onClick={() => setShow(k)}>{k === 'all' ? 'All' : k === 'capital' ? 'Capital' : 'Not capital'}</button>)}</div>
         <input placeholder="Search" value={q} onChange={(e) => setQ(e.target.value)} style={{ width: 180 }} />
       </div>
       <div className="scrollx"><table className="t compact">

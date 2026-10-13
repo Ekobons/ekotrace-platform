@@ -293,15 +293,17 @@ function Water({ d, c }: { d: Data; c: Ctx }) {
 // ----------------------------------------------------------------- waste --
 /** Route of waste sent out: from the factor's treatment route, else from its name. */
 const ROUTE_NAME: Record<string, string> = { reuse: 'Re-use', open_loop: 'Recycling', closed_loop: 'Recycling', composting: 'Composting / digestion', ad: 'Composting / digestion', combustion: 'Waste-to-energy', landfill: 'Landfill' };
-export const route = (r: Row) => { if (r.route && ROUTE_NAME[r.route]) return ROUTE_NAME[r.route]!; const t = `${r.item} ${r.sub}`.toLowerCase();
+/** GRI 306 operation chosen on the entry (re-use, incineration without energy recovery, other disposal) */
+const GRI_NAME: Record<string, string> = { reuse: 'Re-use', recycling: 'Recycling', composting: 'Composting / digestion', ad: 'Composting / digestion', incin_er: 'Waste-to-energy', incin_noer: 'Incineration', landfill: 'Landfill', other: 'Other' };
+export const route = (r: Row) => { if (r.wgri && GRI_NAME[r.wgri]) return GRI_NAME[r.wgri]!; if (r.route === 'treatment') return 'Other'; if (r.route && ROUTE_NAME[r.route]) return ROUTE_NAME[r.route]!; const t = `${r.item} ${r.sub}`.toLowerCase();
   return /re-?use/.test(t) ? 'Re-use' : /recycl/.test(t) ? 'Recycling' : /compost|anaerobic|digest/.test(t) ? 'Composting / digestion'
     : /incinerat|energy recovery|waste-to-energy|combust/.test(t) ? 'Waste-to-energy' : /landfill/.test(t) ? 'Landfill' : 'Other'; };
-const ROUTE_C: Record<string, string> = { Landfill: '#C2523C', Recycling: '#2BA38A', 'Re-use': '#1F6F5C', 'Composting / digestion': '#86CDB4', 'Waste-to-energy': '#E9B44C', Other: '#9AA7A2' };
+const ROUTE_C: Record<string, string> = { Landfill: '#C2523C', Recycling: '#2BA38A', 'Re-use': '#1F6F5C', 'Composting / digestion': '#86CDB4', 'Waste-to-energy': '#E9B44C', Incineration: '#B07A2A', Other: '#9AA7A2' };
 /** diverted from landfill (common UAE measure: waste-to-energy counts) */
 export const DIVERT = new Set(['Re-use', 'Recycling', 'Composting / digestion', 'Waste-to-energy']);
 /** GRI 306-4 / 306-5: recovery is diverted from disposal; incineration with energy recovery is disposal */
 const GRI306: [string, string, string[]][] = [['Diverted from disposal', 'Preparation for re-use', ['Re-use']], ['Diverted from disposal', 'Recycling', ['Recycling']], ['Diverted from disposal', 'Other recovery (composting, digestion)', ['Composting / digestion']],
-  ['Directed to disposal', 'Incineration with energy recovery', ['Waste-to-energy']], ['Directed to disposal', 'Landfilling', ['Landfill']], ['Directed to disposal', 'Other disposal', ['Other']]];
+  ['Directed to disposal', 'Incineration with energy recovery', ['Waste-to-energy']], ['Directed to disposal', 'Incineration without energy recovery', ['Incineration']], ['Directed to disposal', 'Landfilling', ['Landfill']], ['Directed to disposal', 'Other disposal', ['Other']]];
 export const tonnes = (r: Row) => (r.unit === 't' ? r.qty : r.unit === 'kg' ? r.qty / 1000 : 0);
 function Waste({ d, c }: { d: Data; c: Ctx }) {
   const own = c.cur.filter((r) => r.cat === 'waste_generated'), site = c.cur.filter((r) => r.cat === 'waste_treatment');

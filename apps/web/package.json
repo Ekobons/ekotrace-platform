@@ -13,6 +13,7 @@
     "@fontsource/instrument-sans": "^5.1.0",
     "@fontsource/jetbrains-mono": "^5.1.1",
     "marked": "18.0.14",
+    "qrcode-generator": "1.4.4",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "react-router-dom": "7.18.4"

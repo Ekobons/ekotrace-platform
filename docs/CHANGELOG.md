@@ -2,6 +2,38 @@
 
 Newest first.
 
+## 2026-10-14 · Waste by GRI 306 method, hazardous and manifest rules; QR & field app; coloured sub-tabs; collapsible menu
+
+- **Waste sent out (Scope 3.5):**
+  - **Disposal method** follows GRI 306. Diverted from disposal: preparation for re-use, recycling (closed- / open-loop), composting, anaerobic digestion. Disposal: incineration with energy recovery, incineration without energy recovery, landfill, other disposal (treatment).
+  - Only methods with a factor for the material are offered. Re-use uses the recycling factor; both incineration methods use the combustion factor. Each step says so.
+  - One factor set: DESNZ, end-of-life only, with no recycling credits.
+- **Hazardous** is filled in from the material and can be changed: batteries, asbestos, fridges and freezers, mineral oil, and new hazardous streams.
+  - New streams (DESNZ has no factor for them): clinical / healthcare, chemical and solvent, oily waste and sludge, paints and adhesives, contaminated packaging, other hazardous.
+  - These use the nearest DESNZ factor and are saved as proxy data.
+- **Manifest rules:**
+  - Hazardous waste can't be submitted without its manifest number.
+  - The same manifest with the same material and quantity entered twice is flagged.
+  - The Waste dashboard shows incineration without energy recovery and other disposal.
+- **QR & field app** (Capture menu):
+  - **Bins:** material and usual method, hazardous, contractor, container size, density.
+  - **Labels:** printable QR labels holding only a link with a code; opening one needs sign-in and access to the facility.
+  - **Phone scan page:** Weigh (actual), Fill level (estimated from capacity × % × density), Collection (manifest — required for hazardous — and weighbridge weight). Location is stored only when ticked; scans are kept on the phone when offline.
+  - **Checks:** more than the bin holds, the same bin scanned within 10 minutes, far from the bin's usual weight.
+  - **Scans list:** remove a wrong scan while it's still open.
+  - **Month roll-up:** weighbridge weights replace the field scans for that bin. Draft Scope 3.5 entries are grouped by material, method, hazardous and contractor; weighed and estimated stay apart; manifests are kept. Each scan is used once.
+  - DEMO bins and scans at Al Zahia Community.
+- **Design:**
+  - Sub-tabs in every Add data category are outlined, with the chosen one filled (as in business travel).
+  - The side menu has "Collapse all / Expand all" and « / » to narrow it to icons.
+  - More space between menu items.
+- **Tests:** 60 API and 52 engine tests pass.
+- **Manual:**
+  - Waste: disposal methods, hazardous, contractor and manifest.
+  - New chapter: QR & field app.
+  - Moving around: the menu.
+  - Glossary.
+
 ## 2026-10-13 · Business travel: rows line up, meetings / events separate, factors load themselves
 
 - **Factors load on start:** when the server starts it applies new migrations and loads any DESNZ / EPA / IPCC files the database is missing or has from an older importer, including when a category such as flights or rail has no factors at all. After `git pull` + `npm install`, `npm run app` is enough. Fixes "No DESNZ flight factor…" and the empty "Type of transport" list on databases seeded before business travel was added. `AUTO_SETUP=false` switches it off.

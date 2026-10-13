@@ -79,6 +79,14 @@ export async function saveEntry(c: Tx, req: FastifyRequest, t: { id: string; gwp
   assertCan((await scopeOf(c, req.user)).enter, fac.id, 'enter data for this facility');
   const veh = await applyFleetVehicle(c, b);
   const { result, item, gwpSet, stored } = await calculate(b, contextFor(c, t.gwp_set, fac.country, fac));
+  // Waste: the same manifest, material and quantity already entered is most likely the same load twice.
+  const wi = b.wasteInfo;
+  if (item.calc_method === 'waste_disposal' && wi?.ref?.trim()) {
+    const d = (await c.query(`SELECT a.period_start::text AS p, f.name FROM activity a JOIN org_node f ON f.id = a.facility_id
+                               WHERE lower(trim(a.inputs->'wasteInfo'->>'ref')) = lower(trim($1)) AND a.item_id = $2 AND a.quantity = $3 LIMIT 1`, [wi.ref, item.id, stored.quantity])).rows[0];
+    if (d) result.warnings.push(`Manifest ${wi.ref.trim()} with the same material and quantity is already entered (${d.name}, ${d.p.slice(0, 7)}): check it is not the same load twice.`);
+  }
+  if (item.calc_method === 'waste_disposal' && wi?.hazardous && !wi.ref?.trim()) result.warnings.push('Hazardous waste: add the manifest number — it is needed to submit.');
   if (opts.dryRun) return { id: null, createdAt: null, item: item.name, gwpSet, totals: result.totals, warnings: result.warnings, stored };
   const quantity = stored.quantity;
   const a = (await c.query(

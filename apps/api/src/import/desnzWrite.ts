@@ -226,7 +226,7 @@ export async function importDesnz(c: Tx, p: DesnzParsed, opts: { createdBy?: str
     let item = itemIds.get(itemCode);
     if (!item) {
       item = await upsertItem(itemCode, sub, `${w.material} · ${WASTE_ROUTE_NAME[w.route]}`, { defaultUnit: 't', sort: WASTE_ROUTE_SORT[w.route] });
-      await c.query('UPDATE item SET attrs = $2 WHERE id = $1', [item, JSON.stringify({ material: w.material, route: w.route })]);
+      await c.query('UPDATE item SET attrs = $2 WHERE id = $1', [item, JSON.stringify({ material: w.material, route: w.route, ...(HAZARDOUS_WASTE.has(w.material) ? { hazardous: true } : {}) })]);
     }
     factors.push({ item, basis: 'scope3', unit: 't', co2e: w.co2e, gases: [] });
   }
@@ -418,6 +418,8 @@ export function travelItem(mode: TravelMode, vehicle: string, variant: string) {
     note: mode === 'motorbike' ? 'Per vehicle-km.' : 'Per passenger-km.' };
 }
 
+/** Waste materials that are usually hazardous: the default on screen (the manifest decides). */
+const HAZARDOUS_WASTE = new Set(['Asbestos', 'Batteries', 'WEEE - fridges and freezers', 'Mineral oil']);
 const AIR_HAUL_NAME: Record<string, string> = { domestic: 'Domestic', short: 'Short-haul (under 3,700 km)', long: 'Long-haul (3,700 km or more)', intl: 'International (average)' };
 const AIR_HAUL_SORT: Record<string, number> = { domestic: 0, short: 1, long: 2, intl: 3 };
 const AIR_CLASS_NAME: Record<string, string> = { average: 'average passenger', economy: 'economy', premium: 'premium economy', business: 'business class', first: 'first class' };

@@ -1735,3 +1735,73 @@ test('reports: entries behind the report with their GHG Protocol category, quali
   const b = (await api('GET', '/api/reports/settings', undefined, tenantB)).body;
   assert.equal(b.versions.length, 0); assert.equal(b.templates.length, 0); assert.deepEqual(b.excl, {});
 });
+
+test('waste sent out: GRI 306 operation on the entry, hazardous proxy factor, duplicate manifest warning, hazardous needs a manifest to submit; QR bins, scans with checks, collection with weighbridge, month roll-up into drafts', async () => {
+  const id = async (code: string) => (await pq('SELECT id FROM item WHERE code = $1', [code])).rows[0].id as number;
+  const p = { facilityId: facA, periodStart: '2026-05-01', periodEnd: '2026-05-31', dataType: 'actual' };
+  const fac = async (code: string) => Number((await pq(`SELECT f.co2e FROM factor f JOIN factor_source s ON s.id = f.source_id WHERE f.item_id = $1 AND s.code = 'DESNZ-2026' AND f.status = 'active' AND f.basis = 'scope3'`, [await id(code)])).rows[0].co2e);
+  // incineration without energy recovery: same combustion factor, the operation is kept for GRI 306
+  const ci = await api('POST', '/api/calculate', { ...p, itemId: await id('waste3:refuse:commercial-and-industrial-waste:combustion'), unit: 't', quantity: 2, wasteInfo: { gri: 'incin_noer' } }, tenantA);
+  assert.equal(ci.status, 200, JSON.stringify(ci.body));
+  assert.ok(Math.abs(ci.body.totals.scope3 - 2 * await fac('waste3:refuse:commercial-and-industrial-waste:combustion')) < 1e-6);
+  assert.match(ci.body.steps.join(' '), /without energy recovery/);
+  // clinical waste: no DESNZ factor, the C&I combustion factor as a proxy
+  const cl = await api('POST', '/api/calculate', { ...p, itemId: await id('waste3:hazardous:clinical:treatment'), unit: 't', quantity: 1, wasteInfo: { hazardous: true, gri: 'other' } }, tenantA);
+  assert.equal(cl.status, 200, JSON.stringify(cl.body));
+  assert.ok(Math.abs(cl.body.totals.scope3 - await fac('waste3:refuse:commercial-and-industrial-waste:combustion')) < 1e-6);
+  assert.ok(cl.body.warnings.some((w: string) => /proxy/.test(w)));
+  assert.equal((await pq(`SELECT attrs->>'hazardous' AS h FROM item WHERE code = 'waste3:electrical-items:batteries:open_loop'`)).rows[0].h, 'true', 'batteries hazardous by default');
+  // hazardous without a manifest: saved with a warning, cannot be submitted; the same manifest + material + quantity again: warning
+  const e1 = await api('POST', '/api/activities/batch', { dryRun: false, entries: [
+    { ...p, itemId: await id('waste3:electrical-items:batteries:open_loop'), unit: 't', quantity: 0.3, wasteInfo: { hazardous: true, contractor: 'E-waste B' } },
+    { ...p, itemId: await id('waste3:refuse:commercial-and-industrial-waste:landfill'), unit: 't', quantity: 3.3, wasteInfo: { ref: 'MAN-77' } },
+    { ...p, itemId: await id('waste3:refuse:commercial-and-industrial-waste:landfill'), unit: 't', quantity: 3.3, wasteInfo: { ref: 'man-77 ' } },
+  ] }, tenantA);
+  assert.ok(e1.body.results.every((r: { ok: boolean }) => r.ok), JSON.stringify(e1.body));
+  assert.ok(e1.body.results[0].warnings.some((w: string) => /manifest number/.test(w)));
+  assert.ok(!e1.body.results[1].warnings.some((w: string) => /same load/.test(w)) && e1.body.results[2].warnings.some((w: string) => /same load twice/.test(w)));
+  const sub = await api('POST', '/api/activities/review', { ids: [e1.body.results[0].id], action: 'submit' }, tenantA);
+  assert.equal(sub.body.skipped[0]?.reason, 'hazardous waste needs its manifest number', JSON.stringify(sub.body));
+
+  // QR: a bin, scans, checks
+  const paper = await id('waste3:paper:paper-and-board-mixed:closed_loop');
+  const bin = await api('POST', '/api/qr/bins', { facilityId: facA, name: 'Bay 1 cardboard', itemId: paper, hazardous: false, contractor: 'Recycler C', capacityL: 5000, density: 0.1 }, tenantA);
+  assert.equal(bin.status, 200, JSON.stringify(bin.body));
+  assert.match(bin.body.code, /^[A-Z0-9]{10}$/);
+  assert.equal((await api('POST', '/api/qr/bins', { facilityId: facA, name: 'x', itemId: await id('water:sewer') }, tenantA)).status, 400, 'only waste sent out');
+  const byCode = await api('GET', `/api/qr/scan/${bin.body.code.toLowerCase()}`, undefined, tenantA);
+  assert.equal(byCode.body.bin.id, bin.body.id); assert.equal(byCode.body.canScan, true);
+  assert.equal((await api('GET', `/api/qr/scan/${bin.body.code}`, undefined, tenantB)).status, 404, 'another company cannot open the label');
+  const now = new Date(), y = now.getUTCFullYear(), m = now.getUTCMonth() + 1;
+  const day = (d: number, h = 8) => new Date(Date.UTC(y, m - 1, Math.min(d, now.getUTCDate()), h)).toISOString();
+  const s = (b: Record<string, unknown>) => api('POST', `/api/qr/bins/${bin.body.id}/scans`, b, tenantA);
+  for (const [i, kg] of [40, 50, 45].entries()) assert.equal((await s({ kind: 'weigh', kg, at: day(1, 6 + i) })).status, 200);
+  const fill = await s({ kind: 'fill', fillPct: 50, at: day(1, 12) });
+  assert.equal(fill.body.kg, 250); assert.equal(fill.body.estimated, true);
+  const big = await s({ kind: 'weigh', kg: 400, at: day(1, 14) });
+  assert.ok(big.body.flags.some((f: string) => /usual/.test(f)) && !big.body.flags.some((f: string) => /holds/.test(f)), JSON.stringify(big.body));
+  const over = await s({ kind: 'weigh', kg: 700, at: day(1, 14) });
+  assert.ok(over.body.flags.some((f: string) => /holds/.test(f)) && over.body.flags.some((f: string) => /duplicate/.test(f)), JSON.stringify(over.body));
+  await api('POST', `/api/qr/scans/${over.body.id}/void`, {}, tenantA);
+  assert.equal((await s({ kind: 'weigh' })).status, 400);
+  // roll-up: weighed 40+50+45+400 actual, 250 estimated; one entry each
+  const r0 = (await api('GET', `/api/qr/rollup?facilityId=${facA}&year=${y}&month=${m}`, undefined, tenantA)).body;
+  const g = r0.groups.find((x: { itemId: number }) => x.itemId === paper);
+  assert.equal(g.actual, 535); assert.equal(g.estimated, 250); assert.equal(g.scans, 5);
+  // a hazardous bin: collection needs the manifest; the weighbridge weight replaces the field scans
+  const bat = (await api('POST', '/api/qr/bins', { facilityId: facA, name: 'Batteries', itemId: await id('waste3:electrical-items:batteries:open_loop'), hazardous: true }, tenantA)).body;
+  await api('POST', `/api/qr/bins/${bat.id}/scans`, { kind: 'weigh', kg: 30, at: day(1, 9) }, tenantA);
+  assert.equal((await api('POST', `/api/qr/bins/${bat.id}/scans`, { kind: 'collection', kg: 36, at: day(1, 10) }, tenantA)).status, 400);
+  assert.equal((await api('POST', `/api/qr/bins/${bat.id}/scans`, { kind: 'collection', kg: 36, manifest: 'HZ-9', at: day(1, 10) }, tenantA)).status, 200);
+  const r1 = (await api('GET', `/api/qr/rollup?facilityId=${facA}&year=${y}&month=${m}`, undefined, tenantA)).body;
+  const hb = r1.perBin.find((x: { bin: string }) => x.bin === 'Batteries');
+  assert.equal(hb.basis, 'weighbridge'); assert.equal(hb.actualKg, 36);
+  const made = await api('POST', '/api/qr/rollup', { facilityId: facA, year: y, month: m }, tenantA);
+  assert.equal(made.status, 200, JSON.stringify(made.body));
+  assert.equal(made.body.made.length, 3, JSON.stringify(made.body));
+  const acts = (await pq(`SELECT a.quantity::float8 AS q, a.unit, a.data_type, a.status, a.inputs->'wasteInfo' AS wi FROM activity a WHERE a.id = ANY($1) ORDER BY a.quantity`, [made.body.made.map((x: { id: string }) => x.id)])).rows;
+  assert.deepEqual(acts.map((a) => [a.q, a.data_type, a.status]), [[36, 'actual', 'draft'], [250, 'estimated', 'draft'], [535, 'actual', 'draft']]);
+  assert.equal(acts[0].wi.ref, 'HZ-9'); assert.equal(acts[0].wi.hazardous, true); assert.equal(acts[2].wi.contractor, 'Recycler C');
+  assert.equal((await api('POST', '/api/qr/rollup', { facilityId: facA, year: y, month: m }, tenantA)).status, 400, 'scans are used once');
+  assert.equal((await api('POST', `/api/qr/scans/${big.body.id}/void`, {}, tenantA)).status, 400, 'a rolled-up scan is changed through its entry');
+});

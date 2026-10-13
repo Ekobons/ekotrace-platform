@@ -56,9 +56,31 @@ The scope follows **who runs the treatment site**: one Waste tab with a switch.
 - **Composting and anaerobic digestion:** CH₄ and N₂O per tonne; for digesters, measured biogas with leaks and flaring.
 - **Wastewater:** CH₄ from the organic load (BOD or COD) and the treatment system; N₂O from nitrogen in the plant and the effluent.
 
-**Sent to others (Scope 3.5):** rows of material, route (landfill, combustion, recycling, composting, digestion) and tonnes × the DESNZ factor. These are UK averages — landfills without gas capture are likely higher.
+**Sent to others (Scope 3.5):** rows of material, **disposal method** and tonnes × the DESNZ waste disposal factor (one factor set, DESNZ 2022–2026: end-of-life treatment only, no credit for recycling, as the GHG Protocol requires). These are UK averages — landfills without gas capture are likely higher.
 
-**Waste reporting (GRI 306).** Each row of waste sent to others also records whether it is **hazardous**, the **contractor** (collector or treatment company; earlier names are suggested) and the **manifest or ticket** number. These do not change the emissions; they feed the Waste dashboard: waste generated, hazardous and non-hazardous, diverted from disposal (re-use, recycling, composting / digestion) or directed to disposal (incineration with energy recovery, landfill), by contractor and by facility.
+| Disposal method (GRI 306) | Group | Factor used |
+|---|---|---|
+| Preparation for re-use | diverted from disposal | DESNZ has no re-use factor: the recycling one (collection and transport to the facility) |
+| Recycling · closed-loop / open-loop | diverted from disposal | DESNZ recycling |
+| Composting · Anaerobic digestion | diverted from disposal | DESNZ composting / anaerobic digestion |
+| Incineration with energy recovery (WtE) | disposal | DESNZ combustion |
+| Incineration without energy recovery | disposal | DESNZ combustion (energy recovered is never subtracted) |
+| Landfill | disposal | DESNZ landfill |
+| Other disposal (treatment) | disposal | hazardous streams: the nearest DESNZ factor |
+
+Only the methods with a factor for the material are offered (no "glass → composting").
+
+**Hazardous** is filled in from the material (e.g. batteries, asbestos, fridges and freezers, mineral oil, clinical, chemical, oily waste) and can be changed — the manifest decides. Hazardous streams DESNZ has no factor for (clinical / healthcare, chemical and solvent, oily waste and sludge, paints and adhesives, contaminated packaging, other hazardous) use the nearest DESNZ factor, are saved as **proxy** data and say so in the calculation steps.
+
+**Contractor and manifest.** Each row also records the **contractor** (collector or treatment company; earlier names are suggested) and the **manifest / ticket** number. They do not change the emissions:
+
+- the contractor's tonnes are checked against its invoice or monthly statement, and its treatment certificate confirms the disposal method;
+- the manifest links the tonnes to a signed document — the evidence an assurer asks for — and usually carries the weighbridge weight;
+- **hazardous waste needs its manifest number to be submitted** (in the UAE it always travels with one); the same manifest with the same material and quantity entered twice is flagged as a possible duplicate.
+
+They feed the Waste dashboard (GRI 306): waste generated, hazardous and non-hazardous, diverted from disposal (re-use, recycling, composting / digestion) or directed to disposal (incineration with or without energy recovery, landfill, other), by contractor and by facility.
+
+**From QR scans:** waste weighed at the bins (Capture → QR & field app) becomes these entries at month end — see *QR & field app*.
 
 - *Diverted from landfill* (the usual UAE measure) counts waste-to-energy as diverted; GRI 306 counts incineration with energy recovery as disposal. The dashboard shows both.
 - Waste the company treats **for others** at its own sites (landfill, waste-to-energy plant) is operations, not waste it generated: its emissions are Scope 1, and its tonnes are not in "waste generated".

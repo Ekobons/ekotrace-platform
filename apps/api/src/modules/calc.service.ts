@@ -141,7 +141,10 @@ export const calcInputSchema = z.object({
   /** water: the utility's own factor per m³ (replaces the default) */
   water: z.object({ ownFactor: z.number().finite().min(0).max(100).optional(), source: z.string().max(200).optional() }).optional(),
   /** waste sent to others: details for ESG reporting (no effect on the emissions) */
-  wasteInfo: z.object({ hazardous: z.boolean().optional(), contractor: z.string().max(120).optional(), ref: z.string().max(120).optional() }).optional(),
+  /** waste sent out: hazardous (default from the material, can be changed), contractor, manifest / weighbridge ticket, and the
+   *  GRI 306 operation when it is not the factor's own route (re-use, incineration without energy recovery, other disposal) */
+  wasteInfo: z.object({ hazardous: z.boolean().optional(), contractor: z.string().max(120).optional(), ref: z.string().max(120).optional(),
+    gri: z.enum(['reuse', 'recycling', 'composting', 'ad', 'incin_er', 'incin_noer', 'landfill', 'other']).optional() }).optional(),
 });
 export type CalcInput = z.infer<typeof calcInputSchema>;
 
@@ -227,7 +230,21 @@ export async function calculate(input: CalcInput, ctx: CalcContext): Promise<{ r
     result = w.result; stored = w.stored;
   } else if (item.calc_method === 'waste_disposal') {
     if (input.quantity === undefined) throw new AppError('Enter the tonnes of waste');
-    result = calcCombustion({ itemName: item.name, quantity: input.quantity, unit: input.unit, date, region, factors: await loadFactors(item.id), gwp, units: ref.units });
+    // A hazardous stream DESNZ has no factor for (clinical, chemical, oily waste…) uses the nearest DESNZ factor: a proxy, and says so.
+    let factors = await loadFactors(item.id);
+    const proxy = (item.attrs as { proxy?: string } | null)?.proxy;
+    let proxyNote: string | null = null;
+    if (!factors.length && proxy) {
+      const [pi] = await query<{ id: number; name: string }>('SELECT id, name FROM item WHERE code = $1', [proxy]);
+      if (pi) { factors = await loadFactors(pi.id); proxyNote = `No DESNZ factor for ${item.name}: ${pi.name} used as a proxy`; }
+    }
+    if (!factors.length) throw new AppError(`${item.name}: no factor in the library`);
+    result = calcCombustion({ itemName: item.name, quantity: input.quantity, unit: input.unit, date, region, factors, gwp, units: ref.units });
+    if (proxyNote) { result.steps.unshift(proxyNote); result.warnings.push(`${proxyNote} — mark the entry as proxy data.`); }
+    const gri = input.wasteInfo?.gri, rt = (item.attrs as { route?: string } | null)?.route;
+    if (gri === 'reuse') result.steps.push('Preparation for re-use: DESNZ has no re-use factor, the recycling factor (collection and transport to the facility) is used');
+    if (gri === 'incin_noer') result.steps.push('Incineration without energy recovery: same DESNZ combustion factor (energy recovered is never subtracted); reported as disposal without recovery (GRI 306-5)');
+    if (gri === 'other' && rt !== 'treatment') result.steps.push('Other disposal: the factor of the route chosen is used as the nearest');
     stored = { quantity: input.quantity, unit: input.unit, inputs: input.wasteInfo && Object.values(input.wasteInfo).some((v) => v !== undefined && v !== '') ? { wasteInfo: input.wasteInfo } : {} };
   } else if (item.calc_method === 'water') {
     if (input.quantity === undefined) throw new AppError('Enter the volume of water');

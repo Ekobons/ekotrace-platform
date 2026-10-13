@@ -5,6 +5,8 @@ import { createContext, useCallback, useContext, useEffect, useState, type CSSPr
 import { NavLink, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { api, currentTenant, setTenant, whenLoggedOut, ROLE_LABEL, type Company, type Me, type Role } from './lib/api';
 import { Icon } from './components/Icon';
+import { FieldApp } from './pages/FieldApp';
+import { ScanPage } from './pages/ScanPage';
 import { Login, ChangePassword } from './pages/Login';
 import { AddData } from './pages/AddData';
 import { Entries } from './pages/Entries';
@@ -57,7 +59,7 @@ const NAV: { group?: string; items: NavItem[] }[] = [
     { to: '/surveys', label: 'Surveys', icon: 'users', roles: ['super_admin', 'admin', 'manager', 'verifier'] },
     { to: '/approvals', label: 'Approvals', icon: 'check', roles: ['super_admin', 'admin', 'manager', 'preparer'] }, { to: '/progress', label: 'Data progress', icon: 'grid' }, { label: 'Collection calendar', icon: 'calendar', stage: 2 },
     { label: 'Inbox & to-dos', icon: 'inbox', stage: 2 }, { label: 'Document vault', icon: 'folder', stage: 2 }, { label: 'Batch runs', icon: 'upload', stage: 4 },
-    { label: 'QR & field app', icon: 'qr', stage: 4 },
+    { to: '/qr', label: 'QR & field app', icon: 'qr', roles: ['super_admin', 'admin', 'manager', 'preparer', 'verifier'] },
   ] },
   { group: 'Value chain', items: [{ to: '/suppliers', label: 'Suppliers', icon: 'users', roles: ['super_admin', 'admin', 'manager', 'preparer', 'verifier'] }, { label: 'Product LCA', icon: 'leaf', stage: 4 }] },
   { group: 'Net zero', items: [{ to: '/targets', label: 'Targets & actions', icon: 'target' }, { label: 'Carbon credits', icon: 'leaf', stage: 4 }] },
@@ -116,16 +118,25 @@ function Shell() {
   const choose = async (id: string) => { setTenant(id || null); await reload(); nav('/'); };
   const logout = async () => { await api.logout().catch(() => {}); setTenant(null); location.href = '/'; };
   const [folded, setFolded] = useState<Set<string>>(() => { try { return new Set(JSON.parse(localStorage.getItem('eko_nav') ?? '[]') as string[]); } catch { return new Set(); } });
+  // the whole menu narrowed to icons (as in the prototype), kept on this browser
+  const [mini, setMini] = useState(() => { try { return localStorage.getItem('eko_mini') === '1'; } catch { return false; } });
+  const toggleMini = () => setMini((m) => { try { localStorage.setItem('eko_mini', m ? '0' : '1'); } catch { /* not kept */ } return !m; });
+  const allGroups = NAV.flatMap((g) => (g.group ? [g.group] : []));
+  const allClosed = allGroups.every((g) => folded.has(g));
+  const foldAll = () => { const n = new Set(allClosed ? [] : allGroups); try { localStorage.setItem('eko_nav', JSON.stringify([...n])); } catch { /* not kept */ } setFolded(n); };
   const fold = (g: string) => setFolded((f) => { const n = new Set(f); if (n.has(g)) n.delete(g); else n.add(g); try { localStorage.setItem('eko_nav', JSON.stringify([...n])); } catch { /* not kept */ } return n; });
   // waiting for my approval: the count on the Approvals menu item (refreshed as you move around)
   const [apprN, setApprN] = useState(0);
   useEffect(() => { if (!tenant || !['super_admin', 'admin', 'manager', 'platform_admin'].includes(role)) { setApprN(0); return; } api.approvals().then((a) => setApprN(a.mine.length)).catch(() => {}); }, [path, tenant?.id, role]); // eslint-disable-line react-hooks/exhaustive-deps
   const visible = (i: NavItem) => !i.roles || (i.roles.length === 0 ? role === 'platform_admin' : can(...i.roles));
+  // a bin's QR label opens the scan page full screen (phone), without the menu
+  if (path.startsWith('/scan/')) return <Routes><Route path="/scan/:code" element={<ScanPage />} /></Routes>;
 
   return (
-    <div className="app">
+    <div className={`app${mini ? ' mini' : ''}`}>
       <aside className="side">
-        <div className="brand"><div className="mark">e</div><div><b>ekotrace</b><small>Carbon operating system</small></div></div>
+        <div className="brand"><div className="mark">e</div><div className="bt"><b>ekotrace</b><small>Carbon operating system</small></div>
+          <button type="button" className="minibtn" onClick={toggleMini} aria-label={mini ? 'Expand the menu' : 'Collapse the menu'} title={mini ? 'Expand the menu' : 'Collapse the menu'}>{mini ? '»' : '«'}</button></div>
         <div className="org">
           {role === 'platform_admin' ? (
             <>
@@ -139,21 +150,22 @@ function Shell() {
             <><b style={{ fontSize: 14 }}>{tenant?.name}</b><span style={{ fontSize: 11.5, color: 'var(--side-dim)' }}>{tenant?.planLimits?.name ?? tenant?.plan} plan{tenant?.scope_name ? ` · ${tenant.scope_name}` : ' · whole group'}</span></>
           )}
         </div>
+        {tenant && !mini && <div className="navtools"><button type="button" onClick={foldAll} title={allClosed ? 'Expand all sections' : 'Collapse all sections'}>{allClosed ? '▸▸ Expand all' : '▾▾ Collapse all'}</button></div>}
         <nav className="nav">
-          {role === 'platform_admin' && <NavLink to="/console"><Icon name="gear" />Platform console</NavLink>}
+          {role === 'platform_admin' && <NavLink to="/console" title={mini ? 'Platform console' : undefined}><Icon name="gear" /><span className="nl">Platform console</span></NavLink>}
           {tenant && NAV.map((g, gi) => {
             const items = g.items.filter(visible);
             if (!items.length) return null;
             const sc = SEC_C[g.group ?? ''] ?? '#fff';
             const on = items.some((i) => i.to && (path === i.to || (i.to.startsWith('/data/') && path.startsWith('/data/'))));
-            const open = !g.group || !folded.has(g.group) || on;
+            const open = mini || !g.group || !folded.has(g.group) || on;
             return (
               <div key={gi} className="navsec" style={{ '--sc': sc } as CSSProperties}>
-                {g.group && <button type="button" className={`sech${open ? ' open' : ''}${on ? ' has' : ''}`} aria-expanded={open} onClick={() => fold(g.group!)}>
+                {g.group && <button type="button" className={`sech${open ? ' open' : ''}${on ? ' has' : ''}`} aria-expanded={open} title={g.group} onClick={() => !mini && fold(g.group!)}>
                   <i className="sdot" /><span>{g.group.toUpperCase()}</span><span className="chev">{open ? '▾' : '▸'}</span></button>}
                 {open && <div className="secitems">{items.map((i) => i.to
-                  ? <NavLink key={i.label} to={i.to} className={({ isActive }) => (isActive || (i.to?.startsWith('/data/') && path.startsWith('/data/')) ? 'active' : '')}><Icon name={i.icon} />{i.label}{i.to === '/approvals' && apprN > 0 && <span className="navb amber">{apprN}</span>}</NavLink>
-                  : <a key={i.label} className="soon" aria-disabled="true" title={`Coming in stage ${i.stage}`}><Icon name={i.icon} />{i.label}<span className="soonchip">S{i.stage}</span></a>)}</div>}
+                  ? <NavLink key={i.label} to={i.to} title={mini ? i.label : undefined} className={({ isActive }) => (isActive || (i.to?.startsWith('/data/') && path.startsWith('/data/')) ? 'active' : '')}><Icon name={i.icon} /><span className="nl">{i.label}</span>{i.to === '/approvals' && apprN > 0 && <span className="navb amber">{apprN}</span>}</NavLink>
+                  : <a key={i.label} className="soon" aria-disabled="true" title={`${i.label} · coming in stage ${i.stage}`}><Icon name={i.icon} /><span className="nl">{i.label}</span><span className="soonchip">S{i.stage}</span></a>)}</div>}
               </div>
             );
           })}
@@ -176,6 +188,7 @@ function Shell() {
           <Route path="/home" element={<NeedCo><Home /></NeedCo>} />
           <Route path="/kpis" element={<NeedCo><Kpis /></NeedCo>} />
           <Route path="/targets" element={<NeedCo><Targets /></NeedCo>} />
+          <Route path="/qr" element={<NeedCo><FieldApp /></NeedCo>} />
           <Route path="/approvals" element={<NeedCo><Approvals /></NeedCo>} />
           <Route path="/progress" element={<NeedCo><DataProgress /></NeedCo>} />
           <Route path="/reports" element={<NeedCo><Reports /></NeedCo>} />

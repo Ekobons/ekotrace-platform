@@ -59,6 +59,11 @@
 | Radiative forcing (RF) | The extra warming of aircraft emissions released at altitude (contrails, NOx); DESNZ flight factors with RF are about 1.7× those without |
 | Great-circle distance | The shortest distance between two airports over the Earth's surface; DESNZ adds 8% for real routes |
 | Flight type (haul) | Domestic (one country), Short-haul (under 3,700 km), Long-haul (3,700 km or more), International (the average, when the distance is not known) — the DESNZ flight factor groups |
+| Manifest (waste transfer note) | the signed document that travels with a load of waste: what, how much, from where, to where; required for hazardous waste; the evidence for the tonnes |
+| Contractor (waste) | the licensed company that collects and treats the waste; its statement is used to check the month's tonnes |
+| GRI 306 disposal method | re-use, recycling, composting, anaerobic digestion (diverted from disposal); incineration with or without energy recovery, landfill, other disposal (disposal) |
+| QR label (bin) | a label with a link to the bin's scan page; holds no data; opening it needs a signed-in person with access to the facility |
+| Weighbridge weight | the weight on the collection ticket; replaces the month's field scans for that bin |
 | Room-night | One hotel room for one night; 2 rooms for 3 nights = 6 room-nights |
 | Target path | The straight-line route from base-year emissions to the reduction target in the target year; each month is compared with the same base-year month cut by the share due by then |
 | Due day | Day of the next month by which a month's data should be submitted (Methodology → Collection rules) |

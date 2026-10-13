@@ -92,8 +92,11 @@ A facility or a person above the limit cannot be added (or brought back); what t
 
 The menu on the left is grouped into coloured sections — Capture, Value chain, Net zero, Disclose, Setup and Help. Click a section title to fold or open it (the section of the page you are on always stays open). Greyed items with a stage label (S2, S3, S4) are coming later.
 
+**▾▾ Collapse all / ▸▸ Expand all** (above the menu) folds or opens every section at once. **«** next to the logo narrows the menu to icons only (hover an icon for its name); **»** widens it again. Both are remembered on this browser.
+
 - **Home** — what needs your attention, for your role. **KPI dashboard** — the indicators you track against targets.
 - **Add data** — categories on the left; facility and months on top; the result is calculated as you type.
 - **Entries & results** — everything saved for the year, totals per scope, per gas, and the detail of each entry.
 - **Meters** and **Bills** — data that arrives from other systems or as PDF bills.
+- **QR & field app** — bins with QR labels; scans at the bin roll up into the month's waste entries.
 - **User manual** — this guide. It is updated with every release.

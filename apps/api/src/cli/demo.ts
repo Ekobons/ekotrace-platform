@@ -67,7 +67,7 @@ async function main() {
     if (old) {
       // Demo company only (matched by its exact name): remove everything it holds.
       for (const sql of [
-        'DELETE FROM certificate_claim WHERE tenant_id = $1', 'DELETE FROM energy_certificate WHERE tenant_id = $1', 'DELETE FROM supplier_factor WHERE tenant_id = $1',
+        'DELETE FROM waste_scan WHERE tenant_id = $1', 'DELETE FROM waste_bin WHERE tenant_id = $1', 'DELETE FROM certificate_claim WHERE tenant_id = $1', 'DELETE FROM energy_certificate WHERE tenant_id = $1', 'DELETE FROM supplier_factor WHERE tenant_id = $1',
         'DELETE FROM job WHERE tenant_id = $1', 'UPDATE purchase_line SET activity_id = NULL WHERE tenant_id = $1', 'DELETE FROM activity_result WHERE tenant_id = $1', 'DELETE FROM activity WHERE tenant_id = $1',
         'DELETE FROM purchase_batch WHERE tenant_id = $1', 'DELETE FROM purchase_rule WHERE tenant_id = $1', 'DELETE FROM purchase_profile WHERE tenant_id = $1', 'DELETE FROM supplier_ef WHERE tenant_id = $1', 'DELETE FROM supplier WHERE tenant_id = $1', 'DELETE FROM fx_rate WHERE tenant_id = $1', 'DELETE FROM vehicle WHERE tenant_id = $1',
         'DELETE FROM bill WHERE tenant_id = $1', 'DELETE FROM document WHERE tenant_id = $1', 'DELETE FROM meter_reading WHERE tenant_id = $1', 'DELETE FROM meter WHERE tenant_id = $1', 'DELETE FROM api_key WHERE tenant_id = $1',
@@ -294,6 +294,30 @@ async function main() {
         const hot = 1 + 0.35 * Math.max(0, Math.sin(((m - 3) / 12) * 2 * Math.PI)); // more water in the hot months
         for (const [fac, code, v] of wv) if (wItems[code]) { await put(fac, { itemId: wItems[code], unit: 'm3', quantity: Math.round(v * k * hot), periodStart: ps, periodEnd: pe }); nw++; }
         nw += 6;
+      }
+    }
+    // QR & field app (DEMO bins and scans, not real): Al Zahia Community, this month so far — open, ready to roll up.
+    {
+      const binItems = Object.fromEntries((await c.query(`SELECT code, id FROM item WHERE code IN ('waste3:paper:paper-and-board-mixed:closed_loop','waste3:refuse:organic-food-and-drink-waste:composting',
+        'waste3:refuse:commercial-and-industrial-waste:landfill','waste3:electrical-items:batteries:open_loop')`)).rows.map((r) => [r.code, r.id]));
+      const now = new Date(), y = now.getUTCFullYear(), mo = now.getUTCMonth(), day = now.getUTCDate();
+      const bins: [string, string, string, string, boolean, string, number, number, number][] = [
+        ['Al Zahia Community', 'Loading bay 1 · cardboard', 'Retail loading bay', 'waste3:paper:paper-and-board-mixed:closed_loop', false, 'DEMO Paper Recycler', 1100, 0.06, 45],
+        ['Al Zahia Community', 'Food court · food waste', 'Food court back-of-house', 'waste3:refuse:organic-food-and-drink-waste:composting', false, 'DEMO Waste Collector LLC', 240, 0.5, 95],
+        ['Al Zahia Community', 'Compactor · general waste', 'Service yard', 'waste3:refuse:commercial-and-industrial-waste:landfill', false, 'DEMO Waste Collector LLC', 20000, 0.15, 0],
+        ['Al Zahia Community', 'Facilities store · used batteries', 'Facilities store', 'waste3:electrical-items:batteries:open_loop', true, 'DEMO E-waste Recycler', 120, 0.9, 0],
+      ];
+      let k = 0;
+      for (const [fac, name, loc, code, haz, contractor, cap, dens, daily] of bins) {
+        if (!binItems[code]) continue;
+        const bin = (await c.query(`INSERT INTO waste_bin (tenant_id, facility_id, code, name, location, item_id, hazardous, contractor, capacity_l, density, created_by)
+                                     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'demo') RETURNING id`, [t, ids.get(fac), `DEMO${String(++k).padStart(4, '0')}`, name, loc, binItems[code], haz, contractor, cap, dens])).rows[0].id;
+        const scan = (d: number, kind: string, kg: number, extra: { fill?: number; est?: boolean; manifest?: string } = {}) => c.query(
+          `INSERT INTO waste_scan (tenant_id, bin_id, facility_id, kind, kg, fill_pct, estimated, manifest, at, by_user) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'Omar (demo)')`,
+          [t, bin, ids.get(fac), kind, kg, extra.fill ?? null, extra.est ?? false, extra.manifest ?? null, new Date(Date.UTC(y, mo, d, 6 + (d % 5), 15)).toISOString()]);
+        if (daily) for (let d = 1; d < day; d++) await scan(d, d % 4 === 0 ? 'fill' : 'weigh', d % 4 === 0 ? Math.round(cap * 0.75 * dens) : Math.round(daily * (0.8 + 0.4 * Math.abs(Math.sin(d)))), d % 4 === 0 ? { fill: 75, est: true } : {});
+        if (name.startsWith('Compactor')) for (const d of [3, 10].filter((x) => x < day)) await scan(d, 'collection', 2800 + d * 20, { manifest: `DEMO-WTN-${y}${mo + 1}-${d}` });
+        if (haz && day > 5) await scan(5, 'collection', 85, { manifest: `DEMO-HZ-${y}${mo + 1}-05` });
       }
     }
     // ------------------------------------------------------------ business travel --
