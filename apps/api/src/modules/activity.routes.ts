@@ -149,10 +149,13 @@ function recalcInput(a: Record<string, any>, periodStart: string, periodEnd: str
   if (a.calc_method === 'water') return { ...base, quantity: Number(a.quantity), water: inputs.water ?? undefined };
   if (a.calc_method === 'waste_disposal') return { ...base, quantity: Number(a.quantity), wasteInfo: inputs.wasteInfo ?? undefined };
   // Trips: the passenger-km / room-nights worked out when saved; only an own factor is kept.
-  // A hotel stay with a star rating or meeting space is worked out again from the stay (country, rooms, nights, m², hours).
+  // A hotel stay with a star rating, and meeting space, are worked out again from what was entered (country, hotel type, rooms, nights, m², hours).
   const tr = inputs.trip as Record<string, any> | undefined; // eslint-disable-line @typescript-eslint/no-explicit-any
-  if (a.calc_method === 'trip' && tr?.kind === 'hotel' && tr.countryItem && (tr.stars || tr.meetingSqm) && tr.ownFactor === undefined) {
-    return { ...base, itemId: Number(tr.countryItem), trip: { kind: 'hotel', rooms: tr.rooms, nights: tr.nights, trips: tr.trips, stars: tr.stars, meetingSqm: tr.meetingSqm, meetingHours: tr.meetingHours } };
+  if (a.calc_method === 'trip' && tr?.kind === 'hotel' && tr.countryItem && tr.stars && tr.ownFactor === undefined) {
+    return { ...base, itemId: Number(tr.countryItem), trip: { kind: 'hotel', rooms: tr.rooms, nights: tr.nights, trips: tr.trips, stars: tr.stars } };
+  }
+  if (a.calc_method === 'trip' && tr?.kind === 'meeting' && tr.countryItem) {
+    return { ...base, itemId: Number(tr.countryItem), trip: { kind: 'meeting', trips: tr.trips, stars: tr.stars, meetingSqm: tr.meetingSqm, meetingHours: tr.meetingHours } };
   }
   if (a.calc_method === 'trip') return { ...base, quantity: Number(a.quantity), trip: inputs.trip?.ownFactor !== undefined ? { kind: 'ground', ownFactor: Number(inputs.trip.ownFactor), ownSource: inputs.trip.ownSource } : undefined };
   return { ...base, quantity: Number(a.quantity), cv };

@@ -26,6 +26,11 @@ export const TRIP_HAULS = [
   ['long', 'Long-haul', '3,700 km or more · e.g. Dubai–London, Dubai–Singapore, Dubai–New York'],
   ['intl', 'International', 'Average of all international flights · when not sure'],
 ] as const;
+/** Typical meeting-room sizes, to help fill in the m² (a guide: about 1.5–2 m² per person seated at tables, 1 m² theatre style). */
+export const MEETING_ROOMS = [
+  ['board', 'Boardroom · up to 12 people', 40], ['small', 'Meeting room · 20–25 people', 60], ['training', 'Training room · 40–50 people', 100],
+  ['conference', 'Conference hall · 100–150 people', 250], ['ballroom', 'Ballroom / large event · 300+ people', 500],
+] as const;
 export const HOTEL_CLASSES = [[2, '2-star (economy)'], [3, '3-star (midscale)'], [4, '4-star (upscale)'], [5, '5-star (luxury)']] as const;
 
 export async function tripRoutes(app: FastifyInstance) {
@@ -66,12 +71,13 @@ export async function tripRoutes(app: FastifyInstance) {
       // Star-rating and meeting-space factors in the factor library (any country, or all countries).
       const lib = (await c.query(
         `SELECT i.code, array_agg(DISTINCT f.region) AS regions FROM item i JOIN factor f ON f.item_id = i.id AND f.status = 'active' AND f.basis = 'scope3'
-          WHERE (i.code LIKE 'bt:hotel:class:%' OR i.code = 'bt:meeting:space') AND i.active GROUP BY i.code`)).rows as { code: string; regions: string[] }[];
+          WHERE (i.code LIKE 'bt:hotel:class:%' OR i.code LIKE 'bt:meeting:space%') AND i.active GROUP BY i.code`)).rows as { code: string; regions: string[] }[];
       const libOf = (code: string) => lib.find((l) => l.code === code)?.regions ?? [];
       return {
         rf: t.flight_rf, classes: TRIP_CLASSES.map(([key, label]) => ({ key, label })), hauls: TRIP_HAULS.map(([key, label, hint]) => ({ key, label, hint })), typicalKm: TYPICAL_KM,
         airKg: Object.fromEntries(air.map((a) => [a.code, a.kg])),
-        hotelClasses: HOTEL_CLASSES.map(([stars, label]) => ({ stars, label, regions: libOf(`bt:hotel:class:${stars}`) })), meetingRegions: libOf('bt:meeting:space'),
+        hotelClasses: HOTEL_CLASSES.map(([stars, label]) => ({ stars, label, regions: libOf(`bt:hotel:class:${stars}`), meetingRegions: libOf(`bt:meeting:space:${stars}`) })), meetingRegions: libOf('bt:meeting:space'),
+        rooms: MEETING_ROOMS.map(([key, label, sqm]) => ({ key, label, sqm })),
         uplift: UPLIFT, shortHaulMaxKm: SHORT_HAUL_MAX_KM, country: t.country,
         hotels: hotels.map((h) => ({ itemId: h.id, country: h.country, iso: h.iso, co2e: h.co2e, factorYear: h.fyear })),
         ground: ground.map((g) => ({ itemId: g.id, code: g.code, name: g.name, group: g.sub_name, sub: g.sub, unit: g.unit, note: g.note })),

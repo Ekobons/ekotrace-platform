@@ -940,3 +940,7 @@ table.t tr.scoperow td { background: var(--soft); font-size: 13.5px; }
 .viaw { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; }
 .viaw .input { width: 92px; }
 .btn.link { background: none; border: 0; color: var(--primary); padding: 2px 0; font-weight: 600; font-size: 12px; cursor: pointer; }
+/* trip rows: everything lines up at the top, so a hint or an error under one box does not move the others */
+table.t.rows.trips td { vertical-align: top; }
+table.t.rows.trips td.mid { padding-top: 15px; }
+table.t.rows.trips td.mid2 { padding-top: 9px; }

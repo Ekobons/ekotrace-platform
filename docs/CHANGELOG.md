@@ -2,6 +2,13 @@
 
 Newest first.
 
+## 2026-10-13 · Business travel: rows line up, meetings / events separate, factors load themselves
+
+- **Factors load on start:** when the server starts it applies new migrations and loads any DESNZ / EPA / IPCC files the database is missing or has from an older importer, including when a category such as flights or rail has no factors at all. After `git pull` + `npm install`, `npm run app` is enough. Fixes "No DESNZ flight factor…" and the empty "Type of transport" list on databases seeded before business travel was added. `AUTO_SETUP=false` switches it off.
+- **Alignment:** trip rows line up at the top, so a hint, a distance or an error under one box no longer moves the other boxes (flights, hotels, other transport).
+- **Hotel stays** split into **Room stays** (country, hotel type, rooms, nights) and **Meetings / events** (country, hotel type, kind of room, m², hours). "Kind of room" fills in a typical size: boardroom ≈ 40 m², meeting room ≈ 60, training room ≈ 100, conference hall ≈ 250, ballroom ≈ 500.
+- Meetings are saved as their own entries (m²-hours). Factor library: meeting space by hotel type (2- to 5-star), with "any hotel type" as the fallback. Until a factor is added the entry is kept at 0 with a note, ready to recalculate.
+
 ## 2026-10-13 · Business travel: flight types, connecting flights, hotel type and meeting space; factor library
 
 - **Flights by type** — no distance to type. Types renamed **Domestic**, **Short-haul** (under 3,700 km), **Long-haul** (3,700 km or more) and **International** (average, when not sure), each with examples and the kg CO₂e per person one way; a typical one-way distance per type (450 / 1,500 / 6,500 / 3,000 km) is used and shown in the calculation steps.

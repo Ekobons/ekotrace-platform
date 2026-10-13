@@ -1512,7 +1512,7 @@ test('Enter → Review → Approved: drafts submitted, approved by someone else 
   assert.ok(['activity.submit', 'activity.approve', 'activity.return'].every((x) => audits.includes(x)), JSON.stringify(audits));
 });
 
-test('business travel: flights from airports (great-circle + 8%, type by distance, class, return, trips, RF as the company chose), connecting legs, by flight type (typical distance), hotel stays by country, star rating and meeting space from the library, rail; spend lines still go to 3.6', async () => {
+test('business travel: flights from airports (great-circle + 8%, type by distance, class, return, trips, RF as the company chose), connecting legs, by flight type (typical distance), hotel stays by country, star rating and meetings / events from the library, rail; spend lines still go to 3.6', async () => {
   const p = { facilityId: facA, periodStart: '2026-03-01', periodEnd: '2026-03-31' };
   const f = (code: string) => pq(`SELECT f.basis, f.co2e::float8 AS v FROM factor f JOIN item i ON i.id = f.item_id JOIN factor_source s ON s.id = f.source_id WHERE i.code = $1 AND s.code = 'DESNZ-2026' AND f.status = 'active'`, [code]).then((r) => r.rows as { basis: string; v: number }[]);
   const sum = (rows: { v: number }[]) => rows.reduce((a, r) => a + r.v, 0);
@@ -1558,25 +1558,32 @@ test('business travel: flights from airports (great-circle + 8%, type by distanc
   ] }, tenantA);
   assert.ok(Math.abs(h.body.results[0].totals.scope3 - 6 * sum(await f('bt:hotel:united-arab-emirates'))) < 1e-6, JSON.stringify(h.body.results[0]));
   assert.equal(h.body.results[1].totals.scope3, 80);
-  // star rating and meeting space: country average and a warning until the library has factors; then the library's
-  const s4 = await api('POST', '/api/calculate', { ...p, itemId: uae, unit: 'room_night', trip: { kind: 'hotel', rooms: 1, nights: 2, stars: 4, meetingSqm: 50, meetingHours: 3 } }, tenantA);
+  // star rating: country average and a warning until the library has a factor; meetings: not counted until then
+  const s4 = await api('POST', '/api/calculate', { ...p, itemId: uae, unit: 'room_night', trip: { kind: 'hotel', rooms: 1, nights: 2, stars: 4 } }, tenantA);
   assert.equal(s4.status, 200, JSON.stringify(s4.body));
   assert.ok(Math.abs(s4.body.totals.scope3 - 2 * sum(await f('bt:hotel:united-arab-emirates'))) < 1e-6);
-  assert.ok(s4.body.warnings.some((w: string) => /No 4-star hotel factor/.test(w)) && s4.body.warnings.some((w: string) => /Meeting space not counted/.test(w)));
+  assert.ok(s4.body.warnings.some((w: string) => /No 4-star hotel factor/.test(w)));
+  const m0 = await api('POST', '/api/calculate', { ...p, itemId: uae, unit: 'sqm_hour', trip: { kind: 'meeting', meetingSqm: 50, meetingHours: 3, stars: 4 } }, tenantA);
+  assert.equal(m0.status, 200, JSON.stringify(m0.body));
+  assert.equal(m0.body.totals.scope3, 0); assert.ok(m0.body.warnings.some((w: string) => /Meeting space not counted/.test(w)));
   const src = (await pq(`INSERT INTO factor_source (code, publisher, title) VALUES ('TEST-CHSB', 'test', 'test') ON CONFLICT (code) DO UPDATE SET code = EXCLUDED.code RETURNING id`)).rows[0].id;
-  const fac = (await pq(`INSERT INTO factor (item_id, source_id, region, basis, unit, co2e, valid_from, valid_to, version)
-                          SELECT id, $1, $2, 'scope3', $3, $4, '2020-01-01', '2030-12-31', 1 FROM item WHERE code = $5 RETURNING id`, [src, 'AE', 'room_night', 30, 'bt:hotel:class:4'])).rows[0].id;
-  const fm = (await pq(`INSERT INTO factor (item_id, source_id, region, basis, unit, co2e, valid_from, valid_to, version)
-                         SELECT id, $1, 'GLOBAL', 'scope3', 'sqm_hour', 0.1, '2020-01-01', '2030-12-31', 1 FROM item WHERE code = 'bt:meeting:space' RETURNING id`, [src])).rows[0].id;
-  const s4b = await api('POST', '/api/calculate', { ...p, itemId: uae, unit: 'room_night', trip: { kind: 'hotel', rooms: 1, nights: 2, stars: 4, meetingSqm: 50, meetingHours: 3 } }, tenantA);
-  assert.ok(Math.abs(s4b.body.totals.scope3 - (2 * 30 + 150 * 0.1)) < 1e-6, JSON.stringify(s4b.body));
+  const add = async (code: string, region: string, unit: string, v: number) => (await pq(`INSERT INTO factor (item_id, source_id, region, basis, unit, co2e, valid_from, valid_to, version)
+      SELECT id, $1, $2, 'scope3', $3, $4, '2020-01-01', '2030-12-31', 1 FROM item WHERE code = $5 RETURNING id`, [src, region, unit, v, code])).rows[0].id as number;
+  const ids = [await add('bt:hotel:class:4', 'AE', 'room_night', 30), await add('bt:meeting:space', 'GLOBAL', 'sqm_hour', 0.1)];
+  const s4b = await api('POST', '/api/calculate', { ...p, itemId: uae, unit: 'room_night', trip: { kind: 'hotel', rooms: 1, nights: 2, stars: 4 } }, tenantA);
+  assert.ok(Math.abs(s4b.body.totals.scope3 - 60) < 1e-6, JSON.stringify(s4b.body));
   assert.match(s4b.body.steps.join(' '), /4-star hotel factor from the factor library/);
-  const meetOnly = await api('POST', '/api/calculate', { ...p, itemId: uae, unit: 'room_night', trip: { kind: 'hotel', meetingSqm: 100, meetingHours: 4 } }, tenantA);
-  assert.ok(Math.abs(meetOnly.body.totals.scope3 - 40) < 1e-6, JSON.stringify(meetOnly.body));
+  const m1 = await api('POST', '/api/calculate', { ...p, itemId: uae, unit: 'sqm_hour', trip: { kind: 'meeting', meetingSqm: 100, meetingHours: 4, stars: 4 } }, tenantA);
+  assert.ok(Math.abs(m1.body.totals.scope3 - 40) < 1e-6, JSON.stringify(m1.body));
+  assert.match(m1.body.steps.join(' '), /any hotel type — none for 4-star yet/);
+  ids.push(await add('bt:meeting:space:4', 'GLOBAL', 'sqm_hour', 0.2));
+  const m2 = await api('POST', '/api/calculate', { ...p, itemId: uae, unit: 'sqm_hour', trip: { kind: 'meeting', meetingSqm: 100, meetingHours: 4, stars: 4 } }, tenantA);
+  assert.ok(Math.abs(m2.body.totals.scope3 - 80) < 1e-6, JSON.stringify(m2.body));
   const opt4 = (await api('GET', '/api/trips/options?year=2026', undefined, tenantA)).body;
-  assert.deepEqual(opt4.hotelClasses.find((c: { stars: number }) => c.stars === 4).regions, ['AE']); assert.deepEqual(opt4.meetingRegions, ['GLOBAL']);
-  await pq(`DELETE FROM factor WHERE id = ANY($1)`, [[fac, fm]]);
-  assert.equal((await api('POST', '/api/calculate', { ...p, itemId: uae, unit: 'room_night', trip: { kind: 'hotel', rooms: 1 } }, tenantA)).status, 400, 'nights or meeting space needed');
+  const c4 = opt4.hotelClasses.find((c: { stars: number }) => c.stars === 4);
+  assert.deepEqual(c4.regions, ['AE']); assert.deepEqual(c4.meetingRegions, ['GLOBAL']); assert.deepEqual(opt4.meetingRegions, ['GLOBAL']); assert.ok(opt4.rooms.length >= 4);
+  await pq(`DELETE FROM factor WHERE id = ANY($1)`, [ids]);
+  assert.equal((await api('POST', '/api/calculate', { ...p, itemId: uae, unit: 'room_night', trip: { kind: 'hotel', rooms: 1 } }, tenantA)).status, 400, 'nights needed');
   // rail: 120 km one way, return, 3 trips
   const rail = (await pq(`SELECT id FROM item WHERE code = 'bt:rail:national-rail'`)).rows[0];
   assert.ok(rail, 'national rail item');

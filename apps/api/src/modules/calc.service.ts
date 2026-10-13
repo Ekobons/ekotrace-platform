@@ -100,7 +100,7 @@ export type WasteInput = z.infer<typeof wasteSchema>;
  * library has one, and meeting space (m² × hours). Other transport: one-way km × trips (× 2 when return).
  */
 export const tripSchema = z.object({
-  kind: z.enum(['flight', 'hotel', 'ground']),
+  kind: z.enum(['flight', 'hotel', 'meeting', 'ground']),
   from: z.string().trim().length(3).optional(), to: z.string().trim().length(3).optional(),
   haul: z.enum(['domestic', 'short', 'long', 'intl']).optional(),
   cls: z.enum(['average', 'economy', 'premium', 'business', 'first']).optional(),
@@ -273,7 +273,11 @@ export async function calculate(input: CalcInput, ctx: CalcContext): Promise<{ r
         steps: [`${fmtN(input.quantity)} ${input.unit === 'room_night' ? 'room-nights' : input.unit} × ${own} kg CO₂e (${input.trip?.ownSource || 'factor entered'}) = ${fmtN(kg)} kg CO₂e`], warnings: [] } as unknown as CalcResult;
     } else {
       const factors = await loadFactors(item.id);
-      if (!factors.length) throw new AppError(`${item.name}: no DESNZ factor. Enter the hotel's own factor per room-night, or choose a nearby country.`);
+      if (!factors.length && tripInfo?.noFactor) {
+        result = { totals: { direct: 0, wtt: 0, outside_scopes: 0, memo: 0, scope2: 0, scope2_market: 0, td_loss: 0, scope3: 0 }, lines: [], factors: [],
+          steps: [`${item.name}: no factor yet — not counted`], warnings: [] } as unknown as CalcResult;
+      } else {
+      if (!factors.length) throw new AppError(item.code.startsWith('bt:hotel') ? `${item.name}: no DESNZ factor — choose a nearby country.` : `${item.name}: no factor loaded — restart the app to load the DESNZ files.`);
       result = calcCombustion({ itemName: item.name, quantity: input.quantity, unit: input.unit, date, region: tripInfo?.region ?? 'GLOBAL', factors, gwp, units: ref.units });
       // The well-to-tank of the travel belongs to the same category (3.6), not to 3.3.
       if (result.totals.wtt) {
@@ -282,12 +286,7 @@ export async function calculate(input: CalcInput, ctx: CalcContext): Promise<{ r
         result.totals.wtt = 0;
         for (const l of result.lines) if (l.basis === 'wtt') l.basis = 'scope3';
       }
-    }
-    if (tripInfo?.meeting) {
-      const m = tripInfo.meeting;
-      result.totals.scope3 += m.kg;
-      result.lines.push({ basis: 'scope3', gas: 'CO2e', kgGas: null, kgCo2e: m.kg, factorId: m.factorId, method: 'published' } as (typeof result.lines)[number]);
-      result.steps.push(m.step);
+      }
     }
     if (tripInfo) result.steps.unshift(...tripInfo.steps);
     if (tripInfo?.warnings.length) result.warnings.push(...tripInfo.warnings);
@@ -572,11 +571,11 @@ function classFor(haul: string, cls: string) {
  * Works out a trip's quantity (passenger-km, room-nights, km) and, for a flight, its DESNZ item.
  * Sets input.itemId / quantity / unit; returns the explanation for the steps and what to keep.
  */
-type TripInfo = { steps: string[]; warnings: string[]; stored: Record<string, unknown>; region?: string; meeting?: { kg: number; factorId: number; step: string } };
+type TripInfo = { steps: string[]; warnings: string[]; stored: Record<string, unknown>; region?: string; noFactor?: boolean };
 /** The library factor (scope3) of an item for a country, or GLOBAL, valid at the date (or the latest before it). */
 async function libFactor(code: string, iso: string | null, date: string) {
-  const [f] = await query<{ id: number; item_id: number; co2e: number; region: string; year: number; source: string }>(
-    `SELECT f.id, f.item_id, f.co2e::float8 AS co2e, f.region, extract(year FROM f.valid_from)::int AS year, s.code AS source
+  const [f] = await query<{ id: number; item_id: number; code: string; co2e: number; region: string; year: number; source: string }>(
+    `SELECT f.id, f.item_id, i.code, f.co2e::float8 AS co2e, f.region, extract(year FROM f.valid_from)::int AS year, s.code AS source
        FROM factor f JOIN item i ON i.id = f.item_id JOIN factor_source s ON s.id = f.source_id
       WHERE i.code = $1 AND i.active AND f.status = 'active' AND f.basis = 'scope3' AND f.co2e IS NOT NULL AND f.valid_from <= $3
         AND f.region IN ($2, 'GLOBAL')
@@ -616,37 +615,43 @@ export async function resolveTrip(input: CalcInput): Promise<TripInfo> {
     if (cls !== (t.cls ?? 'economy')) steps.push(`DESNZ has no ${t.cls} factor for ${HAUL_NAME[haul!]} flights: ${cls === 'average' ? 'average passenger' : cls} used`);
     const code = `bt:air:${haul}:${cls}:${rf ? 'rf' : 'norf'}`;
     const [row] = await query<{ id: number }>('SELECT id FROM item WHERE code = $1', [code]);
-    if (!row) throw new AppError(`No DESNZ flight factor for ${code} — load the DESNZ files`);
+    if (!row) throw new AppError('Flight factors are not loaded in this database yet: restart the app (it loads the DESNZ files), or run npm run db:seed');
     input.itemId = row.id; input.unit = 'pkm';
     input.quantity = km! * legs * trips;
     steps.push(`${fmtN(km!)} km${times} = ${fmtN(input.quantity)} passenger-km${rf ? ' · with radiative forcing (DESNZ)' : ' · without radiative forcing'}`);
     return { steps, warnings, stored: { ...stored, cls, rf } };
   }
-  if (t.kind === 'hotel') {
-    const rooms = t.rooms ?? 1, nights = t.nights ?? 0, meet = t.meetingSqm && t.meetingHours ? t.meetingSqm * t.meetingHours * trips : 0;
-    if (!nights && !meet) throw new AppError('Enter the nights, or the meeting space and hours');
+  if (t.kind === 'hotel' || t.kind === 'meeting') {
     if (!input.itemId) throw new AppError('Choose the country of the hotel');
     const [h] = await query<{ iso: string | null; country: string | null }>(`SELECT attrs->>'iso' AS iso, attrs->>'country' AS country FROM item WHERE id = $1`, [input.itemId]);
     const iso = h?.iso ?? null, where = h?.country ?? 'the country';
-    const info: TripInfo = { steps, warnings, stored: { countryItem: input.itemId } };
-    input.unit = 'room_night'; input.quantity = rooms * nights * trips;
-    if (nights) steps.push(`${fmtN(rooms)} room${rooms === 1 ? '' : 's'} × ${fmtN(nights)} night${nights === 1 ? '' : 's'}${trips !== 1 ? ` × ${fmtN(trips)} stays` : ''} = ${fmtN(input.quantity)} room-nights`);
-    if (t.stars) {
-      const f = await libFactor(`bt:hotel:class:${t.stars}`, iso, input.periodStart);
-      if (f) {
-        input.itemId = f.item_id; info.region = f.region;
-        steps.push(`${t.stars}-star hotel factor from the factor library (${f.source}, ${f.region === 'GLOBAL' ? 'all countries' : where}) used instead of the country average`);
-      } else if (nights) {
-        warnings.push(`No ${t.stars}-star hotel factor in the factor library yet: the DESNZ average for ${where} is used.`);
+    const info: TripInfo = { steps, warnings, stored: { countryItem: input.itemId, ...(t.stars ? { stars: t.stars } : {}) } };
+    if (t.kind === 'hotel') {
+      const rooms = t.rooms ?? 1, nights = t.nights ?? 0;
+      if (!nights) throw new AppError('Enter the nights');
+      input.unit = 'room_night'; input.quantity = rooms * nights * trips;
+      steps.push(`${fmtN(rooms)} room${rooms === 1 ? '' : 's'} × ${fmtN(nights)} night${nights === 1 ? '' : 's'}${trips !== 1 ? ` × ${fmtN(trips)} stays` : ''} = ${fmtN(input.quantity)} room-nights`);
+      if (t.stars) {
+        const f = await libFactor(`bt:hotel:class:${t.stars}`, iso, input.periodStart);
+        if (f) { input.itemId = f.item_id; info.region = f.region; steps.push(`${t.stars}-star hotel factor from the factor library (${f.source}, ${f.region === 'GLOBAL' ? 'all countries' : where}) used instead of the country average`); }
+        else warnings.push(`No ${t.stars}-star hotel factor in the factor library yet: the DESNZ average for ${where} is used.`);
       }
-      info.stored.stars = t.stars;
+      return info;
     }
-    if (meet) {
-      const f = await libFactor('bt:meeting:space', iso, input.periodStart);
-      const area = `${fmtN(t.meetingSqm!)} m² × ${fmtN(t.meetingHours!)} h${trips !== 1 ? ` × ${fmtN(trips)}` : ''} = ${fmtN(meet)} m²-hours`;
-      if (f) info.meeting = { kg: meet * f.co2e, factorId: f.id, step: `Meeting space: ${area} × ${f.co2e} kg CO₂e (${f.source}${f.region === 'GLOBAL' ? '' : `, ${where}`}) = ${fmtN(meet * f.co2e)} kg CO₂e` };
-      else { steps.push(`Meeting space: ${area}`); warnings.push('Meeting space not counted: no meeting-space factor in the factor library yet.'); }
-      Object.assign(info.stored, { meetingSqm: t.meetingSqm, meetingHours: t.meetingHours, meetingSqmH: meet });
+    // meeting / event space: m² × hours × times, the hotel type's factor or the one for any hotel
+    if (!t.meetingSqm || !t.meetingHours) throw new AppError('Enter the meeting space (m²) and the hours');
+    input.unit = 'sqm_hour'; input.quantity = t.meetingSqm * t.meetingHours * trips;
+    steps.push(`${fmtN(t.meetingSqm)} m² × ${fmtN(t.meetingHours)} h${trips !== 1 ? ` × ${fmtN(trips)} events` : ''} = ${fmtN(input.quantity)} m²-hours of meeting space`);
+    const f = (t.stars ? await libFactor(`bt:meeting:space:${t.stars}`, iso, input.periodStart) : null) ?? await libFactor('bt:meeting:space', iso, input.periodStart);
+    Object.assign(info.stored, { meetingSqm: t.meetingSqm, meetingHours: t.meetingHours });
+    if (f) {
+      input.itemId = f.item_id; info.region = f.region;
+      steps.push(`Meeting-space factor from the factor library (${f.source}, ${f.code.endsWith(':space') ? (t.stars ? `any hotel type — none for ${t.stars}-star yet` : 'any hotel type') : `${t.stars}-star`}, ${f.region === 'GLOBAL' ? 'all countries' : where})`);
+    } else {
+      const [g] = await query<{ id: number }>(`SELECT id FROM item WHERE code = 'bt:meeting:space'`);
+      if (!g) throw new AppError('Meeting space is not in the catalogue: restart the app to update the database');
+      input.itemId = g.id; info.noFactor = true;
+      warnings.push('Meeting space not counted yet: no meeting-space factor in the factor library. The entry keeps the m² and hours, so it can be recalculated once the factor is added.');
     }
     return info;
   }

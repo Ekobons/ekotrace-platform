@@ -118,7 +118,8 @@ The scope follows **who runs the treatment site**: one Waste tab with a switch.
 | Way | What you give | How it is counted |
 |---|---|---|
 | **Flights** | from / to airports (code or city, e.g. DXB, Riyadh), with **+ via** for a connecting airport — or just the flight type; class; return; trips (journeys × people) | distance × trips × the DESNZ air factor for the flight type and class, per passenger-km |
-| **Hotel stays** | country, hotel type (2- to 5-star, or not known), rooms, nights; meeting space (m²) and hours if a meeting room was used | room-nights × the star rating's factor from the factor library, or the DESNZ hotel-stay factor of the country; + m² × hours × the meeting-space factor |
+| **Hotel stays → Room stays** | country, hotel type (2- to 5-star, or not known), rooms, nights | room-nights × the hotel type's factor from the factor library, or the DESNZ hotel-stay factor of the country |
+| **Hotel stays → Meetings / events** | country, hotel type, kind of room (fills in a typical size) or the m², hours | m² × hours × the meeting-space factor for the hotel type, or for any hotel type |
 | **Other transport** | train, metro, bus, coach, taxi, hire car (by size and fuel) or ferry; one-way km; return; trips | DESNZ business travel – land and sea, per passenger-km (hire cars per km) |
 | **By spend** | the amount, when only the cost is known (e.g. a card statement) | EPA spend factor for air, hotel or ground travel; expense or travel-agency exports go through Purchases |
 
@@ -146,7 +147,9 @@ The calculation steps of the entry show the distance used.
 
 **Hotels:** DESNZ publishes a factor per room per night for about 50 countries (from the Cornell Hotel Sustainability Benchmarking index); when a country has no value in the year, the latest earlier year is used. For other countries choose a nearby one.
 
-**Hotel type and meeting space:** the factor library has items for 2-, 3-, 4- and 5-star hotels (per room-night) and for meeting and event space (per m² per hour). Their factors come from the Cornell Hotel Sustainability Benchmarking (CHSB) index / Hotel Carbon Measurement Initiative and are added in the factor library — for a country, or for all countries — once the data set is licensed. While a star rating has no factor, the country average is used and the entry says so; meeting space is not counted until its factor is in the library.
+**Meeting space — typical sizes** (pick the kind of room and the m² is filled in; change it if you know better): boardroom up to 12 people ≈ 40 m²; meeting room 20–25 people ≈ 60 m²; training room 40–50 people ≈ 100 m²; conference hall 100–150 people ≈ 250 m²; ballroom or large event 300+ people ≈ 500 m². As a rule of thumb: about 1.5–2 m² per person seated at tables, about 1 m² per person in rows (theatre style).
+
+**Hotel type and meeting space:** the factor library has items for 2-, 3-, 4- and 5-star hotels (per room-night) and for meeting and event space (per m² per hour; by hotel type, and one for any hotel type). Their factors come from the Cornell Hotel Sustainability Benchmarking (CHSB) index / Hotel Carbon Measurement Initiative and are added in the factor library — for a country, or for all countries — once the data set is licensed. While a star rating has no factor, the country average is used and the entry says so; meeting space is not counted until its factor is in the library.
 
 ## Employee commuting — Scope 3.7
 

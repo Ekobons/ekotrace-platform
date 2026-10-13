@@ -52,7 +52,7 @@ npm run app
 
 Open **http://localhost:4000**. Stop with Ctrl + C. Next time only `npm run app` is needed.
 
-After pulling new code: `git pull`, `npm install`, `npm run db:migrate`, `npm run db:seed` (only when the change log says so), `npm run app`.
+After pulling new code: `git pull`, `npm install`, `npm run app`. On start the server applies new migrations and loads any factor files the database is missing (DESNZ, EPA, IPCC) — the first time this takes about a minute; set `AUTO_SETUP=false` in `.env` to switch it off and run `npm run db:migrate` / `npm run db:seed` yourself.
 
 For development with live reload: `npm run dev:api` and, in a second window, `npm run dev:web` (screens on http://localhost:5173).
 

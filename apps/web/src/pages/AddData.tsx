@@ -87,7 +87,7 @@ const WAYS: Record<Way, [string, string, string]> = {
   upload: ['Excel / CSV', 'download', 'Download a template for this facility and these months, fill it in, then upload it here.'],
   auto: ['Automatic feed', 'feed', 'Connected systems post data straight into Ekotrace.'],
   flights: ['Flights', 'plane', 'One row per trip: airports or flight type, class, return and how many trips.'],
-  hotels: ['Hotel stays', 'building', 'One row per stay: country, rooms and nights.'],
+  hotels: ['Hotel stays', 'building', 'Room stays (rooms × nights) or meetings and events (m² × hours), one row each.'],
   ground: ['Other transport', 'bus', 'Trains, buses, taxis, hire cars and ferries: one-way km, return, trips.'],
   spend: ['By spend', 'cart', 'Fares, hotels and taxis known only by the amount paid: spend-based factors (EPA). Expense or travel-agency files go through Purchases.'],
 };
