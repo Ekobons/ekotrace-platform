@@ -5,7 +5,9 @@
  *   GET /api/trips/distance?from=&to=   great-circle km, + 8%, and the DESNZ haul
  *   GET /api/trips/options?year= hotel countries (with the room-night factor of the year, or the latest
  *                                before it), other transport (rail, bus, taxi, car, ferry), classes,
- *                                the company's radiative-forcing choice, typical distances
+ *                                the company's radiative-forcing choice, flight types with typical distances
+ *                                and their factors, hotel star ratings and meeting space (and which countries
+ *                                the factor library has a factor for)
  *
  * The calculation itself is in calc.service (resolveTrip): entries are saved through /api/activities.
  */
@@ -14,12 +16,17 @@ import { z } from 'zod';
 import { tenantTx } from '../db/pool.js';
 import { requireTenant } from '../lib/auth.js';
 import { AppError } from '../lib/errors.js';
-import { airport, greatCircleKm, haulOf, searchAirports, UPLIFT, SHORT_HAUL_MAX_KM } from '../lib/airports.js';
+import { airport, greatCircleKm, haulOf, searchAirports, UPLIFT, SHORT_HAUL_MAX_KM, TYPICAL_KM } from '../lib/airports.js';
 import { tenantSettings } from './activity.routes.js';
 
 export const TRIP_CLASSES = [['economy', 'Economy'], ['premium', 'Premium economy'], ['business', 'Business'], ['first', 'First'], ['average', 'Not known (average)']] as const;
-export const TRIP_HAULS = [['domestic', 'Domestic (within one country)'], ['intl', 'International'], ['short', 'Short-haul to/from the UK (under 3,700 km)'], ['long', 'Long-haul to/from the UK']] as const;
-export const TYPICAL_KM: Record<string, number> = { domestic: 450, short: 1500, long: 6500, intl: 3000 };
+export const TRIP_HAULS = [
+  ['domestic', 'Domestic', 'Within one country · e.g. Riyadh–Jeddah, Abu Dhabi–Sir Bani Yas'],
+  ['short', 'Short-haul', 'Under 3,700 km · e.g. Dubai–Riyadh, Dubai–Mumbai, Dubai–Cairo'],
+  ['long', 'Long-haul', '3,700 km or more · e.g. Dubai–London, Dubai–Singapore, Dubai–New York'],
+  ['intl', 'International', 'Average of all international flights · when not sure'],
+] as const;
+export const HOTEL_CLASSES = [[2, '2-star (economy)'], [3, '3-star (midscale)'], [4, '4-star (upscale)'], [5, '5-star (luxury)']] as const;
 
 export async function tripRoutes(app: FastifyInstance) {
   app.get('/api/trips/airports', async (req) => {
@@ -50,8 +57,21 @@ export async function tripRoutes(app: FastifyInstance) {
         `SELECT i.id, i.code, i.name, s.code AS sub, s.name AS sub_name, s.default_unit AS unit, i.note FROM item i JOIN subcategory s ON s.id = i.subcategory_id
           WHERE s.code IN ('bt_rail', 'bt_bus', 'bt_taxi', 'bt_car', 'bt_sea') AND i.active AND EXISTS (SELECT 1 FROM factor f WHERE f.item_id = i.id AND f.status = 'active')
           ORDER BY s.sort, i.sort, i.name`)).rows;
+      // Flight factors of the year (or the latest before it), per passenger-km incl. well-to-tank: for the per-flight hints.
+      const air = (await c.query(
+        `SELECT i.code, sum(f.co2e)::float8 AS kg FROM item i JOIN subcategory s ON s.id = i.subcategory_id
+           JOIN factor f ON f.item_id = i.id AND f.status = 'active' AND f.basis IN ('scope3', 'wtt')
+          WHERE s.code = 'bt_air' AND f.valid_from = (SELECT max(g.valid_from) FROM factor g WHERE g.item_id = i.id AND g.status = 'active' AND g.valid_from <= make_date($1, 12, 31))
+          GROUP BY i.code`, [q.year])).rows;
+      // Star-rating and meeting-space factors in the factor library (any country, or all countries).
+      const lib = (await c.query(
+        `SELECT i.code, array_agg(DISTINCT f.region) AS regions FROM item i JOIN factor f ON f.item_id = i.id AND f.status = 'active' AND f.basis = 'scope3'
+          WHERE (i.code LIKE 'bt:hotel:class:%' OR i.code = 'bt:meeting:space') AND i.active GROUP BY i.code`)).rows as { code: string; regions: string[] }[];
+      const libOf = (code: string) => lib.find((l) => l.code === code)?.regions ?? [];
       return {
-        rf: t.flight_rf, classes: TRIP_CLASSES.map(([key, label]) => ({ key, label })), hauls: TRIP_HAULS.map(([key, label]) => ({ key, label })), typicalKm: TYPICAL_KM,
+        rf: t.flight_rf, classes: TRIP_CLASSES.map(([key, label]) => ({ key, label })), hauls: TRIP_HAULS.map(([key, label, hint]) => ({ key, label, hint })), typicalKm: TYPICAL_KM,
+        airKg: Object.fromEntries(air.map((a) => [a.code, a.kg])),
+        hotelClasses: HOTEL_CLASSES.map(([stars, label]) => ({ stars, label, regions: libOf(`bt:hotel:class:${stars}`) })), meetingRegions: libOf('bt:meeting:space'),
         uplift: UPLIFT, shortHaulMaxKm: SHORT_HAUL_MAX_KM, country: t.country,
         hotels: hotels.map((h) => ({ itemId: h.id, country: h.country, iso: h.iso, co2e: h.co2e, factorYear: h.fyear })),
         ground: ground.map((g) => ({ itemId: g.id, code: g.code, name: g.name, group: g.sub_name, sub: g.sub, unit: g.unit, note: g.note })),

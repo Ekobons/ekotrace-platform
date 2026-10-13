@@ -3,8 +3,10 @@
  *
  * Distance = great-circle distance between the two airports + 8% for routing, stacking and
  * delays, as DESNZ advises for its air travel factors.
- * Haul (which DESNZ factor): both airports in one country → domestic; to or from the UK →
- * short-haul (< 3,700 km) or long-haul; otherwise international (DESNZ "to/from non-UK").
+ * Flight type (which DESNZ factor): both airports in one country → domestic; otherwise short-haul
+ * (under 3,700 km) or long-haul by the distance. DESNZ publishes its short- and long-haul factors for
+ * flights to/from the UK; they are used for any flight of that length. "International" (DESNZ
+ * "to/from non-UK", an average) is only for a flight whose distance is not known.
  */
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -14,6 +16,8 @@ export interface Airport { iata: string; name: string; city: string; country: st
 export type Haul = 'domestic' | 'short' | 'long' | 'intl';
 export const UPLIFT = 1.08;
 export const SHORT_HAUL_MAX_KM = 3700;
+/** One-way distance used for a flight entered by type, when the airports are not known (incl. the 8%). */
+export const TYPICAL_KM: Record<Haul, number> = { domestic: 450, short: 1500, long: 6500, intl: 3000 };
 
 const DATA = join(dirname(fileURLToPath(import.meta.url)), '../../../../data/airports');
 let cache: { list: Airport[]; byCode: Map<string, Airport>; countries: Map<string, string> } | null = null;
@@ -68,6 +72,5 @@ export function greatCircleKm(a: { lat: number; lon: number }, b: { lat: number;
 
 export function haulOf(a: Airport, b: Airport, km: number): Haul {
   if (a.country === b.country) return 'domestic';
-  if (a.country === 'GB' || b.country === 'GB') return km < SHORT_HAUL_MAX_KM ? 'short' : 'long';
-  return 'intl';
+  return km < SHORT_HAUL_MAX_KM ? 'short' : 'long';
 }

@@ -117,24 +117,36 @@ The scope follows **who runs the treatment site**: one Waste tab with a switch.
 
 | Way | What you give | How it is counted |
 |---|---|---|
-| **Flights** | from / to airports (code or city, e.g. DXB, Riyadh) — or the flight type and the one-way km; class; return; trips (journeys × people) | distance × trips × the DESNZ air factor for the haul and class, per passenger-km |
-| **Hotel stays** | country, rooms, nights (or the hotel's own factor per room-night) | room-nights × the DESNZ hotel-stay factor of the country |
+| **Flights** | from / to airports (code or city, e.g. DXB, Riyadh), with **+ via** for a connecting airport — or just the flight type; class; return; trips (journeys × people) | distance × trips × the DESNZ air factor for the flight type and class, per passenger-km |
+| **Hotel stays** | country, hotel type (2- to 5-star, or not known), rooms, nights; meeting space (m²) and hours if a meeting room was used | room-nights × the star rating's factor from the factor library, or the DESNZ hotel-stay factor of the country; + m² × hours × the meeting-space factor |
 | **Other transport** | train, metro, bus, coach, taxi, hire car (by size and fuel) or ferry; one-way km; return; trips | DESNZ business travel – land and sea, per passenger-km (hire cars per km) |
 | **By spend** | the amount, when only the cost is known (e.g. a card statement) | EPA spend factor for air, hotel or ground travel; expense or travel-agency exports go through Purchases |
 
 ```flow
 > Distance | great-circle distance between the airports + 8% for routing, stacking and delays (DESNZ)
-> Haul | both airports in one country → domestic; to or from the UK → short-haul (under 3,700 km) or long-haul; otherwise international (DESNZ "to/from non-UK")
+> Flight type | both airports in one country → Domestic; otherwise Short-haul (under 3,700 km) or Long-haul (3,700 km or more) by the distance. DESNZ publishes these two factors for flights to/from the UK; they are used for any flight of that length. International (DESNZ "to/from non-UK", an average) is for a flight whose distance is not known
+> Connecting flight | each leg has its own distance and type and is saved as its own entry (the note says "DXB-DOH-LHR leg 1/2")
 > Class | economy, premium economy, business, first, or not known (average); DESNZ has only the average for domestic flights and economy / business for short-haul — the nearest is used and the steps say so
 > Passenger-km | one-way km × 2 when return × trips
 > Factor | DESNZ business travel – air, with radiative forcing (the company can choose without, under Methodology); its well-to-tank is counted in 3.6
 ```
 
-**Flight type and distance:** when the airports are not known, choose domestic, international or (to/from the UK) short- or long-haul and type the one-way km; left empty, a typical distance is used (domestic 450 km, international 3,000 km, short-haul 1,500 km, long-haul 6,500 km) and the entry says so.
+**Flight type:** when the airports are not known, switch to **Flight type** and pick the type and class — no distance is needed. Each type uses a typical one-way distance, shown in the list with an example and the kg CO₂e per person one way:
+
+| Type | Typical one-way distance | Examples |
+|---|---|---|
+| Domestic | 450 km | within one country: Riyadh–Jeddah |
+| Short-haul | 1,500 km | under 3,700 km: Dubai–Riyadh, Dubai–Mumbai, Dubai–Cairo |
+| Long-haul | 6,500 km | 3,700 km or more: Dubai–London, Dubai–Singapore |
+| International | 3,000 km | not sure: the average of international flights |
+
+The calculation steps of the entry show the distance used.
 
 **Radiative forcing** adds the warming effect of aircraft emissions at altitude (contrails, NOx) — DESNZ recommends including it; GHG Protocol leaves it optional. The company's choice is under Methodology and shows on every flight entry.
 
-**Hotels:** DESNZ publishes a factor per room per night for about 50 countries; when a country has no value in the year, the latest earlier year is used. For other countries choose a nearby one or enter the hotel's own factor.
+**Hotels:** DESNZ publishes a factor per room per night for about 50 countries (from the Cornell Hotel Sustainability Benchmarking index); when a country has no value in the year, the latest earlier year is used. For other countries choose a nearby one.
+
+**Hotel type and meeting space:** the factor library has items for 2-, 3-, 4- and 5-star hotels (per room-night) and for meeting and event space (per m² per hour). Their factors come from the Cornell Hotel Sustainability Benchmarking (CHSB) index / Hotel Carbon Measurement Initiative and are added in the factor library — for a country, or for all countries — once the data set is licensed. While a star rating has no factor, the country average is used and the entry says so; meeting space is not counted until its factor is in the library.
 
 ## Employee commuting — Scope 3.7
 

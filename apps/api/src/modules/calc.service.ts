@@ -93,9 +93,11 @@ export const wasteSchema = z.discriminatedUnion('process', [
 export type WasteInput = z.infer<typeof wasteSchema>;
 
 /**
- * Business travel. Flights: from / to airports (IATA) or a haul with the one-way km; class; return;
- * trips (journeys × people). The flight's DESNZ item and the passenger-km are worked out here.
- * Hotel stays: rooms × nights (the item is the country). Other transport: one-way km × trips (× 2 when return).
+ * Business travel. Flights: from / to airports (IATA; a connecting flight is saved one entry per leg)
+ * or the flight type (a typical distance for the type); class; return; trips (journeys × people).
+ * The flight's DESNZ item and the passenger-km are worked out here.
+ * Hotel stays: rooms × nights (the item is the country); the star rating's factor when the factor
+ * library has one, and meeting space (m² × hours). Other transport: one-way km × trips (× 2 when return).
  */
 export const tripSchema = z.object({
   kind: z.enum(['flight', 'hotel', 'ground']),
@@ -106,8 +108,13 @@ export const tripSchema = z.object({
   km: z.number().finite().positive().max(25000).optional(),
   ret: z.boolean().optional(),
   trips: z.number().finite().positive().max(100000).optional(),
+  /** a leg of a connecting flight: "1/2", and the whole route "DXB-DOH-LHR" */
+  leg: z.string().trim().regex(/^\d\/\d$/).optional(), route: z.string().trim().max(40).optional(),
   rooms: z.number().finite().positive().max(10000).optional(),
-  nights: z.number().finite().positive().max(366).optional(),
+  nights: z.number().finite().min(0).max(366).optional(),
+  stars: z.number().int().min(2).max(5).optional(),
+  meetingSqm: z.number().finite().positive().max(100000).optional(),
+  meetingHours: z.number().finite().positive().max(1000).optional(),
   ownFactor: z.number().finite().min(0).max(1000).optional(),
   ownSource: z.string().trim().max(200).optional(),
   who: z.string().trim().max(120).optional(),
@@ -267,7 +274,7 @@ export async function calculate(input: CalcInput, ctx: CalcContext): Promise<{ r
     } else {
       const factors = await loadFactors(item.id);
       if (!factors.length) throw new AppError(`${item.name}: no DESNZ factor. Enter the hotel's own factor per room-night, or choose a nearby country.`);
-      result = calcCombustion({ itemName: item.name, quantity: input.quantity, unit: input.unit, date, region: 'GLOBAL', factors, gwp, units: ref.units });
+      result = calcCombustion({ itemName: item.name, quantity: input.quantity, unit: input.unit, date, region: tripInfo?.region ?? 'GLOBAL', factors, gwp, units: ref.units });
       // The well-to-tank of the travel belongs to the same category (3.6), not to 3.3.
       if (result.totals.wtt) {
         result.totals.scope3 += result.totals.wtt;
@@ -275,6 +282,12 @@ export async function calculate(input: CalcInput, ctx: CalcContext): Promise<{ r
         result.totals.wtt = 0;
         for (const l of result.lines) if (l.basis === 'wtt') l.basis = 'scope3';
       }
+    }
+    if (tripInfo?.meeting) {
+      const m = tripInfo.meeting;
+      result.totals.scope3 += m.kg;
+      result.lines.push({ basis: 'scope3', gas: 'CO2e', kgGas: null, kgCo2e: m.kg, factorId: m.factorId, method: 'published' } as (typeof result.lines)[number]);
+      result.steps.push(m.step);
     }
     if (tripInfo) result.steps.unshift(...tripInfo.steps);
     if (tripInfo?.warnings.length) result.warnings.push(...tripInfo.warnings);
@@ -547,8 +560,7 @@ async function wasteCalc(input: CalcInput, item: ItemRow, ctx: CalcContext, gwp:
 const fmtN = (x: number) => Number(x.toPrecision(6)).toLocaleString('en', { maximumFractionDigits: 3 });
 
 // ------------------------------------------------------------------ business travel --
-const DEFAULT_KM: Record<string, number> = { domestic: 450, short: 1500, long: 6500, intl: 3000 };
-const HAUL_NAME: Record<string, string> = { domestic: 'domestic', short: 'short-haul (to/from UK)', long: 'long-haul (to/from UK)', intl: 'international' };
+const HAUL_NAME: Record<string, string> = { domestic: 'domestic', short: 'short-haul', long: 'long-haul', intl: 'international (average)' };
 /** DESNZ gives every class only for long-haul and international; short-haul has economy and business; domestic the average. */
 function classFor(haul: string, cls: string) {
   if (haul === 'domestic') return 'average';
@@ -560,13 +572,25 @@ function classFor(haul: string, cls: string) {
  * Works out a trip's quantity (passenger-km, room-nights, km) and, for a flight, its DESNZ item.
  * Sets input.itemId / quantity / unit; returns the explanation for the steps and what to keep.
  */
-export async function resolveTrip(input: CalcInput): Promise<{ steps: string[]; warnings: string[]; stored: Record<string, unknown> }> {
+type TripInfo = { steps: string[]; warnings: string[]; stored: Record<string, unknown>; region?: string; meeting?: { kg: number; factorId: number; step: string } };
+/** The library factor (scope3) of an item for a country, or GLOBAL, valid at the date (or the latest before it). */
+async function libFactor(code: string, iso: string | null, date: string) {
+  const [f] = await query<{ id: number; item_id: number; co2e: number; region: string; year: number; source: string }>(
+    `SELECT f.id, f.item_id, f.co2e::float8 AS co2e, f.region, extract(year FROM f.valid_from)::int AS year, s.code AS source
+       FROM factor f JOIN item i ON i.id = f.item_id JOIN factor_source s ON s.id = f.source_id
+      WHERE i.code = $1 AND i.active AND f.status = 'active' AND f.basis = 'scope3' AND f.co2e IS NOT NULL AND f.valid_from <= $3
+        AND f.region IN ($2, 'GLOBAL')
+      ORDER BY (f.region = $2) DESC, f.valid_from DESC LIMIT 1`, [code, iso ?? 'GLOBAL', date]);
+  return f ?? null;
+}
+
+export async function resolveTrip(input: CalcInput): Promise<TripInfo> {
   const t = input.trip!;
   const steps: string[] = [], warnings: string[] = [];
   const trips = t.trips ?? 1, legs = t.ret ? 2 : 1;
   const times = `${t.ret ? ' × 2 (return)' : ''}${trips !== 1 ? ` × ${fmtN(trips)} trips` : ''}`;
   if (t.kind === 'flight') {
-    const { airport, greatCircleKm, haulOf, UPLIFT } = await import('../lib/airports.js');
+    const { airport, greatCircleKm, haulOf, UPLIFT, TYPICAL_KM } = await import('../lib/airports.js');
     let km = t.km, haul = t.haul;
     const stored: Record<string, unknown> = {};
     if (t.from && t.to) {
@@ -577,12 +601,14 @@ export async function resolveTrip(input: CalcInput): Promise<{ steps: string[]; 
       const gc = greatCircleKm(a, b);
       km = gc * UPLIFT;
       haul = haulOf(a, b, gc);
+      if (t.leg && t.route) steps.push(`Connecting flight ${t.route.split('-').join(' → ')}: leg ${t.leg.replace('/', ' of ')}, each leg with its own distance and type`);
       steps.push(`${a.iata} ${a.city || a.name} → ${b.iata} ${b.city || b.name}: great-circle ${fmtN(gc)} km + 8% (DESNZ) = ${fmtN(km)} km, ${HAUL_NAME[haul]}`);
       Object.assign(stored, { from: a.iata, to: b.iata, fromCountry: a.country, toCountry: b.country, gcKm: Math.round(gc), km: Math.round(km), haul });
     } else {
       if (!haul) throw new AppError('Enter the airports, or choose the flight type');
-      if (!km) { km = DEFAULT_KM[haul]!; warnings.push(`Typical ${HAUL_NAME[haul]} distance of ${fmtN(km)} km used: enter the airports or the distance for a better figure.`); }
-      { const hn = HAUL_NAME[haul] ?? haul; steps.push(`${hn.charAt(0).toUpperCase()}${hn.slice(1)} flight, ${fmtN(km)} km one way`); }
+      const hn = HAUL_NAME[haul] ?? haul, Hn = `${hn.charAt(0).toUpperCase()}${hn.slice(1)}`;
+      if (!km) { km = TYPICAL_KM[haul]!; steps.push(`${Hn} flight: typical distance ${fmtN(km)} km one way (enter the airports for the actual distance)`); }
+      else steps.push(`${Hn} flight, ${fmtN(km)} km one way`);
       Object.assign(stored, { km: Math.round(km), haul });
     }
     const rf = t.rf ?? true;
@@ -597,11 +623,32 @@ export async function resolveTrip(input: CalcInput): Promise<{ steps: string[]; 
     return { steps, warnings, stored: { ...stored, cls, rf } };
   }
   if (t.kind === 'hotel') {
-    const rooms = t.rooms ?? 1, nights = t.nights;
-    if (!nights) throw new AppError('Enter the nights');
+    const rooms = t.rooms ?? 1, nights = t.nights ?? 0, meet = t.meetingSqm && t.meetingHours ? t.meetingSqm * t.meetingHours * trips : 0;
+    if (!nights && !meet) throw new AppError('Enter the nights, or the meeting space and hours');
+    if (!input.itemId) throw new AppError('Choose the country of the hotel');
+    const [h] = await query<{ iso: string | null; country: string | null }>(`SELECT attrs->>'iso' AS iso, attrs->>'country' AS country FROM item WHERE id = $1`, [input.itemId]);
+    const iso = h?.iso ?? null, where = h?.country ?? 'the country';
+    const info: TripInfo = { steps, warnings, stored: { countryItem: input.itemId } };
     input.unit = 'room_night'; input.quantity = rooms * nights * trips;
-    steps.push(`${fmtN(rooms)} room${rooms === 1 ? '' : 's'} × ${fmtN(nights)} night${nights === 1 ? '' : 's'}${trips !== 1 ? ` × ${fmtN(trips)} stays` : ''} = ${fmtN(input.quantity)} room-nights`);
-    return { steps, warnings, stored: {} };
+    if (nights) steps.push(`${fmtN(rooms)} room${rooms === 1 ? '' : 's'} × ${fmtN(nights)} night${nights === 1 ? '' : 's'}${trips !== 1 ? ` × ${fmtN(trips)} stays` : ''} = ${fmtN(input.quantity)} room-nights`);
+    if (t.stars) {
+      const f = await libFactor(`bt:hotel:class:${t.stars}`, iso, input.periodStart);
+      if (f) {
+        input.itemId = f.item_id; info.region = f.region;
+        steps.push(`${t.stars}-star hotel factor from the factor library (${f.source}, ${f.region === 'GLOBAL' ? 'all countries' : where}) used instead of the country average`);
+      } else if (nights) {
+        warnings.push(`No ${t.stars}-star hotel factor in the factor library yet: the DESNZ average for ${where} is used.`);
+      }
+      info.stored.stars = t.stars;
+    }
+    if (meet) {
+      const f = await libFactor('bt:meeting:space', iso, input.periodStart);
+      const area = `${fmtN(t.meetingSqm!)} m² × ${fmtN(t.meetingHours!)} h${trips !== 1 ? ` × ${fmtN(trips)}` : ''} = ${fmtN(meet)} m²-hours`;
+      if (f) info.meeting = { kg: meet * f.co2e, factorId: f.id, step: `Meeting space: ${area} × ${f.co2e} kg CO₂e (${f.source}${f.region === 'GLOBAL' ? '' : `, ${where}`}) = ${fmtN(meet * f.co2e)} kg CO₂e` };
+      else { steps.push(`Meeting space: ${area}`); warnings.push('Meeting space not counted: no meeting-space factor in the factor library yet.'); }
+      Object.assign(info.stored, { meetingSqm: t.meetingSqm, meetingHours: t.meetingHours, meetingSqmH: meet });
+    }
+    return info;
   }
   // ground: one-way km × legs × trips
   if (t.km !== undefined) {

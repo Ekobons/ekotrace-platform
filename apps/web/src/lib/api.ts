@@ -202,7 +202,8 @@ export interface SurveyRead {
 
 // ------------------------------------------------------------- business travel --
 export interface TripOptions {
-  rf: boolean; classes: { key: string; label: string }[]; hauls: { key: string; label: string }[]; typicalKm: Record<string, number>; uplift: number; shortHaulMaxKm: number; country: string;
+  rf: boolean; classes: { key: string; label: string }[]; hauls: { key: string; label: string; hint: string }[]; typicalKm: Record<string, number>;
+  airKg: Record<string, number>; hotelClasses: { stars: number; label: string; regions: string[] }[]; meetingRegions: string[]; uplift: number; shortHaulMaxKm: number; country: string;
   hotels: { itemId: number; country: string; iso: string | null; co2e: number | null; factorYear: number | null }[];
   ground: { itemId: number; code: string; name: string; group: string; sub: string; unit: string; note: string | null }[];
 }

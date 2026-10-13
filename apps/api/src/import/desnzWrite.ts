@@ -418,15 +418,15 @@ export function travelItem(mode: TravelMode, vehicle: string, variant: string) {
     note: mode === 'motorbike' ? 'Per vehicle-km.' : 'Per passenger-km.' };
 }
 
-const AIR_HAUL_NAME: Record<string, string> = { domestic: 'domestic', short: 'short-haul, to/from UK', long: 'long-haul, to/from UK', intl: 'international' };
-const AIR_HAUL_SORT: Record<string, number> = { intl: 0, domestic: 1, short: 2, long: 3 };
+const AIR_HAUL_NAME: Record<string, string> = { domestic: 'Domestic', short: 'Short-haul (under 3,700 km)', long: 'Long-haul (3,700 km or more)', intl: 'International (average)' };
+const AIR_HAUL_SORT: Record<string, number> = { domestic: 0, short: 1, long: 2, intl: 3 };
 const AIR_CLASS_NAME: Record<string, string> = { average: 'average passenger', economy: 'economy', premium: 'premium economy', business: 'business class', first: 'first class' };
 const AIR_CLASS_SORT: Record<string, number> = { economy: 0, premium: 1, business: 2, first: 3, average: 4 };
 const AIR_HAUL_NOTE: Record<string, string> = {
-  domestic: 'Flights within one country. Per passenger-km.',
-  short: 'Flights to or from the UK under 3,700 km. Per passenger-km.',
-  long: 'Flights to or from the UK of 3,700 km or more. Per passenger-km.',
-  intl: 'Flights between two countries, not to or from the UK (DESNZ "International, to/from non-UK"). Per passenger-km.',
+  domestic: 'Flights within one country. DESNZ domestic factor. Per passenger-km.',
+  short: 'Flights under 3,700 km between two countries. DESNZ short-haul factor (published for flights to/from the UK). Per passenger-km.',
+  long: 'Flights of 3,700 km or more between two countries. DESNZ long-haul factor (published for flights to/from the UK). Per passenger-km.',
+  intl: 'Average of international flights, when the distance is not known (DESNZ "International, to/from non-UK"). Per passenger-km.',
 };
 /** DESNZ hotel-stay country names → ISO codes (to suggest the country of a trip). */
 const HOTEL_ISO: Record<string, string> = {

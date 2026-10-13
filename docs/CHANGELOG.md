@@ -2,6 +2,16 @@
 
 Newest first.
 
+## 2026-10-13 · Business travel: flight types, connecting flights, hotel type and meeting space; factor library
+
+- **Flights by type** — no distance to type. Types renamed **Domestic**, **Short-haul** (under 3,700 km), **Long-haul** (3,700 km or more) and **International** (average, when not sure), each with examples and the kg CO₂e per person one way; a typical one-way distance per type (450 / 1,500 / 6,500 / 3,000 km) is used and shown in the calculation steps.
+- Flights from airports are typed by distance for every country pair (DXB–RUH is now short-haul, DXB–SIN long-haul) rather than "international" for anything not touching the UK. Saved entries are unchanged.
+- **Connecting flights**: "+ via" adds up to two connecting airports; each leg gets its own distance and type and is saved as its own entry (note "DXB-DOH-LHR leg 1/2").
+- Clearer switch between "From / to airports" and "Flight type" (filled, coloured active state).
+- **Hotel stays**: hotel type (2- to 5-star, or not known) and **meeting space** (m² and hours); the hotel's own-factor box is removed.
+- **Factor library**: flight items renamed to the new types with notes; new items for 2-, 3-, 4- and 5-star hotels (per room-night) and meeting / event space (per m²-hour, new unit), for CHSB / HCMI factors by country or for all countries. Until a factor is added, the stay uses the DESNZ country average and the meeting space is not counted (the entry says so). DESNZ 2026 air, hotel, land and sea factors are already loaded (DESNZ carried its 2025 air factors into 2026).
+- **Other transport**: when no transport factors are loaded, the screen now says so and how to load them (migrate + seed) instead of an empty list.
+
 ## 2026-10-13 · Reports (as in the prototype); filters in Approvals
 
 - New **Reports** page (menu → Disclose) for the selection and period viewed, location- or market-based Scope 2, **Download report** and **Print / PDF**.

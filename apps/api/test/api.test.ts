@@ -1512,7 +1512,7 @@ test('Enter → Review → Approved: drafts submitted, approved by someone else 
   assert.ok(['activity.submit', 'activity.approve', 'activity.return'].every((x) => audits.includes(x)), JSON.stringify(audits));
 });
 
-test('business travel: flights from airports (great-circle + 8%, haul, class, return, trips, RF as the company chose), by flight type, hotel stays by country, rail; spend lines still go to 3.6', async () => {
+test('business travel: flights from airports (great-circle + 8%, type by distance, class, return, trips, RF as the company chose), connecting legs, by flight type (typical distance), hotel stays by country, star rating and meeting space from the library, rail; spend lines still go to 3.6', async () => {
   const p = { facilityId: facA, periodStart: '2026-03-01', periodEnd: '2026-03-31' };
   const f = (code: string) => pq(`SELECT f.basis, f.co2e::float8 AS v FROM factor f JOIN item i ON i.id = f.item_id JOIN factor_source s ON s.id = f.source_id WHERE i.code = $1 AND s.code = 'DESNZ-2026' AND f.status = 'active'`, [code]).then((r) => r.rows as { basis: string; v: number }[]);
   const sum = (rows: { v: number }[]) => rows.reduce((a, r) => a + r.v, 0);
@@ -1534,10 +1534,16 @@ test('business travel: flights from airports (great-circle + 8%, haul, class, re
   assert.ok(Math.abs(rows[0].q - gc * 1.08 * 2 * 2) < 0.01, `${rows[0].q} vs ${gc * 1.08 * 4}`);
   assert.ok(Math.abs(rows[0].s3 - rows[0].q * sum(await f('bt:air:long:economy:rf'))) < 1e-3, 'Scope 3 incl. well-to-tank, with RF');
   assert.equal(rows[0].wtt, 0); assert.equal(rows[0].inputs.trip.haul, 'long'); assert.equal(rows[0].inputs.trip.from, 'DXB');
-  assert.equal(rows[1].code, 'bt:air:intl:business:rf', 'DXB–RUH: not the UK → international');
+  assert.equal(rows[1].code, 'bt:air:short:business:rf', 'DXB–RUH: two countries, under 3,700 km → short-haul');
   assert.equal(rows[2].code, 'bt:air:domestic:average:rf', 'AUH–DXB: one country → domestic, average (DESNZ has no first class for domestic)');
   assert.equal(rows[3].code, 'bt:air:intl:premium:rf'); assert.equal(rows[3].q, 3000, 'typical distance when only the type is known');
-  assert.ok(fl.body.results[3].warnings.some((w: string) => /Typical international distance/.test(w)));
+  assert.ok(!fl.body.results[3].warnings.length, 'a typical distance is not a warning');
+  const typ = await api('POST', '/api/calculate', { ...p, unit: 'pkm', trip: { kind: 'flight', haul: 'long', cls: 'economy' } }, tenantA);
+  assert.match(typ.body.steps.join(' '), /Long-haul flight: typical distance 6,500 km/);
+  // a leg of a connecting flight says so
+  const leg = await api('POST', '/api/calculate', { ...p, unit: 'pkm', trip: { kind: 'flight', from: 'DOH', to: 'LHR', cls: 'economy', leg: '2/2', route: 'DXB-DOH-LHR' } }, tenantA);
+  assert.equal(leg.status, 200, JSON.stringify(leg.body));
+  assert.match(leg.body.steps.join(' '), /Connecting flight DXB → DOH → LHR: leg 2 of 2/);
   // the company chooses without radiative forcing
   await api('PATCH', '/api/tenant', { flightRf: false }, tenantA);
   const norf = await api('POST', '/api/calculate', { ...p, unit: 'pkm', trip: { kind: 'flight', from: 'DXB', to: 'LHR', cls: 'economy' } }, tenantA);
@@ -1552,6 +1558,25 @@ test('business travel: flights from airports (great-circle + 8%, haul, class, re
   ] }, tenantA);
   assert.ok(Math.abs(h.body.results[0].totals.scope3 - 6 * sum(await f('bt:hotel:united-arab-emirates'))) < 1e-6, JSON.stringify(h.body.results[0]));
   assert.equal(h.body.results[1].totals.scope3, 80);
+  // star rating and meeting space: country average and a warning until the library has factors; then the library's
+  const s4 = await api('POST', '/api/calculate', { ...p, itemId: uae, unit: 'room_night', trip: { kind: 'hotel', rooms: 1, nights: 2, stars: 4, meetingSqm: 50, meetingHours: 3 } }, tenantA);
+  assert.equal(s4.status, 200, JSON.stringify(s4.body));
+  assert.ok(Math.abs(s4.body.totals.scope3 - 2 * sum(await f('bt:hotel:united-arab-emirates'))) < 1e-6);
+  assert.ok(s4.body.warnings.some((w: string) => /No 4-star hotel factor/.test(w)) && s4.body.warnings.some((w: string) => /Meeting space not counted/.test(w)));
+  const src = (await pq(`INSERT INTO factor_source (code, publisher, title) VALUES ('TEST-CHSB', 'test', 'test') ON CONFLICT (code) DO UPDATE SET code = EXCLUDED.code RETURNING id`)).rows[0].id;
+  const fac = (await pq(`INSERT INTO factor (item_id, source_id, region, basis, unit, co2e, valid_from, valid_to, version)
+                          SELECT id, $1, $2, 'scope3', $3, $4, '2020-01-01', '2030-12-31', 1 FROM item WHERE code = $5 RETURNING id`, [src, 'AE', 'room_night', 30, 'bt:hotel:class:4'])).rows[0].id;
+  const fm = (await pq(`INSERT INTO factor (item_id, source_id, region, basis, unit, co2e, valid_from, valid_to, version)
+                         SELECT id, $1, 'GLOBAL', 'scope3', 'sqm_hour', 0.1, '2020-01-01', '2030-12-31', 1 FROM item WHERE code = 'bt:meeting:space' RETURNING id`, [src])).rows[0].id;
+  const s4b = await api('POST', '/api/calculate', { ...p, itemId: uae, unit: 'room_night', trip: { kind: 'hotel', rooms: 1, nights: 2, stars: 4, meetingSqm: 50, meetingHours: 3 } }, tenantA);
+  assert.ok(Math.abs(s4b.body.totals.scope3 - (2 * 30 + 150 * 0.1)) < 1e-6, JSON.stringify(s4b.body));
+  assert.match(s4b.body.steps.join(' '), /4-star hotel factor from the factor library/);
+  const meetOnly = await api('POST', '/api/calculate', { ...p, itemId: uae, unit: 'room_night', trip: { kind: 'hotel', meetingSqm: 100, meetingHours: 4 } }, tenantA);
+  assert.ok(Math.abs(meetOnly.body.totals.scope3 - 40) < 1e-6, JSON.stringify(meetOnly.body));
+  const opt4 = (await api('GET', '/api/trips/options?year=2026', undefined, tenantA)).body;
+  assert.deepEqual(opt4.hotelClasses.find((c: { stars: number }) => c.stars === 4).regions, ['AE']); assert.deepEqual(opt4.meetingRegions, ['GLOBAL']);
+  await pq(`DELETE FROM factor WHERE id = ANY($1)`, [[fac, fm]]);
+  assert.equal((await api('POST', '/api/calculate', { ...p, itemId: uae, unit: 'room_night', trip: { kind: 'hotel', rooms: 1 } }, tenantA)).status, 400, 'nights or meeting space needed');
   // rail: 120 km one way, return, 3 trips
   const rail = (await pq(`SELECT id FROM item WHERE code = 'bt:rail:national-rail'`)).rows[0];
   assert.ok(rail, 'national rail item');
@@ -1561,6 +1586,8 @@ test('business travel: flights from airports (great-circle + 8%, haul, class, re
   assert.equal((await api('GET', '/api/trips/airports?q=riyadh', undefined, tenantA)).body.airports[0].iata, 'RUH');
   const opt = (await api('GET', '/api/trips/options?year=2026', undefined, tenantA)).body;
   assert.ok(opt.hotels.some((x: { iso: string; co2e: number }) => x.iso === 'AE' && x.co2e > 0) && opt.ground.length > 5 && opt.rf === true);
+  assert.deepEqual(opt.hauls.map((x: { label: string }) => x.label), ['Domestic', 'Short-haul', 'Long-haul', 'International']);
+  assert.ok(opt.airKg['bt:air:short:economy:rf'] > 0.1 && opt.hotelClasses.length === 4);
   assert.equal((await api('POST', '/api/calculate', { ...p, unit: 'pkm', trip: { kind: 'flight', from: 'XXX', to: 'LHR' } }, tenantA)).status, 400);
 });
 

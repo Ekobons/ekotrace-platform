@@ -58,7 +58,7 @@
 | Approved | Checked by an approver; counts in the dashboards and reports |
 | Radiative forcing (RF) | The extra warming of aircraft emissions released at altitude (contrails, NOx); DESNZ flight factors with RF are about 1.7× those without |
 | Great-circle distance | The shortest distance between two airports over the Earth's surface; DESNZ adds 8% for real routes |
-| Haul | DESNZ flight groups: domestic, short-haul and long-haul (to/from the UK, split at 3,700 km) and international (not to/from the UK) |
+| Flight type (haul) | Domestic (one country), Short-haul (under 3,700 km), Long-haul (3,700 km or more), International (the average, when the distance is not known) — the DESNZ flight factor groups |
 | Room-night | One hotel room for one night; 2 rooms for 3 nights = 6 room-nights |
 | Target path | The straight-line route from base-year emissions to the reduction target in the target year; each month is compared with the same base-year month cut by the share due by then |
 | Due day | Day of the next month by which a month's data should be submitted (Methodology → Collection rules) |
