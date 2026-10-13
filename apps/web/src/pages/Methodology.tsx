@@ -5,7 +5,7 @@
  */
 import { useEffect, useState } from 'react';
 import { useApp } from '../App';
-import { api, tco2e } from '../lib/api';
+import { api, tco2e, type ApprovalsData } from '../lib/api';
 import { Prices } from '../components/Prices';
 
 type Approach = 'operational' | 'financial' | 'equity';
@@ -115,8 +115,44 @@ export function Methodology() {
           <p className="sub">A month’s data is due on this day of the following month. Home shows what is due, overdue and escalated for the categories each facility reports.</p>
         </div>
       </div>
+      <ApprovalLevels edit={edit} />
       <Prices canEdit={['platform_admin', 'super_admin', 'admin'].includes(role)} />
       <div className="note info">Standards: GHG Protocol Corporate Standard; factors DESNZ (UK) 2022–2026 and IPCC 2006 where DESNZ has none; kWh on net calorific value unless entered as gross. Vehicles: DESNZ per km / mile by class and powertrain, or by fuel used; electricity for electric vehicles in Scope 2 (location-based grid factor of the facility's country).</div>
     </div>
   );
+}
+
+/** Approval levels (as in the prototype): level 1 always; level 2 optional, for large entries or chosen categories. */
+function ApprovalLevels({ edit }: { edit: boolean }) {
+  const { toast } = useApp();
+  const [d, setD] = useState<ApprovalsData | null>(null);
+  const [P, setP] = useState<{ l2: boolean; minT: string; cats: string[]; checkPct: string } | null>(null);
+  useEffect(() => { api.approvals().then((x) => { setD(x); setP({ l2: x.settings.l2, minT: String(x.settings.minT), cats: x.settings.cats, checkPct: String(x.settings.checkPct) }); }).catch(() => {}); }, []);
+  if (!d || !P) return null;
+  const groups = [...new Map(d.categories.map((c) => { const g = c.code.startsWith('waste_') ? 'waste' : c.code.startsWith('water_') ? 'water' : c.code; return [g, g === 'waste' ? 'Waste' : g === 'water' ? 'Water' : c.name] as [string, string]; })).entries()];
+  const save = async () => {
+    try { const r = await api.saveApprovalSettings({ l2: P.l2, minT: Math.max(0, Number(P.minT) || 0), cats: P.cats, checkPct: Math.max(1, Math.round(Number(P.checkPct) || 35)) }); setD({ ...d, settings: r }); toast(r.l2 ? `Level 2 for entries of ${r.minT} t or more${r.cats.length ? ` and ${r.cats.length} categories` : ''}` : 'One approval level'); }
+    catch (e) { toast((e as Error).message); }
+  };
+  return (
+    <div className="grid2" style={{ gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', alignItems: 'start' }}>
+      <div className="card" style={{ display: 'grid', gap: 10 }}>
+        <h2>Approval levels</h2>
+        <div className="soft"><b>Level 1 · checker</b><span className="muted" style={{ fontSize: 13 }}>The facility manager (or sub-group admin, or the super admin) approves or sends back each entry. Nobody approves their own entry.</span></div>
+        <label className="row" style={{ gap: 8, fontSize: 13.5 }}><input type="checkbox" disabled={!edit} checked={P.l2} onChange={(e) => setP({ ...P, l2: e.target.checked })} /> <b>Add a level-2 approval</b> by a sub-group admin or the super admin (a different person from level 1)</label>
+        <div style={{ opacity: P.l2 ? 1 : 0.5, display: 'grid', gap: 8 }}>
+          <label className="field" style={{ width: 220 }}><span>For entries of at least (tCO₂e)</span><input className="input num" inputMode="decimal" disabled={!edit} value={P.minT} onChange={(e) => setP({ ...P, minT: e.target.value })} /></label>
+          <div><span className="lbl">…or always for these categories</span>
+            <div className="row" style={{ gap: 6, marginTop: 6, flexWrap: 'wrap' }}>{groups.map(([code, name]) => { const on = P.cats.includes(code); return (
+              <label key={code} className={`chip ${on ? 'c-info' : 'c-n'}`} style={{ cursor: edit ? 'pointer' : 'default' }}><input type="checkbox" disabled={!edit} checked={on} style={{ marginRight: 4 }} onChange={() => setP({ ...P, cats: on ? P.cats.filter((x) => x !== code) : [...P.cats, code] })} />{name}</label>); })}</div></div>
+        </div>
+        {edit && <div><button className="btn p" onClick={() => void save()}>Save</button></div>}
+      </div>
+      <div className="card" style={{ display: 'grid', gap: 10, alignContent: 'start' }}>
+        <h2>Quantity check</h2>
+        <label className="field" style={{ width: 220 }}><span>Flag entries more than ± % from usual</span><input className="input num" inputMode="numeric" disabled={!edit} value={P.checkPct} onChange={(e) => setP({ ...P, checkPct: e.target.value })} /></label>
+        <p className="sub">Each entry waiting for approval is compared with the same item at the same facility over the 6 months before. Entries outside the limit are flagged in Approvals and on Home, and are left out of “Approve all without warnings”.</p>
+        {edit && <div><button className="btn" onClick={() => void save()}>Save</button></div>}
+      </div>
+    </div>);
 }

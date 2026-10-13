@@ -259,7 +259,7 @@ function Decisions({ x, h, n = 6 }: { x: H; h: HomeData; n?: number }) {
   const { role } = useApp();
   const out: Dec[] = [];
   const now = Date.now();
-  if (h.approvals.length) { const old = Math.max(0, ...h.approvals.map((a) => (a.at ? (now - new Date(a.at).getTime()) / dayMs : 0))); out.push(['c-warn', 'Approve', `${h.approvals.length} entr${h.approvals.length > 1 ? 'ies' : 'y'} waiting for you`, `oldest ${Math.floor(old)} days · ${h.approvals.filter((a) => a.warn).length} with warnings`, `${catLink(h.approvals[0]!.cat)}?stage=review&facility=${h.approvals[0]!.f}`, 'Review']); }
+  if (h.approvals.length) { const old = Math.max(0, ...h.approvals.map((a) => (a.at ? (now - new Date(a.at).getTime()) / dayMs : 0))); out.push(['c-warn', 'Approve', `${h.approvals.length} entr${h.approvals.length > 1 ? 'ies' : 'y'} waiting for you`, `oldest ${Math.floor(old)} days · ${h.approvals.filter((a) => a.warn).length} with warnings`, '/approvals', 'Review']); }
   if (x.cyc.esc) out.push(['c-bad', 'Escalated', `${x.cyc.esc} submission${x.cyc.esc > 1 ? 's' : ''} badly overdue`, `more than ${h.settings.escalateDays} days past the due date`, '/data/stationary_combustion', 'Chase']);
   if (x.cyc.overdue) out.push(['c-bad', 'Overdue', `${x.cyc.overdue} submission${x.cyc.overdue > 1 ? 's' : ''} past due`, `due on day ${h.settings.dueDay} of the next month`, '/data/stationary_combustion', 'Open']);
   if (h.batches.failed && role !== 'preparer') out.push(['c-bad', 'Integration', `${h.batches.failed} purchase file${h.batches.failed > 1 ? 's' : ''} failed`, 'read or calculation stopped', '/purchases', 'Retry']);
@@ -345,7 +345,7 @@ function HomeManager({ x, h, d, c, reload, pick }: { x: H; h: HomeData; d: Data;
       <Tile lbl="Overdue at your sites" v={x.cyc.overdue + x.cyc.esc} sub={x.cyc.esc ? `${x.cyc.esc} already escalated` : 'past the due date'} col={x.cyc.overdue + x.cyc.esc ? 'var(--bad)' : 'var(--ok)'} />
     </div>
     <div className="hgrid">
-      <section className="card hcard2"><div className="row"><h2>Approval queue</h2><span className={`chip ${ap.length ? 'c-warn' : 'c-ok'}`}>{ap.length}</span><span className="grow" />{clean.length > 0 && <button className="btn sm p" onClick={() => void act(clean.map((a) => a.id))}>Approve {clean.length} clean</button>}</div>
+      <section className="card hcard2"><div className="row"><h2>Approval queue</h2><span className={`chip ${ap.length ? 'c-warn' : 'c-ok'}`}>{ap.length}</span><span className="grow" /><Link className="btn sm ghost" to="/approvals">All approvals →</Link>{clean.length > 0 && <button className="btn sm p" onClick={() => void act(clean.map((a) => a.id))}>Approve {clean.length} clean</button>}</div>
         {ap.length ? ap.slice(0, 6).map((a) => (
           <div key={a.id} className="hitem"><span style={{ flex: 1, minWidth: 0 }}><b>{CAT_NAME[a.cat] ?? a.category} · {MN[Number(a.month.slice(5, 7)) - 1]} {a.month.slice(0, 4)}</b>
             <small>{a.facility} · {fmt(a.qty, 0)} {a.unit} · {fmt(a.kg / 1000, 1)} t · by {a.by ?? '—'}</small>{a.warn && <small style={{ color: 'var(--warn)' }}>! {a.warn}</small>}</span>

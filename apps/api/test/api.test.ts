@@ -1635,3 +1635,41 @@ test('targets & actions: SBTi structure and templates, objectives, scenarios (co
   assert.equal(b.actions.length, 0); assert.equal(b.objectives.length, 0);
   assert.equal((await api('PATCH', `/api/actions/${a2.body.id}`, { owner: 'x' }, tenantB)).status, 404);
 });
+
+test('approvals: waiting for me vs someone else, 6-month check; level 2 for large entries by an admin or the super admin, never the level-1 person', async () => {
+  const sa = await login(superA.email, superA.temporaryPassword);
+  const mgr = await login('rmgr@a.test', 'a long enough pass'), prep = await login('rprep@a.test', 'a long enough pass');
+  const fac = (await call(sa, 'GET', '/api/org')).body.nodes.find((n: { name: string }) => n.name === 'Review depot').id;
+  const id = await diesel();
+  const e = (m: string, q: number) => ({ facilityId: fac, itemId: id, quantity: q, unit: 'L', periodStart: `2024-${m}-01`, periodEnd: `2024-${m}-28` });
+  // history: approved months, then a month far above the usual
+  const hist = [] as string[];
+  for (const m of ['01', '02', '03']) hist.push((await call(prep, 'POST', '/api/activities', e(m, 1000))).body.id);
+  await call(prep, 'POST', '/api/activities/review', { ids: hist, action: 'submit' });
+  assert.equal((await call(mgr, 'POST', '/api/activities/review', { ids: hist, action: 'approve' })).body.done, 3);
+  const big = (await call(prep, 'POST', '/api/activities', e('04', 3000))).body.id, ok = (await call(prep, 'POST', '/api/activities', e('05', 1050))).body.id;
+  await call(prep, 'POST', '/api/activities/review', { ids: [big, ok], action: 'submit' });
+  const ap = (await call(mgr, 'GET', '/api/approvals')).body;
+  const b = ap.mine.find((x: { id: string }) => x.id === big), o = ap.mine.find((x: { id: string }) => x.id === ok);
+  assert.ok(b && o, JSON.stringify(ap.mine.map((x: { id: string }) => x.id)));
+  assert.equal(b.check.ok, false); assert.match(b.check.txt, /\+200% vs 6-month average/); assert.equal(o.check.ok, true);
+  assert.ok((await call(prep, 'GET', '/api/approvals')).body.others.some((x: { id: string; waitingFor: string }) => x.id === big && x.waitingFor === 'rmgr@a.test'));
+  // level 2 for every entry from 0 t: the manager's approval moves it to level 2
+  assert.equal((await call(mgr, 'PUT', '/api/approvals/settings', { l2: true, minT: 0, cats: [], checkPct: 35 })).status, 403);
+  assert.equal((await call(sa, 'PUT', '/api/approvals/settings', { l2: true, minT: 0, cats: [], checkPct: 35 })).status, 200);
+  const r1 = (await call(mgr, 'POST', '/api/activities/review', { ids: [big], action: 'approve' })).body;
+  assert.equal(r1.toLevel2, 1);
+  const l2 = (await call(sa, 'GET', '/api/approvals')).body.mine.find((x: { id: string }) => x.id === big);
+  assert.equal(l2.stage, 'L2'); assert.equal(l2.l1, 'rmgr@a.test');
+  assert.equal((await call(mgr, 'POST', '/api/activities/review', { ids: [big], action: 'approve' })).body.skipped[0].reason, 'level 2 is approved by an admin or the super admin');
+  assert.equal((await call(sa, 'POST', '/api/activities/review', { ids: [big], action: 'approve' })).body.done, 1);
+  // the super admin as level 1 cannot also be level 2
+  assert.equal((await call(sa, 'POST', '/api/activities/review', { ids: [ok], action: 'approve' })).body.toLevel2, 1);
+  assert.equal((await call(sa, 'POST', '/api/activities/review', { ids: [ok], action: 'approve' })).body.skipped[0].reason, 'level 2 is approved by someone other than level 1');
+  // sent back: back to level 1 when resubmitted
+  await call(sa, 'POST', '/api/activities/review', { ids: [ok], action: 'return', note: 'check' });
+  await call(prep, 'POST', '/api/activities/review', { ids: [ok], action: 'submit' });
+  assert.equal((await call(mgr, 'GET', '/api/approvals')).body.mine.find((x: { id: string }) => x.id === ok).stage, null);
+  await call(sa, 'PUT', '/api/approvals/settings', { l2: false, minT: 100, cats: [], checkPct: 35 });
+  assert.equal((await call(mgr, 'POST', '/api/activities/review', { ids: [ok], action: 'approve' })).body.done, 1);
+});

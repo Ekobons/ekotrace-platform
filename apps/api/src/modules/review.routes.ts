@@ -20,6 +20,7 @@ import { tenantTx } from '../db/pool.js';
 import { audit, requireTenant } from '../lib/auth.js';
 import { assertCan, scopeOf } from '../lib/access.js';
 import { AppError, notFound } from '../lib/errors.js';
+import { approvalSettings, needsL2 } from './approvals.routes.js';
 
 const ymd = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 
@@ -91,8 +92,10 @@ export async function reviewRoutes(app: FastifyInstance) {
     return tenantTx(tenant, async (c) => {
       const s = await scopeOf(c, req.user);
       const me = String(req.user.id);
-      const rows = (await c.query('SELECT id, facility_id, status, created_by, submitted_by FROM activity WHERE id = ANY($1) FOR UPDATE', [b.ids])).rows;
-      const done: string[] = [], skipped: { id: string; reason: string }[] = [];
+      const rows = (await c.query(`SELECT a.id, a.facility_id, a.status, a.created_by, a.submitted_by, a.approval_stage, a.l1_by, cat.code AS cat, (a.co2e_direct + a.co2e_scope2 + a.co2e_scope3)::float8 AS kg
+                                     FROM activity a JOIN category cat ON cat.id = a.category_id WHERE a.id = ANY($1) FOR UPDATE OF a`, [b.ids])).rows;
+      const done: string[] = [], skipped: { id: string; reason: string }[] = [], toL2: string[] = [];
+      const set = await approvalSettings(c, tenant), canL2 = ['super_admin', 'admin', 'platform_admin'].includes(req.user.role);
       // A company whose only user (verifiers aside) is its super admin approves its own entries: marked self-reviewed.
       const solo = req.user.role === 'super_admin' && Number((await c.query(`SELECT count(*)::int AS n FROM app_user WHERE NOT disabled AND role <> 'verifier'`)).rows[0].n) === 1;
       for (const a of rows) {
@@ -102,27 +105,34 @@ export async function reviewRoutes(app: FastifyInstance) {
         else if (b.action === 'submit') {
           if (!s.enter.has(a.facility_id)) why = 'you cannot enter data for this facility';
           else if (a.status !== 'draft' && a.status !== 'rejected') why = `already ${a.status === 'approved' ? 'approved' : 'waiting for approval'}`;
-          else sql = `UPDATE activity SET status = 'submitted', submitted_at = now(), submitted_by = $2, updated_at = now() WHERE id = $1`;
+          else sql = `UPDATE activity SET status = 'submitted', submitted_at = now(), submitted_by = $2, approval_stage = NULL, l1_by = NULL, l1_at = NULL, updated_at = now() WHERE id = $1`;
         } else if (b.action === 'withdraw') {
           if (a.status !== 'submitted') why = 'not waiting for approval';
           else if (a.submitted_by !== me && !s.enter.has(a.facility_id)) why = 'only the person who submitted it';
-          else sql = `UPDATE activity SET status = 'draft', submitted_at = NULL, submitted_by = NULL, updated_at = now() WHERE id = $1`;
+          else sql = `UPDATE activity SET status = 'draft', submitted_at = NULL, submitted_by = NULL, approval_stage = NULL, l1_by = NULL, l1_at = NULL, updated_at = now() WHERE id = $1`;
         } else {
           if (!s.approve.has(a.facility_id)) why = 'you cannot approve data for this facility';
           else if (mine && !solo) why = 'nobody approves their own entry';
           else if (b.action === 'approve' && a.status !== 'submitted') why = a.status === 'approved' ? 'already approved' : 'not submitted yet';
           else if (b.action === 'return' && a.status !== 'submitted' && a.status !== 'approved') why = 'not submitted';
-          else sql = b.action === 'approve'
+          else if (a.approval_stage === 'L2' && b.action === 'approve' && !canL2) why = 'level 2 is approved by an admin or the super admin';
+          else if (a.approval_stage === 'L2' && b.action === 'approve' && a.l1_by === me) why = 'level 2 is approved by someone other than level 1';
+          else if (b.action === 'approve' && !a.approval_stage && needsL2(set, Number(a.kg), a.cat) && !solo) {
+            // level 1 done: on to level 2
+            sql = `UPDATE activity SET approval_stage = 'L2', l1_by = $2, l1_at = now(), updated_at = now() WHERE id = $1`; toL2.push(a.id);
+          } else sql = b.action === 'approve'
             ? `UPDATE activity SET status = 'approved', reviewed_at = now(), reviewed_by = $2, review_note = NULL, self_reviewed = ${mine ? 'true' : 'false'}, updated_at = now() WHERE id = $1`
-            : `UPDATE activity SET status = 'rejected', reviewed_at = now(), reviewed_by = $2, review_note = $3, updated_at = now() WHERE id = $1`;
+            : `UPDATE activity SET status = 'rejected', reviewed_at = now(), reviewed_by = $2, review_note = $3, approval_stage = NULL, l1_by = NULL, l1_at = NULL, updated_at = now() WHERE id = $1`;
         }
         if (why) { skipped.push({ id: a.id, reason: why }); continue; }
         await c.query(sql, b.action === 'return' ? [a.id, me, b.note] : sql.includes('$2') ? [a.id, me] : [a.id]);
         done.push(a.id);
       }
       for (const id of b.ids) if (!rows.some((r) => r.id === id)) skipped.push({ id, reason: 'not found' });
-      if (done.length) await audit(c, req, `activity.${b.action}`, 'activity', done.length === 1 ? done[0] : null, { ids: done, note: b.note ?? undefined });
-      return { done: done.length, skipped };
+      const final = done.filter((id) => !toL2.includes(id));
+      if (final.length) await audit(c, req, `activity.${b.action}`, 'activity', final.length === 1 ? final[0] : null, { ids: final, note: b.note ?? undefined });
+      if (toL2.length) await audit(c, req, 'activity.approve_l1', 'activity', toL2.length === 1 ? toL2[0] : null, { ids: toL2 });
+      return { done: done.length, skipped, toLevel2: toL2.length };
     });
   });
 

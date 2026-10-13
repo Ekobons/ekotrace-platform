@@ -18,6 +18,7 @@ import { tenantTx } from '../db/pool.js';
 import { audit, requireRole, requireTenant } from '../lib/auth.js';
 import { scopeOf, subtreeFacilities } from '../lib/access.js';
 import { AppError } from '../lib/errors.js';
+import { USUAL_SQL, approvalSettings, checkOf } from './approvals.routes.js';
 
 export const KPI_IDS = ['tot', 's12', 's3', 'pemp', 'pm2', 'elec', 'ren', 'eui', 'cool', 'water', 'wemp', 'waste', 'div', 'fuel', 'fleet', 'travel', 'purch', 'supsp', 'refr'] as const;
 
@@ -42,33 +43,34 @@ export async function homeRoutes(app: FastifyInstance) {
            FROM org_node f LEFT JOIN org_node p ON p.id = f.parent_id LEFT JOIN app_user u ON u.id = f.manager_user_id
           WHERE f.id = ANY($1) AND f.kind = 'facility' AND f.active ORDER BY f.name`, [facs])).rows;
       // categories each facility reports (data this year or last); monthly categories only (not purchases or the commuting year)
+      // an entry covering several months (a landfill model for Jan–Sep) counts in each month it covers, up to a year
+      const MON = `generate_series(date_trunc('month', a.period_start), date_trunc('month', a.period_end), interval '1 month') AS mo(d)`;
       const usual = (await c.query(
         `SELECT DISTINCT a.facility_id AS f, CASE WHEN cat.code LIKE 'waste_%' THEN 'waste' WHEN cat.code LIKE 'water_%' THEN 'water' ELSE cat.code END AS cat
            FROM activity a JOIN category cat ON cat.id = a.category_id
-          WHERE a.facility_id = ANY($1) AND extract(year FROM a.period_start) IN ($2::int, $2::int - 1) AND a.period_end - a.period_start < 40
+          WHERE a.facility_id = ANY($1) AND extract(year FROM a.period_start) IN ($2::int, $2::int - 1) AND a.period_end - a.period_start < 366
             AND cat.calc_method NOT IN ('spend', 'travel') AND a.purchase_batch_id IS NULL`, [facs, year])).rows;
       const cells = (await c.query(
         `SELECT a.facility_id AS f, CASE WHEN cat.code LIKE 'waste_%' THEN 'waste' WHEN cat.code LIKE 'water_%' THEN 'water' ELSE cat.code END AS cat,
-                extract(month FROM a.period_start)::int AS m,
+                extract(month FROM mo.d)::int AS m,
                 count(*) FILTER (WHERE a.status = 'draft')::int AS draft, count(*) FILTER (WHERE a.status = 'submitted')::int AS submitted,
                 count(*) FILTER (WHERE a.status = 'approved')::int AS approved, count(*) FILTER (WHERE a.status = 'rejected')::int AS rejected,
                 min(coalesce(a.submitted_at, CASE WHEN a.status = 'approved' THEN a.created_at END)) AS sub
-           FROM activity a JOIN category cat ON cat.id = a.category_id
-          WHERE a.facility_id = ANY($1) AND extract(year FROM a.period_start) = $2 AND a.period_end - a.period_start < 40 GROUP BY 1, 2, 3`, [facs, year])).rows;
+           FROM activity a JOIN category cat ON cat.id = a.category_id CROSS JOIN LATERAL ${MON}
+          WHERE a.facility_id = ANY($1) AND extract(year FROM mo.d) = $2 AND a.period_end - a.period_start < 366 GROUP BY 1, 2, 3`, [facs, year])).rows;
       // waiting for my approval: facilities I may approve, not entered or submitted by me (a one-user company approves its own)
       const users = Number((await c.query(`SELECT count(*)::int AS n FROM app_user WHERE NOT disabled AND role <> 'verifier'`)).rows[0].n);
       const solo = users === 1 && req.user.role === 'super_admin';
       const apprFacs = facs.filter((f) => s.approve.has(f));
+      const set = await approvalSettings(c, tenant), canL2 = ['super_admin', 'admin', 'platform_admin'].includes(req.user.role);
       const approvals = (await c.query(
         `SELECT a.id, a.facility_id AS f, fo.name AS facility, cat.code AS cat, cat.name AS category, i.name AS item, a.period_start::text AS month, a.quantity::float8 AS qty, a.unit,
-                (a.co2e_direct + a.co2e_scope2 + a.co2e_scope3)::float8 AS kg, ue.name AS by, a.submitted_at AS at,
-                (SELECT percentile_cont(0.5) WITHIN GROUP (ORDER BY b.quantity) FROM activity b WHERE b.facility_id = a.facility_id AND b.item_id = a.item_id AND b.id <> a.id
-                    AND b.status = 'approved' AND b.period_end - b.period_start < 40 AND b.period_start > a.period_start - interval '13 months')::float8 AS usual
+                (a.co2e_direct + a.co2e_scope2 + a.co2e_scope3)::float8 AS kg, ue.name AS by, a.submitted_at AS at, a.approval_stage AS stage, a.l1_by, ${USUAL_SQL} AS usual
            FROM activity a JOIN category cat ON cat.id = a.category_id JOIN item i ON i.id = a.item_id JOIN org_node fo ON fo.id = a.facility_id LEFT JOIN app_user ue ON ue.id::text = a.created_by
           WHERE a.facility_id = ANY($1) AND a.status = 'submitted' AND ($2 OR (coalesce(a.created_by, '') <> $3 AND coalesce(a.submitted_by, '') <> $3))
-          ORDER BY a.submitted_at NULLS LAST LIMIT 500`, [apprFacs, solo, me])).rows.map((r) => ({
-        ...r, warn: r.usual && r.qty && (r.qty > r.usual * 1.6 || r.qty < r.usual * 0.4) ? `${r.qty > r.usual ? Math.round((r.qty / r.usual - 1) * 100) + '% above' : Math.round((1 - r.qty / r.usual) * 100) + '% below'} the usual month` : null,
-      }));
+          ORDER BY a.submitted_at NULLS LAST LIMIT 500`, [apprFacs, solo, me])).rows
+        .filter((r) => r.stage !== 'L2' || (canL2 && r.l1_by !== me))
+        .map(({ usual, l1_by: _l, ...r }) => { const ck = checkOf(r.qty, usual, set.checkPct); return { ...r, usual, warn: ck && !ck.ok ? ck.txt : null }; });
       const mine = (await c.query(
         `SELECT a.id, a.facility_id AS f, fo.name AS facility, CASE WHEN cat.code LIKE 'waste_%' THEN 'waste' WHEN cat.code LIKE 'water_%' THEN 'water' ELSE cat.code END AS cat, cat.name AS category,
                 i.name AS item, a.period_start::text AS month, a.status, a.review_note, ur.name AS reviewed_by

@@ -209,6 +209,12 @@ export interface TripOptions {
 export interface AirportHit { iata: string; name: string; city: string; country: string; countryName: string }
 
 // ------------------------------------------------------------- home & KPIs --
+export interface ApprovalSettings { l2: boolean; minT: number; cats: string[]; checkPct: number }
+export interface ApprovalRow {
+  id: string; f: string; facility: string; month: string; cat: string; category: string; item: string; note: string | null; dataType: string; qty: number; unit: string; kg: number;
+  by: string | null; at: string | null; stage: 'L2' | null; l1: string | null; mine: boolean; canApprove: boolean; waitingFor: string; check: { ok: boolean; txt: string } | null; willNeedL2: boolean;
+}
+export interface ApprovalsData { settings: ApprovalSettings; mine: ApprovalRow[]; others: ApprovalRow[]; categories: { code: string; name: string; scope: number }[]; canSettings: boolean }
 export interface HomeData {
   year: number; solo: boolean; users: number;
   settings: { dueDay: number; remindDays: number; escalateDays: number; baseYear: number | null; target: { year: number; s12: number; s3: number }; plan: string; accessExpiry: string | null };
@@ -463,7 +469,9 @@ export const api = {
   dataStatus: (facilityId: string, year: number) => call<DataStatus>('GET', `/api/data/status?facilityId=${facilityId}&year=${year}`),
   review: (q: { facilityId: string; category: string; from: string; to: string; stage: 'open' | 'approved' }) =>
     call<{ entries: ReviewEntry[]; canEnter: boolean; canApprove: boolean }>('GET', `/api/review?${new URLSearchParams(q as Record<string, string>)}`),
-  reviewAction: (ids: string[], action: 'submit' | 'withdraw' | 'approve' | 'return', note?: string) => call<{ done: number; skipped: { id: string; reason: string }[] }>('POST', '/api/activities/review', { ids, action, note }),
+  approvals: () => call<ApprovalsData>('GET', '/api/approvals'),
+  saveApprovalSettings: (b: ApprovalSettings) => call<ApprovalSettings>('PUT', '/api/approvals/settings', b),
+  reviewAction: (ids: string[], action: 'submit' | 'withdraw' | 'approve' | 'return', note?: string) => call<{ done: number; skipped: { id: string; reason: string }[]; toLevel2?: number }>('POST', '/api/activities/review', { ids, action, note }),
   deleteActivity: (id: string) => call<{ ok: true }>('DELETE', `/api/activities/${id}`),
   surveys: () => call<{ surveys: Survey[]; canCreate: boolean }>('GET', '/api/surveys'),
   createSurvey: (b: { name: string; year: number; closeAt: string | null; weeks: number; facilityIds: string[]; wfh: boolean }) => call<{ id: string }>('POST', '/api/surveys', b),

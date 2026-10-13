@@ -2,6 +2,13 @@
 
 Newest first.
 
+## 2026-10-13 · Approvals and Data progress (as in the prototype)
+
+- **Approvals** page (menu → Capture, with the number waiting for you): entries waiting for you with facility and month, category and item, quantity, tCO₂e (How calculated), a check against the 6-month average for the same item (±35% by default), who entered it; Approve, or Send back with a note; **Approve all N without warnings**; entries waiting for someone else and who.
+- **Approval levels** (Methodology, super admin): level 1 always; optional level 2 by an admin or the super admin — a different person — for entries of at least N tCO₂e or chosen categories; the check limit. Sending back clears both levels.
+- **Data progress** page: each facility × month — Approved, In review, Partial, Missing, Future; hover for each category, click to open Add data for that facility and month (Add data now takes ?year= and ?month=).
+- Home: the approval queue and "Needs your decision" link to Approvals and use the same check; entries covering several months count in each month they cover.
+
 ## 2026-10-13 · Targets & actions (as in the prototype)
 
 - New **Targets & actions** page (menu → Net zero) with six tabs: Target register, SBTi setup, Scenario analysis, Action portfolio, ROI & cost, Tracking.

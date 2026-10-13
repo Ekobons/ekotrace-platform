@@ -107,9 +107,11 @@ export function AddData() {
   const [facilities, setFacilities] = useState<Facility[]>([]);
   const [facilityId, setFacilityId] = useState(() => new URLSearchParams(window.location.search).get('facility') ?? '');
   const now = new Date(), nowY = now.getFullYear(), nowM = now.getMonth();
-  const [year, setYear] = useState(nowY);
+  // ?year= and ?month= (1–12) open a given month, e.g. from Data progress
+  const q0 = new URLSearchParams(window.location.search), qy = Number(q0.get('year')), qm = Number(q0.get('month'));
+  const [year, setYear] = useState(qy >= 2000 && qy <= 2100 ? qy : nowY);
   /** months picked (0–11); `whole` = one entry for the whole year */
-  const [picked, setPicked] = useState<number[]>([Math.max(0, nowM - 1)]);
+  const [picked, setPicked] = useState<number[]>([qm >= 1 && qm <= 12 ? qm - 1 : Math.max(0, nowM - 1)]);
   const [whole, setWhole] = useState(false);
   const [status, setStatus] = useState<DataStatus | null>(null);
   const [tick, setTick] = useState(0);

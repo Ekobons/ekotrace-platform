@@ -72,3 +72,5 @@
 | NPV (8%) | Net present value: lifetime net savings discounted at 8% a year, minus the investment |
 | Marginal abatement cost | Net cost per tonne reduced; negative means the action saves money |
 | Residual emissions | What is left at net zero (at most ~10% of the base year), neutralised by permanent removals |
+| Level 1 / level 2 approval | Level 1: the facility manager, sub-group admin or super admin. Level 2 (optional): a second approval by an admin or the super admin for large entries or chosen categories |
+| 6-month check | An entry's quantity compared with the average for the same item at the same facility over the 6 months before |

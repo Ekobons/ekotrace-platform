@@ -19,6 +19,8 @@ import { Suppliers } from './pages/Suppliers';
 import { Home } from './pages/Home';
 import { Kpis } from './pages/Kpis';
 import { Targets } from './pages/Targets';
+import { Approvals } from './pages/Approvals';
+import { DataProgress } from './pages/DataProgress';
 import { Dashboards } from './pages/Dashboards';
 import { Currencies } from './pages/Currencies';
 import { AuditLog } from './pages/AuditLog';
@@ -52,7 +54,7 @@ const NAV: { group?: string; items: NavItem[] }[] = [
     { to: '/data/stationary_combustion', label: 'Add data', icon: 'plus', roles: ['super_admin', 'admin', 'manager', 'preparer'] },
     { to: '/entries', label: 'Entries & results', icon: 'list' },
     { to: '/surveys', label: 'Surveys', icon: 'users', roles: ['super_admin', 'admin', 'manager', 'verifier'] },
-    { label: 'Approvals', icon: 'check', stage: 2 }, { label: 'Data progress', icon: 'grid', stage: 2 }, { label: 'Collection calendar', icon: 'calendar', stage: 2 },
+    { to: '/approvals', label: 'Approvals', icon: 'check', roles: ['super_admin', 'admin', 'manager', 'preparer'] }, { to: '/progress', label: 'Data progress', icon: 'grid' }, { label: 'Collection calendar', icon: 'calendar', stage: 2 },
     { label: 'Inbox & to-dos', icon: 'inbox', stage: 2 }, { label: 'Document vault', icon: 'folder', stage: 2 }, { label: 'Batch runs', icon: 'upload', stage: 4 },
     { label: 'QR & field app', icon: 'qr', stage: 4 },
   ] },
@@ -114,6 +116,9 @@ function Shell() {
   const logout = async () => { await api.logout().catch(() => {}); setTenant(null); location.href = '/'; };
   const [folded, setFolded] = useState<Set<string>>(() => { try { return new Set(JSON.parse(localStorage.getItem('eko_nav') ?? '[]') as string[]); } catch { return new Set(); } });
   const fold = (g: string) => setFolded((f) => { const n = new Set(f); if (n.has(g)) n.delete(g); else n.add(g); try { localStorage.setItem('eko_nav', JSON.stringify([...n])); } catch { /* not kept */ } return n; });
+  // waiting for my approval: the count on the Approvals menu item (refreshed as you move around)
+  const [apprN, setApprN] = useState(0);
+  useEffect(() => { if (!tenant || !['super_admin', 'admin', 'manager', 'platform_admin'].includes(role)) { setApprN(0); return; } api.approvals().then((a) => setApprN(a.mine.length)).catch(() => {}); }, [path, tenant?.id, role]); // eslint-disable-line react-hooks/exhaustive-deps
   const visible = (i: NavItem) => !i.roles || (i.roles.length === 0 ? role === 'platform_admin' : can(...i.roles));
 
   return (
@@ -146,7 +151,7 @@ function Shell() {
                 {g.group && <button type="button" className={`sech${open ? ' open' : ''}${on ? ' has' : ''}`} aria-expanded={open} onClick={() => fold(g.group!)}>
                   <i className="sdot" /><span>{g.group.toUpperCase()}</span><span className="chev">{open ? '▾' : '▸'}</span></button>}
                 {open && <div className="secitems">{items.map((i) => i.to
-                  ? <NavLink key={i.label} to={i.to} className={({ isActive }) => (isActive || (i.to?.startsWith('/data/') && path.startsWith('/data/')) ? 'active' : '')}><Icon name={i.icon} />{i.label}</NavLink>
+                  ? <NavLink key={i.label} to={i.to} className={({ isActive }) => (isActive || (i.to?.startsWith('/data/') && path.startsWith('/data/')) ? 'active' : '')}><Icon name={i.icon} />{i.label}{i.to === '/approvals' && apprN > 0 && <span className="navb amber">{apprN}</span>}</NavLink>
                   : <a key={i.label} className="soon" aria-disabled="true" title={`Coming in stage ${i.stage}`}><Icon name={i.icon} />{i.label}<span className="soonchip">S{i.stage}</span></a>)}</div>}
               </div>
             );
@@ -170,6 +175,8 @@ function Shell() {
           <Route path="/home" element={<NeedCo><Home /></NeedCo>} />
           <Route path="/kpis" element={<NeedCo><Kpis /></NeedCo>} />
           <Route path="/targets" element={<NeedCo><Targets /></NeedCo>} />
+          <Route path="/approvals" element={<NeedCo><Approvals /></NeedCo>} />
+          <Route path="/progress" element={<NeedCo><DataProgress /></NeedCo>} />
           <Route path="/dashboards" element={<NeedCo><Dashboards /></NeedCo>} />
           <Route path="/entries" element={<NeedCo><Entries /></NeedCo>} />
           <Route path="/surveys" element={<NeedCo><Surveys /></NeedCo>} />
