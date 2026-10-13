@@ -20,7 +20,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useApp } from '../App';
-import { api, ROLE_LABEL, type HomeData, type Role } from '../lib/api';
+import { api, ROLE_LABEL, type HomeData, type Role, type TargetsData } from '../lib/api';
 import { Fit, MN, fmt, fmt0 } from '../components/DashCharts';
 import { CONS, S, ViewBar, sum, useView, type Ctx, type Data, type Row } from '../components/ViewBar';
 
@@ -133,6 +133,15 @@ function CycleStrip({ x, children }: { x: H; children?: ReactNode }) {
       <div className="cyc-s">{c.overdue > 0 && <span className="chip c-bad">{c.overdue} overdue</span>}{c.esc > 0 && <span className="chip c-bad">{c.esc} escalated</span>}{!c.overdue && !c.esc && <span className="chip c-ok">Nothing overdue</span>}</div>
       <div className="row" style={{ gap: 6 }}>{children}</div>
     </section>);
+}
+/** Reductions delivered (as in the prototype): actions done, in the facilities viewed or company-wide. */
+function Delivered({ d }: { d: Data }) {
+  const [t, setT] = useState<TargetsData | null>(null);
+  useEffect(() => { api.targets(d.year).then(setT).catch(() => setT(null)); }, [d.year]);
+  const ids = new Set(d.facilities.map((f) => f.id));
+  const done = (t?.actions ?? []).filter((a) => a.status === 'Done' && !a.excluded && (!a.facilityId || ids.has(a.facilityId)));
+  const tn = done.reduce((s, a) => s + (a.actual ?? a.abate), 0), sav = done.reduce((s, a) => s + a.saving, 0);
+  return <Tile lbl="Reductions delivered" v={<>{t ? fmt0(tn) : '—'} <small>t/yr</small></>} sub={t ? `${done.length} action${done.length === 1 ? '' : 's'} done · ${t.currency} ${fmt(sav / 1e6, 2)}m saved a year` : ''} to="/targets?ttab=track" />;
 }
 function Tile({ lbl, v, sub, to, col, bar, barCol }: { lbl: string; v: ReactNode; sub: ReactNode; to?: string; col?: string; bar?: number | [number, string][]; barCol?: string }) {
   const nav = useNavigate();
@@ -296,7 +305,7 @@ function HomeLeader({ x, h, d, c, pick }: { x: H; h: HomeData; d: Data; c: Ctx; 
     <div className="htiles">
       <EmTile c={c} d={d} /><PathTile x={x} />
       <Tile lbl="Data approved" v={`${Math.round(x.comp * 100)}%`} sub={x.gaps ? `${x.gaps} ${x.gaps === 1 ? 'facility has' : 'facilities have'} gaps this year` : 'All facilities complete'} bar={x.comp * 100} barCol={x.comp > 0.9 ? 'var(--primary)' : 'var(--warn)'} to="/entries" />
-      <Tile lbl="Reductions delivered" v={<>— <small>t/yr</small></>} sub="Tracked once Targets & actions is in use" />
+      <Delivered d={d} />
     </div>
     <div className="hgrid"><TrendCard x={x} d={d} c={c} span={2} /><Decisions x={x} h={h} /><FacLeague x={x} h={h} d={d} c={c} span={2} pick={pick} /><Hotspots c={c} /></div>
   </>;

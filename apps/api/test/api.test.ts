@@ -1584,3 +1584,54 @@ test('home and KPIs: facility status by category and month, approvals waiting fo
   // another company: its own KPI settings
   assert.deepEqual((await api('GET', '/api/kpis', undefined, tenantB)).body.list, ['tot', 'purch', 'div', 'ren', 'fleet', 'pemp']);
 });
+
+test('targets & actions: SBTi structure and templates, objectives, scenarios (copy the current plan), library and custom actions with costs and delivery; who may change what; companies kept apart', async () => {
+  const sa = await login(superA.email, superA.temporaryPassword);
+  const g0 = await call(sa, 'GET', '/api/targets');
+  assert.equal(g0.status, 200, JSON.stringify(g0.body));
+  assert.equal(g0.body.scenarios.length, 1); assert.equal(g0.body.scenarios[0].name, 'Current plan');
+  assert.equal(g0.body.sbti.cov12, 95); assert.equal(g0.body.canTarget, true); assert.equal(g0.body.currency, 'AED');
+  const plan = g0.body.defaultScenario as string;
+  // SBTi template: 1.5 °C → 4.2% a year × years from the base year
+  const base = (await call(sa, 'GET', '/api/tenant')).body.base_year ?? 2025;
+  const tp = await call(sa, 'POST', '/api/targets/template', { template: 'nz', year: 2030 });
+  assert.equal(tp.status, 200, JSON.stringify(tp.body)); assert.equal(tp.body.s12, Math.round(Math.min(90, 4.2 * (2030 - base)) * 10) / 10);
+  const g1 = (await call(sa, 'GET', '/api/targets')).body;
+  assert.equal(g1.sbti.type, 'Near-term + net-zero'); assert.ok(g1.objectives.some((o: { year: number }) => o.year === 2050));
+  assert.equal((await call(sa, 'PUT', '/api/targets', { sbti: { nzYear: 2028 } })).status, 400);  // before the near-term year
+  assert.equal((await call(sa, 'PUT', '/api/targets', { year: 2030, s12: 42, s3: 25, sbti: { growth: 3, status: 'Validated', nzYear: 2045, resid: 8 } })).status, 200);
+  const ob = await call(sa, 'POST', '/api/targets/objectives', { name: 'Fleet −50%', scope: 'Scope 1', year: 2032, pct: 50, growth: 2 });
+  assert.equal(ob.status, 200);
+  assert.equal((await call(sa, 'DELETE', `/api/targets/objectives/${ob.body.id}`)).status, 200);
+  // actions: a library action in the current plan, a custom one for a facility
+  const fac = (await call(sa, 'GET', '/api/org')).body.nodes.find((n: { name: string }) => n.name === 'Review depot').id;
+  const a1 = await call(sa, 'POST', '/api/actions', { lib: 'solar', name: 'Rooftop solar', cat: 'Energy', scopes: [2], objVal: 25, start: 2026, end: 2028, abate: 120, capex: 400000, saving: 90000 });
+  assert.equal(a1.status, 200, JSON.stringify(a1.body));
+  const a2 = await call(sa, 'POST', '/api/actions', { name: 'Depot LED', cat: 'Energy', scopes: [2], start: 2026, end: 2026, abate: 10, facilityId: fac, status: 'Approved' });
+  assert.equal((await call(sa, 'POST', '/api/actions', { name: 'Backwards', start: 2030, end: 2026 })).status, 400);
+  // a scenario starting from the current plan's actions
+  const sc = await call(sa, 'POST', '/api/scenarios', { name: 'Accelerated', copy: true });
+  let acts = (await call(sa, 'GET', '/api/targets')).body.actions as { id: string; scenarioIds: string[]; status: string; actual: number | null }[];
+  assert.ok(acts.find((a) => a.id === a1.body.id)!.scenarioIds.includes(sc.body.id));
+  assert.equal((await call(sa, 'PATCH', `/api/actions/${a2.body.id}`, { scenarioIds: [sc.body.id], status: 'Done', actual: 9, actualNote: 'meter' })).status, 200);
+  acts = (await call(sa, 'GET', '/api/targets')).body.actions;
+  const d2 = acts.find((a) => a.id === a2.body.id)!;
+  assert.deepEqual(d2.scenarioIds, [sc.body.id]); assert.equal(d2.status, 'Done'); assert.equal(d2.actual, 9);
+  assert.equal((await call(sa, 'DELETE', `/api/scenarios/${plan}`)).status, 400);  // the current plan stays
+  // a manager of the depot may change actions, not targets; a preparer and a verifier only look
+  const mgr = await login('rmgr@a.test', 'a long enough pass'), prep = await login('rprep@a.test', 'a long enough pass');
+  assert.equal((await call(mgr, 'PATCH', `/api/actions/${a2.body.id}`, { owner: 'Hessa' })).status, 200);
+  assert.equal((await call(mgr, 'PUT', '/api/targets', { s12: 10 })).status, 403);
+  assert.equal((await call(prep, 'POST', '/api/actions', { name: 'x', start: 2026, end: 2027 })).status, 403);
+  assert.equal((await call(prep, 'GET', '/api/targets')).body.canAct, false);
+  const lv = await call(mgr, 'POST', '/api/levers', { name: 'Fast', levers: { ren: 50, ev: 40, eff: 10, refr: 50, div: 30, growth: 2 }, end: 1000, year: 2030 });
+  assert.equal(lv.status, 200);
+  assert.equal((await call(sa, 'DELETE', `/api/scenarios/${sc.body.id}`)).status, 200);
+  assert.deepEqual((await call(sa, 'GET', '/api/targets')).body.actions.find((a: { id: string }) => a.id === a2.body.id).scenarioIds, []);
+  assert.equal((await call(sa, 'DELETE', `/api/actions/${a1.body.id}`)).status, 200);
+  assert.ok(!(await call(sa, 'GET', '/api/targets')).body.actions.some((a: { id: string }) => a.id === a1.body.id));
+  // another company sees none of it
+  const b = (await api('GET', '/api/targets', undefined, tenantB)).body;
+  assert.equal(b.actions.length, 0); assert.equal(b.objectives.length, 0);
+  assert.equal((await api('PATCH', `/api/actions/${a2.body.id}`, { owner: 'x' }, tenantB)).status, 404);
+});

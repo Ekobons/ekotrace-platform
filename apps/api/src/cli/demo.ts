@@ -73,6 +73,7 @@ async function main() {
         'DELETE FROM bill WHERE tenant_id = $1', 'DELETE FROM document WHERE tenant_id = $1', 'DELETE FROM meter_reading WHERE tenant_id = $1', 'DELETE FROM meter WHERE tenant_id = $1', 'DELETE FROM api_key WHERE tenant_id = $1',
         'DELETE FROM commute_record WHERE tenant_id = $1', 'DELETE FROM survey WHERE tenant_id = $1', 'DELETE FROM waste_deposit WHERE tenant_id = $1', 'DELETE FROM waste_site WHERE tenant_id = $1',
         'DELETE FROM price WHERE tenant_id = $1', 'DELETE FROM user_facility WHERE tenant_id = $1',
+        'DELETE FROM reduction_action WHERE tenant_id = $1', 'DELETE FROM scenario WHERE tenant_id = $1', 'DELETE FROM target_objective WHERE tenant_id = $1', 'DELETE FROM lever_scenario WHERE tenant_id = $1',
         'DELETE FROM session WHERE user_id IN (SELECT id FROM app_user WHERE tenant_id = $1)', 'DELETE FROM audit_log WHERE tenant_id = $1',
         'UPDATE org_node SET manager_user_id = NULL WHERE tenant_id = $1', 'DELETE FROM app_user WHERE tenant_id = $1', 'DELETE FROM tenant_catalogue WHERE tenant_id = $1',
         'DELETE FROM org_node WHERE tenant_id = $1 AND kind = \'facility\'', 'DELETE FROM org_node WHERE tenant_id = $1 AND kind = \'subgroup\'', 'DELETE FROM org_node WHERE tenant_id = $1',
@@ -420,6 +421,28 @@ async function main() {
     await c.query(`UPDATE activity SET status = 'rejected', reviewed_by = $3, reviewed_at = now() - interval '1 day', created_by = $2, submitted_by = $2,
                           review_note = 'DEMO: the quantity does not match the delivery note — please check'
                     WHERE id = (SELECT a.id FROM activity a JOIN category k ON k.id = a.category_id WHERE a.tenant_id = $1 AND a.period_start = '2026-08-01' AND k.code = 'stationary_combustion' ORDER BY a.created_at LIMIT 1)`, [t, prep, mgrU]);
+    // ------------------------------------------------------------ targets & actions --
+    // A current plan and an accelerated scenario with DEMO reduction actions (figures are illustrative, not real).
+    const sa0 = String(users.get('super_admin'));
+    const plan = (await c.query(`INSERT INTO scenario (tenant_id, name, is_default, created_by) VALUES ($1, 'Current plan', true, $2) RETURNING id`, [t, sa0])).rows[0].id as string;
+    const acc = (await c.query(`INSERT INTO scenario (tenant_id, name, created_by) VALUES ($1, 'Accelerated', $2) RETURNING id`, [t, sa0])).rows[0].id as string;
+    const ACTS: [string | null, string, string, number[], string, number | null, number, number, number, number, number, string, string, string | null, number | null, boolean][] = [
+      // lib, name, category, scopes, KPI, metric %, start, end, t/yr, capex, saving/yr, status, owner, facility, actual t/yr, also in accelerated only
+      ['solar', 'Rooftop and car-park solar PV', 'Energy', [2], 'Share of site electricity from on-site solar', 25, 2026, 2028, 78, 1250000, 165000, 'Approved', 'Hessa (DEMO)', null, null, false],
+      ['hvac', 'Chiller and HVAC optimisation (setpoints, VSDs, free cooling)', 'Energy', [2], 'Cooling energy reduction', 60, 2026, 2028, 112, 420000, 210000, 'In progress', 'Facilities team (DEMO)', 'BEEAH Headquarters', 31, false],
+      ['led', 'LED lighting and controls', 'Energy', [2], 'Sites retrofitted', 80, 2026, 2026, 46, 95000, 61000, 'Done', 'Facilities team (DEMO)', null, 41, false],
+      ['evlight', 'Electrify light vehicles (cars, vans, pickups)', 'Fleet', [1, 2], 'Light fleet electrified', 40, 2026, 2030, 34, 640000, 52000, 'Idea', 'Fleet manager (DEMO)', null, null, false],
+      ['recycle', 'Increase recycling and diversion from landfill', 'Waste', [3], 'Waste diverted from landfill', 50, 2026, 2029, 22, 60000, 9000, 'Approved', 'Sustainability (DEMO)', null, null, false],
+      [null, 'WtE plant: flue-gas heat recovery and auxiliary load cut (DEMO)', 'Energy', [1], 'Auxiliary diesel and grid use avoided', null, 2027, 2029, 2400, 18500000, 2350000, 'Idea', 'Plant manager (DEMO)', 'Sharjah Waste-to-Energy', null, true],
+      ['travel', 'Travel policy: rail / economy, fewer trips', 'Travel & commute', [3], 'Trips avoided or downgraded', 80, 2026, 2027, 18, 0, 140000, 'Approved', 'HR (DEMO)', null, null, false],
+    ];
+    for (const [lib, name, cat, sc, kpi, ov, s0, s1, ab, capex, sav, st, owner, facN, actual, accOnly] of ACTS) {
+      await c.query(`INSERT INTO reduction_action (tenant_id, lib, name, cat, scopes, kpi, obj_val, start_year, end_year, abate, capex, saving, life, status, owner, facility_id, actual, actual_note, comment, scenario_ids, created_by, updated_by)
+                     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,10,$13,$14,$15,$16,$17,'DEMO figures — illustrative, not real',$18,$19,$19)`,
+        [t, lib, name, cat, sc, kpi, ov, s0, s1, ab, capex, sav, st, owner, facN ? ids.get(facN) ?? null : null, actual, actual !== null ? 'DEMO: metered before/after' : null, accOnly ? [acc] : [plan, acc], sa0]);
+    }
+    await c.query(`UPDATE tenant SET sbti = $2 WHERE id = $1`, [t, JSON.stringify({ status: 'Committed (letter sent)', growth: 2, nzYear: 2040, resid: 10 })]);
+    console.log(`Targets & actions: 2 scenarios, ${ACTS.length} DEMO reduction actions.`);
     console.log(`Survey: "Employee commuting 2026", ${nsp} DEMO people, ${nsa} answers (open).`);
     console.log(`Meters: ${nr.toLocaleString('en')} DEMO readings (hourly, daily register, weekly), ${ns} monthly entries; ${nb} DEMO SEWA bills (7 booked, 1 to check).`);
     console.log(`Waste: a landfill with a DEMO tonnage history 2000–2025, ${nw} waste and water entries (landfill, waste-to-energy, composting, wastewater, waste sent out with contractors, water in and out by facility).`);

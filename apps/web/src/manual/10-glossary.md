@@ -66,3 +66,9 @@
 | Submission | One facility × one category it reports × one month |
 | Self-reviewed | An entry approved by the person who entered it — only allowed when the company has a single user |
 | KPI target | A level set for a KPI and a selection (company, sub-group, facility or group); bars turn green when met |
+| Run-rate | This year's approved emissions for the months so far, annualised |
+| Abatement | The reduction an action brings, in tCO₂e a year once fully delivered |
+| Scenario | A set of selected reduction actions; compared on gap to the target, capex and NPV |
+| NPV (8%) | Net present value: lifetime net savings discounted at 8% a year, minus the investment |
+| Marginal abatement cost | Net cost per tonne reduced; negative means the action saves money |
+| Residual emissions | What is left at net zero (at most ~10% of the base year), neutralised by permanent removals |

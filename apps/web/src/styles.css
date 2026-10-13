@@ -864,3 +864,30 @@ table.t.rows input.input:not(.num), table.t.rows select.input { width: 100%; min
 .dcard > .dsplit { flex-wrap: wrap; justify-content: center; gap: 14px 18px; }
 .dcard > .dsplit > svg { flex: none; }
 .dcard > .dsplit > .dleg { min-width: 250px; }
+/* targets & actions (as in the prototype) */
+.tahead { align-items: flex-end; gap: 8px; }
+.tahead h1 { margin: 2px 0 2px; font-size: 28px; letter-spacing: -.02em; }
+.tahead .muted { font-size: 14px; }
+.tacard { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.tacard h2 { font-size: 16px; margin: 0; }
+.tagrid2 { display: grid; gap: 12px; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); align-items: stretch; }
+.tagrid2.even { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.kvrow { padding: 10px 0; border-bottom: 1px solid var(--line); flex-wrap: nowrap; font-size: 14px; }
+.tafig { gap: 26px; flex-wrap: wrap; }
+.tafig > div { display: flex; flex-direction: column; gap: 2px; }
+.tafig .muted { font-size: 12.5px; } .tafig b { font-size: 21px; font-variant-numeric: tabular-nums; }
+.tplgrid { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+.tplgrid .gcard { min-height: 0; }
+.tplgrid .gcard.on { border-color: var(--primary); background: var(--primary-soft); }
+.formgrid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+.lever { display: grid; gap: 4px; } .lever b { font-size: 13.5px; } .lever input[type=range] { width: 100%; accent-color: var(--primary); }
+.soft4 { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); }
+.soft4 .soft { gap: 3px; }
+.tatable td { vertical-align: middle; }
+table.t tr.excl td { opacity: .5; text-decoration: line-through; }
+table.t tr.excl td:last-child { opacity: 1; text-decoration: none; }
+table.t tr.sel td, table.t tr.totrow td { background: var(--soft); }
+.small { font-size: 12.5px; }
+.hitem small { display: block; color: var(--muted); font-size: 12.5px; }
+.hk .kc .bar { margin: 2px 0; }
+@media (max-width: 1100px) { .tagrid2, .tagrid2.even { grid-template-columns: minmax(0, 1fr); } }

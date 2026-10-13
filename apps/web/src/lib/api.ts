@@ -219,6 +219,21 @@ export interface HomeData {
   batches: { review: number; failed: number };
   verifier: { n: number; evidence: number; self: number; sample: { id: string; facility: string; category: string; month: string; kg: number; approved_by: string | null; self_reviewed: boolean; evidence: boolean }[] };
 }
+export type ActStatus = 'Idea' | 'Approved' | 'In progress' | 'Done';
+export interface RAction {
+  id: string; lib: string | null; name: string; cat: string; scopes: number[]; kpi: string | null; objVal: number | null; start: number; end: number; abate: number;
+  capex: number; opex: number; saving: number; life: number; status: ActStatus; owner: string | null; facilityId: string | null; facility: string | null; excluded: boolean;
+  actual: number | null; actualNote: string | null; capexMeth: string | null; opexMeth: string | null; comment: string | null; scenarioIds: string[]; updatedAt: string;
+}
+export interface Sbti { type: string; scopes: string; cov12: number; cov3: number; ambition: string; status: string; growth: number; nzYear: number; resid: number; template: string | null }
+export interface TargetsData {
+  baseYear: number | null; currency: string; target: { year: number; s12: number; s3: number }; sbti: Sbti;
+  objectives: { id: string; name: string; scope: string; year: number; pct: number; growth: number }[];
+  scenarios: { id: string; name: string; isDefault: boolean }[]; defaultScenario: string; actions: RAction[];
+  levers: { id: string; name: string; levers: Record<string, number>; end: number; year: number; at: string }[];
+  supplierCoverage: number; canTarget: boolean; canAct: boolean; facilities: string[];
+}
+export type ActionInput = Partial<Omit<RAction, 'id' | 'facility' | 'updatedAt'>>;
 export interface KpiConfig { list: string[]; targets: Record<string, Record<string, number>>; canTarget: boolean; canChoose: boolean }
 
 // ------------------------------------------------------------- review --
@@ -432,6 +447,18 @@ export const api = {
   flightDistance: (from: string, to: string) => call<{ from: string; to: string; gcKm: number; km: number; haul: string }>('GET', `/api/trips/distance?from=${from}&to=${to}`),
   home: (q: { year?: number; node?: string; group?: string }) => call<HomeData>('GET', `/api/home?${new URLSearchParams(Object.entries(q).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)]))}`),
   kpis: () => call<KpiConfig>('GET', '/api/kpis'),
+  targets: (year?: number) => call<TargetsData>('GET', `/api/targets${year ? `?year=${year}` : ''}`),
+  saveTargets: (b: { year?: number; s12?: number; s3?: number; sbti?: Partial<Sbti> }) => call<{ ok: true }>('PUT', '/api/targets', b),
+  applyTemplate: (template: string, year: number) => call<{ s12: number; s3: number; year: number }>('POST', '/api/targets/template', { template, year }),
+  addObjective: (b: { name: string; scope: string; year: number; pct: number; growth: number }) => call<{ id: string }>('POST', '/api/targets/objectives', b),
+  removeObjective: (id: string) => call<{ ok: true }>('DELETE', `/api/targets/objectives/${id}`),
+  addScenario: (name: string, copy: boolean) => call<{ id: string }>('POST', '/api/scenarios', { name, copy }),
+  removeScenario: (id: string) => call<{ ok: true }>('DELETE', `/api/scenarios/${id}`),
+  addAction: (b: ActionInput & { name: string; start: number; end: number }) => call<{ id: string }>('POST', '/api/actions', b),
+  updateAction: (id: string, b: ActionInput) => call<{ ok: true }>('PATCH', `/api/actions/${id}`, b),
+  removeAction: (id: string) => call<{ ok: true }>('DELETE', `/api/actions/${id}`),
+  saveLevers: (b: { name: string; levers: Record<string, number>; end: number; year: number }) => call<{ id: string }>('POST', '/api/levers', b),
+  removeLevers: (id: string) => call<{ ok: true }>('DELETE', `/api/levers/${id}`),
   saveKpis: (b: { list?: string[]; key?: string; targets?: Record<string, number> }) => call<{ list: string[]; targets: Record<string, Record<string, number>> }>('PUT', '/api/kpis', b),
   dataStatus: (facilityId: string, year: number) => call<DataStatus>('GET', `/api/data/status?facilityId=${facilityId}&year=${year}`),
   review: (q: { facilityId: string; category: string; from: string; to: string; stage: 'open' | 'approved' }) =>

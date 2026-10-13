@@ -89,7 +89,8 @@ export async function dashboardRoutes(app: FastifyInstance) {
                 coalesce(i.attrs->>'route', '') AS route, coalesce(i.attrs->>'flow', '') AS flow, coalesce(i.attrs->>'gri', '') AS gri,
                 CASE WHEN cat.code = 'waste_generated' THEN coalesce((a.inputs->'wasteInfo'->>'hazardous')::boolean, false) END AS haz,
                 CASE WHEN cat.code = 'waste_generated' THEN nullif(a.inputs->'wasteInfo'->>'contractor', '') END AS contractor,
-                coalesce(sum((SELECT sum(k.kwh) FROM certificate_claim k WHERE k.activity_id = a.id) * ${W}), 0)::float8 AS rec
+                coalesce(sum((SELECT sum(k.kwh) FROM certificate_claim k WHERE k.activity_id = a.id) * ${W}), 0)::float8 AS rec,
+                max(CASE WHEN a.period_end - a.period_start >= 40 THEN greatest(1, round((a.period_end - a.period_start + 1) / 30.44))::int END) AS span
            ${FROM.replace('JOIN item i ON i.id = a.item_id', 'JOIN item i ON i.id = a.item_id JOIN subcategory sc ON sc.id = i.subcategory_id JOIN unit u ON u.code = a.unit')}
            GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, cat.calc_method, cat.code, i.attrs, haz, contractor`;
       const ref = await refdata();

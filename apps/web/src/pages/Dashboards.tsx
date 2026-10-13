@@ -15,7 +15,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useApp } from '../App';
-import { api, type DashGroup, type OrgNode } from '../lib/api';
+import { api, type DashGroup, type OrgNode, type TargetsData } from '../lib/api';
 import { Icon } from '../components/Icon';
 import { Bars, DCard, Donut, Dot, DStat, HBars, Legend, MN, PAL, SC, Treemap, fmt, fmt0, fmtT, type BarRow, type Part } from '../components/DashCharts';
 import { CONS, S, ViewBar, pc, range, signPct, sum, tot, useView, type Ctx, type Data, type Row } from '../components/ViewBar';
@@ -388,14 +388,21 @@ function NetZero({ d, c }: { d: Data; c: Ctx }) {
   const allNow = sum(d.rows, tot), ann = c.nMax < 12 ? (allNow * 12) / c.nMax : allNow, prev = sum(d.prevRows, tot);
   const rows: BarRow[] = [...(d.prevRows.length ? [{ lbl: String(d.cmpYear), parts: [{ v: prev, c: 'var(--s2)', n: 'Net emissions' }] }] : []),
     { lbl: c.nMax < 12 ? `${d.year} (annualised)` : String(d.year), parts: [{ v: ann, c: 'var(--s2)', n: 'Net emissions' }] }];
+  // reductions delivered (actions done, from Targets & actions), counted for the months viewed
+  const [tg, setTg] = useState<TargetsData | null>(null);
+  useEffect(() => { api.targets(d.year).then(setTg).catch(() => setTg(null)); }, [d.year]);
+  const ids = new Set(d.facilities.map((f) => f.id));
+  const doneT = (tg?.actions ?? []).filter((a) => a.status === 'Done' && !a.excluded && (!a.facilityId || ids.has(a.facilityId))).reduce((s, a) => s + (a.actual ?? a.abate), 0);
+  const red = (doneT * c.months.length) / 12, resid = tg ? (sum(d.prevRows, tot) * (tg.sbti.resid ?? 10)) / 100 : null;
+  const path = [{ v: c.total, c: 'var(--s2)', n: 'Emissions' }, { v: red, c: '#E9B44C', n: 'Reduced & avoided' }];
   return <>
     <DStat cells={[[`Gross emissions ${d.year}`, <>{fmt0(c.total)} <small>t</small></>, c.periodLabel], [`Credits retired ${d.year}`, '0 t', 'removals and avoidance', '#6B4FA8'],
-      ['Net after credits', T(c.total), 'shown alongside gross, never instead'], ['Reductions delivered', '—', 'completed actions'], ['Credits in pipeline', '—', 'contracted, not retired']]} />
+      ['Net after credits', T(c.total), 'shown alongside gross, never instead'], ['Reductions delivered', tg ? `${fmt0(doneT)} t/yr` : '—', 'completed actions'], ['Credits in pipeline', '—', 'contracted, not retired']]} />
     <div className="dgrid">
       <DCard title="Emissions vs offsets by year (tCO₂e)" span={2}><Bars rows={rows} unit="t" h={175} label="Emissions by year" />
-        <div className="lgd"><span><i style={{ background: 'var(--s2)' }} />Net emissions</span><span><i style={{ background: '#6B4FA8' }} />Offset by retired credits</span></div></DCard>
-      <DCard title="Path to net zero"><div className="dsplit"><Donut parts={[{ v: c.total, c: 'var(--s2)', n: 'Emissions' }]} center="0%" sub="addressed" size={118} /><Legend parts={[{ v: c.total, c: 'var(--s2)', n: 'Emissions' }]} unit="t" /></div></DCard>
-      <DCard title="Credit portfolio" span={2}><div className="muted" style={{ fontSize: 13 }}>No carbon credits recorded. Credits and reduction actions come with the targets and net zero module; until then gross and net are the same.</div></DCard>
+        <div className="lgd"><span><i style={{ background: 'var(--s2)' }} />Net emissions</span><span><i style={{ background: '#6B4FA8' }} />Offset by retired credits</span>{tg && resid !== null && <span className="muted">Net zero {tg.sbti.nzYear}: residual ≤ {fmt0(resid)} t neutralised by permanent removals</span>}</div></DCard>
+      <DCard title="Path to net zero" right={<Link className="btn sm ghost" to="/targets?ttab=track">Targets →</Link>}><div className="dsplit"><Donut parts={path} center={`${Math.round(c.total + red ? (red / (c.total + red)) * 100 : 0)}%`} sub="addressed" size={118} /><Legend parts={path} unit="t" /></div></DCard>
+      <DCard title="Credit portfolio" span={2}><div className="muted" style={{ fontSize: 13 }}>No carbon credits recorded (Carbon credits is coming in stage 4); until then gross and net are the same. Reduction actions are planned and tracked under Targets &amp; actions.</div></DCard>
       <DCard title="Good practice"><ul style={{ margin: 0, paddingLeft: 18, fontSize: 12.5, lineHeight: 1.6 }}><li>Report gross emissions first; credits separately.</li><li>SBTi targets count reductions only — credits do not.</li><li>Use permanent removals for the residual at net zero.</li></ul></DCard>
     </div>
   </>;

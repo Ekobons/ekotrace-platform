@@ -18,6 +18,7 @@ export interface Row {
   f: string; m: number; cat: string; item: string; grp: string; sub: string; unit: string; s1: number; s2: number; s3: number; s33: number; bio: number; memo: number;
   n: number; approved: number; estimated: number; qty: number; rec: number; kind: 'fuel' | 'electricity' | 'cooling' | 'heat' | null; kwh: number | null;
   m3: number | null; route: string; flow: string; gri: string; haz: boolean | null; contractor: string | null;
+  span?: number | null;   // months an entry covers when it spans more than a month (m = 0)
 }
 export interface Data {
   year: number; years: number[]; group: { id: string; name: string } | null; pend: boolean; consolidation: string; scope2: 'location' | 'market';

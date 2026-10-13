@@ -2,6 +2,19 @@
 
 Newest first.
 
+## 2026-10-13 · Targets & actions (as in the prototype)
+
+- New **Targets & actions** page (menu → Net zero) with six tabs: Target register, SBTi setup, Scenario analysis, Action portfolio, ROI & cost, Tracking.
+- Target register: target, reduction so far, committed abatement, approved investment; SBTi-compatible structure; scenarios compared; objectives (main SBTi targets + your own); largest actions; the targets with Scope 1+2 / Scope 3 paths and each facility against its path. Super admin edits the targets here.
+- SBTi setup with a readiness check against the near-term criteria; **Import SBTi template** (1.5 °C, well-below 2 °C, Net-Zero Standard, supplier engagement).
+- Scenarios: a Current plan plus any you create (optionally copying its actions); scenario lab with levers, saved lever settings.
+- Action portfolio: a 21-action library sized from your own data (run-rate × typical reduction × metric value) plus custom actions; select into a scenario; details for KPI, period, owner, status, facility, planned and actual reduction, CapEx, OpEx, saving, life; exclude.
+- ROI & cost: payback, ROI, TCO, NPV at 8%, cost per tonne, scenario comparison, marginal abatement cost curve.
+- Tracking: Net Zero trajectory (year and residual % set by the super admin), projection waterfall, delivery tracking, estimated vs actual.
+- Home "Reductions delivered" and the Net zero dashboard now show completed actions.
+- Run-rate: entries covering several months are annualised; a yearly source not entered yet this year carries its base-year figure.
+- Who: everyone views; managers and above change actions and scenarios; the super admin changes targets. All changes are in the audit log. Demo company: 2 scenarios and 7 DEMO actions.
+
 ## 2026-10-13 · Dashboards, Home and KPIs fill the screen; larger charts and text
 
 - Charts are drawn at the size of their card instead of a fixed picture, so they grow with the screen while their labels stay readable; on Dashboards, Home and the KPI dashboard the main chart row stretches to fill the screen height (no empty band at the bottom).

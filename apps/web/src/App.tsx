@@ -18,6 +18,7 @@ import { PublishedPurchasesPage } from './pages/PublishedPurchases';
 import { Suppliers } from './pages/Suppliers';
 import { Home } from './pages/Home';
 import { Kpis } from './pages/Kpis';
+import { Targets } from './pages/Targets';
 import { Dashboards } from './pages/Dashboards';
 import { Currencies } from './pages/Currencies';
 import { AuditLog } from './pages/AuditLog';
@@ -56,7 +57,7 @@ const NAV: { group?: string; items: NavItem[] }[] = [
     { label: 'QR & field app', icon: 'qr', stage: 4 },
   ] },
   { group: 'Value chain', items: [{ to: '/suppliers', label: 'Suppliers', icon: 'users', roles: ['super_admin', 'admin', 'manager', 'preparer', 'verifier'] }, { label: 'Product LCA', icon: 'leaf', stage: 4 }] },
-  { group: 'Net zero', items: [{ label: 'Targets & actions', icon: 'target', stage: 4 }, { label: 'Carbon credits', icon: 'leaf', stage: 4 }] },
+  { group: 'Net zero', items: [{ to: '/targets', label: 'Targets & actions', icon: 'target' }, { label: 'Carbon credits', icon: 'leaf', stage: 4 }] },
   { group: 'Disclose', items: [{ label: 'Reports', icon: 'doc', stage: 3 }, { label: 'Audit & assurance', icon: 'shield', stage: 3 }] },
   { group: 'Setup', items: [
     { to: '/organisation', label: 'Organisation & groups', icon: 'tree' },
@@ -168,6 +169,7 @@ function Shell() {
           <Route path="/data/:category" element={<NeedCo><AddData /></NeedCo>} />
           <Route path="/home" element={<NeedCo><Home /></NeedCo>} />
           <Route path="/kpis" element={<NeedCo><Kpis /></NeedCo>} />
+          <Route path="/targets" element={<NeedCo><Targets /></NeedCo>} />
           <Route path="/dashboards" element={<NeedCo><Dashboards /></NeedCo>} />
           <Route path="/entries" element={<NeedCo><Entries /></NeedCo>} />
           <Route path="/surveys" element={<NeedCo><Surveys /></NeedCo>} />
