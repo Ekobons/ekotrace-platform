@@ -2,6 +2,12 @@
 
 Newest first.
 
+## 2026-10-13 · Dashboards, Home and KPIs fill the screen; larger charts and text
+
+- Charts are drawn at the size of their card instead of a fixed picture, so they grow with the screen while their labels stay readable; on Dashboards, Home and the KPI dashboard the main chart row stretches to fill the screen height (no empty band at the bottom).
+- Larger text: headline numbers, card titles, legends, facility bars, axis labels; donuts about 15% larger, and their legend moves below the donut when the card is narrow so names are not cut.
+- A chart with no data says so instead of showing an axis of zeros.
+
 ## 2026-10-13 · Side menu colours and full-width pages
 
 - Side menu as in the prototype: each section has its own colour (Capture mint, Value chain amber, Net zero green, Disclose lilac, Setup grey, Help pink) — a coloured dot and title, a coloured line along its items, coloured icons and the current page highlighted in the section colour. Sections fold with ▾/▸ (remembered on this browser); the section of the open page always shows.

@@ -3,7 +3,22 @@
  * reference lines, donut, treemap, horizontal bars and legends, card and stat-strip frames.
  * Every mark has a title (hover) with its value; legends carry the numbers as text.
  */
-import type { ReactNode } from 'react';
+import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+
+/**
+ * A box that fills the space its card gives it (at least minH tall) and draws its chart at the real
+ * pixel size, so text stays the same size whatever the screen and the chart grows with the card.
+ */
+export function Fit({ minH, children, className }: { minH: number; children: (w: number, h: number) => ReactNode; className?: string }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [s, setS] = useState<{ w: number; h: number } | null>(null);
+  useLayoutEffect(() => {
+    const el = ref.current; if (!el) return;
+    const ro = new ResizeObserver(([e]) => { const r = e!.contentRect; setS((p) => (p && Math.abs(p.w - r.width) < 1 && Math.abs(p.h - r.height) < 1 ? p : { w: r.width, h: r.height })); });
+    ro.observe(el); return () => ro.disconnect();
+  }, []);
+  return <div ref={ref} className={`fit${className ? ' ' + className : ''}`} style={{ minHeight: minH }}>{s && s.w > 0 ? children(Math.round(s.w), Math.max(minH, Math.round(s.h))) : null}</div>;
+}
 
 export const MN = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 export const PAL = ['#1F6F5C', '#2BA38A', '#86CDB4', '#E9B44C', '#C2523C', '#6B4FA8', '#2E6FB0', '#9AA7A2', '#D27A3A', '#4F7F2E'];
@@ -15,33 +30,43 @@ export const fmtT = (v: number) => (Math.abs(v) < 10 ? fmt(v, Math.abs(v) < 1 ? 
 export interface Part { v: number; c: string; n: string }
 export interface BarRow { lbl: string; parts: Part[]; line?: number | null; line2?: number | null; dim?: boolean }
 
-export function Bars({ rows, unit = 't', h = 170, w = 640, label = 'Chart' }: { rows: BarRow[]; unit?: string; h?: number; w?: number; label?: string }) {
-  const W = w, H = h, L = 40, B = 20, T = 8, n = rows.length, bw = (W - L) / Math.max(1, n);
+export function Bars({ rows, unit = 't', h = 170, label = 'Chart' }: { rows: BarRow[]; unit?: string; h?: number; w?: number; label?: string }) {
+  return <Fit minH={Math.round(h * 1.3)}>{(w, hh) => <BarsSvg rows={rows} unit={unit} W={w} H={hh} label={label} />}</Fit>;
+}
+function BarsSvg({ rows, unit, W, H, label }: { rows: BarRow[]; unit: string; W: number; H: number; label: string }) {
+  const L = 46, B = 24, T = 10, n = rows.length, bw = (W - L) / Math.max(1, n);
   const tot = (r: BarRow) => r.parts.reduce((a, p) => a + (p.v || 0), 0);
+  if (!rows.some((r) => tot(r) > 0 || (r.line ?? 0) > 0 || (r.line2 ?? 0) > 0)) return (
+    <svg viewBox={`0 0 ${W} ${H}`} width={W} height={H} role="img" aria-label={label}>
+      <line x1={L} x2={W} y1={H - B} y2={H - B} stroke="var(--line)" />
+      {rows.map((r, i) => <text key={r.lbl + i} x={L + i * ((W - L) / Math.max(1, rows.length)) + (W - L) / Math.max(1, rows.length) / 2} y={H - 6} fontSize="12.5" textAnchor="middle" fill="var(--muted)">{r.lbl}</text>)}
+      <text x={(L + W) / 2} y={(H - B) / 2} fontSize="13" textAnchor="middle" fill="var(--muted)">No data for this selection and period</text>
+    </svg>);
   const mx = Math.max(1e-9, ...rows.map((r) => Math.max(tot(r), r.line ?? 0, r.line2 ?? 0))) * 1.1;
   const yy = (v: number) => T + (1 - v / mx) * (H - T - B);
   const tick = (v: number) => (v >= 1e6 ? `${fmt(v / 1e6, 1)}M` : v >= 1000 ? `${fmt(v / 1000, 1)}k` : fmt(v, v < 10 ? 1 : 0));
   const line = (k: 'line' | 'line2') => rows.map((r, i) => (r[k] == null ? null : `${(L + i * bw + bw / 2).toFixed(1)},${yy(r[k]!).toFixed(1)}`)).filter(Boolean) as string[];
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ display: 'block' }} role="img" aria-label={label}>
-      {[0, 0.5, 1].map((g) => { const v = (mx / 1.1) * g; return <g key={g}><line x1={L} x2={W} y1={yy(v)} y2={yy(v)} stroke="var(--line)" /><text x={L - 5} y={yy(v) + 3.5} fontSize="11" textAnchor="end" fill="var(--muted)">{tick(v)}</text></g>; })}
+    <svg viewBox={`0 0 ${W} ${H}`} width={W} height={H} role="img" aria-label={label}>
+      {[0, 0.25, 0.5, 0.75, 1].map((g) => { const v = (mx / 1.1) * g; return <g key={g}><line x1={L} x2={W} y1={yy(v)} y2={yy(v)} stroke="var(--line)" /><text x={L - 6} y={yy(v) + 4} fontSize="12" textAnchor="end" fill="var(--muted)">{tick(v)}</text></g>; })}
       {rows.map((r, i) => {
-        const x = L + i * bw + bw * 0.18, w = bw * 0.64;
+        const w = Math.min(bw * 0.64, 72), x = L + i * bw + (bw - w) / 2;
         let acc = 0;
         return (
           <g key={r.lbl + i}>
             {r.parts.map((p, k) => { const hh = ((p.v || 0) / mx) * (H - T - B); if (hh <= 0) return null; const y = yy(0) - acc - hh; acc += hh;
               return <rect key={k} x={x} y={y} width={w} height={hh} fill={p.c} opacity={r.dim ? 0.4 : 1}><title>{`${r.lbl}${p.n ? ` · ${p.n}` : ''}: ${fmtT(p.v)} ${unit}`}</title></rect>; })}
-            <text x={x + w / 2} y={H - 5} fontSize="11" textAnchor="middle" fill="var(--muted)">{r.lbl}</text>
+            <text x={x + w / 2} y={H - 6} fontSize="12.5" textAnchor="middle" fill="var(--fg2)">{r.lbl}</text>
           </g>);
       })}
       {(['line', 'line2'] as const).map((k, j) => { const pts = line(k); const col = j ? '#D99A1E' : 'var(--muted)';
-        return pts.length > 1 ? <polyline key={k} points={pts.join(' ')} fill="none" stroke={col} strokeWidth="1.8" strokeDasharray={j ? '5 4' : undefined} /> : null; })}
+        return pts.length > 1 ? <polyline key={k} points={pts.join(' ')} fill="none" stroke={col} strokeWidth="2" strokeDasharray={j ? '5 4' : undefined} /> : null; })}
     </svg>
   );
 }
 
-export function Donut({ parts, center, sub, size = 150 }: { parts: Part[]; center: string; sub?: string; size?: number }) {
+export function Donut({ parts, center, sub, size: size0 = 150 }: { parts: Part[]; center: string; sub?: string; size?: number }) {
+  const size = Math.round(size0 * 1.15);
   const tot = parts.reduce((a, p) => a + Math.max(0, p.v || 0), 0) || 1, R = size / 2 - 4, r = R * 0.62, c = size / 2;
   let a0 = -Math.PI / 2;
   const P = (ang: number, rad: number) => [c + rad * Math.cos(ang), c + rad * Math.sin(ang)];
@@ -65,7 +90,11 @@ export function Legend({ parts, unit, tot }: { parts: Part[]; unit?: string; tot
     <div key={p.n}><i style={{ background: p.c }} /><span className="nm" title={p.n}>{p.n}</span><b>{p.v < 100 ? fmt(p.v, p.v < 10 ? 2 : 1) : fmt0(p.v)}{unit ? ` ${unit}` : ''}</b><span className="muted">{Math.round((p.v / T) * 100)}%</span></div>))}</div>;
 }
 
-export function Treemap({ items, W = 640, H = 210 }: { items: Part[]; W?: number; H?: number }) {
+export function Treemap({ items, H = 210 }: { items: Part[]; W?: number; H?: number }) {
+  if (!items.reduce((a, i) => a + i.v, 0)) return <div className="muted" style={{ fontSize: 13 }}>No data.</div>;
+  return <Fit minH={Math.round(H * 1.2)}>{(w, h) => <TreemapSvg items={items} W={w} H={h} />}</Fit>;
+}
+function TreemapSvg({ items, W, H }: { items: Part[]; W: number; H: number }) {
   const out: { it: Part; x: number; y: number; w: number; h: number }[] = [];
   const tot0 = items.reduce((a, i) => a + i.v, 0);
   if (!tot0) return <div className="muted" style={{ fontSize: 13 }}>No data.</div>;
@@ -81,14 +110,14 @@ export function Treemap({ items, W = 640, H = 210 }: { items: Part[]; W?: number
   };
   split(items.filter((i) => i.v > 0).sort((a, b) => b.v - a.v), 0, 0, W, H);
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ display: 'block' }} role="img" aria-label="Treemap">
+    <svg viewBox={`0 0 ${W} ${H}`} width={W} height={H} role="img" aria-label="Treemap">
       {out.map(({ it, x, y, w, h }, i) => (
         <g key={i}>
           <rect x={x + 1} y={y + 1} width={Math.max(0, w - 2)} height={Math.max(0, h - 2)} rx="4" fill={it.c}><title>{`${it.n}: ${fmtT(it.v)} t (${Math.round((it.v / tot0) * 100)}%)`}</title></rect>
-          {w > 70 && h > 34 ? <>
-            <text x={x + 7} y={y + 17} fontSize="11.5" fontWeight="600" fill="#fff">{it.n.length > w / 7 ? `${it.n.slice(0, Math.floor(w / 7))}…` : it.n}</text>
-            <text x={x + 7} y={y + 31} fontSize="10.5" fill="#fff" opacity=".9">{fmtT(it.v)} t · {Math.round((it.v / tot0) * 100)}%</text>
-          </> : w > 34 && h > 18 ? <text x={x + w / 2} y={y + h / 2 + 4} fontSize="10" fontWeight="600" textAnchor="middle" fill="#fff">{Math.max(1, Math.round((it.v / tot0) * 100))}%</text> : null}
+          {w > 80 && h > 40 ? <>
+            <text x={x + 8} y={y + 19} fontSize="13" fontWeight="600" fill="#fff">{it.n.length > w / 7.5 ? `${it.n.slice(0, Math.floor(w / 7.5))}…` : it.n}</text>
+            <text x={x + 8} y={y + 35} fontSize="12" fill="#fff" opacity=".9">{fmtT(it.v)} t · {Math.round((it.v / tot0) * 100)}%</text>
+          </> : w > 34 && h > 18 ? <text x={x + w / 2} y={y + h / 2 + 4} fontSize="11.5" fontWeight="600" textAnchor="middle" fill="#fff">{Math.max(1, Math.round((it.v / tot0) * 100))}%</text> : null}
         </g>))}
     </svg>
   );

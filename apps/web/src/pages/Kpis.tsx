@@ -17,7 +17,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useApp } from '../App';
 import { api, type HomeData, type KpiConfig } from '../lib/api';
-import { Bars, DCard, HBars, MN, PAL, fmt, fmt0, type BarRow } from '../components/DashCharts';
+import { Bars, DCard, Fit, HBars, MN, PAL, fmt, fmt0, type BarRow } from '../components/DashCharts';
 import { ViewBar, sum, useView, type Ctx, type Data, type Row } from '../components/ViewBar';
 import { DIVERT, route, tonnes } from './Dashboards';
 
@@ -98,7 +98,7 @@ export function Kpis() {
           : <>
             <div className="row" style={{ gap: 8, fontSize: 12.5 }}><span className="chip c-info">{cfg.list.length} KPIs</span><span className={`chip ${set0 ? 'c-ok' : 'c-n'}`}>{set0} with a target for this selection</span>
               <span className="muted">Bars green when on target, amber when off; dashed line = target; pale = period still filling. Change a card’s KPI from its title.</span></div>
-            <div className="dgrid">{cfg.list.map((id, i) => <KpiCard key={i + id} i={i} id={id} d={d} c={c} freq={freq} cmp={cmp} target={tg[id]} onPick={(nid) => void saveSlot(i, nid)} />)}</div>
+            <div className="dgrid kfill">{cfg.list.map((id, i) => <KpiCard key={i + id} i={i} id={id} d={d} c={c} freq={freq} cmp={cmp} target={tg[id]} onPick={(nid) => void saveSlot(i, nid)} />)}</div>
           </>}
       </>}
       {panel && cfg && <>
@@ -186,11 +186,10 @@ function Perf({ d, c, home, freq, metric, setMetric, setFreq, name }: { d: Data;
   const okD = (r: typeof rows[number]) => !!r.a && (r.comp === null || r.comp >= 0.9), full = rows.filter(okD), onTrack = full.filter((r) => (act(r) ?? 0) <= tDone(r)).length;
   const metName = ({ tot: 'Total (all scopes)', s12: 'Scope 1 + 2', s3: 'Scope 3' } as Record<string, string>)[metric] ?? 'Total';
   // chart
-  const W = 760, H = 240, pad = 40, bw = (W - pad) / rows.length;
-  const max = Math.max(1, ...rows.map((r) => Math.max(act(r) ?? 0, tDone(r)))) * 1.12, yy = (val: number) => H - 24 - (val / max) * (H - 44);
+  const pad = 46, max = Math.max(1, ...rows.map((r) => Math.max(act(r) ?? 0, tDone(r)))) * 1.12;
   const Tile = ({ l, val, s, col }: { l: string; val: string; s: string; col?: string }) => <section className="card kc"><span className="muted">{l}</span><span className="v" style={col ? { color: col } : undefined}>{val}</span><span className="ks">{s}</span></section>;
   return (
-    <section className="card" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+    <section className="card kperf" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <div className="row"><div><h2 style={{ fontSize: 15 }}>Performance against target · {y}</h2>
         <div className="muted" style={{ fontSize: 12.5 }}>Target level = same period of {base} × the straight-line path to −{T.s12}% Scope 1+2 and −{T.s3}% Scope 3 by {T.year} ({y}: {Math.round((1 - k12) * 100)}% / {Math.round((1 - k3) * 100)}% below {base}). {d.pend ? 'Includes entries waiting approval.' : 'Approved data only.'}</div></div><span className="grow" />
         <div className="seg">{Object.entries(FREQ).map(([k, [nm]]) => <button key={k} className={freq === k ? 'on' : ''} onClick={() => setFreq(k)}>{nm}</button>)}</div>
@@ -201,19 +200,20 @@ function Perf({ d, c, home, freq, metric, setMetric, setFreq, name }: { d: Data;
         <Tile l="Full-year forecast" val={`${fmt0(fc)} t`} s={`run-rate vs ${fmt0(yrT)} t target`} col={fc > yrT ? 'var(--bad)' : 'var(--ok)'} />
         <Tile l="Periods on target" val={`${onTrack} of ${full.length}`} s={`${FREQ[freq]![0].toLowerCase()} periods with complete data`} />
       </div>
-      <svg viewBox={`0 0 ${W} ${H}`} width="100%" role="img" aria-label="Emissions against target by period" style={{ display: 'block' }}>
-        {[0, 1, 2, 3].map((g) => { const val = (max / 1.12) * g / 3, gy = yy(val); return <g key={g}><line x1={pad} x2={W} y1={gy} y2={gy} stroke="var(--line)" /><text x={pad - 6} y={gy + 4} fontSize="10" textAnchor="end" fill="var(--muted)">{val >= 1000 ? `${fmt(val / 1000, 1)}k` : fmt0(val)}</text></g>; })}
+      <Fit minH={280}>{(W, H) => { const bw = (W - pad) / rows.length, yy = (val: number) => H - 26 - (val / max) * (H - 48); return (
+      <svg viewBox={`0 0 ${W} ${H}`} width={W} height={H} role="img" aria-label="Emissions against target by period">
+        {[0, 1, 2, 3].map((g) => { const val = (max / 1.12) * g / 3, gy = yy(val); return <g key={g}><line x1={pad} x2={W} y1={gy} y2={gy} stroke="var(--line)" /><text x={pad - 6} y={gy + 4} fontSize="12" textAnchor="end" fill="var(--muted)">{val >= 1000 ? `${fmt(val / 1000, 1)}k` : fmt0(val)}</text></g>; })}
         {rows.map((r, i) => {
           const cx = pad + i * bw + bw / 2, w = Math.min(64, bw * 0.56), val = act(r), t = tDone(r), inc = r.comp !== null && r.comp < 0.9;
           return (
             <g key={r.lbl}>
-              {val !== null ? <rect x={cx - w / 2} y={yy(val)} width={w} height={Math.max(1, H - 24 - yy(val))} rx="4" fill={inc ? 'var(--line2)' : val > t ? '#E3B25A' : 'var(--s2)'}><title>{`${r.lbl}: ${fmt0(val)} t vs target ${fmt0(t)} t${inc ? ' — data incomplete' : ''}`}</title></rect>
-                : <rect x={cx - w / 2} y={H - 26} width={w} height="2" fill="var(--line2)" />}
+              {val !== null ? <rect x={cx - w / 2} y={yy(val)} width={w} height={Math.max(1, H - 26 - yy(val))} rx="4" fill={inc ? 'var(--line2)' : val > t ? '#E3B25A' : 'var(--s2)'}><title>{`${r.lbl}: ${fmt0(val)} t vs target ${fmt0(t)} t${inc ? ' — data incomplete' : ''}`}</title></rect>
+                : <rect x={cx - w / 2} y={H - 28} width={w} height="2" fill="var(--line2)" />}
               <line x1={cx - w / 2 - 6} x2={cx + w / 2 + 6} y1={yy(t)} y2={yy(t)} stroke="var(--fg)" strokeWidth="2.5" strokeDasharray={val === null ? '4 3' : undefined} />
-              <text x={cx} y={H - 8} fontSize="11" textAnchor="middle" fill="var(--fg2)">{r.lbl}{r.partial ? '*' : ''}</text>
+              <text x={cx} y={H - 8} fontSize="12.5" textAnchor="middle" fill="var(--fg2)">{r.lbl}{r.partial ? '*' : ''}</text>
             </g>);
         })}
-      </svg>
+      </svg>); }}</Fit>
       <div className="row" style={{ gap: 14, fontSize: 12, color: 'var(--fg2)' }}>
         <span className="row" style={{ gap: 5 }}><i className="sw" style={{ background: 'var(--s2)' }} />At or below target</span><span className="row" style={{ gap: 5 }}><i className="sw" style={{ background: '#E3B25A' }} />Above target</span>
         <span className="row" style={{ gap: 5 }}><i className="sw" style={{ background: 'var(--line2)' }} />Data under 90% in</span><span className="row" style={{ gap: 5 }}><i style={{ width: 16, borderTop: '2.5px solid var(--fg)' }} />Target level</span>

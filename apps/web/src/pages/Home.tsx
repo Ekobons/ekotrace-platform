@@ -21,7 +21,7 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useApp } from '../App';
 import { api, ROLE_LABEL, type HomeData, type Role } from '../lib/api';
-import { MN, fmt, fmt0 } from '../components/DashCharts';
+import { Fit, MN, fmt, fmt0 } from '../components/DashCharts';
 import { CONS, S, ViewBar, sum, useView, type Ctx, type Data, type Row } from '../components/ViewBar';
 
 const ROLE_C: Record<string, string> = { super_admin: 'r-sa', admin: 'r-ad', manager: 'r-mg', preparer: 'r-dp', verifier: 'r-vf', platform_admin: 'r-op' };
@@ -159,7 +159,7 @@ function PathTile({ x }: { x: H }) {
 
 /** Monthly emissions by scope; grey line = same month last year; amber dashed = target path. */
 function TrendCard({ x, d, c, span }: { x: H; d: Data; c: Ctx; span?: number }) {
-  const W = 760, H0 = 230, L = 44, B = 24, Tp = 10;
+  const L = 48, B = 26, Tp = 12;
   const rows = MN.map((lbl, i) => {
     const m = i + 1, rs = d.rows.filter((r) => r.m === m), v = S.map((f) => sum(rs, f)), tot = v[0]! + v[1]! + v[2]!;
     const pm = d.prevMonthly.find((p) => p.m === m), last = pm ? pm.s1 + pm.s2 + pm.s3 : 0;
@@ -167,28 +167,31 @@ function TrendCard({ x, d, c, span }: { x: H; d: Data; c: Ctx; span?: number }) 
     return { m, i, lbl, v, tot, last, path: x.base && x.base < x.y ? x.pathM(m) : null, open, cpl };
   });
   const closed = rows.filter((r) => r.open && (r.cpl ?? 0) >= 0.999 && r.tot && r.path !== null), below = closed.filter((r) => r.tot <= (r.path ?? 0)).length;
-  const mx = Math.max(1, ...rows.map((r) => Math.max(r.tot, r.last, r.path ?? 0))) * 1.08, bw = (W - L) / 12, yy = (val: number) => Tp + (1 - val / mx) * (H0 - Tp - B);
+  const mx = Math.max(1, ...rows.map((r) => Math.max(r.tot, r.last, r.path ?? 0))) * 1.08;
+  const draw = (W: number, H0: number) => { const bw = (W - L) / 12, yy = (val: number) => Tp + (1 - val / mx) * (H0 - Tp - B);
   const line = (k: 'last' | 'path') => rows.filter((r) => r[k] !== null && (k !== 'last' || d.prevMonthly.length)).map((r) => `${(L + r.i * bw + bw / 2).toFixed(1)},${yy(r[k] as number).toFixed(1)}`).join(' ');
+  return (
+      <svg viewBox={`0 0 ${W} ${H0}`} width={W} height={H0} role="img" aria-label="Monthly emissions against last year and the target path">
+        {[0, 1, 2, 3, 4].map((g) => { const val = (mx / 1.08) * g / 4; return <g key={g}><line x1={L} x2={W} y1={yy(val)} y2={yy(val)} stroke="var(--line)" /><text x={L - 6} y={yy(val) + 4} fontSize="12" textAnchor="end" fill="var(--muted)">{val >= 1000 ? `${fmt(val / 1000, 1)}k` : fmt0(val)}</text></g>; })}
+        {rows.map((r) => {
+          const w = Math.min(bw * 0.6, 64), bx = L + r.i * bw + (bw - w) / 2, op = r.open && (r.cpl ?? 1) < 0.999 ? 0.45 : 1; let acc = 0;
+          return (
+            <g key={r.m}>
+              {r.v.map((val, k) => { const hh = (val / mx) * (H0 - Tp - B); if (hh <= 0) return null; const yv = yy(0) - acc - hh; acc += hh; return <rect key={k} x={bx} y={yv} width={w} height={hh} fill={`var(--s${k + 1})`} opacity={op}><title>{`${r.lbl} · Scope ${k + 1}: ${fmt0(val)} t`}</title></rect>; })}
+              {r.open && (r.cpl ?? 1) < 0.999 && <text x={bx + w / 2} y={yy(r.tot) - 6} fontSize="11.5" textAnchor="middle" fill="var(--warn)">{r.tot ? `${Math.round((r.cpl ?? 0) * 100)}% in` : 'due'}</text>}
+              <text x={bx + w / 2} y={H0 - 7} fontSize="12.5" textAnchor="middle" fill={r.open ? 'var(--fg2)' : 'var(--muted)'}>{r.lbl}</text>
+              <rect x={L + r.i * bw} y={Tp} width={bw} height={H0 - Tp - B} fill="transparent"><title>{`${r.lbl} ${x.y}: ${r.tot ? `${fmt0(r.tot)} t` : 'no data yet'} · ${r.lbl} ${d.cmpYear}: ${fmt0(r.last)} t${r.path !== null ? ` · target path: ${fmt0(r.path)} t` : ''}${r.open ? ` · data in ${Math.round((r.cpl ?? 0) * 100)}%` : ''}`}</title></rect>
+            </g>);
+        })}
+        {d.prevMonthly.length > 0 && <polyline points={line('last')} fill="none" stroke="var(--muted)" strokeWidth="2" />}
+        {rows.some((r) => r.path !== null) && <polyline points={line('path')} fill="none" stroke="#D99A1E" strokeWidth="2.4" strokeDasharray="6 4" />}
+      </svg>); };
   const msg = closed.length ? `${below} of ${closed.length} complete months at or below the target path` : 'No complete months yet';
   return (
     <section className="card hcard2" style={span ? { gridColumn: `span ${span}` } : undefined}>
       <div className="row"><div><h2>Monthly emissions</h2><div className="muted" style={{ fontSize: 12 }}>Is each month below the path to the target? Pale bars are months still being filled in.</div></div><span className="grow" />
         <span className={`chip ${closed.length && below === closed.length ? 'c-ok' : below >= closed.length / 2 && closed.length ? 'c-warn' : closed.length ? 'c-bad' : 'c-warn'}`}>{msg}</span><Link className="btn sm ghost" to="/dashboards">Dashboards →</Link></div>
-      <svg viewBox={`0 0 ${W} ${H0}`} width="100%" style={{ display: 'block' }} role="img" aria-label="Monthly emissions against last year and the target path">
-        {[0, 1, 2, 3, 4].map((g) => { const val = (mx / 1.08) * g / 4; return <g key={g}><line x1={L} x2={W} y1={yy(val)} y2={yy(val)} stroke="var(--line)" /><text x={L - 6} y={yy(val) + 4} fontSize="10" textAnchor="end" fill="var(--muted)">{val >= 1000 ? `${fmt(val / 1000, 1)}k` : fmt0(val)}</text></g>; })}
-        {rows.map((r) => {
-          const bx = L + r.i * bw + bw * 0.2, w = bw * 0.6, op = r.open && (r.cpl ?? 1) < 0.999 ? 0.45 : 1; let acc = 0;
-          return (
-            <g key={r.m}>
-              {r.v.map((val, k) => { const hh = (val / mx) * (H0 - Tp - B); if (hh <= 0) return null; const yv = yy(0) - acc - hh; acc += hh; return <rect key={k} x={bx} y={yv} width={w} height={hh} fill={`var(--s${k + 1})`} opacity={op}><title>{`${r.lbl} · Scope ${k + 1}: ${fmt0(val)} t`}</title></rect>; })}
-              {r.open && (r.cpl ?? 1) < 0.999 && <text x={bx + w / 2} y={yy(r.tot) - 5} fontSize="9.5" textAnchor="middle" fill="var(--warn)">{r.tot ? `${Math.round((r.cpl ?? 0) * 100)}% in` : 'due'}</text>}
-              <text x={bx + w / 2} y={H0 - 7} fontSize="10.5" textAnchor="middle" fill={r.open ? 'var(--fg2)' : 'var(--muted)'}>{r.lbl}</text>
-              <rect x={L + r.i * bw} y={Tp} width={bw} height={H0 - Tp - B} fill="transparent"><title>{`${r.lbl} ${x.y}: ${r.tot ? `${fmt0(r.tot)} t` : 'no data yet'} · ${r.lbl} ${d.cmpYear}: ${fmt0(r.last)} t${r.path !== null ? ` · target path: ${fmt0(r.path)} t` : ''}${r.open ? ` · data in ${Math.round((r.cpl ?? 0) * 100)}%` : ''}`}</title></rect>
-            </g>);
-        })}
-        {d.prevMonthly.length > 0 && <polyline points={line('last')} fill="none" stroke="var(--muted)" strokeWidth="1.8" />}
-        {rows.some((r) => r.path !== null) && <polyline points={line('path')} fill="none" stroke="#D99A1E" strokeWidth="2.2" strokeDasharray="6 4" />}
-      </svg>
+      <Fit minH={280}>{draw}</Fit>
       <div className="row lgd"><span><i style={{ background: 'var(--s1)' }} />Scope 1</span><span><i style={{ background: 'var(--s2)' }} />Scope 2</span><span><i style={{ background: 'var(--s3)' }} />Scope 3</span>
         <span><i className="ln" style={{ borderColor: 'var(--muted)' }} />Same month {d.cmpYear}</span><span><i className="ln dash" style={{ borderColor: '#D99A1E' }} />Target path {x.T.year}</span>
         {c.cmpOn ? null : <span className="muted">no {d.cmpYear} data to compare</span>}</div>
