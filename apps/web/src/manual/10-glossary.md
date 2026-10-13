@@ -74,3 +74,7 @@
 | Residual emissions | What is left at net zero (at most ~10% of the base year), neutralised by permanent removals |
 | Level 1 / level 2 approval | Level 1: the facility manager, sub-group admin or super admin. Level 2 (optional): a second approval by an admin or the super admin for large entries or chosen categories |
 | 6-month check | An entry's quantity compared with the average for the same item at the same facility over the 6 months before |
+| GHG Protocol category | 1.1–1.4 Scope 1, 2.1–2.2 Scope 2, 3.1–3.15 Scope 3 (the 15 Scope 3 categories) |
+| Exclusion justification | Why a category has no data (e.g. no products sold); every excluded category needs one in the inventory |
+| MRV dataset | One row per approved entry (facility, scope, category, activity, unit, factor, source, data type, evidence) for a regulator's MRV platform or a verifier |
+| Report version | The inventory frozen at a point in time, to compare with today |

@@ -905,3 +905,28 @@ table.t tr.sel td, table.t tr.totrow td { background: var(--soft); }
 table.progt { table-layout: fixed; width: 100%; min-width: 1100px; }
 table.progt td, table.progt th { padding-left: 3px; padding-right: 3px; }
 table.progt th:first-child { width: 230px; } table.progt th:last-child { width: 80px; }
+.apfilt { gap: 8px; flex-wrap: wrap; }
+/* reports (as in the prototype) */
+table.t tr.scoperow td { background: var(--soft); font-size: 13.5px; }
+.repcover { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 18px; padding: 22px 24px !important; }
+.repcover h2 { font-size: 32px; margin: 6px 0 2px; letter-spacing: -.02em; }
+.repcover b { font-size: 22px; font-variant-numeric: tabular-nums; }
+.repcover .rc-sub { color: var(--muted); font-size: 12.5px; }
+.repbar { display: grid; grid-template-columns: minmax(0, 260px) 1fr auto; gap: 10px; align-items: center; font-size: 13px; padding: 3px 0; }
+.repbar > span:first-child { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.repbar .bar { height: 10px; } .repbar b { font-size: 13px; text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.rprev { font-size: 13.5px; line-height: 1.55; max-height: 1000px; overflow: auto; border: 1px solid var(--line); border-radius: 12px; padding: 18px 22px; background: var(--surface); }
+.rprev h1 { font-size: 24px; margin: 4px 0 12px; }
+.rprev h2 { font-size: 16px; margin: 22px 0 8px; padding-top: 14px; border-top: 1px solid var(--line); }
+.rprev table { border-collapse: collapse; width: 100%; margin: 6px 0; font-size: 13px; }
+.rprev th, .rprev td { padding: 5px 8px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+.rprev th { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+.rprev .n { text-align: right; font-variant-numeric: tabular-nums; }
+.rprev .kv td:first-child { color: var(--muted); width: 38%; } .rprev .kv td { text-align: left; }
+.rprev .cover { border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; } .rprev .eyb { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--primary); }
+.rprev .small { font-size: 12px; color: var(--muted); } .rprev .note { background: var(--warn-bg); border-radius: 8px; padding: 10px 12px; font-size: 12.5px; }
+.tplwrap { display: grid; grid-template-columns: minmax(260px, 340px) minmax(0, 1fr); gap: 12px; align-items: start; }
+.tplitem { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; background: var(--surface); cursor: pointer; font: inherit; color: inherit; }
+.tplitem.on { border-color: var(--primary); box-shadow: 0 0 0 2px var(--primary-soft); }
+.secrow { gap: 8px; padding: 5px 8px; border-radius: 8px; font-size: 13.5px; }
+@media (max-width: 1000px) { .tplwrap { grid-template-columns: minmax(0, 1fr); } }

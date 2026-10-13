@@ -35,6 +35,7 @@ import { tripRoutes } from './modules/trip.routes.js';
 import { homeRoutes } from './modules/home.routes.js';
 import { targetsRoutes } from './modules/targets.routes.js';
 import { approvalsRoutes } from './modules/approvals.routes.js';
+import { reportsRoutes } from './modules/reports.routes.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const BRANDS = join(HERE, '../../../brands');
@@ -78,6 +79,7 @@ export async function buildApp(opts: { logger?: boolean } = {}): Promise<Fastify
     await secured.register(homeRoutes);
     await secured.register(targetsRoutes);
     await secured.register(approvalsRoutes);
+    await secured.register(reportsRoutes);
     await secured.register(orgRoutes);
     await secured.register(peopleRoutes);
     await secured.register(platformRoutes);

@@ -35,7 +35,20 @@ export function Approvals() {
     } catch (e) { toast((e as Error).message); } finally { setBusy(false); }
   };
   const show = async (id: string) => { try { setOpen(await api.activity(id)); dlg.current?.showModal(); } catch (e) { toast((e as Error).message); } };
-  const clean = (d?.mine ?? []).filter((l) => !l.check || l.check.ok);
+  // filters: facility, category, month, check, level, search — applied to both lists
+  const [F, setF] = useState({ fac: '', cat: '', month: '', check: '', level: '', q: '' });
+  const all = [...(d?.mine ?? []), ...(d?.others ?? [])];
+  const uniq = <T,>(xs: T[]) => [...new Set(xs)];
+  const facs = uniq(all.map((l) => l.facility)).sort(), cats = uniq(all.map((l) => l.category)).sort(), months = uniq(all.map((l) => l.month.slice(0, 7))).sort().reverse();
+  const keep = (l: ApprovalRow) => (!F.fac || l.facility === F.fac) && (!F.cat || l.category === F.cat) && (!F.month || l.month.startsWith(F.month))
+    && (!F.check || (F.check === 'warn' ? l.check && !l.check.ok : F.check === 'ok' ? l.check?.ok : !l.check))
+    && (!F.level || (F.level === 'L2' ? l.stage === 'L2' : l.stage !== 'L2'))
+    && (!F.q || `${l.item} ${l.note ?? ''} ${l.by ?? ''}`.toLowerCase().includes(F.q.toLowerCase()));
+  const mine = (d?.mine ?? []).filter(keep), others = (d?.others ?? []).filter(keep), filtered = Object.values(F).some(Boolean);
+  const clean = mine.filter((l) => !l.check || l.check.ok);
+  const sel = (k: keyof typeof F, label: string, opts: [string, string][]) => (
+    <select className="input sm" aria-label={label} style={{ width: 'auto', maxWidth: 230 }} value={F[k]} onChange={(e) => setF({ ...F, [k]: e.target.value })}>
+      <option value="">{label}</option>{opts.map(([v, n]) => <option key={v} value={v}>{n}</option>)}</select>);
 
   const row = (l: ApprovalRow, can: boolean) => (
     <tr key={l.id}>
@@ -62,17 +75,27 @@ export function Approvals() {
         <div><span className="lbl">Capture</span><h1>Approvals</h1><div className="muted">Entries submitted for facilities you look after. Approved data flows into dashboards and reports.</div></div>
         <span className="grow" />
         {d && d.settings.l2 && <span className="chip c-info">Level 2 on · ≥ {fmt(d.settings.minT, 0)} t{d.settings.cats.length ? ` or ${d.settings.cats.length} categories` : ''}</span>}
-        {clean.length > 0 && <button className="btn p" disabled={busy} onClick={() => void act(clean.map((l) => l.id), 'approve')}>Approve all {clean.length} without warnings</button>}
+        {clean.length > 0 && <button className="btn p" disabled={busy} onClick={() => void act(clean.map((l) => l.id), 'approve')}>Approve all {clean.length}{filtered ? ' shown' : ''} without warnings</button>}
       </div>
       {!d ? <div className="card empty">Loading…</div> : <>
+        <div className="row apfilt">
+          <input className="input sm" type="search" placeholder="Search item, note, person" style={{ width: 220 }} value={F.q} onChange={(e) => setF({ ...F, q: e.target.value })} />
+          {sel('fac', 'All facilities', facs.map((x) => [x, x]))}
+          {sel('cat', 'All categories', cats.map((x) => [x, x]))}
+          {sel('month', 'All months', months.map((m) => [m, ml(m)]))}
+          {sel('check', 'Any check', [['warn', 'With warnings'], ['ok', 'In usual range'], ['none', 'No history']])}
+          {d.settings.l2 && sel('level', 'Any level', [['L1', 'Level 1'], ['L2', 'Level 2']])}
+          {filtered && <button className="btn sm ghost" onClick={() => setF({ fac: '', cat: '', month: '', check: '', level: '', q: '' })}>Clear filters</button>}
+          <span className="grow" /><span className="muted small">{mine.length + others.length} of {all.length} shown</span>
+        </div>
         <section className="card tacard">
-          <div className="row"><h2>Waiting for you · {d.mine.length}</h2><span className="grow" /><span className="muted small">Check = quantity against the facility’s average for the same item over the 6 months before (limit ±{d.settings.checkPct}%). Nobody approves their own entry.</span></div>
-          <div className="scrollx"><table className="t">{head}<tbody>{d.mine.map((l) => row(l, true))}{!d.mine.length && <tr><td colSpan={7} className="muted">Nothing waiting for your approval.</td></tr>}</tbody></table></div>
+          <div className="row"><h2>Waiting for you · {mine.length}{filtered ? ` of ${d.mine.length}` : ''}</h2><span className="grow" /><span className="muted small">Check = quantity against the facility’s average for the same item over the 6 months before (limit ±{d.settings.checkPct}%). Nobody approves their own entry.</span></div>
+          <div className="scrollx"><table className="t">{head}<tbody>{mine.map((l) => row(l, true))}{!mine.length && <tr><td colSpan={7} className="muted">{d.mine.length ? 'Nothing matches the filters.' : 'Nothing waiting for your approval.'}</td></tr>}</tbody></table></div>
         </section>
-        {d.others.length > 0 && (
+        {others.length > 0 && (
           <section className="card tacard">
-            <h2>Waiting for someone else · {d.others.length}</h2>
-            <div className="scrollx"><table className="t">{head}<tbody>{d.others.map((l) => row(l, false))}</tbody></table></div>
+            <h2>Waiting for someone else · {others.length}</h2>
+            <div className="scrollx"><table className="t">{head}<tbody>{others.map((l) => row(l, false))}</tbody></table></div>
           </section>)}
         <div className="row muted small" style={{ gap: 12 }}><span>Approval levels and the check limit are set under</span><Link to="/methodology" className="btn xs ghost">Methodology & boundaries →</Link><span>Month by month status:</span><Link to="/progress" className="btn xs ghost">Data progress →</Link></div>
       </>}

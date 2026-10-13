@@ -21,6 +21,7 @@ import { Kpis } from './pages/Kpis';
 import { Targets } from './pages/Targets';
 import { Approvals } from './pages/Approvals';
 import { DataProgress } from './pages/DataProgress';
+import { Reports } from './pages/Reports';
 import { Dashboards } from './pages/Dashboards';
 import { Currencies } from './pages/Currencies';
 import { AuditLog } from './pages/AuditLog';
@@ -60,7 +61,7 @@ const NAV: { group?: string; items: NavItem[] }[] = [
   ] },
   { group: 'Value chain', items: [{ to: '/suppliers', label: 'Suppliers', icon: 'users', roles: ['super_admin', 'admin', 'manager', 'preparer', 'verifier'] }, { label: 'Product LCA', icon: 'leaf', stage: 4 }] },
   { group: 'Net zero', items: [{ to: '/targets', label: 'Targets & actions', icon: 'target' }, { label: 'Carbon credits', icon: 'leaf', stage: 4 }] },
-  { group: 'Disclose', items: [{ label: 'Reports', icon: 'doc', stage: 3 }, { label: 'Audit & assurance', icon: 'shield', stage: 3 }] },
+  { group: 'Disclose', items: [{ to: '/reports', label: 'Reports', icon: 'doc' }, { label: 'Audit & assurance', icon: 'shield', stage: 3 }] },
   { group: 'Setup', items: [
     { to: '/organisation', label: 'Organisation & groups', icon: 'tree' },
     { to: '/methodology', label: 'Methodology & boundaries', icon: 'scale', roles: ['super_admin', 'admin', 'verifier'] },
@@ -177,6 +178,7 @@ function Shell() {
           <Route path="/targets" element={<NeedCo><Targets /></NeedCo>} />
           <Route path="/approvals" element={<NeedCo><Approvals /></NeedCo>} />
           <Route path="/progress" element={<NeedCo><DataProgress /></NeedCo>} />
+          <Route path="/reports" element={<NeedCo><Reports /></NeedCo>} />
           <Route path="/dashboards" element={<NeedCo><Dashboards /></NeedCo>} />
           <Route path="/entries" element={<NeedCo><Entries /></NeedCo>} />
           <Route path="/surveys" element={<NeedCo><Surveys /></NeedCo>} />

@@ -1673,3 +1673,31 @@ test('approvals: waiting for me vs someone else, 6-month check; level 2 for larg
   await call(sa, 'PUT', '/api/approvals/settings', { l2: false, minT: 100, cats: [], checkPct: 35 });
   assert.equal((await call(mgr, 'POST', '/api/activities/review', { ids: [ok], action: 'approve' })).body.done, 1);
 });
+
+test('reports: entries behind the report with their GHG Protocol category, quality controls and justifications, entity and exclusions, templates, versions; who may change what; companies kept apart', async () => {
+  const sa = await login(superA.email, superA.temporaryPassword);
+  const mgr = await login('rmgr@a.test', 'a long enough pass');
+  const l = await call(sa, 'GET', '/api/reports/lines?year=2024');
+  assert.equal(l.status, 200, JSON.stringify(l.body));
+  assert.ok(l.body.lines.length > 0, 'no lines'); assert.ok(l.body.lines.every((x: { code: string; status: string }) => /^[123]\.\d+$/.test(x.code) && x.status === 'approved'), JSON.stringify(l.body.lines.slice(0, 2)));
+  assert.ok(l.body.lines.some((x: { cat: string; code: string }) => x.cat === 'stationary_combustion' && x.code === '1.1'));
+  const qd = await call(sa, 'GET', '/api/reports/quality?year=2024');
+  assert.equal(qd.status, 200, JSON.stringify(qd.body));
+  assert.deepEqual(qd.body.checks.map((c: { id: string }) => c.id), ['missing', 'odd', 'noev', 'spend', 'dup', 'est', 'old']);
+  assert.equal((await call(mgr, 'PUT', '/api/reports/quality/odd', { year: 2024, text: 'x' })).status, 403);
+  assert.equal((await call(sa, 'PUT', '/api/reports/quality/odd', { year: 2024, text: 'Plant shutdown in April' })).status, 200);
+  assert.equal((await call(sa, 'GET', '/api/reports/quality?year=2024')).body.checks.find((c: { id: string }) => c.id === 'odd').justified.text, 'Plant shutdown in April');
+  assert.equal((await call(sa, 'PUT', '/api/reports/settings', { entity: { legal: 'A Co LLC', mrvId: 'MRV-1' }, excl: { '3.9': 'No products shipped' } })).status, 200);
+  assert.equal((await call(mgr, 'PUT', '/api/reports/settings', { entity: { legal: 'x' } })).status, 403);
+  const st = (await call(sa, 'GET', '/api/reports/settings')).body;
+  assert.equal(st.entity.legal, 'A Co LLC'); assert.equal(st.excl['3.9'], 'No products shipped');
+  const t = await call(sa, 'POST', '/api/reports/templates', { name: 'Board pack', audience: 'Board', sections: ['cover', 'summary'] });
+  assert.equal(t.status, 200);
+  assert.equal((await call(sa, 'PUT', `/api/reports/templates/${t.body.id}`, { name: 'Board pack', sections: ['cover', 'summary', 'targets'] })).status, 200);
+  const v = await call(sa, 'POST', '/api/reports/versions', { name: 'Q3 board', label: 'Company', period: '2025 · Jan–Dec', scope2: 'location', s: [10, 5, 2], byCode: { '1.1': 10, '2.1': 5, '3.6': 2 } });
+  assert.equal(v.status, 200);
+  assert.equal((await call(mgr, 'POST', '/api/reports/versions', { name: 'x', label: 'x', period: 'x', scope2: 'location', s: [0, 0, 0], byCode: {} })).status, 403);
+  assert.equal((await call(sa, 'GET', '/api/reports/settings')).body.versions[0].byCode['1.1'], 10);
+  const b = (await api('GET', '/api/reports/settings', undefined, tenantB)).body;
+  assert.equal(b.versions.length, 0); assert.equal(b.templates.length, 0); assert.deepEqual(b.excl, {});
+});

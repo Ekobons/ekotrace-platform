@@ -209,6 +209,19 @@ export interface TripOptions {
 export interface AirportHit { iata: string; name: string; city: string; country: string; countryName: string }
 
 // ------------------------------------------------------------- home & KPIs --
+export interface RepLine {
+  id: string; f: string; facility: string; m: number; from: string; to: string; cat: string; category: string; scope: number; g3: number | null; code: string; item: string; note: string | null;
+  qty: number; unit: string; dataType: string; method: string | null; s1: number; s2: number; s2m: number; s3: number; s33: number; w: number;
+  captured: 'meter' | 'batch' | 'commute' | 'fleet' | 'form'; evidence: boolean; source: string | null; status: string; asset: string | null;
+}
+export interface RepCheck { id: string; name: string; area: string; n: number; items: string[]; justified: { text: string; by: string | null; at: string } | null }
+export interface RepTemplate { id: string; base: string | null; name: string; audience: string | null; note: string | null; sections: string[] }
+export interface RepVersion { id: string; name: string; label: string; period: string; scope2: 'location' | 'market'; s1: number; s2: number; s3: number; byCode: Record<string, number>; by: string | null; at: string }
+export interface RepEntity { legal?: string; licence?: string; emirate?: string; sector?: string; mrvId?: string; contact?: string }
+export interface RepSettings {
+  company: { name: string; country: string; consolidation: string; gwp: string; baseYear: number | null }; entity: RepEntity; excl: Record<string, string>;
+  templates: RepTemplate[]; versions: RepVersion[]; canEntity: boolean; canEdit: boolean;
+}
 export interface ApprovalSettings { l2: boolean; minT: number; cats: string[]; checkPct: number }
 export interface ApprovalRow {
   id: string; f: string; facility: string; month: string; cat: string; category: string; item: string; note: string | null; dataType: string; qty: number; unit: string; kg: number;
@@ -273,6 +286,7 @@ export interface SurveyDetail {
 export interface SurveyOptions { modes: { key: string; label: string }[]; fuels: { key: string; label: string }[]; statuses: Record<string, string> }
 export interface PublishRow { facilityId: string; name: string; t: number; entries?: number; status: 'ok' | 'skipped'; reason?: string; replaces?: string | null }
 
+const qs = (q: Record<string, unknown>) => new URLSearchParams(Object.entries(q).filter(([, v]) => v !== undefined && v !== '' && v !== null).map(([k, v]) => [k, String(v)]));
 export const api = {
   brand: () => call<{ name: string; productName?: string; colors?: Record<string, string> }>('GET', '/api/brand'),
   catalogue: (all = false) => call<{ categories: Category[] }>('GET', `/api/catalogue${all ? '?all=1' : ''}`),
@@ -469,6 +483,15 @@ export const api = {
   dataStatus: (facilityId: string, year: number) => call<DataStatus>('GET', `/api/data/status?facilityId=${facilityId}&year=${year}`),
   review: (q: { facilityId: string; category: string; from: string; to: string; stage: 'open' | 'approved' }) =>
     call<{ entries: ReviewEntry[]; canEnter: boolean; canApprove: boolean }>('GET', `/api/review?${new URLSearchParams(q as Record<string, string>)}`),
+  reportLines: (q: { year: number; node?: string; group?: string; pend?: string }) => call<{ lines: RepLine[] }>('GET', `/api/reports/lines?${qs(q)}`),
+  reportQuality: (q: { year: number; node?: string; group?: string; pend?: string }) => call<{ checks: RepCheck[]; canJustify: boolean }>('GET', `/api/reports/quality?${qs(q)}`),
+  justifyCheck: (check: string, year: number, text: string) => call<{ ok: true }>('PUT', `/api/reports/quality/${check}`, { year, text }),
+  reportSettings: () => call<RepSettings>('GET', '/api/reports/settings'),
+  saveReportSettings: (b: { entity?: RepEntity; excl?: Record<string, string> }) => call<unknown>('PUT', '/api/reports/settings', b),
+  saveTemplate: (b: Omit<RepTemplate, 'id'> & { id?: string }) => (b.id ? call<{ id: string }>('PUT', `/api/reports/templates/${b.id}`, b) : call<{ id: string }>('POST', '/api/reports/templates', b)),
+  removeTemplate: (id: string) => call<{ ok: true }>('DELETE', `/api/reports/templates/${id}`),
+  saveVersion: (b: { name: string; label: string; period: string; scope2: 'location' | 'market'; s: [number, number, number]; byCode: Record<string, number> }) => call<{ id: string }>('POST', '/api/reports/versions', b),
+  removeVersion: (id: string) => call<{ ok: true }>('DELETE', `/api/reports/versions/${id}`),
   approvals: () => call<ApprovalsData>('GET', '/api/approvals'),
   saveApprovalSettings: (b: ApprovalSettings) => call<ApprovalSettings>('PUT', '/api/approvals/settings', b),
   reviewAction: (ids: string[], action: 'submit' | 'withdraw' | 'approve' | 'return', note?: string) => call<{ done: number; skipped: { id: string; reason: string }[]; toLevel2?: number }>('POST', '/api/activities/review', { ids, action, note }),

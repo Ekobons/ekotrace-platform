@@ -2,6 +2,12 @@
 
 Newest first.
 
+## 2026-10-13 · Reports (as in the prototype); filters in Approvals
+
+- New **Reports** page (menu → Disclose) for the selection and period viewed, location- or market-based Scope 2, **Download report** and **Print / PDF**.
+- Tabs: **Summary** (total, scopes, per employee, equivalents, vs same months last year, by GHG Protocol category, top 10 sources, next steps); **GHG Protocol inventory** (1.1–3.15 measured / no data / excluded, exclusion reasons, exports: regulatory file, emission factors, entries); **Granular audit view** (every approved entry with factor, source, quality, capture, how calculated; search and filters); **Data quality** (actual/estimated/proxy, activity-based, supplier-specific, evidence, uncertainty, seven quality controls with justifications); **Templates & regulatory** (Board summary, GHG Protocol report, MOCCAE provisional layout, own templates with sections in order, MRV dataset CSV, reporting-entity details for the cover); **Versions** (save and compare with today).
+- **Approvals**: filters by facility, category, month, check (with warnings / in range / no history), level, and search; "Approve all without warnings" acts on what is shown.
+
 ## 2026-10-13 · Approvals and Data progress (as in the prototype)
 
 - **Approvals** page (menu → Capture, with the number waiting for you): entries waiting for you with facility and month, category and item, quantity, tCO₂e (How calculated), a check against the 6-month average for the same item (±35% by default), who entered it; Approve, or Send back with a note; **Approve all N without warnings**; entries waiting for someone else and who.
