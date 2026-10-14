@@ -1,5 +1,6 @@
 {
   "name": "ekotrace-platform",
+  "version": "0.1.0",
   "private": true,
   "description": "Ekotrace GHG accounting platform (white-label ready). One codebase, many deployments.",
   "workspaces": [

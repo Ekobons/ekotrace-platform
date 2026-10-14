@@ -472,7 +472,7 @@ export async function meterRoutes(app: FastifyInstance) {
   app.post('/api/api-keys', async (req) => {
     const tenant = requireTenant(req);
     requireRole(req, 'super_admin');
-    const b = z.object({ name: z.string().trim().min(2).max(80), scopes: z.array(z.enum(['meter_readings', 'purchases'])).min(1).max(2).default(['meter_readings']) }).parse(req.body);
+    const b = z.object({ name: z.string().trim().min(2).max(80), scopes: z.array(z.enum(['meter_readings', 'purchases', 'audit_events'])).min(1).max(3).default(['meter_readings']) }).parse(req.body);
     return tenantTx(tenant, async (c) => {
       const key = `ek_${newToken()}`;
       const r = (await c.query('INSERT INTO api_key (tenant_id, name, prefix, key_hash, scopes, created_by) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id, name, prefix, scopes, created_at',
@@ -632,9 +632,9 @@ function rateLimit(id: string) {
 
 const KEY_SQL = `SELECT k.id, k.name, k.tenant_id, k.scopes FROM api_key k JOIN tenant t ON t.id = k.tenant_id
                   WHERE k.revoked_at IS NULL AND t.status = 'active' AND `;
-const SCOPE_TEXT: Record<string, string> = { meter_readings: 'send meter readings', purchases: 'send purchase lines' };
+const SCOPE_TEXT: Record<string, string> = { meter_readings: 'send meter readings', purchases: 'send purchase lines', audit_events: 'read audit events' };
 /** The client calling: an access token from /api/v1/oauth/token (or, for simple set-ups, the secret itself), allowed `scope`. */
-export async function apiClient(req: FastifyRequest, scope: 'meter_readings' | 'purchases') {
+export async function apiClient(req: FastifyRequest, scope: 'meter_readings' | 'purchases' | 'audit_events') {
   const h = String(req.headers.authorization ?? '');
   const m = /^Bearer\s+(\S+)$/.exec(h);
   if (!m) throw new AppError('Send an access token as "Authorization: Bearer …" (POST /api/v1/oauth/token)', 401, 'UNAUTHENTICATED');

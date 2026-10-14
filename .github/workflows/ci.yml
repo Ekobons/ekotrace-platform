@@ -1,0 +1,45 @@
+# Every push and pull request: type checks, all tests on a real PostgreSQL, known-vulnerability audit of
+# the dependencies, and a software bill of materials (SBOM, CycloneDX) kept with the run.
+# (BEEAH web application security standard 4.5 / 4.8: security checks automated in CI/CD, dependency scanning, SBOM.)
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: ekotrace
+          POSTGRES_PASSWORD: ekotrace
+          POSTGRES_DB: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U ekotrace" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgres://ekotrace:ekotrace@127.0.0.1:5432/ekotrace_ci
+      TEST_DATABASE_URL: postgres://ekotrace:ekotrace@127.0.0.1:5432/ekotrace_test
+      DATA_KEY: 0000000000000000000000000000000000000000000000000000000000000001
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run build
+      - run: npm test
+      - name: Dependency audit (fails on high or critical)
+        run: npm audit --omit=dev --audit-level=high
+      - name: Software bill of materials
+        run: npm sbom --omit=dev --sbom-format cyclonedx > sbom.cdx.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: sbom.cdx.json

@@ -35,7 +35,7 @@ export function Integrations() {
           <p className="sub">Each sending system gets its own client id and secret. The secret is shown once; only a fingerprint of it is kept. Revoke a client to stop it at once.</p>
           <div className="row" style={{ gap: 8 }}>
             <input className="input grow" value={name} maxLength={80} placeholder="Name of the system, e.g. BMS main plant, utility portal export" onChange={(e) => setName(e.target.value)} />
-            {[['meter_readings', 'Meter readings'], ['purchases', 'Purchase lines']].map(([k, l]) => (
+            {[['meter_readings', 'Meter readings'], ['purchases', 'Purchase lines'], ['audit_events', 'Audit events (SIEM, read-only)']].map(([k, l]) => (
               <label key={k} className="row" style={{ gap: 4, fontSize: 13 }}><input type="checkbox" checked={scopes.includes(k!)} onChange={(e) => setScopes((s) => (e.target.checked ? [...s, k!] : s.filter((x) => x !== k)))} />{l}</label>))}
             <button className="btn p" disabled={name.trim().length < 2 || !scopes.length} onClick={async () => { try { setFresh(await api.addApiKey(name.trim(), scopes)); setName(''); load(); } catch (e) { setErr((e as Error).message); } }}><Icon name="plus" />New client</button>
           </div>

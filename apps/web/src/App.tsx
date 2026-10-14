@@ -35,6 +35,7 @@ import { Integrations } from './pages/Integrations';
 import { Manual } from './pages/Manual';
 import { Console } from './pages/Console';
 import { Vault } from './pages/Vault';
+import { MfaCard, MfaSetup } from './components/MfaSetup';
 import { Messages } from './pages/Messages';
 import { SurveyAnswerPage } from './pages/SurveyAnswer';
 import { Surveys } from './pages/Surveys';
@@ -103,6 +104,7 @@ export function App() {
   if (me === 'loading') return <div className="empty">Loading…</div>;
   if (me === null) return <Login onDone={reload} />;
   if (me.user.mustChangePassword || mustChange) return <ChangePassword forced onDone={reload} />;
+  if (me.user.mfaEnrol) return <MfaSetup forced onDone={reload} />;
 
   const role = me.user.role;
   const can = (...roles: Role[]) => role === 'platform_admin' || roles.includes(role);
@@ -198,7 +200,7 @@ function Shell() {
           <Route path="/console" element={<Gate ok={role === 'platform_admin'}><Console /></Gate>} />
           <Route path="/messages" element={role === 'platform_admin' ? <Messages /> : <NeedCo><Messages /></NeedCo>} />
           <Route path="/vault" element={<NeedCo><Vault /></NeedCo>} />
-          <Route path="/account" element={<div className="page"><ChangePassword onDone={() => nav('/')} /></div>} />
+          <Route path="/account" element={<div className="page"><div className="acctgrid"><ChangePassword onDone={() => nav('/')} /><MfaCard /></div></div>} />
           <Route path="/library/*" element={<Gate ok={role === 'platform_admin'}><Library /></Gate>} />
           <Route path="/data/:category" element={<NeedCo><AddData /></NeedCo>} />
           <Route path="/home" element={<NeedCo><Home /></NeedCo>} />

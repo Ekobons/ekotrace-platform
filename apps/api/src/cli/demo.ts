@@ -16,6 +16,7 @@ import { storeReadings, syncMeter, type MeterRow } from '../modules/meters.route
 import { bookBill, createBill } from '../modules/bills.routes.js';
 import { PDFDocument, StandardFonts } from 'pdf-lib';
 import { demoPurchases } from './demoPurchases.js';
+import { purgeTenant } from '../db/purge.js';
 import { createHash } from 'node:crypto';
 import { linkBins } from '../modules/contractor.routes.js';
 
@@ -68,21 +69,8 @@ async function main() {
     const old = (await c.query('SELECT id FROM tenant WHERE name = $1', [NAME])).rows[0]?.id as string | undefined;
     if (old && !process.argv.includes('--reset')) throw new Error(`"${NAME}" already exists. Run "npm run demo -- --reset" to delete it and create it again.`);
     if (old) {
-      // Demo company only (matched by its exact name): remove everything it holds.
-      for (const sql of [
-        'DELETE FROM announcement_read WHERE user_id IN (SELECT id FROM app_user WHERE tenant_id = $1)', 'DELETE FROM announcement WHERE $1 = ANY(tenant_ids)', 'DELETE FROM message_read WHERE tenant_id = $1', 'DELETE FROM message WHERE tenant_id = $1', 'DELETE FROM message_thread WHERE tenant_id = $1',
-        'DELETE FROM period_lock WHERE tenant_id = $1', 'DELETE FROM document_link WHERE tenant_id = $1', 'DELETE FROM assurance_finding WHERE tenant_id = $1', 'DELETE FROM assurance_sample WHERE tenant_id = $1', 'DELETE FROM assurance_engagement WHERE tenant_id = $1', 'DELETE FROM waste_scan WHERE tenant_id = $1', 'DELETE FROM waste_bin WHERE tenant_id = $1', 'DELETE FROM contractor_statement WHERE tenant_id = $1', 'DELETE FROM contractor_session WHERE tenant_id = $1', 'DELETE FROM waste_contractor WHERE tenant_id = $1', 'DELETE FROM certificate_claim WHERE tenant_id = $1', 'DELETE FROM energy_certificate WHERE tenant_id = $1', 'DELETE FROM supplier_factor WHERE tenant_id = $1',
-        'DELETE FROM job WHERE tenant_id = $1', 'UPDATE purchase_line SET activity_id = NULL WHERE tenant_id = $1', 'DELETE FROM activity_result WHERE tenant_id = $1', 'DELETE FROM activity WHERE tenant_id = $1',
-        'DELETE FROM purchase_batch WHERE tenant_id = $1', 'DELETE FROM purchase_rule WHERE tenant_id = $1', 'DELETE FROM purchase_profile WHERE tenant_id = $1', 'DELETE FROM supplier_ef WHERE tenant_id = $1', 'DELETE FROM supplier WHERE tenant_id = $1', 'DELETE FROM fx_rate WHERE tenant_id = $1', 'DELETE FROM vehicle WHERE tenant_id = $1',
-        'DELETE FROM bill WHERE tenant_id = $1', 'DELETE FROM document WHERE tenant_id = $1', 'DELETE FROM meter_reading WHERE tenant_id = $1', 'DELETE FROM meter WHERE tenant_id = $1', 'DELETE FROM api_key WHERE tenant_id = $1',
-        'DELETE FROM commute_record WHERE tenant_id = $1', 'DELETE FROM survey WHERE tenant_id = $1', 'DELETE FROM waste_deposit WHERE tenant_id = $1', 'DELETE FROM waste_site WHERE tenant_id = $1',
-        'DELETE FROM price WHERE tenant_id = $1', 'DELETE FROM user_facility WHERE tenant_id = $1',
-        'DELETE FROM reduction_action WHERE tenant_id = $1', 'DELETE FROM scenario WHERE tenant_id = $1', 'DELETE FROM target_objective WHERE tenant_id = $1', 'DELETE FROM lever_scenario WHERE tenant_id = $1',
-        'DELETE FROM session WHERE user_id IN (SELECT id FROM app_user WHERE tenant_id = $1)', 'DELETE FROM audit_log WHERE tenant_id = $1',
-        'UPDATE org_node SET manager_user_id = NULL WHERE tenant_id = $1', 'DELETE FROM app_user WHERE tenant_id = $1', 'DELETE FROM tenant_catalogue WHERE tenant_id = $1',
-        'DELETE FROM org_node WHERE tenant_id = $1 AND kind = \'facility\'', 'DELETE FROM org_node WHERE tenant_id = $1 AND kind = \'subgroup\'', 'DELETE FROM org_node WHERE tenant_id = $1',
-        'DELETE FROM tenant WHERE id = $1',
-      ]) await c.query(sql, [old]);
+      // Demo company only (matched by its exact name): remove everything it holds (its audit records stay until their retention ends).
+      await purgeTenant(c, old);
       console.log(`Old "${NAME}" deleted.`);
     }
     const t = (await c.query(`INSERT INTO tenant (name, country, gwp_set, consolidation, base_year) VALUES ($1,'AE','AR5','operational',2025) RETURNING id`, [NAME])).rows[0].id;

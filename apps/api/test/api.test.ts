@@ -9,6 +9,8 @@ import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import pg from 'pg';
 import ExcelJS from 'exceljs';
+// rate limits are tested on their own app instance below
+process.env.RATE_LIMIT = 'off';
 
 const url = process.env.TEST_DATABASE_URL ?? 'postgres://ekotrace:ekotrace@127.0.0.1:5432/ekotrace_test';
 const dbName = new URL(url).pathname.slice(1);
@@ -2096,4 +2098,202 @@ test('message centre: a conversation with the team, unread replies, attachments,
   assert.equal((await call(prep, 'GET', '/api/messages/counts')).body.announcements, 0);
   await api('POST', `/api/team/announcements/${all}/withdraw`);
   assert.ok(!(await call(sa, 'GET', '/api/messages')).body.announcements.some((a: { id: string }) => a.id === all));
+});
+
+// ------------------------------------------------------------------ security --
+test('security: MFA sign-in (code, replay, recovery code), company MFA policy forces set-up, reset by super admin; rate limits; file pages keep their sandbox', async () => {
+  const { codeAt, stepNow } = await import('../src/lib/totp.js');
+  const co = (await api('POST', '/api/platform/companies', { name: 'Secure Co', country: 'AU', gwpSet: 'AR6', superAdmin: { name: 'Sam Secure', email: 'sam@secure.test' } })).body;
+  const raw = (method: string, url: string, payload?: object, cookie?: string) => app.inject({ method: method as 'POST', url, payload, headers: cookie ? { cookie } : {} });
+  const cookieOf = (r: { headers: Record<string, unknown> }) => String(r.headers['set-cookie']).split(';')[0]!;
+  let r = await raw('POST', '/api/auth/login', { email: 'sam@secure.test', password: co.superAdmin.temporaryPassword });
+  let sam = cookieOf(r);
+  await call(sam, 'POST', '/api/auth/password', { current: co.superAdmin.temporaryPassword, next: 'sam long password 1' });
+  // set up: secret + QR; a wrong code refused; the right one gives 10 recovery codes
+  const setup = (await call(sam, 'POST', '/api/auth/mfa/setup')).body;
+  assert.match(setup.uri, /^otpauth:\/\/totp\/.+secret=/);
+  assert.equal((await call(sam, 'POST', '/api/auth/mfa/enable', { code: '000000' })).status, 400);
+  const en = await call(sam, 'POST', '/api/auth/mfa/enable', { code: codeAt(setup.secret, stepNow()) });
+  assert.equal(en.status, 200, JSON.stringify(en.body)); assert.equal(en.body.recoveryCodes.length, 10);
+  const secretRow = (await pq(`SELECT mfa_secret FROM app_user WHERE email = 'sam@secure.test'`)).rows[0].mfa_secret;
+  assert.ok(secretRow.startsWith('v1:') && !secretRow.includes(setup.secret), 'stored encrypted');
+  // sign in again: password, then the code
+  r = await raw('POST', '/api/auth/login', { email: 'sam@secure.test', password: 'sam long password 1' });
+  assert.equal(r.json().mfa, true); assert.ok(!r.headers['set-cookie'], 'no session before the second factor');
+  const ch = r.json().challenge;
+  assert.equal((await raw('POST', '/api/auth/mfa', { challenge: ch, code: codeAt(setup.secret, stepNow()) })).statusCode, 401, 'the code used at set-up cannot be replayed');
+  r = await raw('POST', '/api/auth/mfa', { challenge: ch, code: codeAt(setup.secret, stepNow() + 1) });
+  assert.equal(r.statusCode, 200, r.body); sam = cookieOf(r);
+  assert.equal((await call(sam, 'GET', '/api/auth/me')).body.user.via, 'password+mfa');
+  // a recovery code works once
+  const ch2 = (await raw('POST', '/api/auth/login', { email: 'sam@secure.test', password: 'sam long password 1' })).json().challenge;
+  assert.equal((await raw('POST', '/api/auth/mfa', { challenge: ch2, recoveryCode: en.body.recoveryCodes[0].toLowerCase() })).statusCode, 200);
+  const ch3 = (await raw('POST', '/api/auth/login', { email: 'sam@secure.test', password: 'sam long password 1' })).json().challenge;
+  assert.equal((await raw('POST', '/api/auth/mfa', { challenge: ch3, recoveryCode: en.body.recoveryCodes[0] })).statusCode, 401);
+  // company policy: everyone must use MFA → a new person must set it up before anything else
+  assert.equal((await call(sam, 'PUT', '/api/security/mfa', { required: true })).status, 200);
+  const p = (await call(sam, 'POST', '/api/users', { name: 'Pat', email: 'pat@secure.test', role: 'verifier' })).body;
+  r = await raw('POST', '/api/auth/login', { email: 'pat@secure.test', password: p.temporaryPassword });
+  const pat = cookieOf(r);
+  await call(pat, 'POST', '/api/auth/password', { current: p.temporaryPassword, next: 'pat long password 1' });
+  r = await raw('POST', '/api/auth/login', { email: 'pat@secure.test', password: 'pat long password 1' });
+  assert.equal(r.json().enrolMfa, true);
+  const pat2 = cookieOf(r);
+  const blocked = await call(pat2, 'GET', '/api/home');
+  assert.equal(blocked.status, 403); assert.equal(blocked.body.error, 'MUST_ENROL_MFA');
+  const ps = (await call(pat2, 'POST', '/api/auth/mfa/setup')).body;
+  assert.equal((await call(pat2, 'POST', '/api/auth/mfa/enable', { code: codeAt(ps.secret, stepNow()) })).status, 200);
+  assert.notEqual((await call(pat2, 'GET', '/api/security')).body.error, 'MUST_ENROL_MFA');
+  assert.equal((await call(pat2, 'POST', '/api/auth/mfa/disable', { password: 'pat long password 1', code: codeAt(ps.secret, stepNow() + 1) })).status, 400, 'required: cannot switch off');
+  const sec = (await call(sam, 'GET', '/api/security')).body;
+  assert.equal(sec.people.filter((x: { mfa: boolean }) => x.mfa).length, 2);
+  // lost phone: the super admin resets it; Pat's sessions end
+  const pid = sec.people.find((x: { email: string }) => x.email === 'pat@secure.test').id;
+  assert.equal((await call(sam, 'POST', `/api/users/${pid}/mfa/reset`)).status, 200);
+  assert.equal((await call(pat2, 'GET', '/api/auth/me')).status, 401);
+  assert.ok((await pq(`SELECT 1 FROM audit_log WHERE action = 'mfa.reset'`)).rowCount);
+  // rate limits (own app instance with low limits)
+  const limited = await (await import('../src/app.js')).buildApp({ rateLimit: { user: 4, ip: 3, login: 2 } });
+  const tries = [];
+  for (let i = 0; i < 3; i++) tries.push((await limited.inject({ method: 'POST', url: '/api/auth/login', payload: { email: 'nobody@x.test', password: 'x' } })).statusCode);
+  assert.deepEqual(tries, [401, 401, 429]);
+  const lr = await limited.inject({ method: 'POST', url: '/api/auth/login', payload: { email: 'nobody@x.test', password: 'x' } });
+  assert.ok(Number(lr.headers['retry-after']) > 0);
+  const us = [];
+  for (let i = 0; i < 5; i++) us.push((await limited.inject({ method: 'GET', url: '/api/auth/me', headers: { cookie: sam } })).statusCode);
+  assert.deepEqual(us, [200, 200, 200, 200, 429]);
+  await limited.close();
+  // headers: a stored file keeps its sandbox; pages get the app policy
+  const h = await app.inject({ method: 'GET', url: '/api/health' });
+  assert.match(String(h.headers['content-security-policy']), /frame-ancestors 'none'/);
+  await call(sam, 'PUT', '/api/security/mfa', { required: false });
+  (globalThis as { __secure?: unknown }).__secure = { tenant: co.company.id, sam, secret: setup.secret };
+});
+
+test('security: single sign-on with a mock identity provider (signature, nonce, audience, MFA claim, unknown person), SSO-only refuses passwords except break-glass', async () => {
+  const { generateKeyPairSync, createSign, randomUUID } = await import('node:crypto');
+  const Fastify = (await import('fastify')).default;
+  const { codeAt, stepNow } = await import('../src/lib/totp.js');
+  const S = (globalThis as { __secure?: { tenant: string; sam: string; secret: string } }).__secure!;
+  const key = generateKeyPairSync('rsa', { modulusLength: 2048 }), other = generateKeyPairSync('rsa', { modulusLength: 2048 });
+  const jwk = { ...key.publicKey.export({ format: 'jwk' }), kid: 'k1', use: 'sig', alg: 'RS256' };
+  const idp = Fastify(); let iss = '';
+  const mode: { amr: string[]; email: string; aud?: string; wrongKey?: boolean } = { amr: ['pwd', 'mfa'], email: 'sam@secure.test' };
+  idp.addContentTypeParser('application/x-www-form-urlencoded', { parseAs: 'string' }, (_r, b, done) => done(null, Object.fromEntries(new URLSearchParams(String(b)))));
+  idp.get('/.well-known/openid-configuration', async () => ({ issuer: iss, authorization_endpoint: `${iss}/authorize`, token_endpoint: `${iss}/token`, jwks_uri: `${iss}/keys` }));
+  idp.get('/keys', async () => ({ keys: [jwk] }));
+  idp.post('/token', async (req) => {
+    const b = req.body as Record<string, string>;
+    assert.ok(b.code_verifier && b.client_secret === 'idp-secret' && b.grant_type === 'authorization_code');
+    const now = Math.floor(Date.now() / 1000);
+    const head = Buffer.from(JSON.stringify({ alg: 'RS256', kid: 'k1', typ: 'JWT' })).toString('base64url');
+    const body = Buffer.from(JSON.stringify({ iss, aud: mode.aud ?? 'ekotrace-app', sub: randomUUID(), exp: now + 600, iat: now, nonce: b.code, email: mode.email, amr: mode.amr })).toString('base64url');
+    const sig = createSign('RSA-SHA256').update(`${head}.${body}`).sign(mode.wrongKey ? other.privateKey : key.privateKey).toString('base64url');
+    return { id_token: `${head}.${body}.${sig}`, token_type: 'Bearer' };
+  });
+  await idp.listen({ port: 0, host: '127.0.0.1' });
+  iss = `http://127.0.0.1:${(idp.server.address() as { port: number }).port}`;
+  try {
+    const put = await call(S.sam, 'PUT', '/api/security/sso', { issuer: iss, clientId: 'ekotrace-app', clientSecret: 'idp-secret', domains: ['secure.test'], enabled: true, enforce: false, requireMfa: true });
+    assert.equal(put.status, 200, JSON.stringify(put.body));
+    assert.ok((await pq(`SELECT client_secret FROM sso_config WHERE tenant_id = $1`, [S.tenant])).rows[0].client_secret.startsWith('v1:'), 'client secret encrypted');
+    assert.equal((await call(S.sam, 'POST', '/api/security/sso/test', { issuer: iss })).body.ok, true);
+    // the domain is taken: no other company can claim it
+    assert.equal((await api('PUT', '/api/security/sso', { issuer: iss, clientId: 'x', domains: ['secure.test'], enabled: false, enforce: false, requireMfa: true }, tenantB)).status, 400);
+    const run = async () => {
+      const st = await app.inject({ method: 'POST', url: '/api/auth/sso/start', payload: { email: 'Sam@Secure.test' } });
+      assert.equal(st.statusCode, 200, st.body);
+      const u = new URL(st.json().url);
+      assert.equal(u.searchParams.get('code_challenge_method'), 'S256');
+      return app.inject({ method: 'GET', url: `/api/auth/sso/callback?code=${u.searchParams.get('nonce')}&state=${u.searchParams.get('state')}` });
+    };
+    let cb = await run();
+    assert.equal(cb.statusCode, 302); assert.equal(cb.headers.location, '/', String(cb.headers.location));
+    const ssoCookie = String(cb.headers['set-cookie']).split(';')[0]!;
+    assert.equal((await call(ssoCookie, 'GET', '/api/auth/me')).body.user.via, 'sso');
+    // a state is used once
+    const st2 = new URL((await app.inject({ method: 'POST', url: '/api/auth/sso/start', payload: { email: 'sam@secure.test' } })).json().url);
+    const q2 = `/api/auth/sso/callback?code=${st2.searchParams.get('nonce')}&state=${st2.searchParams.get('state')}`;
+    assert.equal((await app.inject({ method: 'GET', url: q2 })).headers.location, '/');
+    assert.match(decodeURIComponent(String((await app.inject({ method: 'GET', url: q2 })).headers.location)), /already used/);
+    // refused: no MFA at the provider, wrong key, other application, unknown person, unknown domain
+    mode.amr = ['pwd']; cb = await run(); assert.match(decodeURIComponent(String(cb.headers.location)), /multi-factor/); mode.amr = ['pwd', 'mfa'];
+    mode.wrongKey = true; cb = await run(); assert.match(decodeURIComponent(String(cb.headers.location)), /signature/); mode.wrongKey = false;
+    mode.aud = 'someone-else'; cb = await run(); assert.match(decodeURIComponent(String(cb.headers.location)), /another application/); delete mode.aud;
+    mode.email = 'ghost@secure.test'; cb = await run(); assert.match(decodeURIComponent(String(cb.headers.location)), /no .* account/); mode.email = 'sam@secure.test';
+    assert.equal((await app.inject({ method: 'POST', url: '/api/auth/sso/start', payload: { email: 'a@nowhere.test' } })).statusCode, 404);
+    assert.ok((await pq(`SELECT count(*)::int AS n FROM audit_log WHERE action = 'login.sso_failed' AND tenant_id = $1`, [S.tenant])).rows[0].n >= 4);
+    // SSO only: a verifier's password is refused; the super admin with MFA keeps password + code (break-glass)
+    assert.equal((await call(S.sam, 'PUT', '/api/security/sso', { issuer: iss, clientId: 'ekotrace-app', domains: ['secure.test'], enabled: true, enforce: true, requireMfa: true })).status, 200);
+    const v = (await pq(`SELECT email FROM app_user WHERE email = 'pat@secure.test'`)).rows[0];
+    const pr = await app.inject({ method: 'POST', url: '/api/auth/login', payload: { email: v.email, password: 'pat long password 1' } });
+    assert.equal(pr.statusCode, 403); assert.equal(pr.json().error, 'SSO_REQUIRED');
+    const sr = await app.inject({ method: 'POST', url: '/api/auth/login', payload: { email: 'sam@secure.test', password: 'sam long password 1' } });
+    assert.equal(sr.json().mfa, true);
+    void codeAt; void stepNow;
+    await call(S.sam, 'PUT', '/api/security/sso', { issuer: iss, clientId: 'ekotrace-app', domains: ['secure.test'], enabled: false, enforce: false, requireMfa: true });
+  } finally { await idp.close(); }
+});
+
+test('security: audit log is append-only and hash-chained (tampering detected), forwarded to a SIEM over syslog, pulled over the API; export ZIP; deletion with a certificate', async () => {
+  const S = (globalThis as { __secure?: { tenant: string; sam: string } }).__secure!;
+  const { seal, verify, forward } = await import('../src/lib/auditlog.js');
+  await seal();
+  let v = await verify();
+  assert.equal(v.ok, true, JSON.stringify(v)); assert.ok(v.checked > 10);
+  // the database refuses changes and deletions, even for the platform
+  await assert.rejects(pq(`UPDATE audit_log SET user_name = 'x' WHERE id = (SELECT min(id) FROM audit_log)`), /cannot be changed/);
+  await assert.rejects(pq(`DELETE FROM audit_log WHERE id = (SELECT max(id) FROM audit_log)`), /cannot be deleted/);
+  await assert.rejects(pq(`TRUNCATE audit_log`), /cannot be emptied/);
+  // someone with database-owner rights switches the guard off and edits a record: the chain shows it
+  const target = (await pq(`SELECT id, action FROM audit_log WHERE seal_seq IS NOT NULL ORDER BY seal_seq LIMIT 1 OFFSET 5`)).rows[0];
+  await pq(`ALTER TABLE audit_log DISABLE TRIGGER audit_log_guard`);
+  await pq(`UPDATE audit_log SET action = 'nothing.to.see' WHERE id = $1`, [target.id]);
+  v = await verify();
+  assert.equal(v.ok, false); assert.equal(v.problem?.id, String(target.id)); assert.match(v.problem!.what, /changed/);
+  await pq(`UPDATE audit_log SET action = $2 WHERE id = $1`, [target.id, target.action]);
+  await pq(`ALTER TABLE audit_log ENABLE TRIGGER audit_log_guard`);
+  assert.equal((await verify()).ok, true);
+  assert.equal((await api('GET', '/api/platform/audit/verify')).body.ok, true);
+  assert.equal((await call(S.sam, 'GET', '/api/platform/audit/verify')).status, 403);
+  // SIEM over syslog (TCP, octet-counted RFC 5424 frames)
+  const net = await import('node:net');
+  let got = '';
+  const srv = net.createServer((s) => s.on('data', (d) => { got += d.toString(); }));
+  await new Promise<void>((ok) => srv.listen(0, '127.0.0.1', () => ok()));
+  const n = await forward(`tcp://127.0.0.1:${(srv.address() as { port: number }).port}`);
+  await new Promise((ok) => setTimeout(ok, 200)); srv.close();
+  assert.ok(n > 10 && /^\d+ <109>1 \S+ \S+ ekotrace - login /.test(got), got.slice(0, 200));
+  assert.ok(got.includes('"action":"mfa.enable"'));
+  assert.equal(await forward(`tcp://127.0.0.1:1`), 0, 'nothing new to send');
+  // SIEM pull: an API client with the "audit events" permission sees its own company's events only
+  const k = (await call(S.sam, 'POST', '/api/api-keys', { name: 'SIEM', scopes: ['audit_events'] })).body;
+  const tok = (await app.inject({ method: 'POST', url: '/api/v1/oauth/token', payload: { grant_type: 'client_credentials', client_id: k.id, client_secret: k.key } })).json().access_token;
+  const ev = (await app.inject({ method: 'GET', url: '/api/v1/audit-events?limit=1000', headers: { authorization: `Bearer ${tok}` } })).json();
+  assert.ok(ev.events.length > 5 && ev.events.every((e: { hash: string }) => /^[0-9a-f]{64}$/.test(e.hash)));
+  const mine = (await pq(`SELECT count(*)::int AS n FROM audit_log WHERE tenant_id = $1 AND seal_seq IS NOT NULL`, [S.tenant])).rows[0].n;
+  assert.equal(ev.events.length, mine, 'only this company');
+  assert.equal((await app.inject({ method: 'GET', url: `/api/v1/audit-events?after=${ev.next}`, headers: { authorization: `Bearer ${tok}` } })).json().events.length, 0);
+  // export: ZIP with the company's tables, files and a manifest; no secrets
+  const ex = await app.inject({ method: 'GET', url: '/api/security/export', headers: { cookie: S.sam } });
+  assert.equal(ex.statusCode, 200); assert.equal(ex.headers['content-type'], 'application/zip');
+  const zip = ex.rawPayload;
+  assert.equal(zip.readUInt32LE(0), 0x04034b50);
+  const names = [...zip.toString('latin1').matchAll(/(data\/[a-z_]+\.csv|manifest\.json|README\.txt)/g)].map((m) => m[0]);
+  for (const f of ['data/tenant.csv', 'data/app_user.csv', 'data/audit_log.csv', 'manifest.json']) assert.ok(names.includes(f), f);
+  const sha = String(ex.headers['x-manifest-sha256']);
+  assert.match(sha, /^[0-9a-f]{64}$/);
+  // deletion: only suspended companies, with the name typed; a certificate; audit records stay
+  const del = (b: object) => api('POST', `/api/platform/companies/${S.tenant}/destroy`, b);
+  assert.equal((await del({ confirm: 'Secure Co', reason: 'Contract ended (test)' })).status, 400, 'must be suspended first');
+  await api('PATCH', `/api/platform/companies/${S.tenant}`, { status: 'suspended' });
+  assert.equal((await del({ confirm: 'Secure', reason: 'Contract ended (test)' })).status, 400);
+  const d = await del({ confirm: 'Secure Co', reason: 'Contract ended (test)', exportSha256: sha });
+  assert.equal(d.status, 200, JSON.stringify(d.body));
+  assert.ok(d.body.certificate.rows_deleted.app_user >= 2 && d.body.certificate.export_sha256 === sha);
+  assert.equal((await pq('SELECT count(*)::int AS n FROM tenant WHERE id = $1', [S.tenant])).rows[0].n, 0);
+  assert.equal((await pq('SELECT count(*)::int AS n FROM app_user WHERE tenant_id = $1', [S.tenant])).rows[0].n, 0);
+  assert.ok((await pq(`SELECT count(*)::int AS n FROM audit_log WHERE tenant_id = $1`, [S.tenant])).rows[0].n > 10, 'audit records kept');
+  assert.equal((await api('GET', '/api/platform/certificates')).body.certificates[0].company, 'Secure Co');
+  assert.equal((await verify()).ok, true);
 });

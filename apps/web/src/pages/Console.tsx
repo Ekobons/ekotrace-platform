@@ -6,7 +6,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import { useApp } from '../App';
-import { api, setTenant, type Company, type PlanLimits } from '../lib/api';
+import { api, setTenant, type Company, type DestructionCertificate, type PlanLimits } from '../lib/api';
+import { PlatformAudit } from './AuditLog';
 import { Icon } from '../components/Icon';
 
 const lim = (n: number | null) => (n == null ? 'unlimited' : String(n));
@@ -16,7 +17,7 @@ export function Console() {
   const { toast, reload } = useApp();
   const [list, setList] = useState<Company[]>([]);
   const [plans, setPlans] = useState<PlanLimits[]>([]);
-  const [tab, setTab] = useState<'companies' | 'plans'>('companies');
+  const [tab, setTab] = useState<'companies' | 'plans' | 'security'>('companies');
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<Company | null>(null);
   const [secret, setSecret] = useState<{ email: string; pw: string } | null>(null);
@@ -36,9 +37,9 @@ export function Console() {
         <div><div className="eyebrow">Ekobon · platform</div><h1>Platform console</h1><p className="sub">Companies on this installation, their plans, subscription and access. The shared factor library is managed here too.</p></div>
         <div className="row"><NavLink to="/library" className="btn"><Icon name="book" size={16} />Factor library</NavLink><button className="btn p" onClick={() => setAdding(true)}><Icon name="plus" size={16} />New company</button></div>
       </div>
-      <div className="tabs"><button className={tab === 'companies' ? 'on' : ''} onClick={() => setTab('companies')}>Companies ({list.length})</button><button className={tab === 'plans' ? 'on' : ''} onClick={() => setTab('plans')}>Plans</button></div>
+      <div className="tabs"><button className={tab === 'companies' ? 'on' : ''} onClick={() => setTab('companies')}>Companies ({list.length})</button><button className={tab === 'plans' ? 'on' : ''} onClick={() => setTab('plans')}>Plans</button><button className={tab === 'security' ? 'on' : ''} onClick={() => setTab('security')}>Security & deletions</button></div>
       {err && <div className="note bad">{err}</div>}
-      {tab === 'plans' ? (
+      {tab === 'security' ? <ConsoleSecurity /> : tab === 'plans' ? (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
           {plans.map((p) => (
             <section key={p.code} className="card" style={{ display: 'grid', gap: 6, alignContent: 'start' }}>
@@ -113,6 +114,7 @@ function EditCompany({ c, plans, onClose, onSaved }: { c: Company; plans: PlanLi
         </div>
         <label className="field"><span>Notes (Ekobon only)</span><textarea className="input" rows={3} value={f.notes} onChange={set('notes')} /></label>
         {err && <div className="note bad">{err}</div>}
+        {c.status === 'suspended' && <Destroy c={c} onDone={() => { ref.current?.close(); onSaved(); }} />}
         <div className="row" style={{ justifyContent: 'flex-end' }}>
           <button className="btn" onClick={() => ref.current?.close()}>Cancel</button>
           <button className="btn p" disabled={f.name.trim().length < 2} onClick={async () => {
@@ -181,4 +183,73 @@ function Secret({ email, pw, onClose }: { email: string; pw: string; onClose: ()
       </div>
     </dialog>
   );
+}
+
+/** End of contract: delete a suspended company's data and keep the certificate. */
+function Destroy({ c, onDone }: { c: Company; onDone: () => void }) {
+  const { toast } = useApp();
+  const [open, setOpen] = useState(false);
+  const [f, setF] = useState({ confirm: '', reason: '', sha: '' });
+  const [err, setErr] = useState<string | null>(null);
+  if (!open) return <button type="button" className="btn ghost danger" style={{ justifySelf: 'start' }} onClick={() => setOpen(true)}>Delete all of this company's data…</button>;
+  return (
+    <div className="destroybox">
+      <h3>Delete all of {c.name}'s data</h3>
+      <ol className="sub small">
+        <li>The company downloads its export (Security & audit log → Data export) — or open the company and download it for them.</li>
+        <li>Paste the export's manifest checksum (the X-Manifest-SHA256 of the download, shown in its audit record) so the certificate names it.</li>
+        <li>Type the company name. Everything it holds is deleted at once and cannot be brought back. Its audit trail stays until its retention ends.</li>
+      </ol>
+      <label className="field"><span>Reason (on the certificate)</span><input className="input" value={f.reason} placeholder="e.g. Contract ended 31 Dec 2026; data return confirmed by …" onChange={(e) => setF({ ...f, reason: e.target.value })} /></label>
+      <label className="field"><span>Export manifest SHA-256 (optional)</span><input className="input mono" value={f.sha} onChange={(e) => setF({ ...f, sha: e.target.value.trim().toLowerCase() })} /></label>
+      <label className="field"><span>Type <b>{c.name}</b> to confirm</span><input className="input" value={f.confirm} onChange={(e) => setF({ ...f, confirm: e.target.value })} /></label>
+      {err && <div className="note bad">{err}</div>}
+      <div className="row" style={{ gap: 8 }}>
+        <button type="button" className="btn danger" disabled={f.confirm !== c.name || f.reason.trim().length < 5} onClick={async () => {
+          setErr(null);
+          try { const r = await api.destroyCompany(c.id, { confirm: f.confirm, reason: f.reason.trim(), ...(f.sha ? { exportSha256: f.sha } : {}) }); downloadCertificate(r.certificate); toast('Deleted — the certificate was downloaded'); onDone(); }
+          catch (e) { setErr((e as Error).message); }
+        }}>Delete for good</button>
+        <button type="button" className="btn ghost" onClick={() => setOpen(false)}>Cancel</button>
+      </div>
+    </div>);
+}
+
+function certificateHtml(c: DestructionCertificate) {
+  const esc = (x: unknown) => String(x ?? '').replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]!));
+  const rows = Object.entries(c.rows_deleted).sort((a, b) => b[1] - a[1]);
+  const total = rows.reduce((a, [, n]) => a + n, 0);
+  return `<!doctype html><html><head><meta charset="utf-8"><title>Certificate of destruction — ${esc(c.company)}</title><style>body{font:14px/1.5 system-ui,sans-serif;max-width:760px;margin:40px auto;color:#10201C}h1{font-size:24px;margin:0 0 4px}table{border-collapse:collapse;width:100%;margin:10px 0}td,th{border-bottom:1px solid #DDE5E0;padding:5px 8px;text-align:left}td.n{text-align:right}.k td:first-child{color:#5B6B66;width:34%}.box{border:1px solid #C9D9D2;border-radius:10px;padding:16px 18px;margin:16px 0}small{color:#5B6B66}</style></head><body>
+<small>Ekotrace · Ekobon</small><h1>Certificate of secure data destruction</h1><small>Certificate ${esc(c.id)}</small>
+<div class="box"><table class="k"><tr><td>Company</td><td><b>${esc(c.company)}</b> (${esc(c.country)})</td></tr><tr><td>Company id</td><td>${esc(c.tenant_id)}</td></tr>
+<tr><td>Deleted on</td><td>${esc(new Date(c.performed_at).toUTCString())}</td></tr><tr><td>Performed by</td><td>${esc(c.requested_by)}</td></tr><tr><td>Reason</td><td>${esc(c.reason)}</td></tr>
+<tr><td>Export handed over</td><td>${c.export_sha256 ? `manifest SHA-256 <code>${esc(c.export_sha256)}</code>` : 'not recorded'}</td></tr></table></div>
+<p>All records and files held for the company in the Ekotrace production database were permanently deleted in one transaction: <b>${total.toLocaleString('en')} records</b> in ${rows.length} tables and <b>${c.files_deleted.toLocaleString('en')} stored files</b>. The deletion was verified: no record of the company remains in those tables.</p>
+<p><b>Backups:</b> encrypted backups taken before this date still hold copies; they expire and are destroyed by <b>${esc(c.backups_until)}</b> under the backup retention schedule, and are not restored except for disaster recovery of the whole service.</p>
+<p><b>Audit trail:</b> the company's security audit records (who signed in or changed what, when, from where) are append-only and are kept until <b>${esc(c.audit_until)}</b>, then removed automatically.</p>
+<table><thead><tr><th>Table</th><th class="n">Records deleted</th></tr></thead><tbody>${rows.map(([t, n]) => `<tr><td>${esc(t)}</td><td class="n">${n.toLocaleString('en')}</td></tr>`).join('')}</tbody></table>
+<p style="margin-top:40px">Signed for Ekobon: ______________________ &nbsp; Date: ____________</p></body></html>`;
+}
+function downloadCertificate(c: DestructionCertificate) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([certificateHtml(c)], { type: 'text/html' }));
+  a.download = `certificate-of-destruction-${c.company.replace(/[^\w]+/g, '-')}.html`; a.click();
+}
+
+function ConsoleSecurity() {
+  const [certs, setCerts] = useState<DestructionCertificate[] | null>(null);
+  useEffect(() => { api.destructionCertificates().then((r) => setCerts(r.certificates)).catch(() => setCerts([])); }, []);
+  return (
+    <div className="secgrid">
+      <PlatformAudit />
+      <section className="card secbox">
+        <h2>Certificates of destruction</h2>
+        <p className="sub">To delete a company's data at the end of its contract: suspend it, then Edit → "Delete all of this company's data".</p>
+        {!certs ? <div className="muted">Loading…</div> : !certs.length ? <div className="muted small">None yet.</div> : (
+          <table className="t"><thead><tr><th>Company</th><th>Deleted</th><th>By</th><th className="num">Records</th><th className="num">Files</th><th /></tr></thead>
+            <tbody>{certs.map((c) => <tr key={c.id}><td><b>{c.company}</b></td><td className="small">{new Date(c.performed_at).toLocaleString('en-GB')}</td><td className="small">{c.requested_by}</td>
+              <td className="num">{Object.values(c.rows_deleted).reduce((a, n) => a + n, 0).toLocaleString('en')}</td><td className="num">{c.files_deleted}</td>
+              <td><button className="btn ghost xs" onClick={() => downloadCertificate(c)}>Certificate</button></td></tr>)}</tbody></table>)}
+      </section>
+    </div>);
 }

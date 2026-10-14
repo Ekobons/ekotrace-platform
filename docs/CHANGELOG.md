@@ -2,6 +2,59 @@
 
 Newest first.
 
+## 2026-10-14 · Security: SSO, MFA, sealed audit log with SIEM feed, rate limits, data export and certificate of destruction
+
+Closes the code gaps found against the BEEAH web application security standard.
+
+- **Multi-factor authentication (4.2):**
+  - Uses an authenticator app (RFC 6238 time-based codes): QR set-up on the account page and 10 recovery codes, each usable once.
+  - The code step comes after the password, and a code can't be reused.
+  - Wrong codes count towards the 15-minute lock.
+  - The super admin can require MFA for everyone; people without it must set it up before anything else. The super admin can reset someone's MFA (lost phone).
+  - On servers, platform admins must always use MFA.
+- **Single sign-on (4.2):**
+  - Per company over OpenID Connect (Microsoft Entra ID, Okta, Google…), using the authorization-code flow with PKCE, state and nonce.
+  - Every ID token is checked: signature (RS256 / PS256 / ES256 against the provider's keys), issuer, audience, expiry and nonce.
+  - The email domain decides the company, and each domain belongs to one company only.
+  - "Must use MFA" refuses a sign-in without a second factor from the provider.
+  - **Company sign-in only** refuses passwords, except for super admins with MFA (break-glass).
+  - The provider must use https and not a private address (SSRF guard). Failed company sign-ins are logged with the reason.
+- **Secrets:** MFA keys and SSO client secrets are encrypted with AES-256-GCM under a server key (DATA_KEY).
+- **Audit log (4.3):**
+  - Append-only: database triggers refuse UPDATE, DELETE and TRUNCATE for everyone.
+  - Records are sealed every 10 s in a SHA-256 hash chain. "Check the whole chain" pinpoints a changed, removed or inserted record (tested by tampering with the guard switched off).
+  - Kept 24 months by default (never less than 12), then purged automatically.
+  - Records survive company deletion.
+  - New events logged: sign-in method, MFA events, SSO settings, exports, file views.
+- **SIEM:**
+  - Push: RFC 5424 syslog over TLS, TCP or UDP (SIEM_SYSLOG), in order, with a cursor and error status.
+  - Pull: `GET /api/v1/audit-events` for an API client with the new "Audit events" permission (OAuth client credentials).
+- **Rate limiting (4.3 / 4.7):**
+  - Every API request: 600/min per session, 300/min per address, 20/min on sign-in.
+  - Over the limit returns 429 with Retry-After, plus RateLimit headers.
+- **Fixes:**
+  - The session cookie is always Secure on HTTPS deployments, also behind a proxy (TRUST_PROXY setting).
+  - Stored files keep their stricter sandbox Content-Security-Policy.
+  - Permissions-Policy header added.
+- **Data return and destruction (5, 7):**
+  - The super admin downloads everything as one ZIP: a CSV per table, every file, and a manifest with SHA-256 checksums. Secrets are left out.
+  - The platform admin deletes a suspended company's data in one transaction (typed name, reason, export checksum). Nothing may remain, or the whole deletion is undone.
+  - A certificate of destruction is produced: records per table, files, backup expiry and audit retention.
+  - The demo reset uses the same routine.
+- **Responsible disclosure:** `/.well-known/security.txt` (SECURITY_CONTACT).
+- **CI/CD security (4.5 / 4.8):**
+  - A GitHub Actions workflow runs the type check, build, all tests on PostgreSQL, `npm audit` (fails on high), and a CycloneDX SBOM kept with each run.
+  - CodeQL code scanning (SAST) runs weekly and on every change.
+  - Dependabot opens weekly dependency updates.
+- **Screens:**
+  - Sign-in: code step, recovery code, "Sign in with your company account".
+  - Forced MFA set-up.
+  - Account page: MFA card.
+  - Setup → Security & audit log has tabs for Audit log, Sign-in & MFA (policy, who uses MFA, SSO set-up with test) and Data export & retention.
+  - Platform console → Security & deletions: chain check, SIEM status, certificates.
+- **Manual:** the Security chapter is rewritten (sign-in, audit log, export and deletion, settings for IT, mobile scope); new glossary terms.
+- **Tests:** 68 API tests (3 new: MFA and policies, SSO against a mock identity provider, audit chain / SIEM / export / deletion) and 52 engine tests pass. `npm audit`: 0 vulnerabilities.
+
 ## 2026-10-14 · Document vault and Message centre
 
 - **Document vault** (Capture → Document vault): every file of the company in one place.

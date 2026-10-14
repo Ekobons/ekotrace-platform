@@ -5,14 +5,41 @@ How Ekotrace protects the company's data, layer by layer, and the safety checks 
 ## Layers of protection
 
 ```layers
-Connection | HTTPS on servers (HSTS); security headers on every response: Content-Security-Policy (only the platform's own scripts run), no framing by other sites, no content sniffing, strict referrer
-Login | passwords of 12+ characters, hashed with scrypt (OWASP settings) — never stored readable; 5 wrong passwords lock the account for 15 minutes; temporary passwords shown once and changed at first login
-Session | random token in an http-only cookie (scripts cannot read it, never in a URL); only its fingerprint is stored; ends after 30 minutes without activity, after 12 hours at most, and at logout
-Requests | changes are accepted only as JSON or file uploads (a form on another website cannot post to Ekotrace); every input checked against a schema; errors never show internal details
+Connection | HTTPS (TLS 1.2+) on servers with HSTS; security headers on every response: Content-Security-Policy (only the platform's own scripts run), no framing by other sites, no content sniffing, strict referrer, permissions policy; stored files open sandboxed
+Sign-in | company sign-in (SSO, OpenID Connect: Microsoft Entra ID, Okta, Google…) or a password of 12+ characters hashed with scrypt; multi-factor authentication with an authenticator app (can be required for everyone); 5 wrong passwords or codes lock the account for 15 minutes
+Session | random key in a cookie scripts cannot read (HttpOnly, Secure, SameSite), never in a web address, new at every sign-in; only its fingerprint is stored; ends after 30 minutes without activity, after 12 hours at most, and at log-out
+Requests | every API request rate-limited (per person, per address, tighter on sign-in); changes accepted only as JSON or file uploads (a form on another website cannot post to Ekotrace); every input checked against a schema; errors never show internal details
 Roles | each request checked on the server: who may see, enter or manage which facility (see Getting started → Roles)
 Company separation | the database itself keeps each company's rows apart (row-level security, forced for every connection): a query for one company cannot return another's data
-Audit | every login (and failed attempt), change, recalculation, upload, booking and API batch is recorded with who, when and from where
+Secrets | MFA keys and SSO client secrets encrypted with AES-256-GCM under a server key kept outside the database
+Audit | every sign-in (and failed attempt), change, upload, download, export and API batch, with who, when and from where; append-only and sealed in a hash chain; kept at least 12 months; forwarded to the company's SIEM
 ```
+
+## Sign-in
+
+**Multi-factor authentication (MFA).** After the password, a 6-digit code from an authenticator app (Microsoft Authenticator, Google Authenticator, a password manager). Set it up on your **account page** (your name → Password): scan the QR code, type the first code, save the ten **recovery codes** (each works once, for a lost phone). The super admin can **require MFA for everyone** (Setup → Security & audit log → Sign-in & MFA): people without it set it up at their next sign-in before doing anything else. A super admin can **reset** someone's MFA when they lose their phone. On servers, platform administrators must always use MFA.
+
+**Company sign-in (single sign-on).** People sign in with their work account; the company's own MFA and conditional-access rules apply, and leavers lose access as soon as IT disables their account. The super admin sets it up under Sign-in & MFA:
+
+```flow
+> 1 · Register | in the identity provider (e.g. Microsoft Entra ID → App registrations), a web application with the redirect address shown on the page
+> 2 · Fill in | issuer, client id, client secret, the company's email domains → Test
+> 3 · Switch on | "Sign in with your company account" appears on the sign-in page; the email decides the company
+! Checked | the provider's signature on every sign-in, the issuer, the application, expiry and a one-time value; with "must use MFA", a sign-in without a second factor is refused
+* Company sign-in only | passwords refused, except for super admins who use MFA (break-glass, when the provider is down)
+```
+
+People still need a profile under People & access (role and facilities); the company account only proves who they are.
+
+## Audit log
+
+Every sign-in, change, upload, download, export and API batch is recorded with who, when and from where (Setup → Security & audit log). Nobody can change or delete a record — not from the application, not in the database (it refuses). Every few seconds the new records are **sealed**: each carries the fingerprint (SHA-256) of the one before, so a record changed, removed or slipped in by anyone with direct database access breaks the chain, and the platform's **Check the whole chain** shows where. Records are kept for the retention period (24 months by default, never less than 12), then removed automatically — also after a company is deleted.
+
+**SIEM.** The records go to the company's security monitoring system in two ways: the server forwards them as **syslog** (RFC 5424 over TLS, TCP or UDP), and a SIEM can **pull** them over the API (an API client with the "Audit events" permission: `GET /api/v1/audit-events?after=<last seq>`).
+
+## Data export and deletion
+
+The super admin can download **everything the company holds** at any time (Security & audit log → Data export): every table as CSV, every stored file, and a manifest with the SHA-256 checksum of each file. Password hashes, session keys and MFA / SSO secrets are left out. At the end of a contract, after the export is handed over, Ekobon deletes all of the company's data in one step and issues a **certificate of destruction** (what was deleted, when, by whom, the export's checksum, when the backups holding copies expire).
 
 ## Data separation between companies
 
@@ -68,10 +95,10 @@ Every table holding company data carries the company id, and PostgreSQL row-leve
 
 | Area | Ekotrace (the application) | Hosting / deployment | The company |
 |---|---|---|---|
-| Access | roles, scopes, lockout, sessions | network rules, HTTPS certificate | who gets which role; leavers disabled promptly |
-| Data | company separation, audit log, versioned factors | encryption at rest, backups, disaster recovery, data residency | approving data, keeping evidence |
+| Access | roles, scopes, SSO, MFA, lockout, sessions, rate limits | network rules, HTTPS certificate, WAF and anti-DDoS in front | who gets which role; leavers disabled promptly (automatic with SSO) |
+| Data | company separation, sealed audit log, encrypted secrets, export, certificate of destruction | encryption at rest (AES-256 disks and backups), backups, disaster recovery, data residency | approving data, keeping evidence |
 | Integrations | OAuth clients, rate limits, validation | firewall to the sending systems | keeping client secrets safe; revoking unused clients |
-| Software | dependencies pinned and checked for known vulnerabilities at each release | patching the servers | — |
+| Software | dependencies pinned; every change type-checked, tested, scanned (CodeQL), audited for known vulnerabilities, with a software bill of materials (SBOM) | patching the servers | — |
 
 ## Decisions with security in mind
 
@@ -79,6 +106,18 @@ Every table holding company data carries the company id, and PostgreSQL row-leve
 - **No AI service** receives company data unless the company approves the service and its location. Purchase mapping works without AI (remembered choices and text matching on the server); if the company switches on an approved AI service, it receives only descriptions and category names — never amounts, supplier names or files — and may only choose among the categories the text matching found.
 - **Data residency:** where the data is hosted and backed up is agreed per deployment.
 
-## Not yet available
+## For the server team (IT)
 
-Single sign-on (SSO), multi-factor authentication (MFA) and the approval workflow (maker–checker) are planned. Until then: strong passwords, lockout, short sessions and roles apply; approval status is recorded on each entry.
+| Setting | What |
+|---|---|
+| `HTTPS=true`, `PUBLIC_URL` | HSTS and Secure cookies; the address people open (company sign-in returns there) |
+| `TRUST_PROXY` | the load balancer / WAF in front (true, a hop count or its addresses), so the real client address is used |
+| `DATA_KEY` | 64 hex characters from the secret store; encrypts MFA and SSO secrets |
+| `REQUIRE_ADMIN_MFA` | platform administrators must use MFA (on by default with HTTPS) |
+| `RATE_LIMIT_USER`, `_IP`, `_LOGIN` | requests per minute (600 / 300 / 20 by default) |
+| `AUDIT_RETENTION_MONTHS` | audit records kept (24 by default, at least 12) |
+| `SIEM_SYSLOG`, `SIEM_TLS_CA` | forward audit records, e.g. `tls://siem.example.com:6514` |
+| `BACKUP_RETENTION_DAYS` | stated on certificates of destruction |
+| `SECURITY_CONTACT` | published at `/.well-known/security.txt` for reporting vulnerabilities |
+
+The field app is a web page opened from the bin's QR label (no app-store app), so the mobile-app rules about stores, key-chains and certificate pinning do not apply to it; it runs over the same HTTPS, sign-in and roles as the rest.

@@ -23,7 +23,7 @@ export interface CalcResponse { cv?: CvUsed; stored?: { quantity: number; unit: 
 export interface PlanLimits { code: string; name: string; facilities: number | null; users: number | null; ai: boolean; export: boolean; groups: boolean; note: string }
 export interface Tenant { id: string; name: string; country: string; gwp_set: string; timezone?: string; currency?: string; has_logo?: boolean; consolidation?: string; base_year?: number; plan?: string; status?: string; access_expiry?: string; planLimits?: PlanLimits | null; flight_rf?: boolean; target_year?: number; target_s12?: number; target_s3?: number; due_day?: number; remind_days?: number; escalate_days?: number }
 export type Role = 'platform_admin' | 'super_admin' | 'admin' | 'manager' | 'preparer' | 'verifier';
-export interface Me { user: { id: string; name: string; email: string; role: Role; tenantId: string | null; scopeNodeId: string | null; mustChangePassword: boolean }; company: (Tenant & { scope_name: string | null }) | null }
+export interface Me { user: { id: string; name: string; email: string; role: Role; tenantId: string | null; scopeNodeId: string | null; mustChangePassword: boolean; via?: string; mfaEnrol?: boolean; mfa?: { enabled: boolean; required: boolean; recoveryLeft: number } }; company: (Tenant & { scope_name: string | null }) | null }
 export interface OrgNode { id: string; parent_id: string | null; kind: 'group' | 'subgroup' | 'facility'; name: string; facility_type: string | null; location: string | null; country: string; floor_area_m2: number | null; employees: number | null; ownership_pct: number; operational_control: boolean; financial_control: boolean; active: boolean; sort: number; manager_user_id: string | null; manager_name: string | null; grid_region?: string | null; entries: number; canEdit: boolean; canSee: boolean; canEnter: boolean }
 export interface Person { id: string; name: string; email: string; role: Role; scope_node_id: string | null; scope_name: string | null; disabled: boolean; last_login_at: string | null; created_at: string; must_change_password: boolean; facilities: { id: string; name: string }[]; manages: { id: string; name: string }[]; canEdit: boolean }
 export interface Company { id: string; name: string; country: string; gwp_set: string; plan: string; status: string; access_start: string; access_expiry: string; created_at: string; users: number; facilities: number; entries: number; last_login: string | null; notes: string | null; price: number | null; billing_currency: string; billing_cycle: 'annual' | 'monthly'; po_ref: string | null; billing_email: string | null }
@@ -167,6 +167,13 @@ export interface Msg { id: string; author_name: string; from_team: boolean; body
 export interface Announcement { id: string; kind: 'news' | 'feature' | 'factors' | 'maintenance' | 'regulation'; title: string; body: string; published_at: string; published_by: string | null; expires_at: string | null; read?: boolean;
   tenant_ids?: string[] | null; companies?: string[] | null; reads?: number; withdrawn_at?: string | null }
 
+// ------------------------------------------------------------------ security --
+export interface SsoSettings { issuer: string; clientId: string; hasSecret: boolean; domains: string[]; enabled: boolean; enforce: boolean; requireMfa: boolean; redirectUri: string; updatedBy: string | null; updatedAt: string | null }
+export interface SecuritySettings {
+  mfaRequired: boolean; sso: SsoSettings; canEdit: boolean; idleMinutes: number; audit: { retentionMonths: number; siem: boolean };
+  people: { id: string; name: string; email: string; role: Role; disabled: boolean; mfa: boolean; recovery_left: number; last_login_at: string | null; last_method: string | null }[];
+}
+export interface DestructionCertificate { id: string; tenant_id: string; company: string; country: string | null; requested_by: string; reason: string | null; performed_at: string; rows_deleted: Record<string, number>; files_deleted: number; export_sha256: string | null; backups_until: string; audit_until: string }
 export class ApiError extends Error {
   constructor(message: string, public status: number, public code?: string, public details?: { field: string; message: string }[]) { super(message); }
 }
@@ -356,7 +363,22 @@ export const api = {
   importDesnz: (file: Blob, preview: boolean) => call<{ year: number; version: string; gwpSet: string; fuelRows: number; gasRows: number; skipped?: boolean; factors?: number; items?: number; issues?: number }>('POST', `/api/admin/import/desnz${preview ? '?preview=1' : ''}`, undefined, file),
   addFactor: (b: unknown) => call<{ factor: Factor; replaced: number | null }>('POST', '/api/admin/factors', b),
   // auth
-  login: (email: string, password: string) => call<{ ok: true }>('POST', '/api/auth/login', { email, password }),
+  login: (email: string, password: string) => call<{ ok?: true; mfa?: true; challenge?: string; enrolMfa?: boolean }>('POST', '/api/auth/login', { email, password }),
+  loginMfa: (challenge: string, b: { code?: string; recoveryCode?: string }) => call<{ ok: true; recoveryLeft?: number }>('POST', '/api/auth/mfa', { challenge, ...b }),
+  ssoStart: (email: string) => call<{ url: string }>('POST', '/api/auth/sso/start', { email }),
+  mfaSetup: () => call<{ secret: string; uri: string }>('POST', '/api/auth/mfa/setup'),
+  mfaEnable: (code: string) => call<{ recoveryCodes: string[] }>('POST', '/api/auth/mfa/enable', { code }),
+  mfaRecovery: (code: string) => call<{ recoveryCodes: string[] }>('POST', '/api/auth/mfa/recovery', { code }),
+  mfaDisable: (password: string, code: string) => call<{ ok: true }>('POST', '/api/auth/mfa/disable', { password, code }),
+  security: () => call<SecuritySettings>('GET', '/api/security'),
+  setMfaPolicy: (required: boolean) => call<{ ok: true }>('PUT', '/api/security/mfa', { required }),
+  saveSso: (b: { issuer: string; clientId: string; clientSecret?: string; domains: string[]; enabled: boolean; enforce: boolean; requireMfa: boolean }) => call<{ sso: SsoSettings }>('PUT', '/api/security/sso', b),
+  testSso: (issuer: string) => call<{ ok: boolean; message?: string; issuer?: string; authorization?: string; token?: string; keys?: string }>('POST', '/api/security/sso/test', { issuer }),
+  resetUserMfa: (id: string) => call<{ ok: true }>('POST', `/api/users/${id}/mfa/reset`),
+  auditVerify: () => call<{ ok: boolean; checked: number; firstSeq: number; lastSeq: number; unsealed: number; problem?: { seq: number; id: string; what: string }; purgedThrough: string | null }>('GET', '/api/platform/audit/verify'),
+  siemStatus: () => call<{ target: string | null; sealedThrough: number; forwardedThrough: number; lastError: string | null; updatedAt: string | null; retentionMonths: number }>('GET', '/api/platform/siem'),
+  destroyCompany: (id: string, b: { confirm: string; reason: string; exportSha256?: string }) => call<{ certificate: DestructionCertificate }>('POST', `/api/platform/companies/${id}/destroy`, b),
+  destructionCertificates: () => call<{ certificates: DestructionCertificate[] }>('GET', '/api/platform/certificates'),
   logout: () => call<{ ok: true }>('POST', '/api/auth/logout'),
   me: () => call<Me>('GET', '/api/auth/me'),
   changePassword: (current: string, next: string) => call<{ ok: true }>('POST', '/api/auth/password', { current, next }),

@@ -16,6 +16,7 @@ import type { FastifyReply, FastifyRequest } from 'fastify';
 import { platformTx, type Tx } from '../db/pool.js';
 import { AppError, forbidden } from './errors.js';
 import { sha256 } from './password.js';
+import { config } from '../config.js';
 
 export type Role = 'platform_admin' | 'super_admin' | 'admin' | 'manager' | 'preparer' | 'verifier';
 export interface User {
@@ -27,6 +28,10 @@ export interface User {
   tenantId: string | null;
   scopeNodeId: string | null;
   mustChangePassword: boolean;
+  /** how this session signed in: password, password+mfa, sso */
+  via?: string;
+  /** must set up MFA before anything else */
+  mfaEnrol?: boolean;
 }
 
 declare module 'fastify' {
@@ -48,8 +53,9 @@ export function readCookie(req: FastifyRequest, name: string): string | null {
   return null;
 }
 
-export function setSessionCookie(reply: FastifyReply, token: string | null, secure: boolean) {
-  const attrs = ['Path=/', 'HttpOnly', 'SameSite=Lax', secure ? 'Secure' : ''].filter(Boolean).join('; ');
+/** Secure when the deployment is HTTPS (config), or the request came over HTTPS — also behind a proxy. */
+export function setSessionCookie(reply: FastifyReply, token: string | null, viaHttps: boolean) {
+  const attrs = ['Path=/', 'HttpOnly', 'SameSite=Lax', viaHttps || config.https ? 'Secure' : ''].filter(Boolean).join('; ');
   reply.header('set-cookie', token ? `${COOKIE}=${token}; ${attrs}; Max-Age=${SESSION_HOURS * 3600}` : `${COOKIE}=; ${attrs}; Max-Age=0`);
 }
 
@@ -66,7 +72,7 @@ export async function authenticate(req: FastifyRequest) {
     `UPDATE session s SET last_seen_at = now()
        FROM app_user u
       WHERE s.token_hash = $1 AND u.id = s.user_id AND s.expires_at > now() AND s.last_seen_at > now() - make_interval(mins => $2) AND NOT u.disabled
-      RETURNING u.id, u.name, u.email, u.role, u.tenant_id, u.scope_node_id, u.must_change_password`, [sha256(token), IDLE_MINUTES])).rows[0]);
+      RETURNING u.id, u.name, u.email, u.role, u.tenant_id, u.scope_node_id, u.must_change_password, s.method, s.mfa_enrol`, [sha256(token), IDLE_MINUTES])).rows[0]);
   if (!row) throw new AppError('Your session has ended — please log in again', 401, 'UNAUTHENTICATED');
 
   let tenantId: string | null = row.tenant_id;
@@ -74,9 +80,10 @@ export async function authenticate(req: FastifyRequest) {
     const t = req.headers['x-tenant-id'];
     tenantId = typeof t === 'string' && /^[0-9a-f-]{36}$/i.test(t) ? t : null;
   }
-  req.user = { id: row.id, name: row.name, email: row.email, role: row.role, tenantId, scopeNodeId: row.scope_node_id, mustChangePassword: row.must_change_password };
-  // A temporary password must be changed before anything else.
-  if (row.must_change_password && !req.url.startsWith('/api/auth/')) throw new AppError('Please set your own password first', 403, 'MUST_CHANGE_PASSWORD');
+  req.user = { id: row.id, name: row.name, email: row.email, role: row.role, tenantId, scopeNodeId: row.scope_node_id, mustChangePassword: row.must_change_password, via: row.method, mfaEnrol: row.mfa_enrol };
+  // A temporary password must be changed, and a required MFA set up, before anything else.
+  if (row.must_change_password && row.method !== 'sso' && !req.url.startsWith('/api/auth/')) throw new AppError('Please set your own password first', 403, 'MUST_CHANGE_PASSWORD');
+  if (row.mfa_enrol && !req.url.startsWith('/api/auth/')) throw new AppError('Set up multi-factor authentication first', 403, 'MUST_ENROL_MFA');
 }
 
 export function requireRole(req: FastifyRequest, ...roles: Role[]) {
