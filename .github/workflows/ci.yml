@@ -44,6 +44,7 @@ jobs:
         if: failure()
         shell: bash
         run: |
+          grep -A4 'server error' test.log | head -10 | while IFS= read -r l; do echo "::error::SRV ${l//%/%25}"; done
           grep -A14 '^not ok\|^    not ok' test.log | grep -E 'not ok|error:|message|expected|actual|Error' | head -40 | while IFS= read -r l; do echo "::error::${l//%/%25}"; done
           tail -5 test.log | while IFS= read -r l; do echo "::error::${l//%/%25}"; done
       - name: Dependency audit (fails on high or critical)
