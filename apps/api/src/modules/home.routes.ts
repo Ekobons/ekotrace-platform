@@ -18,7 +18,7 @@ import { tenantTx } from '../db/pool.js';
 import { audit, requireRole, requireTenant } from '../lib/auth.js';
 import { scopeOf, subtreeFacilities } from '../lib/access.js';
 import { AppError } from '../lib/errors.js';
-import { USUAL_SQL, approvalSettings, checkOf } from './approvals.routes.js';
+import { SELF_ROLES, USUAL_SQL, approvalSettings, checkOf, selfAllowed } from './approvals.routes.js';
 import { METRIC_JOIN } from '../lib/collection.js';
 
 export const KPI_IDS = ['tot', 's12', 's3', 'pemp', 'pm2', 'elec', 'ren', 'eui', 'cool', 'water', 'wemp', 'waste', 'div', 'fuel', 'fleet', 'travel', 'purch', 'supsp', 'refr'] as const;
@@ -62,16 +62,17 @@ export async function homeRoutes(app: FastifyInstance) {
       // waiting for my approval: facilities I may approve, not entered or submitted by me (a one-user company approves its own)
       const users = Number((await c.query(`SELECT count(*)::int AS n FROM app_user WHERE NOT disabled AND role <> 'verifier'`)).rows[0].n);
       const solo = users === 1 && req.user.role === 'super_admin';
-      const apprFacs = facs.filter((f) => s.approve.has(f));
+      const apprFacs = req.user.role === 'platform_admin' ? [] : facs.filter((f) => s.approve.has(f));
       const set = await approvalSettings(c, tenant), canL2 = ['super_admin', 'admin', 'platform_admin'].includes(req.user.role);
       const approvals = (await c.query(
         `SELECT a.id, a.facility_id AS f, fo.name AS facility, cat.code AS cat, cat.name AS category, i.name AS item, a.period_start::text AS month, a.quantity::float8 AS qty, a.unit,
-                (a.co2e_direct + a.co2e_scope2 + a.co2e_scope3)::float8 AS kg, ue.name AS by, a.submitted_at AS at, a.approval_stage AS stage, a.l1_by, ${USUAL_SQL} AS usual, mt.check_pct
+                (a.co2e_direct + a.co2e_scope2 + a.co2e_scope3)::float8 AS kg, ue.name AS by, a.submitted_at AS at, a.approval_stage AS stage, a.l1_by, a.created_by, a.submitted_by, ${USUAL_SQL} AS usual, mt.check_pct
            FROM activity a JOIN category cat ON cat.id = a.category_id JOIN item i ON i.id = a.item_id JOIN org_node fo ON fo.id = a.facility_id LEFT JOIN app_user ue ON ue.id::text = a.created_by ${METRIC_JOIN}
           WHERE a.facility_id = ANY($1) AND a.status = 'submitted' AND ($2 OR (coalesce(a.created_by, '') <> $3 AND coalesce(a.submitted_by, '') <> $3))
-          ORDER BY a.submitted_at NULLS LAST LIMIT 500`, [apprFacs, solo, me])).rows
+          ORDER BY a.submitted_at NULLS LAST LIMIT 500`, [apprFacs, solo || (set.selfApproval && SELF_ROLES.includes(req.user.role)), me])).rows
+        .filter((r) => solo || (r.created_by !== me && r.submitted_by !== me) || selfAllowed(set, req.user.role, r.kg))
         .filter((r) => r.stage !== 'L2' || (canL2 && r.l1_by !== me))
-        .map(({ usual, l1_by: _l, check_pct, ...r }) => { const ck = checkOf(r.qty, usual, check_pct ?? set.checkPct); return { ...r, usual, warn: ck && !ck.ok ? ck.txt : null }; });
+        .map(({ usual, l1_by: _l, check_pct, created_by: _cb, submitted_by: _sb, ...r }) => { const ck = checkOf(r.qty, usual, check_pct ?? set.checkPct); return { ...r, usual, warn: ck && !ck.ok ? ck.txt : null }; });
       const mine = (await c.query(
         `SELECT a.id, a.facility_id AS f, fo.name AS facility, CASE WHEN cat.code LIKE 'waste_%' THEN 'waste' WHEN cat.code LIKE 'water_%' THEN 'water' ELSE cat.code END AS cat, cat.name AS category,
                 i.name AS item, a.period_start::text AS month, a.status, a.review_note, ur.name AS reviewed_by

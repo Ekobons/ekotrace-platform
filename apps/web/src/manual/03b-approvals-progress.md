@@ -16,11 +16,27 @@ The number next to **Approvals** in the menu is what waits for you.
 
 Set by the super admin under **Methodology & boundaries → Approval levels**:
 
-- **Level 1** — the facility manager, a sub-group admin or the super admin. Nobody approves their own entry.
+- **Level 1** — another manager of the facility, else the sub-group admin, else the super admin. Nobody approves their own entry (unless self-approval is switched on, below).
 - **Level 2** (optional) — for entries of at least a number of tCO₂e, or always for chosen categories, a second approval by a sub-group admin or the super admin, a different person from level 1. After level 1 the entry shows **Level 2 · Level 1 approved by …**.
 - **Quantity check** — the ± % limit for the check.
 
 Sending an entry back clears both levels; when it is resubmitted it starts again at level 1.
+
+Platform staff (Ekobon) never approve or send back a company's data, and never decide its registry changes or base-year restatements. They can view and help.
+
+### Self-approval (off by default)
+
+For companies where an independent check is impractical, for example one person runs the data for a site, the super admin can switch on **Allow super admins, admins and managers to approve their own entries**, optionally only below a size in tCO₂e.
+
+When it is on:
+
+- Your own entries appear under "Waiting for you" marked **Your entry**.
+- **Approve my own…** asks what you checked the entry against (the bill, the meter export, the delivery notes). The note is required.
+- The entry is marked **self-reviewed**. It is listed in the data-quality report under "Segregation of duties", with your note, and counted in the verifier pack.
+- **Approve all without warnings** never includes your own entries.
+- Data preparers never approve. Level 2, when it applies, is always someone else.
+
+Verifiers and most frameworks expect an independent check; the BEEAH RFP asks for one. Leave it off where that applies. A company whose only user is its super admin approves its own entries anyway, marked self-reviewed.
 
 ## Data progress
 

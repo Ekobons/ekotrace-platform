@@ -91,6 +91,8 @@ export async function reportsRoutes(app: FastifyInstance) {
       const old = (await q2(`SELECT f.name AS facility, i.name AS item, a.period_start::text AS month, a.submitted_at ${base}
                               AND a.status = 'submitted' AND a.submitted_at < now() - interval '14 days' ORDER BY a.submitted_at`))
         .map((r) => `${nm(r)} · waiting since ${new Date(r.submitted_at).toLocaleDateString('en-GB')}`);
+      const self = (await q2(`SELECT f.name AS facility, i.name AS item, a.period_start::text AS month, ur.name AS by, coalesce(a.self_review_note, '') AS note ${base.replace('WHERE a.facility_id', 'LEFT JOIN app_user ur ON ur.id::text = a.reviewed_by WHERE a.facility_id')}
+                               AND a.status = 'approved' AND a.self_reviewed ORDER BY 3 LIMIT 500`)).map((r) => `${nm(r)} · ${r.by ?? '—'}${r.note ? ` · “${r.note}”` : ''}`);
       const est = (await q2(`SELECT f.name AS facility, i.name AS item, a.period_start::text AS month ${base}
                               AND a.status = 'approved' AND a.data_type <> 'actual' AND coalesce(trim(a.note), '') = '' AND a.commute_record_id IS NULL`)).map((r) => `${nm(r)} · estimated without a basis note`);
       // required data missing: the categories each facility reports (this year or last), months before this one
@@ -116,6 +118,7 @@ export async function reportsRoutes(app: FastifyInstance) {
         ['dup', 'Possible double counting (same facility, month, item and quantity)', 'Double counting', dup],
         ['est', 'Estimated data without a note on how it was estimated', 'Data type', est],
         ['old', 'Entries waiting for approval more than 14 days', 'Workflow', old],
+        ['self', 'Entries approved by the person who entered or submitted them (self-reviewed)', 'Segregation of duties', self],
       ];
       return { checks: checks.map(([id, name, area, items]) => ({ id, name, area, n: items.length, items: items.slice(0, 200), justified: just[id] ?? null })), canJustify: ['super_admin', 'admin', 'platform_admin'].includes(req.user.role) };
     });
@@ -124,7 +127,7 @@ export async function reportsRoutes(app: FastifyInstance) {
   app.put('/api/reports/quality/:check', async (req) => {
     const tenant = requireTenant(req);
     requireRole(req, ...ADMIN);
-    const { check } = z.object({ check: z.enum(['missing', 'odd', 'noev', 'reqev', 'spend', 'dup', 'est', 'old']) }).parse(req.params);
+    const { check } = z.object({ check: z.enum(['missing', 'odd', 'noev', 'reqev', 'spend', 'dup', 'est', 'old', 'self']) }).parse(req.params);
     const b = z.object({ year: z.number().int().min(2000).max(2100), text: z.string().trim().max(1000) }).parse(req.body);
     return tenantTx(tenant, async (c) => {
       if (!b.text) await c.query(`DELETE FROM report_justification WHERE year = $1 AND check_id = $2`, [b.year, check]);

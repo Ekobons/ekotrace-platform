@@ -281,7 +281,7 @@ export async function assuranceRoutes(app: FastifyInstance) {
       const tot = (await c.query(`SELECT coalesce(sum(a.co2e_direct * ${W}), 0)::float8 / 1000 AS s1, coalesce(sum(a.co2e_scope2 * ${W}), 0)::float8 / 1000 AS s2l,
                                          coalesce(sum(coalesce(a.co2e_scope2_market, a.co2e_scope2) * ${W}), 0)::float8 / 1000 AS s2m,
                                          coalesce(sum((a.co2e_scope3 + a.co2e_wtt + coalesce(a.co2e_td, 0)) * ${W}), 0)::float8 / 1000 AS s3, coalesce(sum(a.co2_biogenic * ${W}), 0)::float8 / 1000 AS bio,
-                                         count(*)::int AS n
+                                         count(*)::int AS n, count(*) FILTER (WHERE a.self_reviewed)::int AS self
                                     FROM activity a JOIN org_node f ON f.id = a.facility_id WHERE a.status = 'approved' AND extract(year FROM a.period_start) = $1`, [year])).rows[0];
       const sources = (await c.query(`SELECT coalesce(a.factors->0->>'source', 'own / supplier factor') AS source, count(*)::int AS n FROM activity a
                                        WHERE a.status = 'approved' AND extract(year FROM a.period_start) = $1 GROUP BY 1 ORDER BY 2 DESC`, [year])).rows;

@@ -2,6 +2,15 @@
 
 Newest first.
 
+## 2026-10-15 · Self-approval setting (off by default); platform staff no longer approve company data
+
+- **Self-approval** (Methodology → Approval levels → Self-approval, super admin): "Allow super admins, admins and managers to approve their own entries", optionally only below a size in tCO₂e. Off by default.
+  - When on, own entries appear under "Waiting for you" as "Your entry". **Approve my own…** needs a note saying what the entry was checked against.
+  - The entry is marked self-reviewed (with the note, new column `activity.self_review_note`). A new data-quality check, "Segregation of duties", lists these entries, and the verifier pack counts them.
+  - "Approve all without warnings" never includes own entries. Data preparers never approve. Level 2 is always another person.
+- **Platform staff (Ekobon)** can no longer approve or send back company entries, or decide registry changes and base-year restatements; they view and help. Their approval queues are empty.
+- Manual (Approvals): who approves a manager's entry, self-approval, platform staff. Migration 041. Test added (74 API tests pass).
+
 ## 2026-10-14 · Carbontek name and a new sign-in page
 
 - **Product name:** the platform now shows **Carbontek** (brand pack `brands/carbontek`, now the default; `BRAND=ekotrace` brings the Ekotrace name back). The name comes from the brand pack everywhere: menu, sign-in, contractor and scan pages, manual text, MFA app label and recovery-codes file, e-mails and notices, exports and downloaded file names, report declarations, the destruction certificate, demo texts. Internal identifiers (token audience, syslog app name, SCIM schema, package names) are unchanged.

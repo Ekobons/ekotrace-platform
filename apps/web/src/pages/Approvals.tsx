@@ -21,6 +21,7 @@ export function Approvals() {
   const [d, setD] = useState<ApprovalsData | null>(null);
   const [tick, setTick] = useState(0);
   const [ret, setRet] = useState<{ id: string; note: string } | null>(null);
+  const [own, setOwn] = useState<{ id: string; note: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [open, setOpen] = useState<Awaited<ReturnType<typeof api.activity>> | null>(null);
   const dlg = useRef<HTMLDialogElement>(null);
@@ -32,7 +33,7 @@ export function Approvals() {
       const r = await api.reviewAction(ids, action, note);
       const l2 = r.toLevel2 ?? 0, final = r.done - l2;
       toast(action === 'return' ? 'Sent back with your note' : [final ? `${final} approved` : '', l2 ? `${l2} reviewed — now waiting for level-2 approval` : '', r.skipped.length ? `${r.skipped.length} skipped (${r.skipped[0]!.reason})` : ''].filter(Boolean).join(' · '));
-      setRet(null); reload();
+      setRet(null); setOwn(null); reload();
     } catch (e) { toast((e as Error).message); } finally { setBusy(false); }
   };
   const show = async (id: string) => { try { setOpen(await api.activity(id)); dlg.current?.showModal(); } catch (e) { toast((e as Error).message); } };
@@ -46,7 +47,7 @@ export function Approvals() {
     && (!F.level || (F.level === 'L2' ? l.stage === 'L2' : l.stage !== 'L2'))
     && (!F.q || `${l.item} ${l.note ?? ''} ${l.by ?? ''}`.toLowerCase().includes(F.q.toLowerCase()));
   const mine = (d?.mine ?? []).filter(keep), others = (d?.others ?? []).filter(keep), filtered = Object.values(F).some(Boolean);
-  const clean = mine.filter((l) => !l.check || l.check.ok);
+  const clean = mine.filter((l) => (!l.check || l.check.ok) && !l.self);
   const sel = (k: keyof typeof F, label: string, opts: [string, string][]) => (
     <select className="input sm" aria-label={label} style={{ width: 'auto', maxWidth: 230 }} value={F[k]} onChange={(e) => setF({ ...F, [k]: e.target.value })}>
       <option value="">{label}</option>{opts.map(([v, n]) => <option key={v} value={v}>{n}</option>)}</select>);
@@ -62,7 +63,11 @@ export function Approvals() {
       <td className="num"><b>{fmt(l.kg / 1000, 2)}</b><div><button className="btn xs ghost" onClick={() => void show(l.id)}>How calculated</button></div></td>
       <td className="small" style={{ color: l.check ? (l.check.ok ? 'var(--ok)' : 'var(--warn)') : 'var(--muted)', maxWidth: 240 }}>{l.check ? l.check.txt : 'No history to compare'}</td>
       <td className="muted small nowrap">{l.by?.replace(/ \(.*\)$/, '') ?? '—'}<br />{l.at ? new Date(l.at).toLocaleDateString('en-GB') : ''}</td>
-      <td>{can ? (ret?.id === l.id
+      <td>{can && l.self && ret?.id !== l.id ? (own?.id === l.id
+        ? <div className="row nowrap" style={{ gap: 6 }}><input className="input sm" autoFocus style={{ minWidth: 240 }} placeholder="Checked against… (e.g. the March bill)" value={own.note} onChange={(e) => setOwn({ id: l.id, note: e.target.value })} />
+            <button className="btn sm p" disabled={busy || !own.note.trim()} onClick={() => void act([l.id], 'approve', own.note.trim())}>Approve my own</button><button className="btn sm ghost" onClick={() => setOwn(null)}>Cancel</button></div>
+        : <div className="row nowrap" style={{ gap: 6 }}><span className="chip warn" title="Your company allows self-approval: it is marked self-reviewed and listed in the data-quality report">Your entry</span><button className="btn sm" disabled={busy} onClick={() => setOwn({ id: l.id, note: '' })}>Approve my own…</button><button className="btn sm ghost" disabled={busy} onClick={() => setRet({ id: l.id, note: '' })}>Send back</button></div>)
+        : can ? (ret?.id === l.id
         ? <div className="row nowrap" style={{ gap: 6 }}><input className="input sm" autoFocus style={{ minWidth: 200 }} placeholder="What needs fixing?" value={ret.note} onChange={(e) => setRet({ id: l.id, note: e.target.value })} />
             <button className="btn sm danger" disabled={busy || !ret.note.trim()} onClick={() => void act([l.id], 'return', ret.note.trim())}>Send back</button><button className="btn sm ghost" onClick={() => setRet(null)}>Cancel</button></div>
         : <div className="row nowrap" style={{ gap: 6 }}><button className="btn sm p" disabled={busy} onClick={() => void act([l.id], 'approve')}>Approve</button><button className="btn sm" disabled={busy} onClick={() => setRet({ id: l.id, note: '' })}>Send back</button></div>)
@@ -90,7 +95,7 @@ export function Approvals() {
           <span className="grow" /><span className="muted small">{mine.length + others.length} of {all.length} shown</span>
         </div>
         <section className="card tacard">
-          <div className="row"><h2>Waiting for you · {mine.length}{filtered ? ` of ${d.mine.length}` : ''}</h2><span className="grow" /><span className="muted small">Check = quantity against the facility’s average for the same item over the 6 months before (limit ±{d.settings.checkPct}%). Nobody approves their own entry.</span></div>
+          <div className="row"><h2>Waiting for you · {mine.length}{filtered ? ` of ${d.mine.length}` : ''}</h2><span className="grow" /><span className="muted small">Check = quantity against the facility’s average for the same item over the 6 months before (limit ±{d.settings.checkPct}%). {d.settings.selfApproval ? 'Your company allows self-approval: your own entries need a note and are marked self-reviewed.' : 'Nobody approves their own entry.'}</span></div>
           <div className="scrollx"><table className="t">{head}<tbody>{mine.map((l) => row(l, true))}{!mine.length && <tr><td colSpan={7} className="muted">{d.mine.length ? 'Nothing matches the filters.' : 'Nothing waiting for your approval.'}</td></tr>}</tbody></table></div>
         </section>
         {others.length > 0 && (

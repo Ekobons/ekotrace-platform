@@ -17,8 +17,11 @@ import { audit, requireRole, requireTenant } from '../lib/auth.js';
 import { scopeOf } from '../lib/access.js';
 import { METRIC_JOIN } from '../lib/collection.js';
 
-export interface ApprovalSettings { l2: boolean; minT: number; cats: string[]; checkPct: number }
-export const APPROVAL_DEFAULT: ApprovalSettings = { l2: false, minT: 100, cats: [], checkPct: 35 };
+export interface ApprovalSettings { l2: boolean; minT: number; cats: string[]; checkPct: number; selfApproval: boolean; selfMaxT: number | null }
+export const APPROVAL_DEFAULT: ApprovalSettings = { l2: false, minT: 100, cats: [], checkPct: 35, selfApproval: false, selfMaxT: null };
+/** Self-approval (off by default): a super admin, admin or manager approves their own entry, below the size limit if one is set. */
+export const SELF_ROLES = ['super_admin', 'admin', 'manager'];
+export const selfAllowed = (s: ApprovalSettings, role: string, kg: number) => s.selfApproval && SELF_ROLES.includes(role) && (s.selfMaxT == null || kg / 1000 < s.selfMaxT);
 export async function approvalSettings(c: Tx, tenant: string): Promise<ApprovalSettings> {
   const r = (await c.query(`SELECT approval FROM tenant WHERE id = $1`, [tenant])).rows[0];
   return { ...APPROVAL_DEFAULT, ...(r?.approval ?? {}) };
@@ -55,11 +58,12 @@ export async function approvalsRoutes(app: FastifyInstance) {
       const out = rows.map((r) => {
         const mine = r.created_by === me || r.submitted_by === me;
         const l2 = r.stage === 'L2';
-        const can = s.approve.has(r.f) && (!mine || solo) && (!l2 || (['super_admin', 'admin', 'platform_admin'].includes(req.user.role) && r.l1_by !== me));
+        const self = mine && !solo && selfAllowed(set, req.user.role, r.kg);
+        const can = req.user.role !== 'platform_admin' && s.approve.has(r.f) && (!mine || solo || self) && (!l2 || (['super_admin', 'admin', 'platform_admin'].includes(req.user.role) && r.l1_by !== me));
         const waitingFor = l2 ? 'an admin or the super admin (level 2)' : r.manager ?? 'an admin or the super admin';
         return {
           id: r.id, f: r.f, facility: r.facility, month: r.month, cat: r.cat, category: r.category, item: r.item, note: r.note, dataType: r.data_type, qty: r.qty, unit: r.unit, kg: r.kg,
-          by: r.by, at: r.at, stage: r.stage, l1: r.l1_name, mine, canApprove: can, waitingFor, check: checkOf(r.qty, r.usual, r.check_pct ?? set.checkPct), metric: r.metric_code,
+          by: r.by, at: r.at, stage: r.stage, l1: r.l1_name, mine, self: can && self, canApprove: can, waitingFor, check: checkOf(r.qty, r.usual, r.check_pct ?? set.checkPct), metric: r.metric_code,
           willNeedL2: !l2 && needsL2(set, r.kg, r.cat),
         };
       });
@@ -71,7 +75,8 @@ export async function approvalsRoutes(app: FastifyInstance) {
   app.put('/api/approvals/settings', async (req) => {
     const tenant = requireTenant(req);
     requireRole(req, 'super_admin');
-    const b = z.object({ l2: z.boolean(), minT: z.number().finite().min(0).max(1e9), cats: z.array(z.string().max(60)).max(40), checkPct: z.number().int().min(1).max(500) }).parse(req.body);
+    const b = z.object({ l2: z.boolean(), minT: z.number().finite().min(0).max(1e9), cats: z.array(z.string().max(60)).max(40), checkPct: z.number().int().min(1).max(500),
+      selfApproval: z.boolean().default(false), selfMaxT: z.number().finite().min(0).max(1e9).nullable().default(null) }).parse(req.body);
     return tenantTx(tenant, async (c) => {
       await c.query(`UPDATE tenant SET approval = $2 WHERE id = $1`, [tenant, JSON.stringify(b)]);
       await audit(c, req, 'approval.settings', 'tenant', tenant, b);

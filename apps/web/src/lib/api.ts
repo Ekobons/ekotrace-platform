@@ -301,10 +301,10 @@ export interface RepSettings {
   restatements?: { title: string; trigger: string; facility: string | null; effective: string | null; s1: number; s2: number; s2m: number; s3: number; pct: number | null; applied: boolean; proposed_name: string | null; decided_name: string | null; decided_at: string }[]; restateThreshold?: number;
   templates: RepTemplate[]; versions: RepVersion[]; canEntity: boolean; canEdit: boolean;
 }
-export interface ApprovalSettings { l2: boolean; minT: number; cats: string[]; checkPct: number }
+export interface ApprovalSettings { l2: boolean; minT: number; cats: string[]; checkPct: number; selfApproval: boolean; selfMaxT: number | null }
 export interface ApprovalRow {
   id: string; f: string; facility: string; month: string; cat: string; category: string; item: string; note: string | null; dataType: string; qty: number; unit: string; kg: number;
-  by: string | null; at: string | null; stage: 'L2' | null; l1: string | null; mine: boolean; canApprove: boolean; waitingFor: string; check: { ok: boolean; txt: string } | null; willNeedL2: boolean;
+  by: string | null; at: string | null; stage: 'L2' | null; l1: string | null; mine: boolean; self?: boolean; canApprove: boolean; waitingFor: string; check: { ok: boolean; txt: string } | null; willNeedL2: boolean;
 }
 export interface ApprovalsData { settings: ApprovalSettings; mine: ApprovalRow[]; others: ApprovalRow[]; categories: { code: string; name: string; scope: number }[]; canSettings: boolean }
 export interface HomeData {
@@ -390,7 +390,7 @@ export interface AFinding { id: string; severity: 'low' | 'medium' | 'high'; kin
   raisedBy: string | null; raisedAt: string; closedBy: string | null; closedAt: string | null; closeNote: string | null; activityId: string | null; facility: string | null; item: string | null; period: string | null }
 export interface SampleItem { id: string; key: boolean; result: 'agreed' | 'exception' | null; note: string | null; testedBy: string | null; testedAt: string | null; facility: string; from: string; to: string; category: string; item: string;
   qty: number; unit: string; t: number; source: string | null; dataType: string; entryNote: string | null; evidence: boolean; evidenceKind: string | null; enteredBy: string | null; approvedBy: string | null; approvedAt: string | null }
-export interface AssurancePack { company: string; consolidation: string; gwp: string; baseYear: number | null; totals: { s1: number; s2l: number; s2m: number; s3: number; bio: number; n: number };
+export interface AssurancePack { company: string; consolidation: string; gwp: string; baseYear: number | null; totals: { s1: number; s2l: number; s2m: number; s3: number; bio: number; n: number; self?: number };
   restatements?: { title: string; trigger: string; facility: string | null; t: number; pct: number | null; status: string; applied: boolean; proposed_name: string | null; decided_name: string | null; decided_at: string; decision_note: string | null }[];
   sources: { source: string; n: number }[]; trail: { at: string; user: string | null; action: string; entityId: string | null; detail: unknown }[] }
 export type BinInput = { facilityId: string; name: string; location?: string; itemId: number; gri?: string; hazardous: boolean; contractor?: string; capacityL?: number; density?: number };

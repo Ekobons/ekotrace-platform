@@ -102,6 +102,7 @@ export async function restatementRoutes(app: FastifyInstance) {
       if (!r) throw notFound('Restatement');
       if (r.status !== 'pending') throw new AppError('Already decided', 409, 'DECIDED');
       if (r.proposed_by === req.user.id) throw forbidden('Someone other than the person who recorded it approves it');
+      if (req.user.role === 'platform_admin') throw forbidden('Base-year changes are decided by the company\'s super admin or admin, not platform staff');
       const t = (await c.query(`SELECT base_year, restate_threshold::float8 AS threshold FROM tenant WHERE id = $1`, [tenant])).rows[0];
       if (r.base_year !== t.base_year) throw new AppError(`The base year is now ${t.base_year}; this change was recorded for ${r.base_year}. Record it again for the new base year.`, 409, 'BASE_YEAR');
       if (b.decision === 'reject') {

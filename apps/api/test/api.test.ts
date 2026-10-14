@@ -1720,7 +1720,7 @@ test('reports: entries behind the report with their GHG Protocol category, quali
   assert.ok(l.body.lines.some((x: { cat: string; code: string }) => x.cat === 'stationary_combustion' && x.code === '1.1'));
   const qd = await call(sa, 'GET', '/api/reports/quality?year=2024');
   assert.equal(qd.status, 200, JSON.stringify(qd.body));
-  assert.deepEqual(qd.body.checks.map((c: { id: string }) => c.id), ['missing', 'odd', 'noev', 'reqev', 'spend', 'dup', 'est', 'old']);
+  assert.deepEqual(qd.body.checks.map((c: { id: string }) => c.id), ['missing', 'odd', 'noev', 'reqev', 'spend', 'dup', 'est', 'old', 'self']);
   assert.equal((await call(mgr, 'PUT', '/api/reports/quality/odd', { year: 2024, text: 'x' })).status, 403);
   assert.equal((await call(sa, 'PUT', '/api/reports/quality/odd', { year: 2024, text: 'Plant shutdown in April' })).status, 200);
   assert.equal((await call(sa, 'GET', '/api/reports/quality?year=2024')).body.checks.find((c: { id: string }) => c.id === 'odd').justified.text, 'Plant shutdown in April');
@@ -2662,3 +2662,55 @@ test('base-year restatement: second-person approval, significance threshold alon
   assert.ok(!(await api('GET', '/api/restatements', undefined, tenantB)).body.items.some((x: { id: string }) => x.id === prop.body.id));
   assert.equal((await api('POST', `/api/restatements/${bad}/decide`, { decision: 'approve' }, tenantB)).status, 404);
 });
+
+test('self-approval: off by default; when on, super admin / admin / manager approve their own with a note, below the size limit, marked self-reviewed; preparers and platform staff never approve', async () => {
+  const co = await api('POST', '/api/platform/companies', { name: 'Self Co', country: 'AE', superAdmin: { name: 'Sam Super', email: 'super@self.test' } });
+  const T = co.body.company.id as string;
+  let sa = await login('super@self.test', co.body.superAdmin.temporaryPassword);
+  await call(sa, 'POST', '/api/auth/password', { current: co.body.superAdmin.temporaryPassword, next: 'a long enough pass' });
+  sa = await login('super@self.test', 'a long enough pass');
+  const group = (await call(sa, 'GET', '/api/org')).body.nodes.find((n: { kind: string }) => n.kind === 'group').id;
+  const fac = (await call(sa, 'POST', '/api/org/nodes', { parentId: group, kind: 'facility', name: 'Self plant' })).body.id as string;
+  const mk = async (email: string, role: string) => {
+    const r = await call(sa, 'POST', '/api/users', { name: email, email, role, facilityIds: [fac] });
+    const ck = await login(email, r.body.temporaryPassword);
+    await call(ck, 'POST', '/api/auth/password', { current: r.body.temporaryPassword, next: 'a long enough pass' });
+    return login(email, 'a long enough pass');
+  };
+  const mgr = await mk('smgr@self.test', 'manager'), prep = await mk('sprep@self.test', 'preparer');
+  const id = await diesel();
+  const entry = async (ck: string, q: number) => {
+    const a = (await call(ck, 'POST', '/api/activities', { facilityId: fac, itemId: id, quantity: q, unit: 'L', periodStart: '2025-05-01', periodEnd: '2025-05-31' })).body.id as string;
+    await call(ck, 'POST', '/api/activities/review', { ids: [a], action: 'submit' });
+    return a;
+  };
+  const small = await entry(mgr, 100), big = await entry(mgr, 5000), theirs = await entry(prep, 100);
+  // off by default: nobody approves their own; platform staff approve nothing
+  assert.equal((await call(mgr, 'POST', '/api/activities/review', { ids: [small], action: 'approve' })).body.skipped[0].reason, 'nobody approves their own entry');
+  assert.equal((await api('POST', '/api/activities/review', { ids: [theirs], action: 'approve' }, T)).body.skipped[0].reason, 'platform staff do not approve company data');
+  assert.equal((await api('GET', '/api/approvals', undefined, T)).body.mine.length, 0);
+  // switched on by the super admin, up to 1 tCO2e
+  const st = (await call(sa, 'GET', '/api/approvals')).body.settings;
+  assert.equal(st.selfApproval, false);
+  assert.equal((await call(mgr, 'PUT', '/api/approvals/settings', { ...st, selfApproval: true })).status, 403);
+  assert.equal((await call(sa, 'PUT', '/api/approvals/settings', { ...st, selfApproval: true, selfMaxT: 1 })).status, 200);
+  const ap = (await call(mgr, 'GET', '/api/approvals')).body;
+  assert.ok(ap.mine.some((x: { id: string; self: boolean }) => x.id === small && x.self));
+  assert.ok(!ap.mine.some((x: { id: string }) => x.id === big), 'above the size limit someone else approves');
+  assert.match((await call(mgr, 'POST', '/api/activities/review', { ids: [small], action: 'approve' })).body.skipped[0].reason, /needs a note/);
+  assert.equal((await call(mgr, 'POST', '/api/activities/review', { ids: [small], action: 'approve', note: 'Checked against the May delivery notes' })).body.done, 1);
+  assert.match((await call(mgr, 'POST', '/api/activities/review', { ids: [big], action: 'approve', note: 'x' })).body.skipped[0].reason, /self-approval is not allowed/);
+  // a preparer never approves, even with self-approval on
+  const pe = await entry(prep, 50);
+  assert.equal((await call(prep, 'POST', '/api/activities/review', { ids: [pe], action: 'approve', note: 'x' })).body.skipped[0].reason, 'you cannot approve data for this facility');
+  // marked and reported
+  const row = await tenantRow(T, `SELECT self_reviewed, self_review_note FROM activity WHERE id = $1`, [small]);
+  assert.equal(row.self_reviewed, true); assert.match(row.self_review_note, /delivery notes/);
+  const q = (await call(sa, 'GET', '/api/reports/quality?year=2025')).body.checks.find((c: { id: string }) => c.id === 'self');
+  assert.equal(q.n, 1); assert.match(q.items[0], /smgr@self.test · “Checked against the May delivery notes”/);
+  assert.equal((await call(sa, 'GET', '/api/assurance/pack?year=2025')).body.totals.self, 1);
+});
+const tenantRow = async (T: string, sql: string, params: unknown[]) => {
+  const { tenantTx } = await import('../src/db/pool.js');
+  return tenantTx(T, async (c) => (await c.query(sql, params)).rows[0]);
+};

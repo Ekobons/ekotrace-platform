@@ -33,6 +33,7 @@ import { remindNow, remindTenant } from '../lib/reminders.js';
 import { notify } from '../lib/notify.js';
 import { mailOn } from '../lib/mail.js';
 import { viewFacs } from './reports.routes.js';
+import { SELF_ROLES, approvalSettings } from './approvals.routes.js';
 
 const EDIT = ['super_admin', 'admin', 'platform_admin'];
 const CHASE = ['super_admin', 'admin', 'manager', 'platform_admin'];
@@ -129,13 +130,15 @@ const addDays = (d: string, n: number) => new Date(Date.parse(d + 'T00:00:00Z') 
 
 async function approvalsForMe(c: Tx, req: FastifyRequest): Promise<number> {
   const s = await scopeOf(c, req.user), me = String(req.user.id);
-  if (!s.approve.size) return 0;
+  if (!s.approve.size || req.user.role === 'platform_admin') return 0;
+  const set = await approvalSettings(c, req.user.tenantId!), self = set.selfApproval && SELF_ROLES.includes(req.user.role);
   const solo = req.user.role === 'super_admin' && Number((await c.query(`SELECT count(*)::int AS n FROM app_user WHERE NOT disabled AND role <> 'verifier'`)).rows[0].n) === 1;
   const canL2 = ['super_admin', 'admin', 'platform_admin'].includes(req.user.role);
   return Number((await c.query(
     `SELECT count(*)::int AS n FROM activity a WHERE a.facility_id = ANY($1) AND a.status = 'submitted'
-        AND ($2 OR (coalesce(a.created_by, '') <> $3 AND coalesce(a.submitted_by, '') <> $3))
-        AND (a.approval_stage IS DISTINCT FROM 'L2' OR ($4 AND coalesce(a.l1_by, '') <> $3))`, [[...s.approve], solo, me, canL2])).rows[0].n);
+        AND ($2 OR (coalesce(a.created_by, '') <> $3 AND coalesce(a.submitted_by, '') <> $3)
+             OR ($5 AND ($6::numeric IS NULL OR (a.co2e_direct + a.co2e_scope2 + a.co2e_scope3) / 1000 < $6::numeric)))
+        AND (a.approval_stage IS DISTINCT FROM 'L2' OR ($4 AND coalesce(a.l1_by, '') <> $3))`, [[...s.approve], solo, me, canL2, self, set.selfMaxT])).rows[0].n);
 }
 
 export async function collectionRoutes(app: FastifyInstance) {
@@ -217,6 +220,7 @@ export async function collectionRoutes(app: FastifyInstance) {
       if (!ch) throw notFound('Change');
       if (ch.status !== 'pending') throw new AppError('Already decided', 409, 'DECIDED');
       if (ch.proposed_by === req.user.id) throw forbidden('Someone else approves your own proposal');
+      if (req.user.role === 'platform_admin') throw forbidden('Registry changes are decided by the company\'s super admin, not platform staff');
       let out: { id: string; code: string; version: number } | null = null;
       if (b.decision === 'approve') out = await applyMetric(c, tenant, ch.metric_id, metricBody.parse(ch.proposal), ch.reason, ch.proposed_name ?? 'admin', req.user.name);
       await c.query(`UPDATE metric_change SET status = $2, decided_by = $3, decided_name = $4, decided_at = now(), decision_note = $5, metric_id = coalesce(metric_id, $6) WHERE id = $1`,

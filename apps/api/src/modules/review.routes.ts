@@ -20,7 +20,7 @@ import { tenantTx } from '../db/pool.js';
 import { audit, requireTenant } from '../lib/auth.js';
 import { assertCan, scopeOf } from '../lib/access.js';
 import { AppError, notFound } from '../lib/errors.js';
-import { approvalSettings, needsL2 } from './approvals.routes.js';
+import { approvalSettings, needsL2, selfAllowed } from './approvals.routes.js';
 import { EVIDENCE_SQL, METRIC_JOIN } from '../lib/collection.js';
 import { notify } from '../lib/notify.js';
 
@@ -122,8 +122,11 @@ export async function reviewRoutes(app: FastifyInstance) {
           else if (a.submitted_by !== me && !s.enter.has(a.facility_id)) why = 'only the person who submitted it';
           else sql = `UPDATE activity SET status = 'draft', submitted_at = NULL, submitted_by = NULL, approval_stage = NULL, l1_by = NULL, l1_at = NULL, updated_at = now() WHERE id = $1`;
         } else {
-          if (!s.approve.has(a.facility_id)) why = 'you cannot approve data for this facility';
-          else if (mine && !solo) why = 'nobody approves their own entry';
+          const self = mine && !solo && selfAllowed(set, req.user.role, Number(a.kg));
+          if (req.user.role === 'platform_admin') why = 'platform staff do not approve company data';
+          else if (!s.approve.has(a.facility_id)) why = 'you cannot approve data for this facility';
+          else if (mine && !solo && !self) why = set.selfApproval ? 'self-approval is not allowed for your role or for an entry this large' : 'nobody approves their own entry';
+          else if (self && b.action === 'approve' && !b.note) why = 'approving your own entry needs a note confirming you checked it against its evidence';
           else if (b.action === 'approve' && a.status !== 'submitted') why = a.status === 'approved' ? 'already approved' : 'not submitted yet';
           else if (b.action === 'approve' && a.needs_evidence) why = `metric ${a.metric_code} needs evidence before approval`;
           else if (b.action === 'return' && a.status !== 'submitted' && a.status !== 'approved') why = 'not submitted';
@@ -133,11 +136,11 @@ export async function reviewRoutes(app: FastifyInstance) {
             // level 1 done: on to level 2
             sql = `UPDATE activity SET approval_stage = 'L2', l1_by = $2, l1_at = now(), updated_at = now() WHERE id = $1`; toL2.push(a.id);
           } else sql = b.action === 'approve'
-            ? `UPDATE activity SET status = 'approved', reviewed_at = now(), reviewed_by = $2, review_note = NULL, self_reviewed = ${mine ? 'true' : 'false'}, updated_at = now() WHERE id = $1`
+            ? `UPDATE activity SET status = 'approved', reviewed_at = now(), reviewed_by = $2, review_note = NULL, self_reviewed = ${mine ? 'true' : 'false'}, self_review_note = ${mine ? '$3' : 'NULL'}, updated_at = now() WHERE id = $1`
             : `UPDATE activity SET status = 'rejected', reviewed_at = now(), reviewed_by = $2, review_note = $3, approval_stage = NULL, l1_by = NULL, l1_at = NULL, updated_at = now() WHERE id = $1`;
         }
         if (why) { skipped.push({ id: a.id, reason: why }); continue; }
-        await c.query(sql, b.action === 'return' ? [a.id, me, b.note] : sql.includes('$2') ? [a.id, me] : [a.id]);
+        await c.query(sql, b.action === 'return' || sql.includes('$3') ? [a.id, me, b.note ?? null] : sql.includes('$2') ? [a.id, me] : [a.id]);
         done.push(a.id);
       }
       for (const id of b.ids) if (!rows.some((r) => r.id === id)) skipped.push({ id, reason: 'not found' });
