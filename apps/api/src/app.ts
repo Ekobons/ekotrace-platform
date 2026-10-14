@@ -62,6 +62,10 @@ export async function buildApp(opts: { logger?: boolean; rateLimit?: Limits | nu
     reply.header('X-Content-Type-Options', 'nosniff');
     reply.header('X-Frame-Options', 'DENY');
     reply.header('Referrer-Policy', 'strict-origin-when-cross-origin');
+    // cross-origin isolation: other sites cannot open, embed or read Ekotrace's pages and files
+    reply.header('Cross-Origin-Opener-Policy', 'same-origin');
+    reply.header('Cross-Origin-Resource-Policy', 'same-origin');
+    reply.header('Cross-Origin-Embedder-Policy', 'require-corp');
     reply.header('Permissions-Policy', 'camera=(self), geolocation=(self), microphone=(), payment=(), usb=()');
     if (!reply.hasHeader('Content-Security-Policy')) reply.header('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self' blob:; style-src-attr 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob:; frame-src 'self' blob:; object-src 'none'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'");
     if (config.https) reply.header('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');

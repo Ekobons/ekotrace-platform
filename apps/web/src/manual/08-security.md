@@ -5,7 +5,7 @@ How Ekotrace protects the company's data, layer by layer, and the safety checks 
 ## Layers of protection
 
 ```layers
-Connection | HTTPS (TLS 1.2+) on servers with HSTS; security headers on every response: Content-Security-Policy (only the platform's own scripts and stylesheets run — no inline scripts or style blocks), no framing by other sites, no content sniffing, strict referrer, permissions policy; stored files open sandboxed
+Connection | HTTPS (TLS 1.2+) on servers with HSTS; security headers on every response: Content-Security-Policy (only the platform's own scripts and stylesheets run — no inline scripts or style blocks), no framing by other sites, cross-origin isolation (COOP, CORP, COEP), no content sniffing, strict referrer, permissions policy; stored files open sandboxed
 Sign-in | company sign-in (SSO, OpenID Connect: Microsoft Entra ID, Okta, Google…) or a password of 12+ characters hashed with scrypt; multi-factor authentication with an authenticator app (can be required for everyone); 5 wrong passwords or codes lock the account for 15 minutes
 Session | random key in a cookie scripts cannot read (HttpOnly, Secure, SameSite), never in a web address, new at every sign-in; only its fingerprint is stored; ends after 30 minutes without activity, after 12 hours at most, and at log-out
 Requests | every API request rate-limited (per person, per address, tighter on sign-in); changes accepted only as JSON or file uploads (a form on another website cannot post to Ekotrace); every input checked against a schema; errors never show internal details

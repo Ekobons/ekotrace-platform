@@ -40,6 +40,8 @@ Newest first.
 - **CI:**
   - A new DAST job starts the app with its database and scans it with the OWASP ZAP baseline. A FAIL fails the run; warnings are annotated and the report is kept.
   - GitHub Actions moved to the current major versions.
+- **Cross-origin isolation headers:** COOP, CORP and COEP are set, so other sites can't open, embed or read Ekotrace pages and files. This clears the low findings of the first ZAP scan, which had no medium or high findings.
+- **Fix: key file location.** Without DATA_KEY, the fallback key file is now kept in one place at the project root, whichever folder the server or demo starts from. Previously the server and the demo could each make their own key, and files encrypted by one couldn't be opened by the other. An older key file in apps/api is moved there or still used to open files. Servers that set DATA_KEY were never affected.
 - **Dependencies:** pdfjs-dist 6.4.299, @fastify/static 10.1.6, marked 18.1.0, Instrument Sans font 5.3.0. TypeScript 7 is left for a deliberate upgrade.
 - **Manual:** the Security chapter has new sections (account sync, security alerts) plus platform SSO, encryption, CSP and DAST; new glossary terms (SCIM, SAST / DAST).
 - **Tests:** 71 API tests (3 new: SCIM as Entra sends it; alerts and file encryption; platform SSO with break-glass) and 52 engine tests pass.
