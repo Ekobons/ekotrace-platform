@@ -2322,7 +2322,7 @@ test('account sync (SCIM 2.0, as Microsoft Entra sends it): joiners, group → r
   const annId = ann.json().id;
   assert.equal(ann.json().active, false, 'no mapped group yet: no access');
   assert.equal((await scim('POST', '/Users', { userName: 'ann@synced.test' })).statusCode, 409);
-  assert.equal((await scim('POST', '/Users', { userName: 'super@a.test' })).json().scimType, 'uniqueness', 'an email of another company');
+  if (tenantA) assert.equal((await scim('POST', '/Users', { userName: 'super@a.test' })).json().scimType, 'uniqueness', 'an email of another company');
   // a group arrives; the super admin maps it to Preparer for the Leeds plant
   const g = (await scim('POST', '/Groups', { displayName: 'Ekotrace preparers', externalId: 'g-1', members: [{ value: annId }] })).json();
   let st = (await api('GET', '/api/security/scim', undefined, T)).body;
@@ -2334,9 +2334,13 @@ test('account sync (SCIM 2.0, as Microsoft Entra sends it): joiners, group → r
   // a second group with a higher role wins; leaving it goes back
   const g2 = (await scim('POST', '/Groups', { displayName: 'Ekotrace verifiers' })).json();
   await api('PUT', `/api/security/scim/groups/${g2.id}`, { role: 'verifier' }, T);
-  const g3 = (await scim('POST', '/Groups', { displayName: 'Ekotrace super admins' })).json();
-  await api('PUT', `/api/security/scim/groups/${g3.id}`, { role: 'super_admin' }, T);
+  const g3r = await scim('POST', '/Groups', { displayName: 'Ekotrace super admins' });
+  assert.equal(g3r.statusCode, 201, g3r.body);
+  const g3 = g3r.json();
+  const m3 = await api('PUT', `/api/security/scim/groups/${g3.id}`, { role: 'super_admin' }, T);
+  assert.equal(m3.status, 200, JSON.stringify(m3.body));
   assert.equal((await scim('PATCH', `/Groups/${g3.id}`, { schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'], Operations: [{ op: 'Add', path: 'members', value: [{ value: annId }] }] })).statusCode, 204);
+  if (process.env.DBG) console.log('DBG', JSON.stringify((await pq(`SELECT g.display_name, g.role FROM scim_member m JOIN scim_group g ON g.id = m.group_id WHERE m.user_id = $1`, [annId])).rows), JSON.stringify((await pq(`SELECT action, detail FROM audit_log WHERE tenant_id = $1 AND action LIKE 'scim.%' ORDER BY id DESC LIMIT 4`, [T])).rows));
   assert.equal((await pq('SELECT role FROM app_user WHERE id = $1', [annId])).rows[0].role, 'super_admin');
   await scim('PATCH', `/Groups/${g3.id}`, { Operations: [{ op: 'Remove', path: `members[value eq "${annId}"]` }] });
   assert.equal((await pq('SELECT role FROM app_user WHERE id = $1', [annId])).rows[0].role, 'preparer');

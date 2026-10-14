@@ -112,7 +112,8 @@ export async function scimRoutes(app: FastifyInstance) {
     if (process.env.LOG_ERRORS === '1') console.error('[scim error]', e);
     return err(reply, new ScimError(500, 'Something went wrong'));
   });
-  const send = (reply: FastifyReply, code: number, body: unknown) => reply.code(code).type('application/scim+json').send(body);
+  // the reply is sent only after the transaction commits (the handler returns the body; nothing is sent from inside it)
+  const send = (reply: FastifyReply, code: number, body: unknown) => { reply.code(code).type('application/scim+json'); return body; };
 
   app.get('/scim/v2/ServiceProviderConfig', async (_req, reply) => send(reply, 200, {
     schemas: ['urn:ietf:params:scim:schemas:core:2.0:ServiceProviderConfig'], patch: { supported: true }, bulk: { supported: false, maxOperations: 0, maxPayloadSize: 0 },
@@ -215,7 +216,7 @@ export async function scimRoutes(app: FastifyInstance) {
       await c.query('DELETE FROM scim_member WHERE user_id = $1', [u.id]);
       await log(c, tenant, 'scim.user_delete', u.id, {}, req.ip);
       await applyRoles(c, tenant, [u.id], defaultRole, req.ip);
-      return reply.code(204).send();
+      { reply.code(204); return ''; }
     });
   });
 
@@ -300,7 +301,7 @@ export async function scimRoutes(app: FastifyInstance) {
         [g.id, name ?? null, ext !== undefined, ext ?? null]);
       await log(c, tenant, 'scim.group_update', g.id, { name: name ?? g.display_name, changedMembers: touched.length }, req.ip);
       await applyRoles(c, tenant, touched, defaultRole, req.ip);
-      if (patch) return reply.code(204).send();
+      if (patch) { reply.code(204); return ''; }
       return send(reply, 200, await groupRes(c, req, (await c.query('SELECT * FROM scim_group WHERE id = $1', [g.id])).rows[0]));
     });
   }
@@ -316,7 +317,7 @@ export async function scimRoutes(app: FastifyInstance) {
       await c.query('DELETE FROM scim_group WHERE id = $1', [g.id]);
       await log(c, tenant, 'scim.group_delete', g.id, { name: g.display_name, members: members.length }, req.ip);
       await applyRoles(c, tenant, members, defaultRole, req.ip);
-      return reply.code(204).send();
+      { reply.code(204); return ''; }
     });
   });
 }
