@@ -36,7 +36,15 @@ jobs:
       # the calculation engine's types come from its build
       - run: npm run build
       - run: npm run typecheck
-      - run: npm test
+      - name: Tests
+        shell: bash
+        run: npm test 2>&1 | tee test.log; exit ${PIPESTATUS[0]}
+      - name: Report failing tests
+        if: failure()
+        shell: bash
+        run: |
+          grep -A14 '^not ok\|^    not ok' test.log | grep -E 'not ok|error:|message|expected|actual|Error' | head -40 | while IFS= read -r l; do echo "::error::${l//%/%25}"; done
+          tail -5 test.log | while IFS= read -r l; do echo "::error::${l//%/%25}"; done
       - name: Dependency audit (fails on high or critical)
         run: npm audit --omit=dev --audit-level=high
       - name: Software bill of materials
