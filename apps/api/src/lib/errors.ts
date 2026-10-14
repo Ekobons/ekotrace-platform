@@ -29,5 +29,6 @@ export function errorHandler(err: FastifyError | Error, req: FastifyRequest, rep
     return reply.status((err as FastifyError).statusCode!).send({ error: 'BAD_REQUEST', message: err.message });
   }
   req.log.error(err);
+  if (process.env.LOG_ERRORS === '1') console.error(`[server error] ${req.method} ${req.url}:`, err);
   return reply.status(500).send({ error: 'SERVER_ERROR', message: 'Something went wrong on the server. Please try again.' });
 }

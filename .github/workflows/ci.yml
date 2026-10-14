@@ -22,6 +22,7 @@ jobs:
     env:
       DATABASE_URL: postgres://ekotrace:ekotrace@127.0.0.1:5432/ekotrace_ci
       TEST_DATABASE_URL: postgres://ekotrace:ekotrace@127.0.0.1:5432/ekotrace_test
+      LOG_ERRORS: '1'
       DATA_KEY: 0000000000000000000000000000000000000000000000000000000000000001
     steps:
       - uses: actions/checkout@v4
