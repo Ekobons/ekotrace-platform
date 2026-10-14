@@ -19,6 +19,7 @@ import { demoPurchases } from './demoPurchases.js';
 import { purgeTenant } from '../db/purge.js';
 import { createHash } from 'node:crypto';
 import { linkBins } from '../modules/contractor.routes.js';
+import { sealFile } from '../lib/secrets.js';
 
 const NAME = 'BEEAH Group (demo)';
 const TREE: [string, [string, string, string][]][] = [
@@ -508,7 +509,7 @@ async function main() {
       const buf = await mkPdf(o.title, o.lines);
       const id = (await c.query(`INSERT INTO document (tenant_id, kind, filename, content_type, size, sha256, data, uploaded_by, doc_type, title, facility_id, period_from, period_to, valid_until, tags, note)
                                  VALUES ($1,'vault',$2,'application/pdf',$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING id`,
-        [t, o.file, buf.length, createHash('sha256').update(buf).digest('hex'), buf, U.get(o.by)?.id ?? null, o.type, o.title, o.fac ? F.get(o.fac) ?? null : null, o.from ?? null, o.to ?? null, o.valid ?? null, o.tags ?? [], o.note ?? null])).rows[0].id;
+        [t, o.file, buf.length, createHash('sha256').update(buf).digest('hex'), sealFile(buf), U.get(o.by)?.id ?? null, o.type, o.title, o.fac ? F.get(o.fac) ?? null : null, o.from ?? null, o.to ?? null, o.valid ?? null, o.tags ?? [], o.note ?? null])).rows[0].id;
       if (o.link) await c.query(`INSERT INTO document_link (tenant_id, document_id, activity_id, linked_by) SELECT $1, $2, a.id, $3 FROM activity a WHERE ${o.link} ON CONFLICT DO NOTHING`, [t, id, U.get(o.by)?.name ?? 'demo']);
       return id;
     };

@@ -18,6 +18,7 @@ import { sendWorkbook, styleHeader } from '../../lib/xlsx.js';
 import { apiClient } from '../meters.routes.js';
 import { planOf, requireFeature } from '../../lib/plans.js';
 import { FIELDS, FIELD_LABEL, guessColumns, signature, normSupplier, type Field } from './fields.js';
+import { sealFile } from '../../lib/secrets.js';
 import {
   buildLine, calcLines, explainLine, groupKey, insertLines, loadFacilities, mapGroups, markMaterial, MAX_LINES, prepareBatch, publishBatch, readFileLines, reopenBatch, spendIndex,
   type BatchSettings, type RawLine,
@@ -184,7 +185,7 @@ export async function purchaseRoutes(app: FastifyInstance) {
       const doc = (await c.query(
         `INSERT INTO document (tenant_id, kind, filename, content_type, size, sha256, data, uploaded_by) VALUES ($1, 'purchases', $2, $3, $4, $5, $6, $7)
          ON CONFLICT (tenant_id, sha256) DO UPDATE SET uploaded_at = document.uploaded_at RETURNING id`,
-        [tenant, filename, kind === 'csv' ? 'text/csv' : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', buf.length, sha, buf, req.user.id])).rows[0];
+        [tenant, filename, kind === 'csv' ? 'text/csv' : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', buf.length, sha, sealFile(buf), req.user.id])).rows[0];
       const t = (await c.query('SELECT currency FROM tenant WHERE id = $1', [tenant])).rows[0];
       const out = sheets.map((s) => {
         const headerRow = findHeaderRow(s.rows);

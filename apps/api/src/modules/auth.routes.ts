@@ -88,9 +88,12 @@ export async function authRoutes(app: FastifyInstance) {
     if (!user) {
       dummyHash ??= hashPassword('not-a-real-password');
       await verifyPassword(b.password, await dummyHash);
+      // unknown accounts are logged too (password-guessing across many names shows up as a burst)
+      await platformTx((c) => c.query(`INSERT INTO audit_log (user_name, action, detail, ip) VALUES ($1,'login.failed',$2,$3)`, [b.email.toLowerCase().slice(0, 190), JSON.stringify({ unknownAccount: true }), req.ip]));
       throw fail();
     }
     if (user.locked_until && new Date(user.locked_until) > new Date()) {
+      await platformTx((c) => c.query(`INSERT INTO audit_log (tenant_id, user_id, user_name, action, ip) VALUES ($1,$2,$3,'login.locked',$4)`, [user.tenant_id, user.id, user.name, req.ip]));
       throw new AppError(`Too many attempts. Try again after ${new Date(user.locked_until).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}.`, 429, 'LOCKED');
     }
     const ok = await verifyPassword(b.password, user.password_hash);
@@ -100,6 +103,14 @@ export async function authRoutes(app: FastifyInstance) {
     }
     await companyOk(user.tenant_id);
     const pol = await platformTx((c) => policyOf(c, user));
+    const ps = config.platformSso;
+    if (user.role === 'platform_admin' && ps?.only) {
+      const glass = ps.breakGlass.includes(String(b.email).toLowerCase());
+      if (!glass || !pol.mfaEnabled) {
+        await platformTx((c) => c.query(`INSERT INTO audit_log (user_id, user_name, action, detail, ip) VALUES ($1,$2,'login.password_refused_sso',$3,$4)`, [user.id, user.name, JSON.stringify({ platform: true, breakGlass: glass }), req.ip]));
+        throw new AppError(glass ? 'Break-glass accounts must have multi-factor authentication set up' : 'Platform administrators sign in with the Ekobon account: use "Sign in with your company account".', 403, 'SSO_REQUIRED');
+      }
+    }
     if (pol.ssoOnly && !(user.role === 'super_admin' && pol.mfaEnabled)) {
       await platformTx((c) => c.query(`INSERT INTO audit_log (tenant_id, user_id, user_name, action, ip) VALUES ($1,$2,$3,'login.password_refused_sso',$4)`, [user.tenant_id, user.id, user.name, req.ip]));
       throw new AppError('Your company signs in with its company account: use "Sign in with your company account".', 403, 'SSO_REQUIRED');
@@ -155,6 +166,14 @@ export async function authRoutes(app: FastifyInstance) {
   app.post('/api/auth/sso/start', { config: { public: true } }, async (req) => {
     const b = z.object({ email: z.string().trim().email().max(190) }).parse(req.body);
     const domain = b.email.split('@')[1]!.toLowerCase();
+    const ps = config.platformSso;
+    if (ps && ps.domains.includes(domain)) {
+      let d;
+      try { d = await discover(ps.issuer); } catch (e) { throw new AppError(`The Ekobon sign-in service could not be reached (${(e as Error).message})`, 502, 'SSO_UNAVAILABLE'); }
+      const f = newFlow();
+      await platformTx((c) => c.query(`INSERT INTO sso_state (state_hash, tenant_id, nonce, code_verifier, expires_at) VALUES ($1,NULL,$2,$3, now() + interval '10 minutes')`, [sha256(f.state), f.nonce, f.verifier]));
+      return { url: authorizeUrl(d, { clientId: ps.clientId, redirectUri: ssoRedirectUri(req), state: f.state, nonce: f.nonce, challenge: f.challenge, loginHint: b.email }) };
+    }
     const cfg = await platformTx(async (c) => (await c.query(
       `SELECT s.* FROM sso_config s JOIN tenant t ON t.id = s.tenant_id WHERE s.enabled AND $1 = ANY(s.domains) AND t.status = 'active' LIMIT 1`, [domain])).rows[0]);
     if (!cfg) throw new AppError(`Company sign-in is not set up for @${domain}. Sign in with your password, or ask your administrator.`, 404, 'NO_SSO');
@@ -174,7 +193,10 @@ export async function authRoutes(app: FastifyInstance) {
     if (!q.code || !q.state) return back('The sign-in was not completed');
     const st = await platformTx(async (c) => (await c.query(`DELETE FROM sso_state WHERE state_hash = $1 RETURNING *, expires_at > now() AS live`, [sha256(q.state!)])).rows[0]);
     if (!st || !st.live) return back('The sign-in took too long or was already used — try again');
-    const cfg = await platformTx(async (c) => (await c.query('SELECT * FROM sso_config WHERE tenant_id = $1 AND enabled', [st.tenant_id])).rows[0]);
+    const ps = config.platformSso;
+    const cfg = st.tenant_id
+      ? await platformTx(async (c) => (await c.query('SELECT * FROM sso_config WHERE tenant_id = $1 AND enabled', [st.tenant_id])).rows[0])
+      : ps ? { issuer: ps.issuer, client_id: ps.clientId, client_secret: null as string | null, domains: ps.domains, require_mfa: true, plainSecret: ps.clientSecret } : null;
     if (!cfg) return back('Company sign-in is switched off');
     const refuse = async (why: string, detail: object = {}) => {
       await platformTx((c) => c.query(`INSERT INTO audit_log (tenant_id, action, detail, ip) VALUES ($1,'login.sso_failed',$2,$3)`, [st.tenant_id, JSON.stringify({ reason: why, ...detail }), req.ip]));
@@ -183,7 +205,7 @@ export async function authRoutes(app: FastifyInstance) {
     let claims;
     try {
       const d = await discover(cfg.issuer);
-      const idToken = await exchange(d, { clientId: cfg.client_id, clientSecret: cfg.client_secret ? decrypt(cfg.client_secret) : null, code: q.code, redirectUri: ssoRedirectUri(req), verifier: st.code_verifier });
+      const idToken = await exchange(d, { clientId: cfg.client_id, clientSecret: 'plainSecret' in cfg ? cfg.plainSecret : cfg.client_secret ? decrypt(cfg.client_secret) : null, code: q.code, redirectUri: ssoRedirectUri(req), verifier: st.code_verifier });
       claims = await verifyIdToken(d, idToken, { clientId: cfg.client_id, nonce: st.nonce });
     } catch (e) { return refuse(`Company sign-in failed: ${(e as Error).message}`); }
     const email = emailOf(claims);
@@ -191,8 +213,10 @@ export async function authRoutes(app: FastifyInstance) {
     const domain = email.split('@')[1] ?? '';
     if (!(cfg.domains as string[]).includes(domain)) return refuse(`${email} is not in a domain set up for this company`, { email });
     if (cfg.require_mfa && !usedMfa(claims)) return refuse('Your company sign-in did not use multi-factor authentication, which is required', { email, amr: claims.amr ?? null });
-    const user = await platformTx(async (c) => (await c.query('SELECT id, tenant_id, name, disabled FROM app_user WHERE tenant_id = $1 AND lower(email) = $2', [st.tenant_id, email])).rows[0]);
-    if (!user) return refuse(`${email} has no ${BRAND} account in this company — ask your administrator to add you`, { email });
+    const user = await platformTx(async (c) => (await c.query(st.tenant_id
+      ? 'SELECT id, tenant_id, name, disabled FROM app_user WHERE tenant_id = $1 AND lower(email) = $2'
+      : `SELECT id, tenant_id, name, disabled FROM app_user WHERE $1::uuid IS NULL AND tenant_id IS NULL AND role = 'platform_admin' AND lower(email) = $2`, [st.tenant_id, email])).rows[0]);
+    if (!user) return refuse(st.tenant_id ? `${email} has no ${BRAND} account in this company — ask your administrator to add you` : `${email} is not a platform administrator`, { email });
     if (user.disabled) return refuse('Your account is switched off — contact your administrator', { email });
     try { await companyOk(user.tenant_id); } catch (e) { return back((e as Error).message); }
     await openSession(req, reply, user, 'sso', false, { issuer: cfg.issuer, mfa: usedMfa(claims) });

@@ -17,6 +17,7 @@ import type { User } from '../lib/auth.js';
 import { calcLines, publishBatch } from '../modules/purchases/pipeline.js';
 import { signature } from '../modules/purchases/fields.js';
 import '../modules/purchases/purchases.routes.js'; // registers the background job handlers
+import { sealFile } from '../lib/secrets.js';
 
 const DATA = join(dirname(fileURLToPath(import.meta.url)), '../../../../data');
 const OFFICE = ['BEEAH Headquarters', 'Al Zahia Community'];
@@ -122,7 +123,7 @@ export async function demoPurchases(t: string, superAdmin: User) {
   const upload = async (name: string, file: { buf: Buffer }) => tenantTx(t, async (c) => {
     const sha = createHash('sha256').update(file.buf).digest('hex');
     const doc = (await c.query(`INSERT INTO document (tenant_id, kind, filename, content_type, size, sha256, data, uploaded_by) VALUES ($1, 'purchases', $2, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', $3, $4, $5, $6) RETURNING id`,
-      [t, `${name}.xlsx`, file.buf.length, sha, file.buf, superAdmin.id])).rows[0].id;
+      [t, `${name}.xlsx`, file.buf.length, sha, sealFile(file.buf), superAdmin.id])).rows[0].id;
     const settings = { kind: 'xlsx', headerRow: 1, columns, dateFormat: 'dmy', currency: 'AED', facilityId: null, period: null };
     const b = (await c.query(`INSERT INTO purchase_batch (tenant_id, source, name, document_id, settings, status, created_by) VALUES ($1, 'upload', $2, $3, $4, 'queued', $5) RETURNING id`,
       [t, name, doc, JSON.stringify(settings), superAdmin.id])).rows[0].id;

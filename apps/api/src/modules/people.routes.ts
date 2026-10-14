@@ -43,7 +43,7 @@ export async function peopleRoutes(app: FastifyInstance) {
     if (req.user.role === 'preparer') throw forbidden();
     return tenantTx(tenant, async (c) => {
       const users = (await c.query(
-        `SELECT u.id, u.name, u.email, u.role, u.scope_node_id, s.name AS scope_name, u.disabled, u.last_login_at, u.created_at, u.must_change_password,
+        `SELECT u.id, u.name, u.email, u.role, u.scope_node_id, s.name AS scope_name, u.disabled, u.last_login_at, u.created_at, u.must_change_password, u.scim_managed,
                 COALESCE((SELECT json_agg(json_build_object('id', n.id, 'name', n.name) ORDER BY n.name)
                             FROM user_facility uf JOIN org_node n ON n.id = uf.node_id WHERE uf.user_id = u.id), '[]') AS facilities,
                 COALESCE((SELECT json_agg(json_build_object('id', n.id, 'name', n.name) ORDER BY n.name)
@@ -95,8 +95,11 @@ export async function peopleRoutes(app: FastifyInstance) {
     }).parse(req.body);
     if (id === req.user.id && (b.role || b.disabled)) throw new AppError('You cannot change your own role or disable yourself');
     return tenantTx(tenant, async (c) => {
-      const u = (await c.query('SELECT id, role, scope_node_id, disabled FROM app_user WHERE id = $1', [id])).rows[0];
+      const u = (await c.query('SELECT id, role, scope_node_id, disabled, scim_managed FROM app_user WHERE id = $1', [id])).rows[0];
       if (!u) throw notFound('Person');
+      if (u.scim_managed && (b.role !== undefined || b.disabled !== undefined || b.facilityIds !== undefined || b.scopeNodeId !== undefined)) {
+        throw new AppError('This person is managed by your identity provider: change their groups there (Security & audit log → Sign-in & MFA shows the group mapping)', 400, 'SCIM_MANAGED');
+      }
       if (b.disabled === false && u.disabled) await checkUserLimit(c, tenant);
       const role: Role = b.role ?? u.role;
       const current: string[] = (await c.query('SELECT node_id FROM user_facility WHERE user_id = $1', [id])).rows.map((r) => r.node_id);

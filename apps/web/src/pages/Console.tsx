@@ -7,7 +7,7 @@ import { useEffect, useRef, useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import { useApp } from '../App';
 import { api, setTenant, type Company, type DestructionCertificate, type PlanLimits } from '../lib/api';
-import { PlatformAudit } from './AuditLog';
+import { AlertList, PlatformAudit } from './AuditLog';
 import { Icon } from '../components/Icon';
 
 const lim = (n: number | null) => (n == null ? 'unlimited' : String(n));
@@ -237,10 +237,18 @@ function downloadCertificate(c: DestructionCertificate) {
 }
 
 function ConsoleSecurity() {
+  const { toast } = useApp();
   const [certs, setCerts] = useState<DestructionCertificate[] | null>(null);
-  useEffect(() => { api.destructionCertificates().then((r) => setCerts(r.certificates)).catch(() => setCerts([])); }, []);
+  const [alerts, setAlerts] = useState<Awaited<ReturnType<typeof api.platformAlerts>>['alerts'] | null>(null);
+  const loadAlerts = () => api.platformAlerts().then((r) => setAlerts(r.alerts)).catch(() => setAlerts([]));
+  useEffect(() => { api.destructionCertificates().then((r) => setCerts(r.certificates)).catch(() => setCerts([])); loadAlerts(); }, []);
   return (
     <div className="secgrid">
+      <section className="card secbox" style={{ gridColumn: '1 / -1' }}>
+        <h2>Security alerts</h2>
+        <p className="sub">Platform alerts (failed sign-in bursts, company data deleted, audit chain checks) and every company's high alerts. Companies review their own under Security & audit log.</p>
+        {!alerts ? <div className="muted">Loading…</div> : <AlertList alerts={alerts} showCompany canAck onAck={async (id, note) => { try { await api.ackAlert(id, note); loadAlerts(); window.dispatchEvent(new Event('eko-alerts')); } catch (e) { toast((e as Error).message); } }} />}
+      </section>
       <PlatformAudit />
       <section className="card secbox">
         <h2>Certificates of destruction</h2>

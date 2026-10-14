@@ -28,6 +28,7 @@ import type { User } from '../../lib/auth.js';
 import { cellText, detectKind, sheetRows, type Cell } from '../../lib/sheet.js';
 import { normSupplier, readAmount, readBool, readDate, type Columns, type DateFormat, type Field } from './fields.js';
 import { resolveSuppliers } from './supplierMatch.js';
+import { openFile } from '../../lib/secrets.js';
 
 export const MAX_LINES = 200_000;
 const INSERT_CHUNK = 2000, CALC_CHUNK = 5000;
@@ -137,7 +138,7 @@ export async function readFileLines(jobId: number | undefined, tenant: string, b
     `SELECT b.settings, d.data, d.filename FROM purchase_batch b JOIN document d ON d.id = b.document_id WHERE b.id = $1`, [batchId])).rows[0]);
   if (!b) throw new Error('Batch or its file not found');
   const s = b.settings as BatchSettings;
-  const buf: Buffer = b.data;
+  const buf: Buffer = openFile(b.data);
   const kind = detectKind(buf, b.filename);
   const fac = await tenantTx(tenant, (c) => loadFacilities(c));
   await tenantTx(tenant, (c) => c.query('DELETE FROM purchase_line WHERE batch_id = $1', [batchId]));

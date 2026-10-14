@@ -90,6 +90,8 @@
 | Recovery code | one of ten single-use codes saved when MFA is set up, to sign in after losing the phone |
 | SIEM | the company's security monitoring system; Ekotrace forwards its audit records to it (syslog) or lets it pull them (API) |
 | Hash chain | each audit record carries the fingerprint (SHA-256) of the one before, so any change or removal shows |
+| SCIM | the standard an identity provider uses to add, change and switch off accounts in other systems automatically (account sync) |
+| SAST / DAST | security testing of the code (static) and of the running application from the outside (dynamic) |
 | SBOM | software bill of materials: the list of every component (and version) the software is built from |
 | Evidence | a file that supports an entry (bill, invoice, delivery note, ticket, log); linked to the entry in the document vault and shown in the entry's Evidence |
 | Retention period | how long documents are kept after the period they cover (7 years by default, set by the super admin) |

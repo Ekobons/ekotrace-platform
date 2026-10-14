@@ -19,6 +19,7 @@ import { z } from 'zod';
 import { tenantTx, type Tx } from '../db/pool.js';
 import { audit, requireRole, requireTenant } from '../lib/auth.js';
 import { AppError, forbidden, notFound } from '../lib/errors.js';
+import { sealFile, openFile } from '../lib/secrets.js';
 
 const yearQ = z.object({ year: z.coerce.number().int().min(2000).max(2100) });
 const STANDARDS = ['ISO 14064-3', 'ISAE 3410', 'ISAE 3000 (Revised)', 'ISSA 5000', 'AA1000AS v3', 'Other'] as const;
@@ -116,7 +117,7 @@ export async function assuranceRoutes(app: FastifyInstance) {
       if (!(await c.query('SELECT 1 FROM assurance_engagement WHERE year = $1', [year])).rowCount) throw new AppError('Save the engagement first');
       const id = (await c.query('SELECT id FROM document WHERE sha256 = $1', [h])).rows[0]?.id ?? (await c.query(
         `INSERT INTO document (tenant_id, kind, filename, content_type, size, sha256, data, uploaded_by) VALUES ($1,'assurance',$2,'application/pdf',$3,$4,$5,$6) RETURNING id`,
-        [tenant, filename, buf.length, h, buf, req.user.name])).rows[0].id;
+        [tenant, filename, buf.length, h, sealFile(buf), req.user.name])).rows[0].id;
       await c.query('UPDATE assurance_engagement SET statement_id = $2, updated_by = $3, updated_at = now() WHERE year = $1', [year, id, req.user.name]);
       await audit(c, req, 'assurance.statement', 'document', id, { year, filename });
       return { id, filename };
@@ -128,7 +129,7 @@ export async function assuranceRoutes(app: FastifyInstance) {
     const id = z.string().uuid().parse((req.params as { id: string }).id);
     const d = await tenantTx(tenant, async (c) => (await c.query(`SELECT filename, data FROM document WHERE id = $1 AND kind = 'assurance'`, [id])).rows[0]);
     if (!d) throw notFound('Statement');
-    return reply.header('content-type', 'application/pdf').header('content-disposition', `inline; filename="${String(d.filename).replace(/[^\w.\- ]/g, '_')}"`).send(d.data);
+    return reply.header('content-type', 'application/pdf').header('content-disposition', `inline; filename="${String(d.filename).replace(/[^\w.\- ]/g, '_')}"`).send(openFile(d.data));
   });
 
   // -------------------------------------------------------------------- locks --

@@ -2,6 +2,48 @@
 
 Newest first.
 
+## 2026-10-14 · Security round 2: account sync (SCIM), security alerts, platform SSO, files encrypted at rest, stricter CSP, DAST
+
+- **Account sync from the identity provider (SCIM 2.0) (4.2 joiners and leavers, PAM/PIM):**
+  - `/scim/v2/Users` and `/Groups`, as Microsoft Entra ID provisioning, Okta and others send them: filters, PATCH with string booleans, members[value eq], group add / remove / replace. Authorised by a company token (SHA-256 kept).
+  - Joiners get an account (no password; they sign in with SSO). Leavers are switched off at once and their sessions end. "Delete" keeps the person's history.
+  - The super admin maps provider groups to roles: an Admin group to a sub-group, Manager / Preparer groups to facilities. A person gets the highest role of their groups.
+  - In no mapped group a person has no access, or read-only if the company chooses. The last super admin is never removed. Plan limits are respected.
+  - People & access shows "synced" and refuses manual role changes for these people.
+- **Security alerts (Appendix A: actionable alerts):**
+  - Rules on the sealed audit records:
+    - failed sign-ins from one address (10 in 10 min);
+    - an account locked;
+    - MFA no longer required, switched off or reset;
+    - a new super admin;
+    - a full data export;
+    - SSO or account-sync settings changed;
+    - a new API client;
+    - company sign-ins refused;
+    - company data deleted;
+    - the audit chain broken.
+  - Each alert is raised at most once an hour per key. Alerts are written to the audit log, so the SIEM receives them as syslog error or warning.
+  - Screens: an Alerts tab with "Mark reviewed" and a note, a red count on the menu, and the console list for the platform.
+  - Failed sign-ins with unknown emails and attempts on locked accounts are now logged too.
+- **Platform admins sign in with Ekobon's identity provider (4.2 admin console via SSO and MFA):**
+  - Configured with the PLATFORM_SSO_… settings. MFA is required from the provider.
+  - Password sign-in is refused, except for named break-glass accounts, which must use MFA.
+  - Companies cannot claim the platform's domain.
+- **Files encrypted at rest in the app (4.3):**
+  - Every stored file (bills, invoices, permits, statements, purchase files, logos, message attachments) is encrypted with AES-256-GCM under the server key.
+  - Existing files are encrypted at start-up: 24 locally.
+  - Downloads, previews, exports and the purchases pipeline read them back unchanged.
+- **Stricter Content-Security-Policy (4.9):**
+  - No inline style blocks: `style-src 'self' blob:`, with only style attributes allowed.
+  - The ISO report preview uses a stylesheet file. The print windows for reports and bin labels get their CSS as a browser-made file, and their inline Print button is gone (it was already blocked).
+  - Checked in a browser on 15 pages and both print windows: no blocked content.
+- **CI:**
+  - A new DAST job starts the app with its database and scans it with the OWASP ZAP baseline. A FAIL fails the run; warnings are annotated and the report is kept.
+  - GitHub Actions moved to the current major versions.
+- **Dependencies:** pdfjs-dist 6.4.299, @fastify/static 10.1.6, marked 18.1.0, Instrument Sans font 5.3.0. TypeScript 7 is left for a deliberate upgrade.
+- **Manual:** the Security chapter has new sections (account sync, security alerts) plus platform SSO, encryption, CSP and DAST; new glossary terms (SCIM, SAST / DAST).
+- **Tests:** 71 API tests (3 new: SCIM as Entra sends it; alerts and file encryption; platform SSO with break-glass) and 52 engine tests pass.
+
 ## 2026-10-14 · Security: SSO, MFA, sealed audit log with SIEM feed, rate limits, data export and certificate of destruction
 
 Closes the code gaps found against the BEEAH web application security standard.

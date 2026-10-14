@@ -143,6 +143,13 @@ function Shell() {
     get(); window.addEventListener('eko-msg', get); const t = window.setInterval(get, 120000);
     return () => { window.removeEventListener('eko-msg', get); window.clearInterval(t); };
   }, [path, tenant?.id, role]); // eslint-disable-line react-hooks/exhaustive-deps
+  // security alerts to review (super admin, admin; platform admin: platform alerts)
+  const [alertN, setAlertN] = useState(0);
+  useEffect(() => {
+    const get = () => { if (!['super_admin', 'admin', 'platform_admin'].includes(role) || (!tenant && role !== 'platform_admin')) { setAlertN(0); return; } api.alertCount().then((c) => setAlertN(c.open)).catch(() => {}); };
+    get(); window.addEventListener('eko-alerts', get); const t = window.setInterval(get, 120000);
+    return () => { window.removeEventListener('eko-alerts', get); window.clearInterval(t); };
+  }, [path, tenant?.id, role]); // eslint-disable-line react-hooks/exhaustive-deps
   const visible = (i: NavItem) => !i.roles || (i.roles.length === 0 ? role === 'platform_admin' : can(...i.roles));
   // a bin's QR label opens the scan page full screen (phone), without the menu
   if (path.startsWith('/scan/')) return <Routes><Route path="/scan/:code" element={<ScanPage />} /></Routes>;
@@ -167,7 +174,7 @@ function Shell() {
         </div>
         {tenant && !mini && <div className="navtools"><button type="button" onClick={foldAll} title={allClosed ? 'Expand all sections' : 'Collapse all sections'}>{allClosed ? '▸▸ Expand all' : '▾▾ Collapse all'}</button></div>}
         <nav className="nav">
-          {role === 'platform_admin' && <NavLink to="/console" title={mini ? 'Platform console' : undefined}><Icon name="gear" /><span className="nl">Platform console</span></NavLink>}
+          {role === 'platform_admin' && <NavLink to="/console" title={mini ? 'Platform console' : undefined}><Icon name="gear" /><span className="nl">Platform console</span>{!tenant && alertN > 0 && <span className="navb red" title="Platform security alerts">{alertN}</span>}</NavLink>}
           {role === 'platform_admin' && <NavLink to="/messages" title={mini ? 'Messages' : undefined}><Icon name="chat" /><span className="nl">Messages</span>{msgN > 0 && <span className="navb amber">{msgN}</span>}</NavLink>}
           {tenant && NAV.map((g, gi) => {
             const items = g.items.filter(visible);
@@ -180,7 +187,7 @@ function Shell() {
                 {g.group && <button type="button" className={`sech${open ? ' open' : ''}${on ? ' has' : ''}`} aria-expanded={open} title={g.group} onClick={() => !mini && fold(g.group!)}>
                   <i className="sdot" /><span>{g.group.toUpperCase()}</span><span className="chev">{open ? '▾' : '▸'}</span></button>}
                 {open && <div className="secitems">{items.map((i) => i.to
-                  ? <NavLink key={i.label} to={i.to} title={mini ? i.label : undefined} className={({ isActive }) => (isActive || (i.to?.startsWith('/data/') && path.startsWith('/data/')) ? 'active' : '')}><Icon name={i.icon} /><span className="nl">{i.label}</span>{i.to === '/approvals' && apprN > 0 && <span className="navb amber">{apprN}</span>}{i.to === '/messages' && msgN > 0 && role !== 'platform_admin' && <span className="navb">{msgN}</span>}</NavLink>
+                  ? <NavLink key={i.label} to={i.to} title={mini ? i.label : undefined} className={({ isActive }) => (isActive || (i.to?.startsWith('/data/') && path.startsWith('/data/')) ? 'active' : '')}><Icon name={i.icon} /><span className="nl">{i.label}</span>{i.to === '/approvals' && apprN > 0 && <span className="navb amber">{apprN}</span>}{i.to === '/messages' && msgN > 0 && role !== 'platform_admin' && <span className="navb">{msgN}</span>}{i.to === '/audit' && alertN > 0 && <span className="navb red" title="Security alerts to review">{alertN}</span>}</NavLink>
                   : <a key={i.label} className="soon" aria-disabled="true" title={`${i.label} · coming in stage ${i.stage}`}><Icon name={i.icon} /><span className="nl">{i.label}</span><span className="soonchip">S{i.stage}</span></a>)}</div>}
               </div>
             );

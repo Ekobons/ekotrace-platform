@@ -25,8 +25,8 @@ jobs:
       LOG_ERRORS: '1'
       DATA_KEY: '0000000000000000000000000000000000000000000000000000000000000001'
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -51,7 +51,60 @@ jobs:
         run: npm audit --omit=dev --audit-level=high
       - name: Software bill of materials
         run: npm sbom --omit=dev --sbom-format cyclonedx > sbom.cdx.json
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: sbom
           path: sbom.cdx.json
+
+  # Dynamic application security testing (DAST): the app is started with its database and scanned from the
+  # outside with the OWASP ZAP baseline scan (headers, cookies, information leaks, known-bad patterns).
+  # A FAIL fails the run; warnings are listed in the report kept with the run. (BEEAH standard 4.5.)
+  dast:
+    needs: build-test
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgres://ekotrace:ekotrace@127.0.0.1:5432/ekotrace
+      DATA_KEY: '0000000000000000000000000000000000000000000000000000000000000002'
+      RATE_LIMIT_IP: '100000'
+      SECURITY_CONTACT: mailto:security@example.com
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - name: Database for the application
+        run: |
+          PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -c "CREATE ROLE ekotrace LOGIN CREATEDB PASSWORD 'ekotrace'"
+          PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -c "CREATE DATABASE ekotrace OWNER ekotrace"
+      - run: npm ci
+      - run: npm run build
+      - name: Start Ekotrace
+        run: |
+          nohup node apps/api/dist/server.js > server.log 2>&1 &
+          for i in $(seq 1 90); do curl -sf http://127.0.0.1:4000/api/health && exit 0; sleep 5; done
+          tail -40 server.log; exit 1
+      - name: OWASP ZAP baseline scan
+        run: |
+          mkdir -p zap && chmod 777 zap
+          docker run --rm --network host -v "$PWD/zap:/zap/wrk:rw" ghcr.io/zaproxy/zaproxy:stable \
+            zap-baseline.py -t http://127.0.0.1:4000 -I -r zap-report.html -J zap-report.json
+      - name: Report the scan's warnings
+        if: always()
+        shell: bash
+        run: |
+          [ -f zap/zap-report.json ] || exit 0
+          python3 -c "import json; d=json.load(open('zap/zap-report.json')); [print(f\"::warning::ZAP {a['riskdesc']}: {a['name']} ({a['count']})\") for s in d.get('site',[]) for a in s.get('alerts',[])]"
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: zap-report
+          path: zap/

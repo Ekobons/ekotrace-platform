@@ -12,6 +12,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { pool, platformTx } from './pool.js';
 import { config } from '../config.js';
+import { sealFile } from '../lib/secrets.js';
 import { migrate } from './migrate.js';
 import { seed, seedGrid, gridSourceCodes } from './seed.js';
 import { IMPORTER_VERSION } from '../import/desnzWrite.js';
@@ -41,6 +42,22 @@ export async function checkDbRole(log: (m: string) => void) {
   log(`[security] WARNING: ${msg}`);
 }
 
+/** Files stored before encryption at rest: encrypted in batches (each row checked by its marker). */
+export async function encryptStoredFiles(log: (m: string) => void = () => {}) {
+  let n = 0;
+  for (;;) {
+    const done = await platformTx(async (c) => {
+      const rows = (await c.query(`SELECT id, data FROM document WHERE substring(data FROM 1 FOR 4) <> '\\x454b4631'::bytea ORDER BY id LIMIT 100 FOR UPDATE SKIP LOCKED`)).rows;
+      for (const r of rows) await c.query('UPDATE document SET data = $2 WHERE id = $1', [r.id, sealFile(r.data)]);
+      return rows.length;
+    });
+    n += done;
+    if (done < 100) break;
+  }
+  if (n) log(`[security] ${n} stored files encrypted (AES-256-GCM)`);
+  return n;
+}
+
 export async function autoSetup(log: (m: string) => void) {
   await checkDbRole(log);
   if (process.env.AUTO_SETUP === 'false') return;
@@ -57,6 +74,7 @@ export async function autoSetup(log: (m: string) => void) {
     await seed(log);
     log('[setup] factors loaded');
   }
+  await encryptStoredFiles(log);
   const codes = gridSourceCodes();
   const have = new Set((await pool.query<{ code: string }>(`SELECT code FROM factor_source WHERE code = ANY($1)`, [codes])).rows.map((r) => r.code));
   if (codes.some((c) => !have.has(c))) {

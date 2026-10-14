@@ -17,6 +17,7 @@ import { hostname } from 'node:os';
 import { readFileSync } from 'node:fs';
 import { platformTx } from '../db/pool.js';
 import { config } from '../config.js';
+import { runAlerts } from './alerts.js';
 
 export async function seal(): Promise<number> {
   return platformTx(async (c) => Number((await c.query('SELECT audit_seal() AS n')).rows[0].n));
@@ -54,8 +55,11 @@ export async function purge(months = config.auditRetentionMonths): Promise<numbe
 }
 
 // ------------------------------------------------------------------ syslog --
-const PRI = 13 * 8 + 5; // facility 13 (log audit), severity notice
+// facility 13 (log audit); severity notice, or for alerts: error (high), warning (medium / low)
+const SEV: Record<string, number> = { high: 3, medium: 4, low: 4 };
 export function syslogLine(e: Record<string, unknown>): string {
+  const alert = String(e.action).startsWith('alert.');
+  const PRI = 13 * 8 + (alert ? SEV[String((e.detail as { severity?: string } | null)?.severity)] ?? 4 : 5);
   const ts = new Date(String(e.at)).toISOString();
   const msg = JSON.stringify({ seq: e.seal_seq, id: e.id, tenant: e.tenant_id, company: e.company ?? null, user: e.user_name, userId: e.user_id, action: e.action,
     entity: e.entity, entityId: e.entity_id, ip: e.ip, detail: e.detail, hash: e.hash });
@@ -110,6 +114,7 @@ export function startAuditWorker(log: (m: string) => void = console.log) {
     if (busy) return; busy = true;
     try {
       await seal();
+      if (await runAlerts()) await seal();
       if (config.siemSyslog) await forward().catch((e) => log(`[audit] SIEM forwarding failed: ${(e as Error).message}`));
       if (Date.now() - lastPurge > 86400e3) { lastPurge = Date.now(); const n = await purge(); if (n) log(`[audit] ${n} records past the ${config.auditRetentionMonths}-month retention removed`); }
     } catch (e) { log(`[audit] ${(e as Error).message}`); } finally { busy = false; }

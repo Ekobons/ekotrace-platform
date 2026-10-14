@@ -25,7 +25,7 @@ export interface Tenant { id: string; name: string; country: string; gwp_set: st
 export type Role = 'platform_admin' | 'super_admin' | 'admin' | 'manager' | 'preparer' | 'verifier';
 export interface Me { user: { id: string; name: string; email: string; role: Role; tenantId: string | null; scopeNodeId: string | null; mustChangePassword: boolean; via?: string; mfaEnrol?: boolean; mfa?: { enabled: boolean; required: boolean; recoveryLeft: number } }; company: (Tenant & { scope_name: string | null }) | null }
 export interface OrgNode { id: string; parent_id: string | null; kind: 'group' | 'subgroup' | 'facility'; name: string; facility_type: string | null; location: string | null; country: string; floor_area_m2: number | null; employees: number | null; ownership_pct: number; operational_control: boolean; financial_control: boolean; active: boolean; sort: number; manager_user_id: string | null; manager_name: string | null; grid_region?: string | null; entries: number; canEdit: boolean; canSee: boolean; canEnter: boolean }
-export interface Person { id: string; name: string; email: string; role: Role; scope_node_id: string | null; scope_name: string | null; disabled: boolean; last_login_at: string | null; created_at: string; must_change_password: boolean; facilities: { id: string; name: string }[]; manages: { id: string; name: string }[]; canEdit: boolean }
+export interface Person { id: string; name: string; email: string; role: Role; scim_managed?: boolean; scope_node_id: string | null; scope_name: string | null; disabled: boolean; last_login_at: string | null; created_at: string; must_change_password: boolean; facilities: { id: string; name: string }[]; manages: { id: string; name: string }[]; canEdit: boolean }
 export interface Company { id: string; name: string; country: string; gwp_set: string; plan: string; status: string; access_start: string; access_expiry: string; created_at: string; users: number; facilities: number; entries: number; last_login: string | null; notes: string | null; price: number | null; billing_currency: string; billing_cycle: 'annual' | 'monthly'; po_ref: string | null; billing_email: string | null }
 export interface DashGroup { id: string; name: string; facilityIds: string[]; facilities: { id: string; name: string; parent: string | null }[]; created_by: string; created_by_name: string; created_at: string; canDelete: boolean }
 export interface FacSummary { id: string; meters: number; vehicles: number; sites: number; entries: number; approved: number; months: number; t: number }
@@ -173,6 +173,12 @@ export interface SecuritySettings {
   mfaRequired: boolean; sso: SsoSettings; canEdit: boolean; idleMinutes: number; audit: { retentionMonths: number; siem: boolean };
   people: { id: string; name: string; email: string; role: Role; disabled: boolean; mfa: boolean; recovery_left: number; last_login_at: string | null; last_method: string | null }[];
 }
+export interface ScimSettings {
+  token: { prefix: string; default_role: 'verifier' | null; created_by: string | null; created_at: string; last_used_at: string | null } | null; baseUrl: string;
+  groups: { id: string; display_name: string; role: Role | null; scope_node_id: string | null; scope_name: string | null; facility_ids: string[]; members: number; updated_at: string }[];
+  people: { managed: number; active: number };
+}
+export interface SecurityAlert { id: number; rule: string; severity: 'low' | 'medium' | 'high'; title: string; detail: Record<string, unknown> | null; at: string; ack_by: string | null; ack_at: string | null; ack_note: string | null }
 export interface DestructionCertificate { id: string; tenant_id: string; company: string; country: string | null; requested_by: string; reason: string | null; performed_at: string; rows_deleted: Record<string, number>; files_deleted: number; export_sha256: string | null; backups_until: string; audit_until: string }
 export class ApiError extends Error {
   constructor(message: string, public status: number, public code?: string, public details?: { field: string; message: string }[]) { super(message); }
@@ -378,6 +384,15 @@ export const api = {
   auditVerify: () => call<{ ok: boolean; checked: number; firstSeq: number; lastSeq: number; unsealed: number; problem?: { seq: number; id: string; what: string }; purgedThrough: string | null }>('GET', '/api/platform/audit/verify'),
   siemStatus: () => call<{ target: string | null; sealedThrough: number; forwardedThrough: number; lastError: string | null; updatedAt: string | null; retentionMonths: number }>('GET', '/api/platform/siem'),
   destroyCompany: (id: string, b: { confirm: string; reason: string; exportSha256?: string }) => call<{ certificate: DestructionCertificate }>('POST', `/api/platform/companies/${id}/destroy`, b),
+  scim: () => call<ScimSettings>('GET', '/api/security/scim'),
+  scimToken: () => call<ScimSettings & { secret: string }>('POST', '/api/security/scim/token'),
+  scimRevoke: () => call<{ ok: true }>('DELETE', '/api/security/scim/token'),
+  scimSettings: (defaultRole: 'verifier' | null) => call<ScimSettings>('PUT', '/api/security/scim/settings', { defaultRole }),
+  scimGroup: (id: string, b: { role: Role | null; scopeNodeId?: string | null; facilityIds?: string[] }) => call<ScimSettings>('PUT', `/api/security/scim/groups/${id}`, b),
+  alerts: (open?: boolean) => call<{ alerts: SecurityAlert[]; open: number; canAck: boolean }>('GET', `/api/security/alerts${open ? '?open=true' : ''}`),
+  alertCount: () => call<{ open: number }>('GET', '/api/security/alerts/count'),
+  ackAlert: (id: number, note?: string) => call<{ ok: true }>('POST', `/api/security/alerts/${id}/ack`, { note }),
+  platformAlerts: () => call<{ alerts: (SecurityAlert & { company: string | null })[] }>('GET', '/api/platform/alerts'),
   destructionCertificates: () => call<{ certificates: DestructionCertificate[] }>('GET', '/api/platform/certificates'),
   logout: () => call<{ ok: true }>('POST', '/api/auth/logout'),
   me: () => call<Me>('GET', '/api/auth/me'),

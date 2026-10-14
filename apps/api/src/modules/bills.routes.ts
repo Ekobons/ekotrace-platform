@@ -27,6 +27,7 @@ import { refdata } from './refdata.js';
 import { inputFor, syncMeter, type Actor, type MeterRow } from './meters.routes.js';
 import { calculate } from './calc.service.js';
 import { contextFor } from './activity.routes.js';
+import { sealFile, openFile } from '../lib/secrets.js';
 
 const MAX = 15 * 1024 * 1024;
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
@@ -73,7 +74,7 @@ export async function createBill(c: Tx, tenant: string, buf: Buffer, filename: s
   try { const t = await pdfText(new Uint8Array(buf)); text = t.text; scanned = t.scanned; } catch (e) { problem = `The PDF could not be read (${(e as Error).message.slice(0, 120)})`; }
   const r = readBill(text, water ? 'water' : undefined);
   const doc = prior[0] ? { id: prior[0].doc } : (await c.query('INSERT INTO document (tenant_id, kind, filename, content_type, size, sha256, data, uploaded_by) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id',
-    [tenant, 'bill', filename, 'application/pdf', buf.length, hash, buf, by])).rows[0];
+    [tenant, 'bill', filename, 'application/pdf', buf.length, hash, sealFile(buf), by])).rows[0];
   const meterId = await matchMeter(c, r.account?.value, water);
   const found = { ...r, problem, matchedBy: meterId ? 'account number' : null };
   const b = (await c.query(
@@ -226,7 +227,7 @@ export async function billRoutes(app: FastifyInstance) {
       return doc;
     });
     reply.header('Content-Type', d.content_type).header('Content-Disposition', `inline; filename="${d.filename.replace(/"/g, '')}"`).header('Cache-Control', 'private, max-age=300');
-    return reply.send(d.data);
+    return reply.send(openFile(d.data));
   });
 
   const fieldsSchema = z.object({

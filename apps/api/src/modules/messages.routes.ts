@@ -17,6 +17,7 @@ import { platformTx, tenantTx, type Tx } from '../db/pool.js';
 import { audit, requirePlatformAdmin, requireTenant } from '../lib/auth.js';
 import { AppError, notFound } from '../lib/errors.js';
 import { cleanName, fileType } from './vault.routes.js';
+import { sealFile, openFile } from '../lib/secrets.js';
 
 export const TOPICS = { question: 'Question', data_help: 'Help entering data', problem: 'Something is not working', feature: 'Idea or feature request', factors: 'Emission factors & methods', billing: 'Subscription & billing' } as const;
 const topic = z.enum(Object.keys(TOPICS) as [keyof typeof TOPICS, ...(keyof typeof TOPICS)[]]);
@@ -51,7 +52,7 @@ async function storeAttachment(c: Tx, tenant: string, req: FastifyRequest) {
   const prior = (await c.query(`SELECT id, kind FROM document WHERE sha256 = $1`, [h])).rows[0];
   if (prior) return { documentId: prior.id as string, filename };
   const id = (await c.query(`INSERT INTO document (tenant_id, kind, filename, content_type, size, sha256, data, uploaded_by) VALUES ($1,'message',$2,$3,$4,$5,$6,$7) RETURNING id`,
-    [tenant, filename, type, buf.length, h, buf, req.user.id])).rows[0].id as string;
+    [tenant, filename, type, buf.length, h, sealFile(buf), req.user.id])).rows[0].id as string;
   return { documentId: id, filename };
 }
 const sendFile = (reply: import('fastify').FastifyReply, d: { filename: string; content_type: string; data: Buffer }) =>
@@ -119,7 +120,7 @@ export async function messageRoutes(app: FastifyInstance) {
       `SELECT d.filename, d.content_type, d.data FROM document d WHERE d.id = $2 AND EXISTS (
          SELECT 1 FROM message m JOIN message_thread t ON t.id = m.thread_id WHERE m.document_id = d.id AND (${mineSql(req)}))`, [req.user.id, id])).rows[0]);
     if (!d) throw notFound('Attachment');
-    return sendFile(reply, d);
+    return sendFile(reply, { ...d, data: openFile(d.data) });
   });
 
   const attachOk = async (c: Tx, documentId?: string) => {
@@ -211,7 +212,7 @@ export async function messageRoutes(app: FastifyInstance) {
     const id = idP(req);
     const d = await platformTx(async (c) => (await c.query(`SELECT filename, content_type, data FROM document WHERE id = $1 AND kind = 'message'`, [id])).rows[0]);
     if (!d) throw notFound('Attachment');
-    return sendFile(reply, d);
+    return sendFile(reply, { ...d, data: openFile(d.data) });
   });
   app.post('/api/team/messages/:id/reply', async (req) => {
     requirePlatformAdmin(req);

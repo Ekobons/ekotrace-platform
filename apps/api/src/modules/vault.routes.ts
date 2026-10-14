@@ -22,6 +22,7 @@ import { tenantTx, type Tx } from '../db/pool.js';
 import { audit, requireRole, requireTenant } from '../lib/auth.js';
 import { scopeOf, type Scope } from '../lib/access.js';
 import { AppError, forbidden, notFound } from '../lib/errors.js';
+import { sealFile, openFile } from '../lib/secrets.js';
 
 export const DOC_TYPES = {
   bill: 'Utility bill', invoice: 'Invoice / receipt', statement: 'Supplier or contractor statement', manifest: 'Waste manifest / ticket',
@@ -241,7 +242,7 @@ export async function vaultRoutes(app: FastifyInstance) {
     // never let a browser run an uploaded file as a page
     return reply.header('Content-Type', d.content_type).header('X-Content-Type-Options', 'nosniff').header('Content-Security-Policy', "default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'; sandbox")
       .header('Content-Disposition', `${dl || !/^(application\/pdf|image\/)/.test(d.content_type) ? 'attachment' : 'inline'}; filename="${d.filename.replace(/"/g, '')}"`)
-      .header('Cache-Control', 'private, max-age=60').send(d.data);
+      .header('Cache-Control', 'private, max-age=60').send(openFile(d.data));
   });
 
   /** Upload: body = the file; header x-filename; header x-meta = the details as JSON (URI-encoded), optional linkActivityIds. */
@@ -272,7 +273,7 @@ export async function vaultRoutes(app: FastifyInstance) {
       const id = (await c.query(
         `INSERT INTO document (tenant_id, kind, filename, content_type, size, sha256, data, uploaded_by, doc_type, title, facility_id, period_from, period_to, valid_until, category, note, tags)
          VALUES ($1,'vault',$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) RETURNING id`,
-        [tenant, filename, content, buf.length, h, buf, req.user.id, m.type, m.title || null, m.facilityId ?? null, m.periodFrom ?? null, m.periodTo ?? null,
+        [tenant, filename, content, buf.length, h, sealFile(buf), req.user.id, m.type, m.title || null, m.facilityId ?? null, m.periodFrom ?? null, m.periodTo ?? null,
           m.validUntil ?? null, m.category || null, m.note || null, m.tags ?? []])).rows[0].id;
       const linked = await linkEntries(c, req, s, tenant, id, m.linkActivityIds ?? []);
       await audit(c, req, 'document.upload', 'document', id, { filename, size: buf.length, type: m.type, facilityId: m.facilityId ?? null, entries: m.linkActivityIds ?? [] });
@@ -318,7 +319,7 @@ export async function vaultRoutes(app: FastifyInstance) {
       const nid = (await c.query(
         `INSERT INTO document (tenant_id, kind, filename, content_type, size, sha256, data, uploaded_by, doc_type, title, facility_id, period_from, period_to, valid_until, category, note, tags, version, replaces_id)
          VALUES ($1,'vault',$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18) RETURNING id`,
-        [tenant, filename, content, buf.length, h, buf, req.user.id, old.doc_type, old.title, old.facility_id, old.period_from, old.period_to, old.valid_until, old.category, old.note, old.tags, old.version + 1, id])).rows[0].id;
+        [tenant, filename, content, buf.length, h, sealFile(buf), req.user.id, old.doc_type, old.title, old.facility_id, old.period_from, old.period_to, old.valid_until, old.category, old.note, old.tags, old.version + 1, id])).rows[0].id;
       await c.query('UPDATE document SET replaced_by = $2 WHERE id = $1', [id, nid]);
       await c.query(`INSERT INTO document_link (tenant_id, document_id, activity_id, linked_by) SELECT tenant_id, $2, activity_id, $3 FROM document_link WHERE document_id = $1`, [id, nid, req.user.name]);
       await audit(c, req, 'document.version', 'document', nid, { replaces: id, filename, version: old.version + 1 });

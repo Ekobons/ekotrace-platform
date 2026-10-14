@@ -5,6 +5,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import qrcode from 'qrcode-generator';
+import { printHtml } from '../lib/printwin';
 import { useApp } from '../App';
 import { api, num, type Bin, type Category, type Contractor, type Facility, type Rollup, type Scan, type StatementRec } from '../lib/api';
 import { OPS, firstOp, griOf, materialsOf, methodName, opsOf } from '../lib/waste';
@@ -45,20 +46,18 @@ export function FieldApp() {
   const facName = facs.find((f) => f.id === fac)?.name ?? '';
 
   const printLabels = (list: Bin[]) => {
-    const w = window.open('', '_blank');
-    if (!w) { toast('Allow pop-ups to print the labels'); return; }
     const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]!));
-    w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Bin labels · ${esc(facName)}</title><style>
+    const ok = printHtml(`<!doctype html><html><head><meta charset="utf-8"><title>Bin labels · ${esc(facName)}</title><style>
       body{font-family:system-ui,sans-serif;margin:16px;color:#10201C} .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
       .lbl{border:2px solid #0E7C66;border-radius:12px;padding:12px;break-inside:avoid;text-align:center} .lbl svg{width:150px;height:150px}
       .n{font-weight:700;font-size:15px;margin-top:4px} .s{font-size:11.5px;color:#3D4F49} .h{display:inline-block;background:#FBEBCB;color:#7A4A06;border-radius:99px;padding:1px 8px;font-size:11px;font-weight:700;margin-top:4px}
       .c{font-family:monospace;font-size:12px;letter-spacing:.1em;margin-top:4px} .t{font-size:10.5px;color:#5B6B66;margin-top:6px}
       @media print{body{margin:0}.np{display:none}}</style></head><body>
-      <p class="np"><button onclick="print()">Print</button> · ${list.length} label${list.length === 1 ? '' : 's'} · cut out and stick on each bin.</p><div class="grid">
+      <p class="np">${list.length} label${list.length === 1 ? '' : 's'} · the print dialog opens by itself (or press Ctrl+P) · cut out and stick on each bin.</p><div class="grid">
       ${list.map((b) => `<div class="lbl">${qrSvg(scanUrl(b.code), 4)}<div class="n">${esc(b.name)}</div><div class="s">${esc(b.facility)}${b.location ? ` · ${esc(b.location)}` : ''}</div>
         <div class="s">${esc(b.material ?? b.item)} · ${esc(methodName(b.route, b.gri))}</div>${b.hazardous ? '<div class="h">HAZARDOUS</div>' : ''}<div class="c">${b.code}</div>
         <div class="t">Scan with the phone camera · sign in to Ekotrace</div></div>`).join('')}</div></body></html>`);
-    w.document.close();
+    if (!ok) toast('Allow pop-ups to print the labels');
   };
 
   return (

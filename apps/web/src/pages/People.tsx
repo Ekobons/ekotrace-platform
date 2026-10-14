@@ -68,7 +68,7 @@ export function People() {
             <tbody>{list.map((u) => (
               <tr key={u.id} className={u.disabled ? 'off' : ''}>
                 <td><div className="row" style={{ gap: 10, flexWrap: 'nowrap' }}><span className="avatar">{u.name.split(/\s+/).filter((w) => /^[A-Za-z]/.test(w)).map((w) => w[0]).slice(0, 2).join('').toUpperCase()}</span><div><b>{u.name}</b>{u.id === me.user.id && <span className="chip grey" style={{ marginLeft: 6 }}>you</span>}<div className="sub">{u.email}</div></div></div></td>
-                <td><span className={`chip ${roleChip(u.role)}`}>{ROLE_LABEL[u.role]}</span></td>
+                <td><span className={`chip ${roleChip(u.role)}`}>{ROLE_LABEL[u.role]}</span>{u.scim_managed && <div><span className="chip grey" title="Role and access come from the company's identity provider (groups)">synced</span></div>}</td>
                 <td className="sub">{u.role === 'admin' ? `Sub-group: ${u.scope_name}` : ['super_admin', 'verifier'].includes(u.role) ? 'Whole company'
                   : [...new Map([...u.manages, ...u.facilities].map((f) => [f.id, f.name])).values()].join(', ') || 'No facilities yet'}</td>
                 <td className="sub">{u.disabled ? 'Disabled' : u.must_change_password ? 'Not logged in yet' : u.last_login_at ? new Date(u.last_login_at).toLocaleString() : '—'}</td>
@@ -155,6 +155,7 @@ function PersonDialog({ person, nodes, onClose, onSaved }: { person: Person | nu
             {role === 'manager' && <span className="sub" style={{ textTransform: 'none', letterSpacing: 0, fontWeight: 400 }}>Managers also approve the facilities set to them in each facility's profile.</span>}
           </div>
         )}
+        {person?.scim_managed && <div className="note info small">Synced from your identity provider: role, facilities and access follow the person's groups there (see Security & audit log → Sign-in & MFA). Only the name can be changed here.</div>}
         {err && <div className="note bad">{err}</div>}
         <div className="row" style={{ justifyContent: 'space-between' }}>
           <div className="row" style={{ gap: 6 }}>

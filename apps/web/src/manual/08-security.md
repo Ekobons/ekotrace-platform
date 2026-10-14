@@ -5,19 +5,19 @@ How Ekotrace protects the company's data, layer by layer, and the safety checks 
 ## Layers of protection
 
 ```layers
-Connection | HTTPS (TLS 1.2+) on servers with HSTS; security headers on every response: Content-Security-Policy (only the platform's own scripts run), no framing by other sites, no content sniffing, strict referrer, permissions policy; stored files open sandboxed
+Connection | HTTPS (TLS 1.2+) on servers with HSTS; security headers on every response: Content-Security-Policy (only the platform's own scripts and stylesheets run — no inline scripts or style blocks), no framing by other sites, no content sniffing, strict referrer, permissions policy; stored files open sandboxed
 Sign-in | company sign-in (SSO, OpenID Connect: Microsoft Entra ID, Okta, Google…) or a password of 12+ characters hashed with scrypt; multi-factor authentication with an authenticator app (can be required for everyone); 5 wrong passwords or codes lock the account for 15 minutes
 Session | random key in a cookie scripts cannot read (HttpOnly, Secure, SameSite), never in a web address, new at every sign-in; only its fingerprint is stored; ends after 30 minutes without activity, after 12 hours at most, and at log-out
 Requests | every API request rate-limited (per person, per address, tighter on sign-in); changes accepted only as JSON or file uploads (a form on another website cannot post to Ekotrace); every input checked against a schema; errors never show internal details
 Roles | each request checked on the server: who may see, enter or manage which facility (see Getting started → Roles)
 Company separation | the database itself keeps each company's rows apart (row-level security, forced for every connection): a query for one company cannot return another's data
-Secrets | MFA keys and SSO client secrets encrypted with AES-256-GCM under a server key kept outside the database
-Audit | every sign-in (and failed attempt), change, upload, download, export and API batch, with who, when and from where; append-only and sealed in a hash chain; kept at least 12 months; forwarded to the company's SIEM
+Encryption | stored files (bills, invoices, permits…), MFA keys and SSO client secrets encrypted with AES-256-GCM under a server key kept outside the database; the database disks and backups encrypted by the hosting as well
+Audit | every sign-in (and failed attempt, also for unknown accounts), change, upload, download, export and API batch, with who, when and from where; append-only and sealed in a hash chain; kept at least 12 months; forwarded to the company's SIEM; security alerts raised from it within seconds
 ```
 
 ## Sign-in
 
-**Multi-factor authentication (MFA).** After the password, a 6-digit code from an authenticator app (Microsoft Authenticator, Google Authenticator, a password manager). Set it up on your **account page** (your name → Password): scan the QR code, type the first code, save the ten **recovery codes** (each works once, for a lost phone). The super admin can **require MFA for everyone** (Setup → Security & audit log → Sign-in & MFA): people without it set it up at their next sign-in before doing anything else. A super admin can **reset** someone's MFA when they lose their phone. On servers, platform administrators must always use MFA.
+**Multi-factor authentication (MFA).** After the password, a 6-digit code from an authenticator app (Microsoft Authenticator, Google Authenticator, a password manager). Set it up on your **account page** (your name → Password): scan the QR code, type the first code, save the ten **recovery codes** (each works once, for a lost phone). The super admin can **require MFA for everyone** (Setup → Security & audit log → Sign-in & MFA): people without it set it up at their next sign-in before doing anything else. A super admin can **reset** someone's MFA when they lose their phone. On servers, platform administrators must always use MFA — and they sign in through **Ekobon's own identity provider** (PLATFORM_SSO_… settings), with password sign-in refused except for the named break-glass accounts, which must use MFA.
 
 **Company sign-in (single sign-on).** People sign in with their work account; the company's own MFA and conditional-access rules apply, and leavers lose access as soon as IT disables their account. The super admin sets it up under Sign-in & MFA:
 
@@ -30,6 +30,37 @@ Audit | every sign-in (and failed attempt), change, upload, download, export and
 ```
 
 People still need a profile under People & access (role and facilities); the company account only proves who they are.
+
+## Account sync (SCIM)
+
+The company's identity provider keeps the people list up to date by itself (Microsoft Entra ID provisioning, Okta, OneLogin, JumpCloud — the SCIM 2.0 standard): joiners get an account, **leavers are switched off at once**, and roles follow the provider's groups. Set it up under Sign-in & MFA → Account sync:
+
+```flow
+> 1 · Token | the super admin makes a token (shown once) and copies the tenant URL shown on the page
+> 2 · Provider | in the provider's provisioning settings: the tenant URL and token → Test connection; assign the users and groups; start provisioning
+> 3 · Map groups | groups appear after the first sync: give each a role — Admin groups their sub-group, Manager / Preparer groups their facilities
+! Rules | a person gets the highest role of their groups; in no mapped group they have no access (or read-only, if chosen); deleting someone in the provider switches them off and keeps their history; the last active super admin is never removed by a sync
+```
+
+People added by the sync have no password: they sign in with the company account. Their role, facilities and access are changed in the provider, not on People & access (shown as "synced"). Every change the sync makes is in the audit log as "Identity provider (SCIM)".
+
+## Security alerts
+
+Rules watch the audit log and raise an alert within seconds, also sent to the SIEM with a higher severity. The super admin reviews them under Security & audit log → **Alerts** (a red count on the menu) and marks each reviewed, with a note.
+
+| Alert | When |
+|---|---|
+| Many failed sign-ins (high, platform) | 10 or more wrong passwords or codes from one address in 10 minutes — known or unknown accounts |
+| Account locked (medium) | 5 wrong passwords or codes for one person in 15 minutes |
+| MFA no longer required (high) · MFA switched off / reset (medium) | the company rule or a person's MFA changed |
+| New super admin (high) | someone made a super admin, by hand or through a group mapping |
+| Full data export (medium) | the company's data downloaded |
+| Company sign-in changed · new account-sync token (medium) · new API client (low) | sign-in or integration settings changed |
+| Company sign-ins refused (medium) | 5 or more in 10 minutes |
+| Last super admin kept (medium) | a sync tried to remove the last super admin |
+| Company data deleted · audit chain broken (high, platform) | for the Ekobon team |
+
+The same alert is raised at most once an hour per person, address or setting.
 
 ## Audit log
 
@@ -98,7 +129,7 @@ Every table holding company data carries the company id, and PostgreSQL row-leve
 | Access | roles, scopes, SSO, MFA, lockout, sessions, rate limits | network rules, HTTPS certificate, WAF and anti-DDoS in front | who gets which role; leavers disabled promptly (automatic with SSO) |
 | Data | company separation, sealed audit log, encrypted secrets, export, certificate of destruction | encryption at rest (AES-256 disks and backups), backups, disaster recovery, data residency | approving data, keeping evidence |
 | Integrations | OAuth clients, rate limits, validation | firewall to the sending systems | keeping client secrets safe; revoking unused clients |
-| Software | dependencies pinned; every change type-checked, tested, scanned (CodeQL), audited for known vulnerabilities, with a software bill of materials (SBOM) | patching the servers | — |
+| Software | dependencies pinned and updated weekly; every change type-checked, tested, code-scanned (CodeQL, SAST), audited for known vulnerabilities, with a software bill of materials (SBOM); the running app scanned from outside (OWASP ZAP, DAST) | patching the servers; penetration tests | — |
 
 ## Decisions with security in mind
 
@@ -119,6 +150,7 @@ Every table holding company data carries the company id, and PostgreSQL row-leve
 | `SIEM_SYSLOG`, `SIEM_TLS_CA` | forward audit records, e.g. `tls://siem.example.com:6514` |
 | `BACKUP_RETENTION_DAYS` | stated on certificates of destruction |
 | `SECURITY_CONTACT` | published at `/.well-known/security.txt` for reporting vulnerabilities |
+| `PLATFORM_SSO_ISSUER`, `_CLIENT_ID`, `_CLIENT_SECRET`, `_DOMAINS`, `PLATFORM_SSO_ONLY`, `PLATFORM_BREAKGLASS` | Ekobon's identity provider for platform administrators; SSO only; the break-glass accounts |
 | Database user | an ordinary role, never a superuser or BYPASSRLS (they would skip company separation): with HTTPS on, the server refuses to start that way |
 
 The field app is a web page opened from the bin's QR label (no app-store app), so the mobile-app rules about stores, key-chains and certificate pinning do not apply to it; it runs over the same HTTPS, sign-in and roles as the rest.

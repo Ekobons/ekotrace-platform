@@ -40,6 +40,7 @@ import { qrRoutes } from './modules/qr.routes.js';
 import { vaultRoutes } from './modules/vault.routes.js';
 import { messageRoutes } from './modules/messages.routes.js';
 import { securityRoutes, auditApiRoutes } from './modules/security.routes.js';
+import { scimRoutes } from './modules/scim.routes.js';
 import { assuranceRoutes } from './modules/assurance.routes.js';
 import { contractorPublicRoutes, contractorRoutes } from './modules/contractor.routes.js';
 import { reportsRoutes } from './modules/reports.routes.js';
@@ -62,7 +63,7 @@ export async function buildApp(opts: { logger?: boolean; rateLimit?: Limits | nu
     reply.header('X-Frame-Options', 'DENY');
     reply.header('Referrer-Policy', 'strict-origin-when-cross-origin');
     reply.header('Permissions-Policy', 'camera=(self), geolocation=(self), microphone=(), payment=(), usb=()');
-    if (!reply.hasHeader('Content-Security-Policy')) reply.header('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob:; frame-src 'self' blob:; object-src 'none'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'");
+    if (!reply.hasHeader('Content-Security-Policy')) reply.header('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self' blob:; style-src-attr 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob:; frame-src 'self' blob:; object-src 'none'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'");
     if (config.https) reply.header('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
   });
   // Rate limits on every API request (per session, per address, tighter on sign-in).
@@ -94,6 +95,7 @@ export async function buildApp(opts: { logger?: boolean; rateLimit?: Limits | nu
   await app.register(surveyPublicRoutes);
   await app.register(contractorPublicRoutes);
   await app.register(auditApiRoutes);
+  await app.register(scimRoutes);
   await app.register(async (secured) => {
     secured.addHook('onRequest', authenticate);
     await secured.register(reviewRoutes);

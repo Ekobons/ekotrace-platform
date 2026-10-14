@@ -15,6 +15,7 @@ import { AppError, notFound } from '../lib/errors.js';
 import { calcInputSchema, calculate, findPrice, type CalcContext, type CalcInput } from './calc.service.js';
 import type { Tx } from '../db/pool.js';
 import { syncMeter, type MeterRow } from './meters.routes.js';
+import { sealFile, openFile } from '../lib/secrets.js';
 
 /**
  * A fleet vehicle chosen for the entry: its type, fuel and charging become the
@@ -191,7 +192,7 @@ export async function activityRoutes(app: FastifyInstance) {
     const h = createHash('sha256').update(buf).digest('hex');
     return tenantTx(tenant, async (c) => {
       const id = (await c.query('SELECT id FROM document WHERE sha256 = $1', [h])).rows[0]?.id ?? (await c.query(
-        `INSERT INTO document (tenant_id, kind, filename, content_type, size, sha256, data, uploaded_by) VALUES ($1,'logo','logo',$2,$3,$4,$5,$6) RETURNING id`, [tenant, type, buf.length, h, buf, req.user.name])).rows[0].id;
+        `INSERT INTO document (tenant_id, kind, filename, content_type, size, sha256, data, uploaded_by) VALUES ($1,'logo','logo',$2,$3,$4,$5,$6) RETURNING id`, [tenant, type, buf.length, h, sealFile(buf), req.user.name])).rows[0].id;
       await c.query('UPDATE tenant SET logo_id = $2 WHERE id = $1', [tenant, id]);
       await audit(c, req, 'company.logo', 'tenant', tenant, { size: buf.length });
       return { ok: true };
@@ -206,7 +207,7 @@ export async function activityRoutes(app: FastifyInstance) {
     const tenant = requireTenant(req);
     const d = await tenantTx(tenant, async (c) => (await c.query('SELECT d.content_type, d.data FROM tenant t JOIN document d ON d.id = t.logo_id WHERE t.id = $1', [tenant])).rows[0]);
     if (!d) throw notFound('Logo');
-    return reply.header('content-type', d.content_type).header('cache-control', 'private, max-age=60').send(d.data);
+    return reply.header('content-type', d.content_type).header('cache-control', 'private, max-age=60').send(openFile(d.data));
   });
 
   /** Methodology & boundaries (Super admin): consolidation approach, GWP set, base year, country. */

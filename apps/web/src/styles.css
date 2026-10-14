@@ -1123,3 +1123,12 @@ textarea.input { height: auto; min-height: 64px; padding: 9px 10px; line-height:
 .destroybox h3 { margin: 0; color: var(--bad); }
 .destroybox ol { margin: 0; padding-left: 18px; }
 @media (max-width: 1000px) { .secgrid { grid-template-columns: minmax(0, 1fr); } .mfacodes { grid-template-columns: minmax(0, 1fr); } }
+.alertlist { display: flex; flex-direction: column; }
+.alertrow { display: flex; gap: 10px; align-items: flex-start; padding: 10px 8px; border-top: 1px solid var(--line); flex-wrap: wrap; }
+.alertrow:first-child { border-top: 0; }
+.alertrow.high { border-left: 3px solid var(--bad); } .alertrow.medium { border-left: 3px solid var(--warn); } .alertrow.low { border-left: 3px solid var(--info); }
+.alertrow.done { opacity: .7; }
+.alertrow .grow { min-width: 220px; }
+.scimedit { display: flex; flex-direction: column; gap: 8px; padding: 6px 0; }
+.scimedit select.input { width: auto; max-width: 320px; }
+.navb.red { background: #C2523C; color: #fff; }

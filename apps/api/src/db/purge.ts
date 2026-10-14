@@ -16,7 +16,7 @@ const ORDERED = [
   'UPDATE tenant SET logo_id = NULL WHERE id = $1', 'DELETE FROM bill WHERE tenant_id = $1', 'DELETE FROM document WHERE tenant_id = $1', 'DELETE FROM meter_reading WHERE tenant_id = $1', 'DELETE FROM meter WHERE tenant_id = $1',
   'DELETE FROM api_key WHERE tenant_id = $1', 'DELETE FROM commute_record WHERE tenant_id = $1', 'DELETE FROM survey WHERE tenant_id = $1', 'DELETE FROM waste_deposit WHERE tenant_id = $1', 'DELETE FROM waste_site WHERE tenant_id = $1',
   'DELETE FROM price WHERE tenant_id = $1', 'DELETE FROM user_facility WHERE tenant_id = $1', 'DELETE FROM reduction_action WHERE tenant_id = $1', 'DELETE FROM scenario WHERE tenant_id = $1',
-  'DELETE FROM target_objective WHERE tenant_id = $1', 'DELETE FROM lever_scenario WHERE tenant_id = $1', 'DELETE FROM sso_config WHERE tenant_id = $1', 'DELETE FROM sso_state WHERE tenant_id = $1',
+  'DELETE FROM target_objective WHERE tenant_id = $1', 'DELETE FROM lever_scenario WHERE tenant_id = $1', 'DELETE FROM sso_config WHERE tenant_id = $1', 'DELETE FROM scim_member WHERE tenant_id = $1', 'DELETE FROM scim_group WHERE tenant_id = $1', 'DELETE FROM scim_token WHERE tenant_id = $1', 'DELETE FROM sso_state WHERE tenant_id = $1',
   'DELETE FROM session WHERE user_id IN (SELECT id FROM app_user WHERE tenant_id = $1)', 'DELETE FROM login_challenge WHERE user_id IN (SELECT id FROM app_user WHERE tenant_id = $1)',
   'UPDATE org_node SET manager_user_id = NULL WHERE tenant_id = $1',
 ];

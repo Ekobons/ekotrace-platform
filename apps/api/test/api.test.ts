@@ -2302,3 +2302,161 @@ test('security: audit log is append-only and hash-chained (tampering detected), 
   assert.equal((await api('GET', '/api/platform/certificates')).body.certificates[0].company, 'Secure Co');
   assert.equal((await verify()).ok, true);
 });
+
+test('account sync (SCIM 2.0, as Microsoft Entra sends it): joiners, group → role, leavers switched off, last super admin kept; people page refuses manual role changes', async () => {
+  const co = (await api('POST', '/api/platform/companies', { name: 'Synced Co', country: 'GB', gwpSet: 'AR6', superAdmin: { name: 'Sue Sync', email: 'sue@synced.test' } })).body;
+  const T = co.company.id;
+  const group = (await api('GET', '/api/org', undefined, T)).body.nodes.find((n: { kind: string }) => n.kind === 'group').id;
+  const plant = (await api('POST', '/api/org/nodes', { parentId: group, kind: 'facility', name: 'Leeds plant' }, T)).body.id;
+  const tok = (await api('POST', '/api/security/scim/token', undefined, T)).body;
+  assert.match(tok.secret, /^eks_/); assert.match(tok.baseUrl, /\/scim\/v2$/);
+  const scim = (method: string, url: string, body?: object) => app.inject({ method: method as 'GET', url: `/scim/v2${url}`, payload: body ? JSON.stringify(body) : undefined,
+    headers: { authorization: `Bearer ${tok.secret}`, ...(body ? { 'content-type': 'application/scim+json' } : {}) } });
+  assert.equal((await app.inject({ method: 'GET', url: '/scim/v2/Users', headers: { authorization: 'Bearer nope' } })).statusCode, 401);
+  assert.equal((await scim('GET', '/ServiceProviderConfig')).json().patch.supported, true);
+  // Entra looks the person up, then creates them
+  assert.equal((await scim('GET', '/Users?filter=userName%20eq%20%22ann%40synced.test%22')).json().totalResults, 0);
+  const ann = await scim('POST', '/Users', { schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'], userName: 'Ann@Synced.test', active: true, externalId: 'e-1', displayName: 'Ann Analyst',
+    emails: [{ primary: true, type: 'work', value: 'ann@synced.test' }], name: { givenName: 'Ann', familyName: 'Analyst' } });
+  assert.equal(ann.statusCode, 201, ann.body);
+  const annId = ann.json().id;
+  assert.equal(ann.json().active, false, 'no mapped group yet: no access');
+  assert.equal((await scim('POST', '/Users', { userName: 'ann@synced.test' })).statusCode, 409);
+  assert.equal((await scim('POST', '/Users', { userName: 'super@a.test' })).json().scimType, 'uniqueness', 'an email of another company');
+  // a group arrives; the super admin maps it to Preparer for the Leeds plant
+  const g = (await scim('POST', '/Groups', { displayName: 'Ekotrace preparers', externalId: 'g-1', members: [{ value: annId }] })).json();
+  let st = (await api('GET', '/api/security/scim', undefined, T)).body;
+  assert.equal(st.groups[0].members, 1);
+  await api('PUT', `/api/security/scim/groups/${g.id}`, { role: 'preparer', facilityIds: [plant] }, T);
+  let a = (await pq('SELECT role, disabled FROM app_user WHERE id = $1', [annId])).rows[0];
+  assert.deepEqual([a.role, a.disabled], ['preparer', false]);
+  assert.equal((await pq('SELECT count(*)::int AS n FROM user_facility WHERE user_id = $1 AND node_id = $2', [annId, plant])).rows[0].n, 1);
+  // a second group with a higher role wins; leaving it goes back
+  const g2 = (await scim('POST', '/Groups', { displayName: 'Ekotrace verifiers' })).json();
+  await api('PUT', `/api/security/scim/groups/${g2.id}`, { role: 'verifier' }, T);
+  const g3 = (await scim('POST', '/Groups', { displayName: 'Ekotrace super admins' })).json();
+  await api('PUT', `/api/security/scim/groups/${g3.id}`, { role: 'super_admin' }, T);
+  assert.equal((await scim('PATCH', `/Groups/${g3.id}`, { schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'], Operations: [{ op: 'Add', path: 'members', value: [{ value: annId }] }] })).statusCode, 204);
+  assert.equal((await pq('SELECT role FROM app_user WHERE id = $1', [annId])).rows[0].role, 'super_admin');
+  await scim('PATCH', `/Groups/${g3.id}`, { Operations: [{ op: 'Remove', path: `members[value eq "${annId}"]` }] });
+  assert.equal((await pq('SELECT role FROM app_user WHERE id = $1', [annId])).rows[0].role, 'preparer');
+  // Entra switches a leaver off with PATCH active "False" (a string): no access, sessions ended
+  const p = await scim('PATCH', `/Users/${annId}`, { schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'], Operations: [{ op: 'Replace', path: 'active', value: 'False' }] });
+  assert.equal(p.statusCode, 200, p.body); assert.equal(p.json().active, false);
+  assert.equal((await pq('SELECT disabled FROM app_user WHERE id = $1', [annId])).rows[0].disabled, true);
+  await scim('PATCH', `/Users/${annId}`, { Operations: [{ op: 'replace', value: { active: true, displayName: 'Ann A. Analyst' } }] });
+  a = (await pq('SELECT name, disabled FROM app_user WHERE id = $1', [annId])).rows[0];
+  assert.deepEqual([a.name, a.disabled], ['Ann A. Analyst', false]);
+  // the existing super admin is matched by userName and synced; the provider cannot remove the last one
+  const sue = (await scim('GET', '/Users?filter=userName%20eq%20%22sue%40synced.test%22')).json().Resources[0];
+  await scim('PATCH', `/Users/${sue.id}`, { Operations: [{ op: 'Add', path: 'externalId', value: 'e-sue' }] });
+  assert.equal((await scim('DELETE', `/Users/${sue.id}`)).statusCode, 204);
+  const s = (await pq('SELECT role, disabled FROM app_user WHERE id = $1', [sue.id])).rows[0];
+  assert.deepEqual([s.role, s.disabled], ['super_admin', false], 'last super admin kept');
+  assert.ok((await pq(`SELECT 1 FROM audit_log WHERE action = 'scim.kept_last_super_admin' AND tenant_id = $1`, [T])).rowCount);
+  // the people page refuses manual role changes for synced people
+  const r = await api('PATCH', `/api/users/${annId}`, { role: 'manager' }, T);
+  assert.equal(r.status, 400); assert.equal(r.body.error, 'SCIM_MANAGED');
+  assert.equal((await api('GET', '/api/users', undefined, T)).body.users.find((u: { id: string }) => u.id === annId).scim_managed, true);
+  // people with no mapped group: read-only when the company chooses
+  const bob = (await scim('POST', '/Users', { userName: 'bob@synced.test', active: true })).json();
+  assert.equal(bob.active, false);
+  await api('PUT', '/api/security/scim/settings', { defaultRole: 'verifier' }, T);
+  assert.equal((await pq('SELECT role, disabled FROM app_user WHERE id = $1', [bob.id])).rows[0].disabled, false);
+  // group deleted in the provider: its people lose what it gave
+  assert.equal((await scim('DELETE', `/Groups/${g.id}`)).statusCode, 204);
+  assert.equal((await pq('SELECT role FROM app_user WHERE id = $1', [annId])).rows[0].role, 'verifier');
+  // a new token replaces the old one
+  const tok2 = (await api('POST', '/api/security/scim/token', undefined, T)).body.secret;
+  assert.equal((await scim('GET', '/Users')).statusCode, 401);
+  assert.equal((await app.inject({ method: 'GET', url: '/scim/v2/Users', headers: { authorization: `Bearer ${tok2}` } })).json().totalResults, 3);
+});
+
+test('security alerts from audit records (failed sign-in burst, locked account, MFA policy off, new super admin, export), deduplicated, acknowledged; stored files encrypted at rest', async () => {
+  const { seal } = await import('../src/lib/auditlog.js');
+  const { runAlerts } = await import('../src/lib/alerts.js');
+  const co = (await api('POST', '/api/platform/companies', { name: 'Alert Co', country: 'SG', gwpSet: 'AR6', superAdmin: { name: 'Al Ert', email: 'al@alert.test' } })).body;
+  const T = co.company.id;
+  for (let i = 0; i < 6; i++) await app.inject({ method: 'POST', url: '/api/auth/login', payload: { email: 'al@alert.test', password: 'wrong password ' + i }, remoteAddress: '203.0.113.9' });
+  for (let i = 0; i < 6; i++) await app.inject({ method: 'POST', url: '/api/auth/login', payload: { email: `nobody${i}@alert.test`, password: 'x' }, remoteAddress: '203.0.113.9' });
+  await api('PUT', '/api/security/mfa', { required: true }, T);
+  await api('PUT', '/api/security/mfa', { required: false }, T);
+  await api('POST', '/api/users', { name: 'Second Super', email: 'ss@alert.test', role: 'super_admin' }, T);
+  await app.inject({ method: 'GET', url: '/api/security/export', headers: { cookie: adminCookie, 'x-tenant-id': T } });
+  await seal();
+  const n = await runAlerts();
+  assert.ok(n >= 4, String(n));
+  assert.equal(await runAlerts(), 0, 'nothing new');
+  const list = (await api('GET', '/api/security/alerts?open=true', undefined, T)).body;
+  const rules = list.alerts.map((a: { rule: string }) => a.rule).sort();
+  for (const r of ['account_locked', 'data_export', 'mfa_policy_off', 'new_super_admin']) assert.ok(rules.includes(r), `${r} in ${rules}`);
+  assert.equal(list.alerts.filter((a: { rule: string }) => a.rule === 'account_locked').length, 1, 'once an hour');
+  assert.ok((await pq(`SELECT 1 FROM security_alert WHERE rule = 'failed_signins_ip' AND tenant_id IS NULL`)).rowCount, 'platform alert for the address');
+  assert.ok((await pq(`SELECT 1 FROM audit_log WHERE action = 'alert.mfa_policy_off' AND tenant_id = $1`, [T])).rowCount, 'also in the audit log (→ SIEM)');
+  const { syslogLine } = await import('../src/lib/auditlog.js');
+  assert.match(syslogLine({ action: 'alert.mfa_policy_off', at: new Date().toISOString(), detail: { severity: 'high' } }), /^<107>1 /, 'high → syslog error');
+  const id = list.alerts.find((a: { rule: string }) => a.rule === 'data_export').id;
+  assert.equal((await api('POST', `/api/security/alerts/${id}/ack`, { note: 'Our own year-end backup' }, T)).status, 200);
+  assert.equal((await api('GET', '/api/security/alerts/count', undefined, T)).body.open, list.open - 1);
+  assert.ok((await api('GET', '/api/platform/alerts')).body.alerts.some((a: { rule: string }) => a.rule === 'failed_signins_ip'));
+  // files: encrypted in the database, read back as they were; older plain files encrypted at start-up
+  const lg = await app.inject({ method: 'POST', url: '/api/tenant/logo', payload: Buffer.from('89504e470d0a1a0a0000000d49484452aabbccdd', 'hex'), headers: { cookie: adminCookie, 'x-tenant-id': T, 'content-type': 'application/octet-stream' } });
+  assert.equal(lg.statusCode, 200, lg.body);
+  const raw = (await pq(`SELECT d.data FROM document d JOIN tenant t ON t.logo_id = d.id WHERE t.id = $1`, [T])).rows[0].data as Buffer;
+  assert.equal(raw.subarray(0, 4).toString(), 'EKF1');
+  const back = await app.inject({ method: 'GET', url: '/api/tenant/logo', headers: { cookie: adminCookie, 'x-tenant-id': T } });
+  assert.equal(back.rawPayload.toString('hex'), '89504e470d0a1a0a0000000d49484452aabbccdd');
+  await pq(`INSERT INTO document (tenant_id, kind, filename, content_type, size, sha256, data) VALUES ($1,'vault','old.txt','text/plain',5,'x-old-plain','hello')`, [T]);
+  const { encryptStoredFiles } = await import('../src/db/setup.js');
+  assert.ok(await encryptStoredFiles() >= 1);
+  const old = (await pq(`SELECT data FROM document WHERE sha256 = 'x-old-plain'`)).rows[0].data as Buffer;
+  const { openFile } = await import('../src/lib/secrets.js');
+  assert.equal(old.subarray(0, 4).toString(), 'EKF1'); assert.equal(openFile(old).toString(), 'hello');
+  assert.equal(await encryptStoredFiles(), 0, 'all encrypted');
+});
+
+test('platform admins sign in with Ekobon\'s identity provider; password refused except break-glass with MFA', async () => {
+  const { config } = await import('../src/config.js');
+  const { generateKeyPairSync, createSign } = await import('node:crypto');
+  const { codeAt, stepNow } = await import('../src/lib/totp.js');
+  const Fastify = (await import('fastify')).default;
+  const key = generateKeyPairSync('rsa', { modulusLength: 2048 });
+  const idp = Fastify(); let iss = '';
+  idp.addContentTypeParser('application/x-www-form-urlencoded', { parseAs: 'string' }, (_r, b, done) => done(null, Object.fromEntries(new URLSearchParams(String(b)))));
+  idp.get('/.well-known/openid-configuration', async () => ({ issuer: iss, authorization_endpoint: `${iss}/authorize`, token_endpoint: `${iss}/token`, jwks_uri: `${iss}/keys` }));
+  idp.get('/keys', async () => ({ keys: [{ ...key.publicKey.export({ format: 'jwk' }), kid: 'p1' }] }));
+  idp.post('/token', async (req) => {
+    const b = req.body as Record<string, string>, now = Math.floor(Date.now() / 1000);
+    const h = Buffer.from(JSON.stringify({ alg: 'RS256', kid: 'p1' })).toString('base64url');
+    const p = Buffer.from(JSON.stringify({ iss, aud: 'ekobon-ops', sub: 'x', exp: now + 300, iat: now, nonce: b.code, email: 'ops@ekobon.test', amr: ['pwd', 'mfa'] })).toString('base64url');
+    return { id_token: `${h}.${p}.${createSign('RSA-SHA256').update(`${h}.${p}`).sign(key.privateKey).toString('base64url')}` };
+  });
+  await idp.listen({ port: 0, host: '127.0.0.1' });
+  iss = `http://127.0.0.1:${(idp.server.address() as { port: number }).port}`;
+  const saved = config.platformSso;
+  (config as { platformSso: unknown }).platformSso = { issuer: iss, clientId: 'ekobon-ops', clientSecret: 's', domains: ['ekobon.test'], only: true, breakGlass: ['glass@ekobon.test'] };
+  try {
+    // a company cannot claim the platform's domain
+    assert.equal((await api('PUT', '/api/security/sso', { issuer: iss, clientId: 'x', domains: ['ekobon.test'], enabled: false, enforce: false, requireMfa: true }, tenantB)).status, 400);
+    const st = await app.inject({ method: 'POST', url: '/api/auth/sso/start', payload: { email: 'ops@ekobon.test' } });
+    const u = new URL(st.json().url);
+    const cb = await app.inject({ method: 'GET', url: `/api/auth/sso/callback?code=${u.searchParams.get('nonce')}&state=${u.searchParams.get('state')}` });
+    assert.equal(cb.headers.location, '/', String(cb.headers.location));
+    const ck = String(cb.headers['set-cookie']).split(';')[0]!;
+    const me = (await call(ck, 'GET', '/api/auth/me')).body.user;
+    assert.deepEqual([me.role, me.via], ['platform_admin', 'sso']);
+    // password: refused for platform admins…
+    const pw = await app.inject({ method: 'POST', url: '/api/auth/login', payload: { email: 'ops@ekobon.test', password: 'correct horse battery' } });
+    assert.equal(pw.json().error, 'SSO_REQUIRED');
+    // …except a named break-glass account, and only with MFA
+    const g = (await pq(`INSERT INTO app_user (tenant_id, email, name, role, password_hash, must_change_password) SELECT NULL, 'glass@ekobon.test', 'Glass', 'platform_admin', password_hash, false FROM app_user WHERE email = 'ops@ekobon.test' RETURNING id`)).rows[0];
+    assert.match((await app.inject({ method: 'POST', url: '/api/auth/login', payload: { email: 'glass@ekobon.test', password: 'correct horse battery' } })).json().message, /multi-factor/);
+    (config as { platformSso: unknown }).platformSso = null;
+    const gl = String((await app.inject({ method: 'POST', url: '/api/auth/login', payload: { email: 'glass@ekobon.test', password: 'correct horse battery' } })).headers['set-cookie']).split(';')[0]!;
+    const su = (await call(gl, 'POST', '/api/auth/mfa/setup')).body;
+    await call(gl, 'POST', '/api/auth/mfa/enable', { code: codeAt(su.secret, stepNow()) });
+    (config as { platformSso: unknown }).platformSso = { issuer: iss, clientId: 'ekobon-ops', clientSecret: 's', domains: ['ekobon.test'], only: true, breakGlass: ['glass@ekobon.test'] };
+    assert.equal((await app.inject({ method: 'POST', url: '/api/auth/login', payload: { email: 'glass@ekobon.test', password: 'correct horse battery' } })).json().mfa, true);
+    void g;
+  } finally { (config as { platformSso: unknown }).platformSso = saved; await idp.close(); }
+});

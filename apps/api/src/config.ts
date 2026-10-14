@@ -68,6 +68,18 @@ export const config = {
   siemTlsCa: process.env.SIEM_TLS_CA ?? null,
   backupRetentionDays: Number(process.env.BACKUP_RETENTION_DAYS ?? 35),
   securityContact: process.env.SECURITY_CONTACT ?? null,
+  /**
+   * Platform administrators (Ekobon staff) sign in through Ekobon's own identity provider (OpenID Connect).
+   *   PLATFORM_SSO_ISSUER, PLATFORM_SSO_CLIENT_ID, PLATFORM_SSO_CLIENT_SECRET, PLATFORM_SSO_DOMAINS (e.g. ekobon.com)
+   *   PLATFORM_SSO_ONLY=true      no password sign-in for platform admins…
+   *   PLATFORM_BREAKGLASS=a@x,b@y …except these accounts, which must use MFA (when the provider is down)
+   */
+  platformSso: process.env.PLATFORM_SSO_ISSUER && process.env.PLATFORM_SSO_CLIENT_ID ? {
+    issuer: process.env.PLATFORM_SSO_ISSUER.replace(/\/$/, ''), clientId: process.env.PLATFORM_SSO_CLIENT_ID, clientSecret: process.env.PLATFORM_SSO_CLIENT_SECRET ?? null,
+    domains: (process.env.PLATFORM_SSO_DOMAINS ?? '').split(',').map((d) => d.trim().toLowerCase()).filter(Boolean),
+    only: process.env.PLATFORM_SSO_ONLY === 'true',
+    breakGlass: (process.env.PLATFORM_BREAKGLASS ?? '').split(',').map((d) => d.trim().toLowerCase()).filter(Boolean),
+  } as { issuer: string; clientId: string; clientSecret: string | null; domains: string[]; only: boolean; breakGlass: string[] } | null : null,
   /** the address people open Ekotrace at (SSO sends people back here), e.g. https://ekotrace.example.com */
   publicUrl: (process.env.PUBLIC_URL ?? '').replace(/\/$/, '') || null,
 };

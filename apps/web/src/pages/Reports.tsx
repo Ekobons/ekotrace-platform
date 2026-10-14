@@ -13,10 +13,12 @@
  *
  * Location- or market-based Scope 2 is switched at the top; "Download report" gives the GHG Protocol report.
  */
+import { printHtml } from '../lib/printwin';
+import '../lib/iso-report.css';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useApp } from '../App';
 import { api, num, unitLabel, type RepCheck, type RepLine, type RepSettings, type RepTemplate, type TargetsData } from '../lib/api';
-import { ISO_CSS, datapoints } from '../lib/frameworks';
+import { datapoints } from '../lib/frameworks';
 import { Link } from 'react-router-dom';
 import { CAPTURED, DT_C, EXCL_DEFAULT, GHG_CATS, RSECS, TPL_GROUP, csv, dtypeOf, download, factorsCsv, ghgName, inventory, inventoryCsv, lineConf, lineT, mrvCsv, reportBody, reportHtml, templateList, type RepCtx } from '../lib/reports';
 import { fmt, fmt0 } from '../components/DashCharts';
@@ -63,7 +65,7 @@ export function Reports() {
   const ctx: RepCtx | null = d && inv && st ? { d, rows, prev, months, inv, lines: pLines, mb, label: v.name, period, settings: st, checks: checks?.checks ?? null, targets: tg, preparedBy: me.user.name, consolidation, logo } : null;
   const exportOk = me.company?.planLimits?.export !== false;
   const getReport = (t: RepTemplate) => { if (!ctx) return; download(`${t.name} – ${v.name} – ${period}.html`.replace(/[\\/:*?"<>|]/g, '-'), reportHtml(t, ctx), 'text/html;charset=utf-8'); };
-  const printReport = (t: RepTemplate) => { if (!ctx) return; const w = window.open('', '_blank'); if (!w) { toast('Allow pop-ups to print the report'); return; } w.document.write(reportHtml(t, ctx)); w.document.close(); w.focus(); setTimeout(() => w.print(), 400); };
+  const printReport = (t: RepTemplate) => { if (!ctx) return; if (!printHtml(reportHtml(t, ctx))) toast('Allow pop-ups to print the report'); };
   const ghgp = st ? templateList(st.templates).find((t) => t.base === 'ghgp')! : null;
 
   return (
@@ -303,8 +305,7 @@ function Templates({ ctx, reload, getReport, printReport, exportOk }: { ctx: Rep
             {st.canEdit && !t.builtin && <button className="btn sm ghost danger" onClick={async () => { await api.removeTemplate(t.id).catch(() => {}); setCur(RTPL_FIRST); reload(); }}>Delete</button>}
             {FW_BASES.includes(t.base ?? '') && <button className="btn sm" disabled={!exportOk} onClick={() => download(`${t.name} datapoints – ${ctx.label} – ${ctx.period}.csv`, csv(['Reference', 'Datapoint', 'Value', 'Unit'], datapoints(t.base!, ctx)))}>Datapoints (CSV)</button>}
             <button className="btn sm" onClick={() => printReport(t)}>Print / PDF</button><button className="btn sm p" onClick={() => getReport(t)}>Download report</button></div>
-          <style>{ISO_CSS}</style>
-          <div className="rprev" dangerouslySetInnerHTML={{ __html: reportBody(t, ctx) }} />
+          <div className="rprev isoprev" dangerouslySetInnerHTML={{ __html: reportBody(t, ctx) }} />
         </section>
       </div>
     </div>);

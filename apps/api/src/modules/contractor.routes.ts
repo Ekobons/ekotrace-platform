@@ -26,6 +26,7 @@ import { platformTx, tenantTx, type Tx } from '../db/pool.js';
 import { audit, requireRole, requireTenant } from '../lib/auth.js';
 import { scopeOf } from '../lib/access.js';
 import { AppError, notFound } from '../lib/errors.js';
+import { sealFile, openFile } from '../lib/secrets.js';
 
 const sha = (s: string) => createHash('sha256').update(s).digest('hex');
 const ABC = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -188,7 +189,7 @@ export async function contractorRoutes(app: FastifyInstance) {
     const id = z.string().uuid().parse((req.params as { id: string }).id);
     const d = await tenantTx(tenant, async (c) => (await c.query(`SELECT filename, content_type, data FROM document WHERE id = $1 AND kind = 'waste_evidence'`, [id])).rows[0]);
     if (!d) throw notFound('Document');
-    return reply.header('content-type', d.content_type).header('content-disposition', `inline; filename="${String(d.filename).replace(/[^\w.\- ]/g, '_')}"`).send(d.data);
+    return reply.header('content-type', d.content_type).header('content-disposition', `inline; filename="${String(d.filename).replace(/[^\w.\- ]/g, '_')}"`).send(openFile(d.data));
   });
 }
 
@@ -251,7 +252,7 @@ export async function contractorPublicRoutes(app: FastifyInstance) {
     return tenantTx(k.tenant, async (c) => {
       const prior = (await c.query('SELECT id FROM document WHERE sha256 = $1', [h])).rows[0];
       const id = prior?.id ?? (await c.query(`INSERT INTO document (tenant_id, kind, filename, content_type, size, sha256, data, uploaded_by) VALUES ($1,'waste_evidence',$2,$3,$4,$5,$6,$7) RETURNING id`,
-        [k.tenant, filename, type, buf.length, h, buf, `${k.name} (contractor)`])).rows[0].id;
+        [k.tenant, filename, type, buf.length, h, sealFile(buf), `${k.name} (contractor)`])).rows[0].id;
       await log(c, k, 'contractor.evidence', id, { filename, size: buf.length }, req.ip);
       return { documentId: id, filename };
     });

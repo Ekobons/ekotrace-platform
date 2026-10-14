@@ -15,12 +15,14 @@ import { z } from 'zod';
 import { platformTx, tenantTx, type Tx } from '../db/pool.js';
 import { audit, requirePlatformAdmin, requireRole, requireTenant } from '../lib/auth.js';
 import { AppError, forbidden, notFound } from '../lib/errors.js';
-import { encrypt } from '../lib/secrets.js';
+import { encrypt, openFile } from '../lib/secrets.js';
 import { checkUrl, discover } from '../lib/oidc.js';
 import { seal, verify } from '../lib/auditlog.js';
 import { Zip } from '../lib/zip.js';
 import { countRows, purgeTenant, tenantTables } from '../db/purge.js';
 import { config } from '../config.js';
+import { applyRoles } from './scim.routes.js';
+import { newToken, sha256 } from '../lib/password.js';
 import { apiClient } from './meters.routes.js';
 import { ssoRedirectUri } from './auth.routes.js';
 
@@ -58,6 +60,7 @@ export async function exportCompany(c: Tx, tenantId: string, by: string) {
   const files: { path: string; size: number; sha256: string; kind: string }[] = [];
   const docs = (await c.query('SELECT id, kind, filename, data FROM document WHERE tenant_id = $1 ORDER BY uploaded_at', [tenantId])).rows;
   for (const d of docs) {
+    d.data = openFile(d.data);
     const path = `files/${d.kind}/${d.id.slice(0, 8)}-${String(d.filename).replace(/[^\w.\- ()]/g, '_')}`;
     zip.add(path, d.data); files.push({ path, size: d.data.length, sha256: sha(d.data), kind: d.kind });
   }
@@ -115,6 +118,8 @@ export async function securityRoutes(app: FastifyInstance) {
     if (b.enabled) { try { await discover(issuer); } catch (e) { throw new AppError(`The identity provider could not be reached at ${issuer} (${(e as Error).message})`); } }
     const taken = await platformTx(async (c) => (await c.query(`SELECT d FROM sso_config s, unnest(s.domains) d WHERE s.tenant_id <> $1 AND d = ANY($2)`, [tenant, b.domains])).rows.map((r) => r.d));
     if (taken.length) throw new AppError(`${taken.join(', ')} already signs in to another company`);
+    const plat = b.domains.filter((d) => config.platformSso?.domains.includes(d));
+    if (plat.length) throw new AppError(`${plat.join(', ')} is reserved for platform administrators`);
     if (b.enforce && !b.enabled) throw new AppError('Switch company sign-in on before making it the only way to sign in');
     return tenantTx(tenant, async (c) => {
       if (b.enforce) {
@@ -172,6 +177,118 @@ export async function securityRoutes(app: FastifyInstance) {
     });
     const name = `ekotrace-export-${new Date().toISOString().slice(0, 10)}.zip`;
     return reply.header('Content-Type', 'application/zip').header('Content-Disposition', `attachment; filename="${name}"`).header('X-Manifest-SHA256', r.manifestSha).header('Cache-Control', 'no-store').send(r.zip);
+  });
+
+  // ------------------------------------------------------- account sync (SCIM) --
+  const scimView = async (c: Tx, req: FastifyRequest) => {
+    const t = (await c.query('SELECT prefix, default_role, created_by, created_at, last_used_at FROM scim_token')).rows[0] ?? null;
+    const groups = (await c.query(`SELECT g.id, g.display_name, g.role, g.scope_node_id, g.facility_ids, g.updated_at, n.name AS scope_name,
+                                          (SELECT count(*)::int FROM scim_member m WHERE m.group_id = g.id) AS members
+                                     FROM scim_group g LEFT JOIN org_node n ON n.id = g.scope_node_id ORDER BY lower(g.display_name)`)).rows;
+    const people = (await c.query(`SELECT count(*) FILTER (WHERE scim_managed)::int AS managed, count(*) FILTER (WHERE scim_managed AND NOT disabled)::int AS active FROM app_user`)).rows[0];
+    return { token: t, baseUrl: `${config.publicUrl ?? `${req.protocol}://${req.headers.host}`}/scim/v2`, groups, people };
+  };
+  app.get('/api/security/scim', async (req) => {
+    const tenant = requireTenant(req);
+    if (!['platform_admin', 'super_admin', 'admin', 'verifier'].includes(req.user.role)) throw forbidden();
+    return tenantTx(tenant, (c) => scimView(c, req));
+  });
+  /** A new token (shown once); the old one stops working. */
+  app.post('/api/security/scim/token', async (req) => {
+    const tenant = requireTenant(req);
+    requireRole(req, 'super_admin');
+    const token = `eks_${newToken()}`;
+    return tenantTx(tenant, async (c) => {
+      await c.query(`INSERT INTO scim_token (tenant_id, token_hash, prefix, created_by) VALUES ($1,$2,$3,$4)
+                     ON CONFLICT (tenant_id) DO UPDATE SET token_hash = EXCLUDED.token_hash, prefix = EXCLUDED.prefix, created_by = EXCLUDED.created_by, created_at = now(), last_used_at = NULL`,
+        [tenant, sha256(token), token.slice(0, 10), req.user.name]);
+      await audit(c, req, 'scim.token', 'tenant', tenant, { prefix: token.slice(0, 10) });
+      return { ...(await scimView(c, req)), secret: token };
+    });
+  });
+  app.delete('/api/security/scim/token', async (req) => {
+    const tenant = requireTenant(req);
+    requireRole(req, 'super_admin');
+    return tenantTx(tenant, async (c) => { await c.query('DELETE FROM scim_token WHERE tenant_id = $1', [tenant]); await audit(c, req, 'scim.token_revoke', 'tenant', tenant); return { ok: true }; });
+  });
+  app.put('/api/security/scim/settings', async (req) => {
+    const tenant = requireTenant(req);
+    requireRole(req, 'super_admin');
+    const b = z.object({ defaultRole: z.enum(['verifier']).nullable() }).parse(req.body);
+    return tenantTx(tenant, async (c) => {
+      if (!(await c.query('UPDATE scim_token SET default_role = $2 WHERE tenant_id = $1', [tenant, b.defaultRole])).rowCount) throw new AppError('Make a SCIM token first');
+      const ids = (await c.query('SELECT id FROM app_user WHERE scim_managed')).rows.map((r) => r.id);
+      await applyRoles(c, tenant, ids, b.defaultRole, req.ip);
+      await audit(c, req, 'scim.settings', 'tenant', tenant, b);
+      return scimView(c, req);
+    });
+  });
+  /** What a provider group gives its members. */
+  app.put('/api/security/scim/groups/:id', async (req) => {
+    const tenant = requireTenant(req);
+    requireRole(req, 'super_admin');
+    const id = z.string().uuid().parse((req.params as { id: string }).id);
+    const b = z.object({ role: z.enum(['super_admin', 'admin', 'manager', 'preparer', 'verifier']).nullable(), scopeNodeId: z.string().uuid().nullable().optional(), facilityIds: z.array(z.string().uuid()).max(500).default([]) }).parse(req.body);
+    return tenantTx(tenant, async (c) => {
+      const g = (await c.query('SELECT id, display_name FROM scim_group WHERE id = $1', [id])).rows[0];
+      if (!g) throw notFound('Group');
+      if (b.role === 'admin') {
+        const n = b.scopeNodeId ? (await c.query('SELECT kind FROM org_node WHERE id = $1', [b.scopeNodeId])).rows[0] : null;
+        if (!n || n.kind === 'facility') throw new AppError('Choose the sub-group (or main entity) the Admins of this group run');
+      }
+      if (['manager', 'preparer'].includes(b.role ?? '') && b.facilityIds.length) {
+        const ok = (await c.query(`SELECT count(*)::int AS n FROM org_node WHERE id = ANY($1) AND kind = 'facility'`, [b.facilityIds])).rows[0].n;
+        if (ok !== new Set(b.facilityIds).size) throw new AppError('Some of the facilities do not exist');
+      }
+      await c.query('UPDATE scim_group SET role = $2, scope_node_id = $3, facility_ids = $4, updated_at = now() WHERE id = $1',
+        [id, b.role, b.role === 'admin' ? b.scopeNodeId : null, ['manager', 'preparer'].includes(b.role ?? '') ? b.facilityIds : []]);
+      const members = (await c.query('SELECT user_id FROM scim_member WHERE group_id = $1', [id])).rows.map((r) => r.user_id);
+      const def = (await c.query('SELECT default_role FROM scim_token')).rows[0]?.default_role ?? null;
+      await applyRoles(c, tenant, members, def, req.ip);
+      await audit(c, req, 'scim.group_mapping', 'scim_group', id, { group: g.display_name, ...b });
+      return scimView(c, req);
+    });
+  });
+
+  // ------------------------------------------------------------------- alerts --
+  app.get('/api/security/alerts', async (req) => {
+    const tenant = requireTenant(req);
+    if (!['platform_admin', 'super_admin', 'admin', 'verifier'].includes(req.user.role)) throw forbidden();
+    const q = z.object({ open: z.coerce.boolean().optional() }).parse(req.query);
+    return tenantTx(tenant, async (c) => ({
+      alerts: (await c.query(`SELECT id, rule, severity, title, detail, at, ack_by, ack_at, ack_note FROM security_alert WHERE tenant_id = $1 AND ($2::boolean IS NOT TRUE OR ack_at IS NULL) ORDER BY at DESC LIMIT 300`, [tenant, q.open ?? null])).rows,
+      open: (await c.query(`SELECT count(*)::int AS n FROM security_alert WHERE tenant_id = $1 AND ack_at IS NULL`, [tenant])).rows[0].n,
+      canAck: ['platform_admin', 'super_admin'].includes(req.user.role),
+    }));
+  });
+  app.get('/api/security/alerts/count', async (req) => {
+    if (req.user.role === 'platform_admin' && !req.user.tenantId) {
+      return { open: await platformTx(async (c) => (await c.query(`SELECT count(*)::int AS n FROM security_alert WHERE tenant_id IS NULL AND ack_at IS NULL`)).rows[0].n) };
+    }
+    const tenant = requireTenant(req);
+    if (!['platform_admin', 'super_admin', 'admin'].includes(req.user.role)) return { open: 0 };
+    return { open: await tenantTx(tenant, async (c) => (await c.query(`SELECT count(*)::int AS n FROM security_alert WHERE tenant_id = $1 AND ack_at IS NULL`, [tenant])).rows[0].n) };
+  });
+  app.post('/api/security/alerts/:id/ack', async (req) => {
+    const id = z.coerce.number().int().parse((req.params as { id: string }).id);
+    const b = z.object({ note: z.string().trim().max(500).optional() }).parse(req.body);
+    const platform = req.user.role === 'platform_admin' && !req.user.tenantId;
+    const run = async (c: Tx) => {
+      const a = (await c.query(`UPDATE security_alert SET ack_by = $2, ack_at = now(), ack_note = $3 WHERE id = $1 AND ack_at IS NULL AND ($4 OR tenant_id IS NOT NULL) RETURNING id, title, tenant_id`, [id, req.user.name, b.note ?? null, platform])).rows[0];
+      if (!a) throw notFound('Open alert');
+      await audit(c, req, 'alert.acknowledge', 'security_alert', id, { title: a.title, note: b.note ?? null });
+      return { ok: true };
+    };
+    if (platform) return platformTx(run);
+    const tenant = requireTenant(req);
+    requireRole(req, 'super_admin');
+    return tenantTx(tenant, run);
+  });
+  app.get('/api/platform/alerts', async (req) => {
+    requirePlatformAdmin(req);
+    return platformTx(async (c) => ({ alerts: (await c.query(
+      `SELECT a.id, a.tenant_id, t.name AS company, a.rule, a.severity, a.title, a.detail, a.at, a.ack_by, a.ack_at, a.ack_note
+         FROM security_alert a LEFT JOIN tenant t ON t.id = a.tenant_id WHERE a.tenant_id IS NULL OR a.severity = 'high' ORDER BY a.at DESC LIMIT 300`)).rows }));
   });
 
   // ----------------------------------------------------------------- platform --

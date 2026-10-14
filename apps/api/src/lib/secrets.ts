@@ -38,3 +38,23 @@ export function decrypt(stored: string): string {
   d.setAuthTag(Buffer.from(tag, 'base64'));
   return Buffer.concat([d.update(Buffer.from(ct, 'base64')), d.final()]).toString('utf8');
 }
+
+/**
+ * Stored files (bills, invoices, permits…) are encrypted in the database too: AES-256-GCM under the same
+ * server key. Layout: "EKF1" | iv (12) | tag (16) | ciphertext. A file without the marker (stored before
+ * this) is returned as it is, and encrypted by the start-up job.
+ */
+const MAGIC = Buffer.from('EKF1');
+export function sealFile(plain: Buffer): Buffer {
+  const iv = randomBytes(12);
+  const c = createCipheriv('aes-256-gcm', dataKey(), iv);
+  const ct = Buffer.concat([c.update(plain), c.final()]);
+  return Buffer.concat([MAGIC, iv, c.getAuthTag(), ct]);
+}
+export const isSealed = (b: Buffer) => b.length >= 32 && b.subarray(0, 4).equals(MAGIC);
+export function openFile(stored: Buffer): Buffer {
+  if (!isSealed(stored)) return stored;
+  const d = createDecipheriv('aes-256-gcm', dataKey(), stored.subarray(4, 16));
+  d.setAuthTag(stored.subarray(16, 32));
+  return Buffer.concat([d.update(stored.subarray(32)), d.final()]);
+}
