@@ -388,7 +388,7 @@ function HomeVerifier({ x, h, d, c }: { x: H; h: HomeData; d: Data; c: Ctx }) {
     ['Every required month approved', x.comp >= 0.999, `${Math.round(x.comp * 100)}% approved`],
     ['Estimated or proxy data', all ? est / all < 0.1 : true, all ? `${Math.round((est / all) * 100)}% of entries` : 'none'],
     ['Self-reviewed entries', V.self === 0, V.self ? `${V.self} to sample` : 'none'],
-    ['Entries with evidence (bill or meter)', V.n ? V.evidence / V.n >= 0.5 : true, V.n ? `${Math.round((V.evidence / V.n) * 100)}%` : '—'],
+    ['Entries with evidence (bill, meter, files)', V.n ? V.evidence / V.n >= 0.5 : true, V.n ? `${Math.round((V.evidence / V.n) * 100)}%` : '—'],
   ];
   return <>
     <div className="htiles"><EmTile c={c} d={d} />

@@ -51,7 +51,7 @@ export async function reportsRoutes(app: FastifyInstance) {
                 (a.co2e_scope3 / 1000)::float8 AS s3, ((a.co2e_wtt + coalesce(a.co2e_td, 0)) / 1000)::float8 AS s33, (${W})::float8 AS w,
                 CASE WHEN a.meter_id IS NOT NULL THEN 'meter' WHEN a.purchase_batch_id IS NOT NULL THEN 'batch' WHEN a.commute_record_id IS NOT NULL THEN 'commute'
                      WHEN a.vehicle_id IS NOT NULL THEN 'fleet' ELSE 'form' END AS captured,
-                a.meter_id IS NOT NULL OR a.purchase_batch_id IS NOT NULL AS evidence, a.factors->0->>'source' AS source, a.status, coalesce(mt.name, v.name, ws.name) AS asset, un.dimension AS dim, f.country, pn.name AS division, (a.co2_biogenic / 1000)::float8 AS bio,
+                (a.meter_id IS NOT NULL OR a.purchase_batch_id IS NOT NULL OR EXISTS (SELECT 1 FROM waste_scan ws2 WHERE ws2.activity_id = a.id) OR EXISTS (SELECT 1 FROM document_link dl WHERE dl.activity_id = a.id)) AS evidence, a.factors->0->>'source' AS source, a.status, coalesce(mt.name, v.name, ws.name) AS asset, un.dimension AS dim, f.country, pn.name AS division, (a.co2_biogenic / 1000)::float8 AS bio,
                 (SELECT json_object_agg(x.fam, x.t) FROM (SELECT CASE WHEN g.family IN ('CO2', 'CH4', 'N2O', 'HFC', 'PFC', 'SF6', 'NF3') THEN g.family WHEN g.family IS NULL THEN 'CO2e (not split)' ELSE 'Other (non-Kyoto)' END AS fam,
                         sum(r.kg_co2e) / 1000 AS t FROM activity_result r LEFT JOIN gas g ON g.code = r.gas WHERE r.activity_id = a.id AND r.basis = 'direct' GROUP BY 1) x) AS gases
            FROM activity a JOIN org_node f ON f.id = a.facility_id JOIN category cat ON cat.id = a.category_id JOIN item i ON i.id = a.item_id

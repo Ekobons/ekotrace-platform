@@ -10,6 +10,7 @@ import { Link } from 'react-router-dom';
 import { useApp } from '../App';
 import { api, num, unitLabel, type ApprovalRow, type ApprovalsData } from '../lib/api';
 import { ENERGY_UNITS, Result } from '../components/Result';
+import { Evidence } from '../components/Evidence';
 import { Icon } from '../components/Icon';
 import { MN, fmt } from '../components/DashCharts';
 
@@ -105,6 +106,7 @@ export function Approvals() {
             <div className="row"><div className="grow"><div className="eyebrow">Entry · {open.period_start} to {open.period_end}</div><h2>{open.vehicle ? `${open.vehicle} · ` : ''}{open.waste_site ? `${open.waste_site} · ` : ''}{open.item}</h2></div>
               <button className="btn ghost" onClick={() => dlg.current?.close()} aria-label="Close"><Icon name="x" /></button></div>
             <div className="sub">{num(open.quantity)} {unitLabel(open.unit)} · {open.data_type} · saved {new Date(open.created_at).toLocaleString()}</div>
+            <Evidence activityId={open.id} />
             <Result r={{ gwpSet: open.gwp_set, totals: { direct: Number(open.co2e_direct), scope2: Number(open.co2e_scope2 ?? 0), scope2_market: Number(open.co2e_scope2_market ?? 0), td_loss: Number(open.co2e_td ?? 0), scope3: Number(open.co2e_scope3 ?? 0), wtt: Number(open.co2e_wtt), outside_scopes: Number(open.co2_biogenic), memo: Number(open.co2e_memo) },
               lines: open.lines.map((x) => ({ basis: x.basis, gas: x.gas, kgGas: x.kg_gas, kgCo2e: x.kg_co2e, method: x.method, source: x.source })), steps: open.steps, warnings: open.warnings, factors: open.factors, cv: open.inputs?.cv }} quantity={Number(open.quantity)} unitName={open.unit} energy={ENERGY_UNITS.has(open.unit)} />
           </div>)}

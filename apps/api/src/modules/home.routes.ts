@@ -77,13 +77,13 @@ export async function homeRoutes(app: FastifyInstance) {
            FROM activity a JOIN category cat ON cat.id = a.category_id JOIN item i ON i.id = a.item_id JOIN org_node fo ON fo.id = a.facility_id LEFT JOIN app_user ur ON ur.id::text = a.reviewed_by
           WHERE a.facility_id = ANY($1) AND a.status IN ('draft', 'rejected', 'submitted') AND (a.created_by = $2 OR a.submitted_by = $2) ORDER BY a.period_start DESC LIMIT 300`, [facs, me])).rows;
       const batches = (await c.query(`SELECT count(*) FILTER (WHERE status = 'review')::int AS review, count(*) FILTER (WHERE status = 'failed')::int AS failed FROM purchase_batch`)).rows[0];
-      // verifier: approved entries of the year, the largest first, and how many come with evidence (bill or meter readings)
+      // verifier: approved entries of the year, the largest first, and how many come with evidence (meter / bill, purchase file, scans, linked files)
       const approved = (await c.query(
-        `SELECT count(*)::int AS n, count(*) FILTER (WHERE a.meter_id IS NOT NULL)::int AS evidence, count(*) FILTER (WHERE a.self_reviewed)::int AS self
+        `SELECT count(*)::int AS n, count(*) FILTER (WHERE (a.meter_id IS NOT NULL OR a.purchase_batch_id IS NOT NULL OR EXISTS (SELECT 1 FROM waste_scan ws2 WHERE ws2.activity_id = a.id) OR EXISTS (SELECT 1 FROM document_link dl WHERE dl.activity_id = a.id)))::int AS evidence, count(*) FILTER (WHERE a.self_reviewed)::int AS self
            FROM activity a WHERE a.facility_id = ANY($1) AND a.status = 'approved' AND extract(year FROM a.period_start) = $2`, [facs, year])).rows[0];
       const sample = (await c.query(
         `SELECT a.id, fo.name AS facility, cat.name AS category, a.period_start::text AS month, (a.co2e_direct + a.co2e_scope2 + a.co2e_scope3)::float8 AS kg,
-                ur.name AS approved_by, a.self_reviewed, a.meter_id IS NOT NULL AS evidence
+                ur.name AS approved_by, a.self_reviewed, (a.meter_id IS NOT NULL OR a.purchase_batch_id IS NOT NULL OR EXISTS (SELECT 1 FROM waste_scan ws2 WHERE ws2.activity_id = a.id) OR EXISTS (SELECT 1 FROM document_link dl WHERE dl.activity_id = a.id)) AS evidence
            FROM activity a JOIN category cat ON cat.id = a.category_id JOIN org_node fo ON fo.id = a.facility_id LEFT JOIN app_user ur ON ur.id::text = a.reviewed_by
           WHERE a.facility_id = ANY($1) AND a.status = 'approved' AND extract(year FROM a.period_start) = $2 ORDER BY 5 DESC LIMIT 6`, [facs, year])).rows;
       return {

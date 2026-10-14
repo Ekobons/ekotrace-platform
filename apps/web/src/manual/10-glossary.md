@@ -85,6 +85,8 @@
 | 6-month check | An entry's quantity compared with the average for the same item at the same facility over the 6 months before |
 | GHG Protocol category | 1.1–1.4 Scope 1, 2.1–2.2 Scope 2, 3.1–3.15 Scope 3 (the 15 Scope 3 categories) |
 | Exclusion justification | Why a category has no data (e.g. no products sold); every excluded category needs one in the inventory |
+| Evidence | a file that supports an entry (bill, invoice, delivery note, ticket, log); linked to the entry in the document vault and shown in the entry's Evidence |
+| Retention period | how long documents are kept after the period they cover (7 years by default, set by the super admin) |
 | MRV dataset | One row per approved entry (facility, scope, category, activity, unit, factor, source, data type, evidence) for a regulator's MRV platform or a verifier |
 | Report version | The inventory frozen at a point in time, to compare with today |
 | Limited / reasonable assurance | limited: "nothing has come to our attention…", fewer tests; reasonable: "presents fairly, in all material respects", more evidence and larger samples |

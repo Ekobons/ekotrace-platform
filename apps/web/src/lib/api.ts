@@ -148,6 +148,25 @@ export interface Certificate {
   vintage_from: string; vintage_to: string; reference: string | null; supplier: string | null; retired_on: string | null; note: string | null; claimed_mwh: number; claims: number;
 }
 
+// ------------------------------------------------------------ document vault --
+export interface VaultDoc {
+  id: string; kind: string; source: string; filename: string; contentType: string; size: number; uploadedAt: string; uploadedBy: string | null;
+  type: string; typeName: string; title: string | null; facilityId: string | null; facility: string | null; periodFrom: string | null; periodTo: string | null;
+  validUntil: string | null; expiry: 'expired' | 'soon' | 'valid' | null; note: string | null; tags: string[]; category: string | null; categoryName: string | null;
+  version: number; replaced: boolean; archived: boolean; archiveReason: string | null; links: number; retainUntil: string; canEdit: boolean; billStatus: string | null;
+}
+export interface VaultList { docs: VaultDoc[]; total: number; types: Record<string, string>; canUpload: boolean; canUploadCompanyWide: boolean;
+  kpis: { files: number; size: number; expiring: number; expired: number; unlinked: number; archived: number; retentionYears: number } }
+export interface VaultMeta { type?: string; title?: string | null; facilityId?: string | null; periodFrom?: string | null; periodTo?: string | null; validUntil?: string | null; category?: string | null; note?: string | null; tags?: string[]; linkActivityIds?: string[] }
+export interface VaultLink { id: string; period_start: string; period_end: string; facility: string; item: string; quantity: number; unit: string; status: string; linked_by: string | null; linked_at: string; locked: boolean; canUnlink: boolean }
+export interface EvidenceFile { id: string; filename: string; content_type: string; size: number; type: string; typeName: string; title: string | null; uploaded_at: string; uploaded_by: string | null; how: 'linked' | 'meter bill' | 'collection scan'; linked_by: string | null; canUnlink: boolean }
+// ------------------------------------------------------------ message centre --
+export interface MsgThread { id: string; topic: string; subject: string; page: string | null; status: 'open' | 'answered' | 'closed'; created_at: string; last_at: string; last_body: string | null; n: number;
+  by_name: string; by_email: string; by_role: Role; unread: boolean; created_by: string; company?: string; tenant_id?: string; plan?: string; closed_at: string | null }
+export interface Msg { id: string; author_name: string; from_team: boolean; body: string; created_at: string; document_id: string | null; filename: string | null; content_type: string | null; size: number | null; author_id: string | null }
+export interface Announcement { id: string; kind: 'news' | 'feature' | 'factors' | 'maintenance' | 'regulation'; title: string; body: string; published_at: string; published_by: string | null; expires_at: string | null; read?: boolean;
+  tenant_ids?: string[] | null; companies?: string[] | null; reads?: number; withdrawn_at?: string | null }
+
 export class ApiError extends Error {
   constructor(message: string, public status: number, public code?: string, public details?: { field: string; message: string }[]) { super(message); }
 }
@@ -552,6 +571,36 @@ export const api = {
   respondFinding: (id: string, response: string) => call<{ ok: true }>('PUT', `/api/assurance/findings/${id}/respond`, { response }),
   closeFinding: (id: string, b: { note?: string; reopen?: boolean }) => call<{ ok: true }>('PUT', `/api/assurance/findings/${id}/close`, b),
   assurancePack: (year: number) => call<AssurancePack>('GET', `/api/assurance/pack?year=${year}`),
+  // document vault
+  vault: (q: Record<string, string | number | undefined> = {}) => call<VaultList>('GET', `/api/vault?${new URLSearchParams(Object.entries(q).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)]))}`),
+  vaultDoc: (id: string) => call<{ links: VaultLink[]; versions: { id: string; version: number; filename: string; uploaded_at: string; uploaded_by: string | null; size: number }[] }>('GET', `/api/vault/${id}`),
+  vaultUpload: (f: File, meta: VaultMeta) => call<{ id: string; duplicate: boolean; linked: number; message?: string }>('POST', '/api/vault', undefined, f, { 'x-filename': encodeURIComponent(f.name), 'x-meta': encodeURIComponent(JSON.stringify(meta)) }),
+  vaultEdit: (id: string, meta: VaultMeta) => call<{ ok: true }>('PATCH', `/api/vault/${id}`, meta),
+  vaultVersion: (id: string, f: File) => call<{ id: string; version: number }>('POST', `/api/vault/${id}/version`, undefined, f, { 'x-filename': encodeURIComponent(f.name) }),
+  vaultLink: (id: string, activityIds: string[]) => call<{ linked: number }>('POST', `/api/vault/${id}/links`, { activityIds }),
+  vaultUnlink: (id: string, activityId: string) => call<{ ok: true }>('DELETE', `/api/vault/${id}/links/${activityId}`),
+  vaultArchive: (id: string, reason: string) => call<{ ok: true }>('POST', `/api/vault/${id}/archive`, { reason }),
+  vaultRestore: (id: string) => call<{ ok: true }>('POST', `/api/vault/${id}/restore`),
+  vaultDelete: (id: string) => call<{ ok: true }>('DELETE', `/api/vault/${id}`),
+  vaultSettings: (retentionYears: number) => call<{ ok: true }>('PUT', '/api/vault/settings', { retentionYears }),
+  evidence: (activityId: string) => call<{ files: EvidenceFile[]; canAdd: boolean; locked: boolean; facilityId: string; periodStart: string; periodEnd: string }>('GET', `/api/activities/${activityId}/evidence`),
+  // message centre
+  msgCounts: () => call<{ unread: number; announcements: number; team: boolean }>('GET', '/api/messages/counts'),
+  messages: () => call<{ threads: MsgThread[]; announcements: Announcement[]; topics: Record<string, string>; companyWide: boolean }>('GET', '/api/messages'),
+  messageThread: (id: string) => call<{ thread: MsgThread; messages: Msg[] }>('GET', `/api/messages/${id}`),
+  msgAttach: (f: File) => call<{ documentId: string; filename: string }>('POST', '/api/messages/attachments', undefined, f, { 'x-filename': encodeURIComponent(f.name) }),
+  newMessage: (b: { topic: string; subject: string; page?: string; body: string; documentId?: string }) => call<{ id: string }>('POST', '/api/messages', b),
+  replyMessage: (id: string, b: { body: string; documentId?: string }) => call<{ ok: true }>('POST', `/api/messages/${id}/reply`, b),
+  closeMessage: (id: string) => call<{ ok: true }>('POST', `/api/messages/${id}/close`),
+  readAnnouncement: (id: string) => call<{ ok: true }>('POST', `/api/announcements/${id}/read`),
+  readAllAnnouncements: () => call<{ ok: true }>('POST', '/api/announcements/read-all'),
+  teamMessages: (status: string) => call<{ threads: MsgThread[]; counts: Record<string, number>; topics: Record<string, string> }>('GET', `/api/team/messages?status=${status}`),
+  teamThread: (id: string) => call<{ thread: MsgThread; messages: Msg[] }>('GET', `/api/team/messages/${id}`),
+  teamReply: (id: string, body: string, close = false) => call<{ ok: true }>('POST', `/api/team/messages/${id}/reply`, { body, close }),
+  teamStatus: (id: string, status: 'open' | 'answered' | 'closed') => call<{ ok: true }>('POST', `/api/team/messages/${id}/status`, { status }),
+  teamAnnouncements: () => call<{ announcements: Announcement[] }>('GET', '/api/team/announcements'),
+  publishAnnouncement: (b: { kind: string; title: string; body: string; tenantIds?: string[]; expiresAt?: string }) => call<{ id: string }>('POST', '/api/team/announcements', b),
+  withdrawAnnouncement: (id: string) => call<{ ok: true }>('POST', `/api/team/announcements/${id}/withdraw`),
   uploadLogo: (f: File) => call<{ ok: true }>('POST', '/api/tenant/logo', undefined, f),
   removeLogo: () => call<{ ok: true }>('DELETE', '/api/tenant/logo'),
   makeRollup: (q: { facilityId: string; year: number; month: number }) => call<{ made: { item: string; kg: number; dataType: string; id: string | null; warnings: string[] }[] }>('POST', '/api/qr/rollup', q),

@@ -221,7 +221,7 @@ export async function billRoutes(app: FastifyInstance) {
     const tenant = requireTenant(req);
     const id = z.string().uuid().parse((req.params as { id: string }).id);
     const d = await tenantTx(tenant, async (c) => {
-      const doc = (await c.query('SELECT d.*, m.facility_id FROM document d LEFT JOIN bill b ON b.document_id = d.id LEFT JOIN meter m ON m.id = b.meter_id WHERE d.id = $1', [id])).rows[0];
+      const doc = (await c.query(`SELECT d.*, coalesce(d.facility_id, m.facility_id) AS facility_id FROM document d LEFT JOIN bill b ON b.document_id = d.id LEFT JOIN meter m ON m.id = b.meter_id WHERE d.id = $1 AND d.kind NOT IN ('message', 'purchases', 'assurance')`, [id])).rows[0];
       if (!doc || !(await visible(c, req, doc))) throw notFound('Document');
       return doc;
     });

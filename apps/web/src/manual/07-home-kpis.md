@@ -11,7 +11,7 @@
 | Super admin, admin | Emissions (with the change against last year), **Scope 1+2 vs target path**, **Data approved** (share of the required facility-category-months approved), Reductions delivered; the **monthly emissions** chart; **Needs your decision**; the **Facilities** table; the **Biggest sources** |
 | Manager | Entries **waiting for your approval** (with a warning when a month is far from the usual), overdue items at your sites, the monthly chart and your facilities. **Approve N clean** approves every waiting entry without a warning in one go |
 | Data preparer | When this month's data is due, how much of it is done, what was **sent back** to you, your on-time record, **your checklist** for the month and **To fix** (sent-back entries and drafts not submitted) |
-| Verifier | Approved entries, how many come with evidence (a bill or meter readings), complete months; a **sample to test** (the largest approved entries), **assurance readiness** checks and where to look |
+| Verifier | Approved entries, how many come with evidence (a bill, meter readings or linked files), complete months; a **sample to test** (the largest approved entries), **assurance readiness** checks and where to look |
 | Only user (super admin of a one-user company) | Three steps: enter, check, report. Entries you enter and approve yourself are marked **self-reviewed** |
 
 **Monthly emissions chart** — bars by scope, a grey line for the same month last year and a dashed amber line for the **target path**. A pale bar is a month whose data is still coming in (shows "x% in"). The chip above says how many complete months are at or below the path.

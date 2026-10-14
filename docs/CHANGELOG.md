@@ -2,6 +2,36 @@
 
 Newest first.
 
+## 2026-10-14 · Document vault and Message centre
+
+- **Document vault** (Capture → Document vault): every file of the company in one place.
+  - **What is in it:** files uploaded here or attached to an entry. Files kept by other screens appear by themselves: bills, purchase files, contractor tickets and manifests, the assurance statement.
+  - **Filed by:** type (15 types: invoice, utility bill, manifest, permit, certificate, contract, calibration, refrigerant log, travel report and others), facility or company-wide, period covered, valid until, data category, tags and note.
+  - **Finding files:** filter by facility, type, year and month, and search names, titles, tags and notes. Tiles show files, expiring / expired, not linked to an entry, and the retention period.
+  - **File types:** PDF, images, Excel, Word, PowerPoint, CSV, text and emails, up to 25 MB, checked by their content. The same file is never stored twice.
+- **Evidence on entries:** the entry drawer in Entries & results and in Approvals has an **Evidence** panel.
+  - It lists linked files, the meter's bills for the period, and QR collection scans.
+  - **Attach a file** uploads and links in one step; **Unlink** keeps the file in the vault.
+  - In the vault, a file's drawer links it to entries (several at once).
+  - Linked files now count as evidence in Audit & assurance, the Home verifier view and the data-quality report.
+- **Versions, archive, retention:**
+  - A new version takes over the details and links, and the old one is kept.
+  - Archiving needs a reason and can be undone. A file that supports an approved entry cannot be archived.
+  - Delete for good is super admin only, for archived files past retention that support no entry.
+  - Retention is 7 years by default (1–30), counted from the end of the period a file covers.
+- **Locked months:** evidence can be added to an entry in a locked month but not removed. This is enforced by the database.
+- **Access:** files follow facility access. Purchase files and assurance papers are for admins and verifiers only. Verifiers can read only. Every view, download and change is in the audit log. Downloads are served as attachments, so the browser never runs an uploaded file.
+- **Message centre** (Help → Message centre):
+  - **Conversations with the Ekotrace team:** topic, part of the app, subject, message and an optional screenshot or file. Status goes waiting → answered → closed, and a reply reopens a closed conversation.
+  - **Who sees what:** people see their own conversations; the super admin sees the whole company's. Unread replies show as a count on the menu.
+  - **Announcements** from the team (new factors, features, maintenance, regulation), each marked read per person.
+- **Team side** (platform admin → Messages):
+  - The inbox across all companies, needing a reply first: reply, reply and close, close, reopen.
+  - An announcement composer for every company or chosen companies, with an end date, read counts and withdraw.
+- **Demo:** 14 DEMO vault files (9 linked to diesel entries, one permit expiring, one calibration expired, one invoice not linked), 3 DEMO conversations and 2 DEMO announcements, shown to the demo company only.
+- **Manual:** new chapters Document vault and Message centre; updated Assurance, Home and Glossary.
+- **Tests:** 65 API tests (2 new) and 52 engine tests pass.
+
 ## 2026-10-14 · Grid electricity factors for other countries (US eGRID, EU EEA, Australia NGA, India, Singapore, China, Japan)
 
 - **106 factors in 68 grid regions** now come with Ekotrace in `data/grid/grid-factors.csv`. They load by themselves when the server starts, and loading again changes nothing.

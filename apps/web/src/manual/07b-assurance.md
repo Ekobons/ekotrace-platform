@@ -1,6 +1,6 @@
 # Audit & assurance
 
-**Audit & assurance** (menu → Disclose) prepares the year for external assurance under any of the usual standards — **ISO 14064-3**, **ISAE 3410**, **ISAE 3000 (Revised)**, **ISSA 5000** or **AA1000AS v3** — at **limited** or **reasonable** assurance. Pick the year at the top. The tiles show the approved entries and their tCO₂e, the share with evidence (meter, bill, purchases file or QR scans), the months locked, and the open findings with their estimated impact against materiality.
+**Audit & assurance** (menu → Disclose) prepares the year for external assurance under any of the usual standards — **ISO 14064-3**, **ISAE 3410**, **ISAE 3000 (Revised)**, **ISSA 5000** or **AA1000AS v3** — at **limited** or **reasonable** assurance. Pick the year at the top. The tiles show the approved entries and their tCO₂e, the share with evidence (meter, bill, purchases file, QR scans or files linked in the document vault), the months locked, and the open findings with their estimated impact against materiality.
 
 ```flow
 > 1 · Engagement | standard, level, provider, subject matter, materiality, status

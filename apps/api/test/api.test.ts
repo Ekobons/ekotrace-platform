@@ -1963,3 +1963,137 @@ test('grid factors of other countries: eGRID sub-region, EU country with year fa
   try { await c.query('BEGIN'); const again = await seedGrid(c as never); await c.query('ROLLBACK'); assert.equal(again.added, 0); }
   finally { c.release(); }
 });
+
+// --------------------------------------------------------- vault & messages --
+test('document vault: upload with details, evidence on entries, other screens\' files listed, access by facility, versions, archive rules, locked months keep evidence', async () => {
+  const sa = await login(superA.email, superA.temporaryPassword);
+  const group = (await call(sa, 'GET', '/api/org')).body.nodes.find((n: { kind: string }) => n.kind === 'group').id;
+  const north = (await call(sa, 'POST', '/api/org/nodes', { parentId: group, kind: 'facility', name: 'Vault north' })).body.id;
+  const south = (await call(sa, 'POST', '/api/org/nodes', { parentId: group, kind: 'facility', name: 'Vault south' })).body.id;
+  const mk = async (email: string, role: string, extra: object = {}) => {
+    const r = await call(sa, 'POST', '/api/users', { name: email, email, role, ...extra });
+    const ck = await login(email, r.body.temporaryPassword);
+    await call(ck, 'POST', '/api/auth/password', { current: r.body.temporaryPassword, next: 'a long enough pass' });
+    return ck;
+  };
+  const prep = await mk('vprep@a.test', 'preparer', { facilityIds: [north] });
+  const ver = await mk('vver@a.test', 'verifier');
+  const up = (who: string, name: string, data: Buffer, meta: object, path = '/api/vault') => app.inject({ method: 'POST', url: path, payload: data,
+    headers: { cookie: who, 'content-type': 'application/octet-stream', 'x-filename': encodeURIComponent(name), 'x-meta': encodeURIComponent(JSON.stringify(meta)) } });
+  const pdf = (s: string) => Buffer.from(`%PDF-1.4\n% ${s}\n%%EOF`);
+  // an entry at north, Jan 2022
+  const diesel = (await pq(`SELECT i.id FROM item i JOIN subcategory s ON s.id = i.subcategory_id JOIN category c ON c.id = s.category_id WHERE c.code = 'stationary_combustion' AND i.name ILIKE 'diesel%' ORDER BY i.id LIMIT 1`)).rows[0].id;
+  const e = await call(prep, 'POST', '/api/activities', { facilityId: north, itemId: diesel, unit: 'L', quantity: 300, periodStart: '2022-01-01', periodEnd: '2022-01-31', dataType: 'actual' });
+  assert.equal(e.status, 200, JSON.stringify(e.body));
+  // preparer: a file for their facility, linked to the entry in the same call
+  const r1 = await up(prep, 'fuel-invoice-jan.pdf', pdf('invoice'), { type: 'invoice', facilityId: north, periodFrom: '2022-01-01', periodTo: '2022-01-31', tags: ['diesel'], linkActivityIds: [e.body.id] });
+  assert.equal(r1.statusCode, 200, r1.body); const doc = r1.json().id; assert.equal(r1.json().linked, 1);
+  // not another facility, not company-wide, not a renamed executable
+  assert.equal((await up(prep, 'x.pdf', pdf('south'), { type: 'invoice', facilityId: south })).statusCode, 403);
+  assert.equal((await up(prep, 'x2.pdf', pdf('wide'), { type: 'policy' })).statusCode, 400);
+  assert.equal((await up(prep, 'evil.pdf', Buffer.from('MZ\x90\x00 not a pdf'), { type: 'invoice', facilityId: north })).statusCode, 400);
+  assert.equal((await up(prep, 'run.exe', Buffer.from('MZ'), { type: 'other', facilityId: north })).statusCode, 400);
+  // the same file again is not stored twice
+  assert.equal((await up(prep, 'copy.pdf', pdf('invoice'), { type: 'invoice', facilityId: north })).statusCode, 409);
+  // super admin: a company-wide permit expiring soon, and a south contract
+  const soon = new Date(Date.now() + 20 * 86400e3).toISOString().slice(0, 10);
+  const permit = (await up(sa, 'permit.pdf', pdf('permit'), { type: 'permit', validUntil: soon, title: 'Environmental permit' })).json().id;
+  const contract = (await up(sa, 'south-ppa.pdf', pdf('ppa'), { type: 'contract', facilityId: south })).json().id;
+  // the entry shows its evidence
+  const ev = (await call(prep, 'GET', `/api/activities/${e.body.id}/evidence`)).body;
+  assert.equal(ev.files.length, 1); assert.equal(ev.files[0].how, 'linked'); assert.equal(ev.canAdd, true);
+  // who sees what
+  const listP = (await call(prep, 'GET', '/api/vault')).body;
+  assert.ok(listP.docs.some((d: { id: string }) => d.id === doc) && listP.docs.some((d: { id: string }) => d.id === permit), 'own facility + company-wide');
+  assert.ok(!listP.docs.some((d: { id: string }) => d.id === contract), 'not another facility');
+  assert.equal((await call(prep, 'GET', `/api/vault/${contract}/file`)).status, 404);
+  const listS = (await call(sa, 'GET', '/api/vault?view=expiring')).body;
+  assert.deepEqual(listS.docs.map((d: { id: string }) => d.id), [permit]); assert.ok(listS.kpis.expiring >= 1);
+  assert.equal((await call(sa, 'GET', `/api/vault?facilityId=${south}`)).body.docs.length, 1);
+  assert.equal((await call(sa, 'GET', '/api/vault?q=diesel')).body.docs[0].id, doc, 'search by tag');
+  assert.equal((await call(sa, 'GET', '/api/vault?year=2022&month=1')).body.docs.some((d: { id: string }) => d.id === doc), true);
+  // a file another screen keeps (contractor tickets, bills…) is listed too
+  const t = await app.inject({ method: 'GET', url: `/api/vault/${doc}/file`, headers: { cookie: ver } });
+  assert.equal(t.statusCode, 200); assert.equal(t.headers['x-content-type-options'], 'nosniff');
+  // verifier reads only
+  assert.equal((await call(ver, 'PATCH', `/api/vault/${doc}`, { type: 'invoice', facilityId: north })).status, 403);
+  assert.equal((await up(ver, 'v.pdf', pdf('ver'), { type: 'other', facilityId: north })).statusCode, 403);
+  // a new version keeps the links; the old one is marked replaced
+  const v2 = await up(prep, 'fuel-invoice-jan-corrected.pdf', pdf('invoice v2'), {}, `/api/vault/${doc}/version`);
+  assert.equal(v2.statusCode, 200, v2.body); const doc2 = v2.json().id;
+  const det = (await call(prep, 'GET', `/api/vault/${doc2}`)).body;
+  assert.equal(det.links.length, 1); assert.deepEqual(det.versions.map((x: { version: number }) => x.version), [1, 2]);
+  assert.ok(!(await call(prep, 'GET', '/api/vault')).body.docs.some((d: { id: string }) => d.id === doc), 'replaced versions are hidden from the list');
+  // approved: the evidence cannot be archived; the month locked: evidence can be added, not removed
+  await call(prep, 'POST', '/api/activities/review', { ids: [e.body.id], action: 'submit' });
+  assert.equal((await call(sa, 'POST', '/api/activities/review', { ids: [e.body.id], action: 'approve' })).body.done, 1);
+  assert.equal((await call(prep, 'POST', `/api/vault/${doc2}/archive`, { reason: 'wrong file' })).status, 400);
+  assert.equal((await call(sa, 'POST', '/api/assurance/locks', { month: '2022-01' })).status, 200);
+  const extra = await up(prep, 'delivery-note.pdf', pdf('delivery'), { type: 'invoice', facilityId: north, linkActivityIds: [e.body.id] });
+  assert.equal(extra.statusCode, 200, extra.body);
+  const un = await call(prep, 'DELETE', `/api/vault/${extra.json().id}/links/${e.body.id}`);
+  assert.equal(un.status, 409); assert.equal(un.body.error, 'PERIOD_LOCKED');
+  // counted as evidence for assurance
+  const items = await pq(`SELECT EXISTS (SELECT 1 FROM document_link WHERE activity_id = $1) AS e`, [e.body.id]);
+  assert.equal(items.rows[0].e, true);
+  // archive an unlinked file, restore it; deleting for good waits for the retention period
+  assert.equal((await call(sa, 'POST', `/api/vault/${contract}/archive`, { reason: 'x' })).status, 400, 'needs a reason');
+  assert.equal((await call(sa, 'POST', `/api/vault/${contract}/archive`, { reason: 'Superseded contract' })).status, 200);
+  assert.equal((await call(sa, 'GET', '/api/vault?view=archived')).body.docs[0].id, contract);
+  const del = await call(sa, 'DELETE', `/api/vault/${contract}`);
+  assert.equal(del.status, 400); assert.match(del.body.message, /Kept until/);
+  assert.equal((await call(sa, 'POST', `/api/vault/${contract}/restore`)).status, 200);
+  assert.equal((await call(sa, 'PUT', '/api/vault/settings', { retentionYears: 10 })).body.ok, true);
+  assert.equal((await call(sa, 'GET', '/api/vault')).body.kpis.retentionYears, 10);
+  await call(sa, 'POST', '/api/assurance/locks/2022-01/unlock', { reason: 'test over' });
+});
+
+test('message centre: a conversation with the team, unread replies, attachments, super admin sees the company\'s, team inbox, announcements to all or chosen companies', async () => {
+  const sa = await login(superA.email, superA.temporaryPassword);
+  const r = await call(sa, 'POST', '/api/users', { name: 'Msg Prep', email: 'mprep@a.test', role: 'preparer', facilityIds: [] });
+  const prep = await login('mprep@a.test', r.body.temporaryPassword);
+  await call(prep, 'POST', '/api/auth/password', { current: r.body.temporaryPassword, next: 'a long enough pass' });
+  const png = Buffer.from('89504e470d0a1a0a0000000d49484452', 'hex');
+  const att = await app.inject({ method: 'POST', url: '/api/messages/attachments', payload: png, headers: { cookie: prep, 'content-type': 'application/octet-stream', 'x-filename': 'screen.png' } });
+  assert.equal(att.statusCode, 200, att.body);
+  const t = await call(prep, 'POST', '/api/messages', { topic: 'data_help', subject: 'How do I enter district cooling?', page: '/data/district_cooling', body: 'We get TRh on the bill.', documentId: att.json().documentId });
+  assert.equal(t.status, 200, JSON.stringify(t.body));
+  assert.equal((await call(prep, 'POST', '/api/messages', { topic: 'nope', subject: 'x', body: 'y' })).status, 400);
+  // the super admin sees it; another preparer would not
+  assert.ok((await call(sa, 'GET', '/api/messages')).body.threads.some((x: { id: string }) => x.id === t.body.id));
+  const other = await call(sa, 'POST', '/api/users', { name: 'Other', email: 'mother@a.test', role: 'verifier' });
+  const oth = await login('mother@a.test', other.body.temporaryPassword);
+  await call(oth, 'POST', '/api/auth/password', { current: other.body.temporaryPassword, next: 'a long enough pass' });
+  assert.equal((await call(oth, 'GET', `/api/messages/${t.body.id}`)).status, 404);
+  assert.equal((await call(oth, 'GET', `/api/messages/attachments/${att.json().documentId}`)).status, 404);
+  // the team inbox: waiting, unread; reply → answered, unread for the preparer
+  const inbox = (await api('GET', '/api/team/messages')).body;
+  const th = inbox.threads.find((x: { id: string }) => x.id === t.body.id);
+  assert.ok(th && th.unread && th.company, JSON.stringify(inbox.counts));
+  assert.ok((await api('GET', '/api/messages/counts')).body.unread >= 1);
+  const full = (await api('GET', `/api/team/messages/${t.body.id}`)).body;
+  assert.equal(full.messages[0].filename, 'screen.png');
+  assert.equal((await app.inject({ method: 'GET', url: `/api/team/messages/attachments/${att.json().documentId}`, headers: { cookie: adminCookie } })).headers['content-type'], 'image/png');
+  assert.equal((await api('POST', `/api/team/messages/${t.body.id}/reply`, { body: 'Use District cooling, unit TRh, with the plant COP.' })).status, 200);
+  assert.equal((await call(prep, 'GET', '/api/messages/counts')).body.unread, 1);
+  const open = (await call(prep, 'GET', `/api/messages/${t.body.id}`)).body;
+  assert.equal(open.thread.status, 'answered'); assert.equal(open.messages[1].from_team, true);
+  assert.equal((await call(prep, 'GET', '/api/messages/counts')).body.unread, 0, 'read once opened');
+  // the company replies: waiting again; closes it
+  await call(prep, 'POST', `/api/messages/${t.body.id}/reply`, { body: 'Thanks, done.' });
+  assert.equal((await call(prep, 'GET', `/api/messages/${t.body.id}`)).body.thread.status, 'open');
+  await call(prep, 'POST', `/api/messages/${t.body.id}/close`);
+  assert.equal((await api('GET', '/api/team/messages?status=closed')).body.threads.some((x: { id: string }) => x.id === t.body.id), true);
+  // only the platform admin uses the team side
+  assert.equal((await call(sa, 'GET', '/api/team/messages')).status, 403);
+  // announcements: to everyone, and to company B only
+  const all = (await api('POST', '/api/team/announcements', { kind: 'factors', title: 'Grid factors for 50 countries added', body: 'Recalculate entries with warnings.' })).body.id;
+  await api('POST', '/api/team/announcements', { kind: 'news', title: 'Only for B', body: 'Hello B', tenantIds: [tenantB] });
+  const mine = (await call(prep, 'GET', '/api/messages')).body.announcements;
+  assert.ok(mine.some((a: { id: string }) => a.id === all)); assert.ok(!mine.some((a: { title: string }) => a.title === 'Only for B'));
+  assert.ok((await call(prep, 'GET', '/api/messages/counts')).body.announcements >= 1);
+  await call(prep, 'POST', '/api/announcements/read-all');
+  assert.equal((await call(prep, 'GET', '/api/messages/counts')).body.announcements, 0);
+  await api('POST', `/api/team/announcements/${all}/withdraw`);
+  assert.ok(!(await call(sa, 'GET', '/api/messages')).body.announcements.some((a: { id: string }) => a.id === all));
+});

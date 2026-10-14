@@ -34,6 +34,8 @@ import { Bills } from './pages/Bills';
 import { Integrations } from './pages/Integrations';
 import { Manual } from './pages/Manual';
 import { Console } from './pages/Console';
+import { Vault } from './pages/Vault';
+import { Messages } from './pages/Messages';
 import { SurveyAnswerPage } from './pages/SurveyAnswer';
 import { Surveys } from './pages/Surveys';
 
@@ -60,7 +62,7 @@ const NAV: { group?: string; items: NavItem[] }[] = [
     { to: '/entries', label: 'Entries & results', icon: 'list' },
     { to: '/surveys', label: 'Surveys', icon: 'users', roles: ['super_admin', 'admin', 'manager', 'verifier'] },
     { to: '/approvals', label: 'Approvals', icon: 'check', roles: ['super_admin', 'admin', 'manager', 'preparer'] }, { to: '/progress', label: 'Data progress', icon: 'grid' }, { label: 'Collection calendar', icon: 'calendar', stage: 2 },
-    { label: 'Inbox & to-dos', icon: 'inbox', stage: 2 }, { label: 'Document vault', icon: 'folder', stage: 2 }, { label: 'Batch runs', icon: 'upload', stage: 4 },
+    { label: 'Inbox & to-dos', icon: 'inbox', stage: 2 }, { to: '/vault', label: 'Document vault', icon: 'folder' }, { label: 'Batch runs', icon: 'upload', stage: 4 },
     { to: '/qr', label: 'QR & field app', icon: 'qr', roles: ['super_admin', 'admin', 'manager', 'preparer', 'verifier'] },
   ] },
   { group: 'Value chain', items: [{ to: '/suppliers', label: 'Suppliers', icon: 'users', roles: ['super_admin', 'admin', 'manager', 'preparer', 'verifier'] }, { label: 'Product LCA', icon: 'leaf', stage: 4 }] },
@@ -76,7 +78,7 @@ const NAV: { group?: string; items: NavItem[] }[] = [
     { label: 'Metric registry', icon: 'list', stage: 4 }, { to: '/integrations', label: 'Integrations & API', icon: 'plug', roles: ['super_admin', 'admin'] }, { label: 'AI models', icon: 'spark', stage: 4 },
     { to: '/audit', label: 'Security & audit log', icon: 'lock', roles: ['super_admin', 'admin', 'verifier'] },
   ] },
-  { group: 'Help', items: [{ to: '/help', label: 'User manual', icon: 'book' }, { label: 'Message centre', icon: 'chat', stage: 4 }] },
+  { group: 'Help', items: [{ to: '/help', label: 'User manual', icon: 'book' }, { to: '/messages', label: 'Message centre', icon: 'chat' }] },
 ];
 
 export function App() {
@@ -132,6 +134,13 @@ function Shell() {
   // waiting for my approval: the count on the Approvals menu item (refreshed as you move around)
   const [apprN, setApprN] = useState(0);
   useEffect(() => { if (!tenant || !['super_admin', 'admin', 'manager', 'platform_admin'].includes(role)) { setApprN(0); return; } api.approvals().then((a) => setApprN(a.mine.length)).catch(() => {}); }, [path, tenant?.id, role]); // eslint-disable-line react-hooks/exhaustive-deps
+  // unread replies and announcements (company); conversations waiting for a reply (platform admin)
+  const [msgN, setMsgN] = useState(0);
+  useEffect(() => {
+    const get = () => { if (!tenant && role !== 'platform_admin') return; api.msgCounts().then((c) => setMsgN(c.unread + c.announcements)).catch(() => {}); };
+    get(); window.addEventListener('eko-msg', get); const t = window.setInterval(get, 120000);
+    return () => { window.removeEventListener('eko-msg', get); window.clearInterval(t); };
+  }, [path, tenant?.id, role]); // eslint-disable-line react-hooks/exhaustive-deps
   const visible = (i: NavItem) => !i.roles || (i.roles.length === 0 ? role === 'platform_admin' : can(...i.roles));
   // a bin's QR label opens the scan page full screen (phone), without the menu
   if (path.startsWith('/scan/')) return <Routes><Route path="/scan/:code" element={<ScanPage />} /></Routes>;
@@ -157,6 +166,7 @@ function Shell() {
         {tenant && !mini && <div className="navtools"><button type="button" onClick={foldAll} title={allClosed ? 'Expand all sections' : 'Collapse all sections'}>{allClosed ? '▸▸ Expand all' : '▾▾ Collapse all'}</button></div>}
         <nav className="nav">
           {role === 'platform_admin' && <NavLink to="/console" title={mini ? 'Platform console' : undefined}><Icon name="gear" /><span className="nl">Platform console</span></NavLink>}
+          {role === 'platform_admin' && <NavLink to="/messages" title={mini ? 'Messages' : undefined}><Icon name="chat" /><span className="nl">Messages</span>{msgN > 0 && <span className="navb amber">{msgN}</span>}</NavLink>}
           {tenant && NAV.map((g, gi) => {
             const items = g.items.filter(visible);
             if (!items.length) return null;
@@ -168,7 +178,7 @@ function Shell() {
                 {g.group && <button type="button" className={`sech${open ? ' open' : ''}${on ? ' has' : ''}`} aria-expanded={open} title={g.group} onClick={() => !mini && fold(g.group!)}>
                   <i className="sdot" /><span>{g.group.toUpperCase()}</span><span className="chev">{open ? '▾' : '▸'}</span></button>}
                 {open && <div className="secitems">{items.map((i) => i.to
-                  ? <NavLink key={i.label} to={i.to} title={mini ? i.label : undefined} className={({ isActive }) => (isActive || (i.to?.startsWith('/data/') && path.startsWith('/data/')) ? 'active' : '')}><Icon name={i.icon} /><span className="nl">{i.label}</span>{i.to === '/approvals' && apprN > 0 && <span className="navb amber">{apprN}</span>}</NavLink>
+                  ? <NavLink key={i.label} to={i.to} title={mini ? i.label : undefined} className={({ isActive }) => (isActive || (i.to?.startsWith('/data/') && path.startsWith('/data/')) ? 'active' : '')}><Icon name={i.icon} /><span className="nl">{i.label}</span>{i.to === '/approvals' && apprN > 0 && <span className="navb amber">{apprN}</span>}{i.to === '/messages' && msgN > 0 && role !== 'platform_admin' && <span className="navb">{msgN}</span>}</NavLink>
                   : <a key={i.label} className="soon" aria-disabled="true" title={`${i.label} · coming in stage ${i.stage}`}><Icon name={i.icon} /><span className="nl">{i.label}</span><span className="soonchip">S{i.stage}</span></a>)}</div>}
               </div>
             );
@@ -186,6 +196,8 @@ function Shell() {
         <Routes>
           <Route path="/" element={<Navigate to={role === 'platform_admin' && !tenant ? '/console' : '/home'} replace />} />
           <Route path="/console" element={<Gate ok={role === 'platform_admin'}><Console /></Gate>} />
+          <Route path="/messages" element={role === 'platform_admin' ? <Messages /> : <NeedCo><Messages /></NeedCo>} />
+          <Route path="/vault" element={<NeedCo><Vault /></NeedCo>} />
           <Route path="/account" element={<div className="page"><ChangePassword onDone={() => nav('/')} /></div>} />
           <Route path="/library/*" element={<Gate ok={role === 'platform_admin'}><Library /></Gate>} />
           <Route path="/data/:category" element={<NeedCo><AddData /></NeedCo>} />

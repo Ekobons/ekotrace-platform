@@ -26,7 +26,7 @@ const ADMIN = ['super_admin', 'admin'] as const;
 const canVerify = (req: FastifyRequest) => ['verifier', 'super_admin', 'admin', 'platform_admin'].includes(req.user.role);
 /** tCO2e of an entry as reported (location-based Scope 2), before the consolidation weight. */
 const T_SQL = `((a.co2e_direct + a.co2e_scope2 + a.co2e_scope3 + a.co2e_wtt + coalesce(a.co2e_td, 0)) / 1000)`;
-const EVIDENCE_SQL = `(a.meter_id IS NOT NULL OR a.purchase_batch_id IS NOT NULL OR EXISTS (SELECT 1 FROM waste_scan ws WHERE ws.activity_id = a.id))`;
+const EVIDENCE_SQL = `(a.meter_id IS NOT NULL OR a.purchase_batch_id IS NOT NULL OR EXISTS (SELECT 1 FROM waste_scan ws2 WHERE ws2.activity_id = a.id) OR EXISTS (SELECT 1 FROM document_link dl WHERE dl.activity_id = a.id))`;
 
 /** The consolidation weight of a facility (as in the reports): entries outside the boundary weigh 0 and are not sampled. */
 async function weightSql(c: Tx) {
@@ -204,7 +204,7 @@ export async function assuranceRoutes(app: FastifyInstance) {
       const items = (await c.query(
         `SELECT a.id, t.key_item AS "key", t.result, t.note, t.tested_by AS "testedBy", t.tested_at AS "testedAt", f.name AS facility, a.period_start::text AS "from", a.period_end::text AS "to",
                 cat.name AS category, i.name AS item, a.quantity::float8 AS qty, a.unit, ${T_SQL}::float8 AS t, a.factors->0->>'source' AS source, a.data_type AS "dataType", a.note AS "entryNote",
-                ${EVIDENCE_SQL} AS evidence, CASE WHEN a.meter_id IS NOT NULL THEN 'meter / bill' WHEN a.purchase_batch_id IS NOT NULL THEN 'purchases file' WHEN EXISTS (SELECT 1 FROM waste_scan ws WHERE ws.activity_id = a.id) THEN 'QR scans' ELSE NULL END AS "evidenceKind",
+                ${EVIDENCE_SQL} AS evidence, CASE WHEN EXISTS (SELECT 1 FROM document_link dl WHERE dl.activity_id = a.id) THEN 'files' WHEN a.meter_id IS NOT NULL THEN 'meter / bill' WHEN a.purchase_batch_id IS NOT NULL THEN 'purchases file' WHEN EXISTS (SELECT 1 FROM waste_scan ws WHERE ws.activity_id = a.id) THEN 'QR scans' ELSE NULL END AS "evidenceKind",
                 cu.name AS "enteredBy", ru.name AS "approvedBy", a.reviewed_at AS "approvedAt"
            FROM assurance_test t JOIN activity a ON a.id = t.activity_id JOIN org_node f ON f.id = a.facility_id JOIN item i ON i.id = a.item_id JOIN category cat ON cat.id = a.category_id
            LEFT JOIN app_user cu ON cu.id::text = a.created_by::text LEFT JOIN app_user ru ON ru.id::text = a.reviewed_by
