@@ -124,8 +124,22 @@ export function section(k: string, x: RepCtx): string {
     case 'method': return `<h2>Methodology</h2><p>Emissions = activity data × emission factor ÷ 1,000. Each entry keeps the factor in force when it was entered (DESNZ, IPCC and supplier factors; the source is listed per activity). Refrigerants: mass balance with IPCC ${esc(co.gwp)} GWPs. Scope 2: location-based with grid factors; market-based with contractual instruments (certificates, supplier factors) and residual factors. Purchased goods: supplier-specific factors where available, otherwise spend-based averages. Employee commuting: survey scaled to headcount, or typed in. Only approved entries are reported (maker-checker). Base year ${co.baseYear ?? '—'}.</p>`;
     case 'excl': { const rows = GHG_CATS.filter(([c]) => !inv.byCode[c]).map(([c, , n]) => [`${c} ${esc(n)}`, esc(ex[c] || 'Justification required')]);
       return '<h2>Exclusions</h2>' + (rows.length ? T(rows, ['Category', 'Justification']) : '<p>No category excluded.</p>'); }
-    case 'base': { const b = d.baseMonthly.reduce((a, m) => [a[0]! + m.s1, a[1]! + m.s2, a[2]! + m.s3], [0, 0, 0]);
-      return `<h2>Base year ${co.baseYear ?? ''}</h2>` + T([0, 1, 2].map((i) => [`Scope ${i + 1}`, f1(b[i]!)]).concat([['<b>Total</b>', `<b>${f1(b[0]! + b[1]! + b[2]!)}</b>`]]), ['Scope', 'tCO₂e (approved)']) + '<p>No restatements recorded.</p>'; }
+    case 'base': {
+      const b = d.baseMonthly.reduce((a, m) => [a[0]! + m.s1, a[1]! + m.s2, a[2]! + m.s3], [0, 0, 0]), r = d.restated, rs = x.settings.restatements ?? [], thr = x.settings.restateThreshold ?? 5;
+      const TRIG: Record<string, string> = { acquisition: 'Acquisition', divestment: 'Divestment / closure', insourcing: 'Insourcing', outsourcing: 'Outsourcing', method: 'Method improved', factor: 'Factors / GWP', error: 'Error corrected', boundary: 'Boundary / consolidation', other: 'Other' };
+      const sg = (v: number) => `${v > 0 ? '+' : v < 0 ? '−' : ''}${f1(Math.abs(v))}`;
+      let h = `<h2>Base year ${co.baseYear ?? ''}</h2>`;
+      if (r) {
+        const adj = [r.s1, r.s2, r.s3];
+        h += T([0, 1, 2].map((i) => [`Scope ${i + 1}`, f1(b[i]! - adj[i]!), sg(adj[i]!), `<b>${f1(b[i]!)}</b>`]).concat([['<b>Total</b>', f1(b[0]! + b[1]! + b[2]! - adj[0]! - adj[1]! - adj[2]!), sg(adj[0]! + adj[1]! + adj[2]!), `<b>${f1(b[0]! + b[1]! + b[2]!)}</b>`]]),
+          ['Scope', 'As measured', 'Restatements', 'Restated base year (tCO₂e)']);
+      } else h += T([0, 1, 2].map((i) => [`Scope ${i + 1}`, f1(b[i]!)]).concat([['<b>Total</b>', `<b>${f1(b[0]! + b[1]! + b[2]!)}</b>`]]), ['Scope', 'tCO₂e (approved)']);
+      h += rs.length
+        ? '<h3>Recalculation history</h3>' + T(rs.map((z) => [new Date(z.decided_at).toLocaleDateString('en-GB'), esc(z.title), TRIG[z.trigger] ?? z.trigger, esc(z.facility ?? 'Company'), sg(z.s1 + (x.mb ? z.s2m : z.s2) + z.s3), z.pct != null ? `${f1(z.pct)}%` : '—',
+            z.applied ? 'Restated' : 'Recorded (below threshold)', esc(`${z.proposed_name ?? ''} / ${z.decided_name ?? ''}`)]), ['Approved', 'Change', 'Trigger', 'Facility', 'tCO₂e', '% of base', 'Effect', 'Recorded / approved by'])
+        : '<p>No restatements recorded.</p>';
+      return h + `<p class="small">Policy: the base year is recalculated for structural changes (acquisitions, divestments, in- and outsourcing), changes in calculation methods or emission factors, and errors, when their effect reaches ${thr}% of base-year emissions, alone or together with earlier changes (GHG Protocol Corporate Standard ch. 5; ISO 14064-1 §6.4.1). Each recalculation is approved by a second person; the figures as first measured are kept.</p>`;
+    }
     case 'dq': return x.checks ? '<h2>Data quality controls</h2>' + T(x.checks.map((c) => [esc(c.name), esc(c.area), !c.n ? 'OK' : c.justified ? `Justified: ${esc(c.justified.text)}` : 'To check', c.n]), ['Control', 'Area', 'Status', 'Warnings']) : '';
     case 'targets': { const t = x.targets; if (!t) return ''; return '<h2>Targets</h2>' + T([['Scope 1+2', `−${t.target.s12}% by ${t.target.year} vs ${t.baseYear ?? ''}`], ['Scope 3', `−${t.target.s3}% by ${t.target.year}`], ['Net Zero', `${t.sbti.nzYear} (residual ≤ ${t.sbti.resid}%)`], ['SBTi status', esc(t.sbti.status)]], ['Target', 'Ambition']); }
     case 'actions': { const t = x.targets; if (!t) return ''; const acts = t.actions.filter((a: RAction) => a.scenarioIds.includes(t.defaultScenario) && !a.excluded);

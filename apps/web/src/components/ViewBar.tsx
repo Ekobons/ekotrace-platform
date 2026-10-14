@@ -22,7 +22,7 @@ export interface Row {
 }
 export interface Data {
   year: number; years: number[]; group: { id: string; name: string } | null; pend: boolean; consolidation: string; scope2: 'location' | 'market';
-  baseYear: { year: number; total: number | null } | null; cmpYear: number; rows: Row[]; prevRows: Row[];
+  baseYear: { year: number; total: number | null } | null; restated?: { s1: number; s2: number; s3: number; items: { title: string; trigger: string; facility: string | null }[] } | null; cmpYear: number; rows: Row[]; prevRows: Row[];
   prevMonthly: { m: number; s1: number; s2: number; s3: number }[]; baseMonthly: { m: number; s1: number; s2: number; s3: number }[];
   facilities: { id: string; name: string; parent: string | null; type: string | null; employees: number | null; area: number | null; weight: number }[];
   categories: { code: string; name: string; scope: number; ghg_category: number | null; ghg: string }[]; s3Names: Record<number, string>;

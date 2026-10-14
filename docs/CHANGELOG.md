@@ -2,6 +2,19 @@
 
 Newest first.
 
+## 2026-10-14 · Base-year recalculation and restatement
+
+- **Methodology & boundaries → Base year & restatements (RFP 3.2.9; GHG Protocol ch. 5; ISO 14064-1 §6.4.1):**
+  - Record a change against the base year: trigger (acquisition, divestment or closure, in- or outsourcing, method, factors or GWP, error, boundary, other), date, facility or whole company, the change by scope (Scope 2 location and market), description, and evidence from the Document vault. "Use its base-year emissions" fills in a facility's figures.
+  - A second person approves or rejects it (a super admin or admin, never the person who recorded it; a reason is needed to reject). The person who recorded it can withdraw it while it waits.
+  - Significance threshold: 5% by default, set by the super admin. A change at or above it restates the base year. Below it, the change is recorded and counts towards later ones; when their net effect reaches the threshold, all are applied together (cumulative test). "Restate anyway" applies a change below the threshold.
+  - The panel shows the base year as measured, the restatements applied, the restated base year and the recorded changes waiting.
+- **Restated base year used** for the base-year figure and monthly base on dashboards, Home and the KPI dashboard; for Targets & actions (target paths, Net Zero trajectory, like-for-like reduction); in the report section "Base year and restatements" (as measured, restatements, restated, history, policy) and the ISO 14064-1 report; and in the verifier pack, whose change trail includes them. Comparisons with the previous year use figures as measured.
+- **Views:** a change for a facility counts in views that include it; a whole-company change in whole-company views. A facility switched off is already left out, so its divestment record is not subtracted again.
+- Notifications to the deciders and the person who recorded it; Inbox to-do "base-year changes to approve"; every step in the audit log.
+- Demo: one DEMO restatement applied (landfill methane measured instead of modelled) and one acquisition waiting for approval.
+- Database: migration 040 (base_restatement with row-level security; tenant.restate_threshold).
+
 ## 2026-10-14 · Metric registry, collection calendar, reminders and escalation, Inbox & to-dos
 
 - **Metric registry (Setup) — the data dictionary, separate from the factors (RFP 3.2.1):**

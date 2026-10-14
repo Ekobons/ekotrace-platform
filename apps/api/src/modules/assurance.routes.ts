@@ -287,9 +287,11 @@ export async function assuranceRoutes(app: FastifyInstance) {
                                        WHERE a.status = 'approved' AND extract(year FROM a.period_start) = $1 GROUP BY 1 ORDER BY 2 DESC`, [year])).rows;
       const trail = (await c.query(`SELECT l.at, l.user_name AS "user", l.action, l.entity_id AS "entityId", l.detail FROM audit_log l
                                      WHERE (l.entity = 'activity' AND l.entity_id IN (SELECT a.id::text FROM activity a WHERE extract(year FROM a.period_start) = $1))
-                                        OR l.action LIKE 'period.%' OR l.action LIKE 'assurance.%' OR l.action = 'methodology.update'
+                                        OR l.action LIKE 'period.%' OR l.action LIKE 'assurance.%' OR l.action = 'methodology.update' OR l.action LIKE 'restatement.%'
                                      ORDER BY l.at LIMIT 20000`, [year])).rows;
-      return { company: t.name, consolidation: t.consolidation, gwp: t.gwp_set, baseYear: t.base_year, totals: tot, sources, trail };
+      const restatements = (await c.query(`SELECT r.title, r.trigger, f.name AS facility, (r.s1_t + r.s2_t + r.s3_t)::float8 AS t, r.pct::float8 AS pct, r.status, r.applied, r.proposed_name, r.decided_name, r.decided_at, r.decision_note
+                                             FROM base_restatement r LEFT JOIN org_node f ON f.id = r.facility_id WHERE r.base_year = $1 AND r.status IN ('approved', 'rejected') ORDER BY r.decided_at`, [t.base_year])).rows;
+      return { company: t.name, consolidation: t.consolidation, gwp: t.gwp_set, baseYear: t.base_year, totals: tot, sources, trail, restatements };
     });
   });
 }

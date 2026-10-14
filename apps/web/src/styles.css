@@ -1181,3 +1181,12 @@ ul.plain { list-style: none; margin: 0; padding: 0; }
 .iblist li button:hover { border-color: var(--line2); }
 .ibbody { white-space: pre-line; color: var(--muted); max-height: 7.5em; overflow: hidden; }
 .chkline { gap: 8px; align-items: flex-start; } .chkline b { font-weight: 600; } .chkline input { margin-top: 2px; }
+
+/* base-year restatements */
+.rsgrid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+@media (max-width: 1000px) { .rsgrid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .rsgrid { grid-template-columns: minmax(0, 1fr); } }
+.rsbox { display: grid; gap: 3px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; align-content: start; }
+.rsbox b { font-size: 22px; } .rsbox.strong { border-color: var(--primary); background: var(--primary-soft); }
+.rstable td { vertical-align: top; }
+.rscheck { padding: 10px 12px; border-radius: 10px; background: var(--bg); font-size: 13px; }

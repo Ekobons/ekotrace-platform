@@ -11,6 +11,7 @@
 import { platformTx, pool, tenantTx, type Tx } from '../db/pool.js';
 import { ensureMetrics, metricSnapshot } from '../lib/collection.js';
 import { remindTenant } from '../lib/reminders.js';
+import { measured } from '../lib/restate.js';
 import { applyMetric, metricBody } from '../modules/collection.routes.js';
 import { hashPassword, temporaryPassword } from '../lib/password.js';
 import { calculate } from '../modules/calc.service.js';
@@ -618,8 +619,25 @@ async function main() {
     // meter months up to June were submitted and approved by the manager; July and August meter drafts are still waiting to be sent
     await c.query(`UPDATE activity SET status = 'approved', submitted_at = period_end + interval '6 days', submitted_by = created_by, reviewed_at = period_end + interval '8 days', reviewed_by = $1
                     WHERE status = 'draft' AND meter_id IS NOT NULL AND period_start < '2026-07-01'`, [U.get('manager')?.id ?? null]);
+    // base-year restatement (DEMO): the landfill's 2025 methane re-estimated with measured gas (applied), an acquisition waiting for approval
+    const all = (await c.query(`SELECT id FROM org_node WHERE kind = 'facility' AND active`)).rows.map((x) => x.id as string);
+    const by = (await c.query(`SELECT base_year FROM tenant WHERE id = $1`, [t])).rows[0].base_year as number;
+    const bm = await measured(c, t, by, all);
+    const lf = await fac("Al Saja'a Landfill");
+    if (bm.total > 0) {
+      const cut = -Math.round(bm.total * 0.062);
+      await c.query(`INSERT INTO base_restatement (tenant_id, base_year, trigger, title, description, facility_id, effective, s1_t, status, applied, applied_at, base_before, pct,
+                                                   proposed_by, proposed_name, proposed_at, decided_by, decided_name, decided_at, decision_note)
+                     VALUES ($1,$2,'method',$3,$4,$5,'2026-04-01',$6,'approved',true,now() - interval '20 days',$7,$8,$9,$10,now() - interval '24 days',$11,$12,now() - interval '20 days',$13)`,
+        [t, by, 'DEMO — Landfill methane: measured gas replaces the model', 'DEMO — flow meters on the gas engines since 2026 allow the 2025 methane to be recalculated from measured gas; first-order-decay model replaced.',
+         lf ?? null, cut, Math.round(bm.total), Math.round(Math.abs(cut) / bm.total * 10000) / 100, U.get('admin')!.id, U.get('admin')!.name, U.get('super_admin')!.id, U.get('super_admin')!.name, 'DEMO — checked against the engine logs']);
+      await c.query(`INSERT INTO base_restatement (tenant_id, base_year, trigger, title, description, effective, s1_t, s2_t, s3_t, proposed_by, proposed_name, proposed_at)
+                     VALUES ($1,$2,'acquisition',$3,$4,'2026-09-01',$5,$6,$7,$8,$9,now() - interval '2 days')`,
+        [t, by, 'DEMO — Acquisition of a fleet services company (not real)', 'DEMO — its 2025 fuel and electricity from its own records, added as if it had always been part of the group.',
+         Math.round(bm.total * 0.041), Math.round(bm.total * 0.006), Math.round(bm.total * 0.012), U.get('admin')!.id, U.get('admin')!.name]);
+    }
     const r = await remindTenant(c, t);
-    console.log(`Metric registry: ${M.size} metrics, 3 changed (versions), 1 change waiting for approval. Calendar: reminders ${r.due_soon} due soon, ${r.overdue} overdue, ${r.escalated} escalated → ${r.people} DEMO notices (e-mail held: no mail server).`);
+    console.log(`Base year: 1 DEMO restatement applied (landfill method), 1 waiting for approval (acquisition). Metric registry: ${M.size} metrics, 3 changed (versions), 1 change waiting for approval. Calendar: reminders ${r.due_soon} due soon, ${r.overdue} overdue, ${r.escalated} escalated → ${r.people} DEMO notices (e-mail held: no mail server).`);
   });
   console.log('\nDemo logins (all with the same password, shown once):');
   for (const [name, email] of PEOPLE) console.log(`  ${email.padEnd(24)} ${name}`);

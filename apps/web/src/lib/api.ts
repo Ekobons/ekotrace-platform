@@ -175,9 +175,21 @@ export interface CycleSettings { dueDay: number; remindDays: number; escalateDay
 export interface CalendarData { year: number; today: string; settings: CycleSettings; mailOn: boolean; me: string; obligations: Obligation[]; canSettings: boolean }
 export interface Notice { id: number; kind: string; title: string; body: string | null; link: string | null; at: string; read_at: string | null }
 export interface InboxData {
-  today: string; mine: Obligation[]; escalations: Obligation[]; upcoming: Obligation[]; approvals: number; drafts: number; metricChanges: number; findings: number;
+  today: string; mine: Obligation[]; escalations: Obligation[]; upcoming: Obligation[]; approvals: number; drafts: number; metricChanges: number; findings: number; restatements?: number;
   returned: { id: string; f: string; facility: string; cat: string; category: string; item: string; month: string; note: string | null; by: string | null; at: string | null }[];
   notifications: Notice[]; unread: number; emailNotify: boolean; mailOn: boolean;
+}
+
+// ------------------------------------------------------------ base-year restatement --
+export interface Restatement {
+  id: string; base_year: number; trigger: string; title: string; description: string; facility_id: string | null; facility: string | null; facility_active: boolean | null; effective: string | null;
+  s1: number; s2: number; s2m: number | null; s3: number; document_id: string | null; document: string | null; force: boolean; status: 'pending' | 'approved' | 'rejected' | 'withdrawn'; applied: boolean;
+  applied_at: string | null; applied_with_title: string | null; base_before: number | null; pct: number | null; proposed_name: string | null; proposed_at: string; decided_name: string | null; decided_at: string | null; decision_note: string | null; mine: boolean;
+}
+export interface RestatementData {
+  baseYear: number; threshold: number; measured: { s1: number; s2: number; s2m: number; s3: number; total: number }; restated: { s1: number; s2: number; s2m: number; s3: number; total: number };
+  recorded: { n: number; net: number; pct: number }; items: Restatement[]; triggers: Record<string, string>; facilities: { id: string; name: string; active: boolean }[]; documents: { id: string; name: string }[];
+  canPropose: boolean; canDecide: boolean; canSettings: boolean;
 }
 
 // ------------------------------------------------------------ document vault --
@@ -286,6 +298,7 @@ export interface RepVersion { id: string; name: string; label: string; period: s
 export interface RepEntity { legal?: string; licence?: string; lei?: string; region?: string; emirate?: string; sector?: string; sectorCode?: string; mrvId?: string; contact?: string; website?: string; revenue?: number | null; revenueCurrency?: string; fyEnd?: string }
 export interface RepSettings {
   company: { name: string; country: string; consolidation: string; gwp: string; baseYear: number | null; currency?: string; hasLogo?: boolean }; entity: RepEntity; excl: Record<string, string>;
+  restatements?: { title: string; trigger: string; facility: string | null; effective: string | null; s1: number; s2: number; s2m: number; s3: number; pct: number | null; applied: boolean; proposed_name: string | null; decided_name: string | null; decided_at: string }[]; restateThreshold?: number;
   templates: RepTemplate[]; versions: RepVersion[]; canEntity: boolean; canEdit: boolean;
 }
 export interface ApprovalSettings { l2: boolean; minT: number; cats: string[]; checkPct: number }
@@ -378,6 +391,7 @@ export interface AFinding { id: string; severity: 'low' | 'medium' | 'high'; kin
 export interface SampleItem { id: string; key: boolean; result: 'agreed' | 'exception' | null; note: string | null; testedBy: string | null; testedAt: string | null; facility: string; from: string; to: string; category: string; item: string;
   qty: number; unit: string; t: number; source: string | null; dataType: string; entryNote: string | null; evidence: boolean; evidenceKind: string | null; enteredBy: string | null; approvedBy: string | null; approvedAt: string | null }
 export interface AssurancePack { company: string; consolidation: string; gwp: string; baseYear: number | null; totals: { s1: number; s2l: number; s2m: number; s3: number; bio: number; n: number };
+  restatements?: { title: string; trigger: string; facility: string | null; t: number; pct: number | null; status: string; applied: boolean; proposed_name: string | null; decided_name: string | null; decided_at: string; decision_note: string | null }[];
   sources: { source: string; n: number }[]; trail: { at: string; user: string | null; action: string; entityId: string | null; detail: unknown }[] }
 export type BinInput = { facilityId: string; name: string; location?: string; itemId: number; gri?: string; hazardous: boolean; contractor?: string; capacityL?: number; density?: number };
 
@@ -652,6 +666,12 @@ export const api = {
   vaultRestore: (id: string) => call<{ ok: true }>('POST', `/api/vault/${id}/restore`),
   vaultDelete: (id: string) => call<{ ok: true }>('DELETE', `/api/vault/${id}`),
   vaultSettings: (retentionYears: number) => call<{ ok: true }>('PUT', '/api/vault/settings', { retentionYears }),
+  restatements: () => call<RestatementData>('GET', '/api/restatements'),
+  restatementFacility: (id: string) => call<{ facility: { id: string; name: string; active: boolean }; year: number; s1: number; s2: number; s2m: number; s3: number; total: number }>('GET', `/api/restatements/facility/${id}`),
+  restatementPropose: (b: { trigger: string; title: string; description: string; facilityId: string | null; effective: string | null; s1: number; s2: number; s2m: number | null; s3: number; documentId: string | null; force: boolean }) => call<{ id: string }>('POST', '/api/restatements', b),
+  restatementDecide: (id: string, decision: 'approve' | 'reject', note?: string) => call<{ status: string; applied: boolean; before: number; after: number; pct: number; cumulativePct: number; alsoApplied: number }>('POST', `/api/restatements/${id}/decide`, { decision, note }),
+  restatementWithdraw: (id: string) => call<{ ok: true }>('DELETE', `/api/restatements/${id}`),
+  restatementSettings: (threshold: number) => call<{ threshold: number }>('PUT', '/api/restatements/settings', { threshold }),
   // metric registry, collection calendar, inbox
   metrics: () => call<MetricList>('GET', '/api/metrics'),
   metricHistory: (id: string) => call<{ metric: { id: string; code: string; name: string }; versions: MetricVersion[]; labels: Record<string, string> }>('GET', `/api/metrics/${id}/history`),

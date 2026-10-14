@@ -44,3 +44,47 @@ Net and gross calorific values are different measures of energy and are never co
 ## Waste methods
 
 The IPCC parameters (degradable carbon, decay rates by climate, methane correction factors, oxidation, flare destruction, wastewater MCFs, N₂O factors) are shown on the waste screens with their table numbers. Site values can replace them — e.g. from a waste characterisation survey — and the source is recorded with the site. The company's approved methodology document takes precedence where it differs.
+
+## Base year and restatements
+
+The base year is the year targets are measured from (Methodology & boundaries → Base year). The GHG Protocol (chapter 5) and ISO 14064-1 (§6.4.1) require it to be recalculated when something changes, so that progress compares like with like. Otherwise a sale would look like a reduction, and an acquisition like an increase.
+
+```flow
+> 1 · Record | what happened, when, the facility concerned, the change to the base year by scope, evidence
+> 2 · Approve | a second person (super admin or admin) approves or rejects it — never the person who recorded it
+> 3 · Test | the change as a share of the base year, alone and together with earlier recorded changes, against the threshold
+> 4 · Restate | at or above the threshold: the restated base year is used everywhere; below it: recorded, counts towards the next change
+```
+
+**What triggers a restatement.**
+
+| Trigger | Example | Change to enter |
+|---|---|---|
+| Acquisition or merger | a fleet services company joins the group | **+** its base-year emissions, from its own records |
+| Divestment or closure | a plant is sold | **−** the plant's base-year emissions (choose it, then "− remove them") |
+| Activity brought in-house | waste transport done by own trucks instead of a contractor | **+** in Scope 1 (and **−** in Scope 3 if it was counted there) |
+| Activity outsourced | the canteen handed to a caterer | **−** in Scope 1 or 2, **+** in Scope 3 if still counted |
+| Calculation method improved | landfill gas measured instead of modelled | the difference the new method makes to the base year |
+| Emission factors or GWP changed | a new grid factor source for the base year | the difference |
+| Error found | a meter counted twice in the base year | the correction |
+| Boundary or consolidation changed | operational control to equity share | the difference |
+
+**Significance threshold.** This is 5% of the base year by default. The super admin can change it, from 0 to 50%. A change at or above it restates the base year when it is approved.
+
+A smaller change is approved and **recorded**, and counts towards later ones. When the net effect of the recorded changes and a new one reaches the threshold, all of them are applied together (the cumulative test).
+
+Some policies restate even for small changes: tick "Restate anyway".
+
+**Where the restated base year is used.**
+
+- Targets & actions: the target paths, the Net Zero trajectory and the like-for-like reduction.
+- Home and the KPI dashboard: the target path by month.
+- The base-year figure on dashboards.
+- Reports: the "Base year and restatements" section shows the figures as measured, the restatements, the restated total and the full history, and the ISO 14064-1 report notes the recalculation.
+- The verifier pack lists every approved or rejected change.
+
+The figures as first measured are always kept, and every step is in the audit log. Comparisons with the previous year ("same months last year") use the figures as measured.
+
+**Views.** A change for a facility counts in every view that includes that facility. A change for the whole company, such as an acquisition or a method change, counts in whole-company views only.
+
+A facility that has been switched off is already left out of every view, including the base year. Recording its sale documents the change and counts towards the threshold, but is not subtracted a second time.

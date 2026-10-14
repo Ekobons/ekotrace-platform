@@ -142,7 +142,14 @@ export async function reportsRoutes(app: FastifyInstance) {
       const templates = (await c.query(`SELECT id, base, name, audience, note, sections FROM report_template ORDER BY updated_at`)).rows;
       const versions = (await c.query(`SELECT v.id, v.name, v.label, v.period, v.scope2, v.s1::float8 AS s1, v.s2::float8 AS s2, v.s3::float8 AS s3, v.by_code AS "byCode", u.name AS by, v.created_at AS at
                                          FROM report_version v LEFT JOIN app_user u ON u.id::text = v.created_by ORDER BY v.created_at DESC`)).rows;
+      // base-year restatements approved for the current base year (applied, or recorded below the threshold)
+      const restatements = (await c.query(
+        `SELECT r.title, r.trigger, f.name AS facility, r.effective::text, r.s1_t::float8 AS s1, r.s2_t::float8 AS s2, coalesce(r.s2m_t, r.s2_t)::float8 AS s2m, r.s3_t::float8 AS s3,
+                r.pct::float8 AS pct, r.applied, r.proposed_name, r.decided_name, r.decided_at
+           FROM base_restatement r LEFT JOIN org_node f ON f.id = r.facility_id WHERE r.status = 'approved' AND r.base_year = $1 ORDER BY r.decided_at`, [t.base_year])).rows;
+      const threshold = Number((await c.query(`SELECT restate_threshold FROM tenant WHERE id = $1`, [tenant])).rows[0].restate_threshold);
       return {
+        restatements, restateThreshold: threshold,
         company: { name: t.name, country: t.country, consolidation: t.consolidation, gwp: t.gwp_set, baseYear: t.base_year, currency: t.currency, hasLogo: !!t.logo_id },
         entity: (({ emirate, ...e }) => ({ ...e, region: e.region ?? emirate }))(t.report?.entity ?? {}), excl: t.report?.excl ?? {}, templates, versions,
         canEntity: ['super_admin', 'platform_admin'].includes(req.user.role), canEdit: ['super_admin', 'admin', 'platform_admin'].includes(req.user.role),

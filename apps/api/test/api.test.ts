@@ -2587,3 +2587,78 @@ test('metric registry (standard metrics, admin proposes → super admin approves
   assert.equal((await api('GET', `/api/metrics/${fuel.id}/history`, undefined, tenantB)).status, 404);
   assert.ok(!(await api('GET', '/api/calendar?year=2025', undefined, tenantB)).body.obligations.some((o: { facilityId: string }) => o.facilityId === plant));
 });
+
+test('base-year restatement: second-person approval, significance threshold alone and cumulative, restated base year in dashboards by view, reports and verifier pack; companies kept apart', async () => {
+  const co = await api('POST', '/api/platform/companies', { name: 'Restate Co', country: 'AE', superAdmin: { name: 'Rita Super', email: 'super@restate.test' } });
+  const T = co.body.company.id as string;
+  let sa = await login('super@restate.test', co.body.superAdmin.temporaryPassword);
+  await call(sa, 'POST', '/api/auth/password', { current: co.body.superAdmin.temporaryPassword, next: 'a long enough pass' });
+  sa = await login('super@restate.test', 'a long enough pass');
+  await call(sa, 'PATCH', '/api/tenant', { baseYear: 2025 });
+  const group = (await call(sa, 'GET', '/api/org')).body.nodes.find((n: { kind: string }) => n.kind === 'group').id;
+  const p1 = (await call(sa, 'POST', '/api/org/nodes', { parentId: group, kind: 'facility', name: 'Keep plant' })).body.id as string;
+  const p2 = (await call(sa, 'POST', '/api/org/nodes', { parentId: group, kind: 'facility', name: 'Sold plant' })).body.id as string;
+  const id = await diesel();
+  const ids: string[] = [];
+  for (const [f, q] of [[p1, 3000], [p2, 1000]] as [string, number][]) ids.push((await call(sa, 'POST', '/api/activities', { facilityId: f, itemId: id, quantity: q, unit: 'L', periodStart: '2025-03-01', periodEnd: '2025-03-31' })).body.id);
+  await call(sa, 'POST', '/api/activities/review', { ids, action: 'submit' });
+  assert.equal((await call(sa, 'POST', '/api/activities/review', { ids, action: 'approve' })).body.done, 2, 'a one-person company approves its own (self-reviewed)');
+  const ad = await call(sa, 'POST', '/api/users', { name: 'Rex Admin', email: 'admin@restate.test', role: 'admin', scopeNodeId: group });
+  let adm = await login('admin@restate.test', ad.body.temporaryPassword);
+  await call(adm, 'POST', '/api/auth/password', { current: ad.body.temporaryPassword, next: 'a long enough pass' });
+  adm = await login('admin@restate.test', 'a long enough pass');
+
+  const r0 = (await call(adm, 'GET', '/api/restatements')).body;
+  assert.equal(r0.baseYear, 2025); assert.equal(r0.threshold, 5); assert.ok(r0.measured.total > 0); assert.equal(r0.restated.total, r0.measured.total);
+  const sold = (await call(adm, 'GET', `/api/restatements/facility/${p2}`)).body;
+  assert.ok(Math.abs(sold.total / r0.measured.total - 0.25) < 0.01, 'the sold plant is a quarter of the base year');
+  // the admin records the sale; nobody approves their own; a reason is needed to reject
+  const prop = await call(adm, 'POST', '/api/restatements', { trigger: 'divestment', title: 'Sale of the second plant', facilityId: p2, s1: -sold.s1, s2: -sold.s2, s3: -sold.s3, effective: '2026-06-30' });
+  assert.equal(prop.status, 200, JSON.stringify(prop.body));
+  assert.equal((await call(adm, 'POST', `/api/restatements/${prop.body.id}/decide`, { decision: 'approve' })).status, 403);
+  assert.equal((await call(sa, 'POST', `/api/restatements/${prop.body.id}/decide`, { decision: 'reject' })).status, 400);
+  assert.ok((await call(sa, 'GET', '/api/inbox')).body.restatements >= 1);
+  const ok = (await call(sa, 'POST', `/api/restatements/${prop.body.id}/decide`, { decision: 'approve' })).body;
+  assert.equal(ok.applied, true); assert.ok(ok.pct > 20);
+  const r1 = (await call(sa, 'GET', '/api/restatements')).body;
+  assert.ok(Math.abs(r1.restated.total - r0.measured.total * 0.75) < 0.01 * r0.measured.total, JSON.stringify(r1.restated));
+  // dashboards: the whole company uses the restated base year; a view of the kept plant is unchanged; of the sold plant, close to zero
+  const dash = async (node?: string) => (await call(sa, 'GET', `/api/dashboard?year=2026${node ? `&node=${node}` : ''}`)).body;
+  const whole = await dash();
+  assert.ok(Math.abs(whole.baseYear.total - r1.restated.total) < 0.01, `${whole.baseYear.total} vs ${r1.restated.total}`);
+  assert.equal(whole.restated.items.length, 1);
+  const bm = whole.baseMonthly.reduce((a: number, m: { s1: number; s2: number; s3: number }) => a + m.s1 + m.s2 + m.s3, 0);
+  assert.ok(Math.abs(bm - r1.restated.total) < 0.01, 'the monthly base year (target paths, KPIs) adds up to the restated total');
+  assert.ok(Math.abs((await dash(p1)).baseYear.total - (r0.measured.total - sold.total)) < 0.01);
+  assert.equal((await dash(p1)).restated, null);
+  assert.ok(Math.abs((await dash(p2)).baseYear.total) < 0.01);
+  // below the threshold: recorded; the next one takes the net change over it and both are applied
+  const small = (await call(adm, 'POST', '/api/restatements', { trigger: 'method', title: 'Refrigerant method improved', s1: r1.restated.total * 0.02 })).body.id;
+  const s1 = (await call(sa, 'POST', `/api/restatements/${small}/decide`, { decision: 'approve' })).body;
+  assert.equal(s1.applied, false); assert.ok(s1.pct < 5);
+  assert.equal((await call(sa, 'GET', '/api/restatements')).body.recorded.n, 1);
+  const more = (await call(adm, 'POST', '/api/restatements', { trigger: 'error', title: 'Missing generator found', s1: r1.restated.total * 0.035 })).body.id;
+  const s2 = (await call(sa, 'POST', `/api/restatements/${more}/decide`, { decision: 'approve' })).body;
+  assert.equal(s2.applied, true); assert.equal(s2.alsoApplied, 1); assert.ok(s2.cumulativePct >= 5);
+  const r2 = (await call(sa, 'GET', '/api/restatements')).body;
+  assert.equal(r2.recorded.n, 0);
+  assert.ok(Math.abs(r2.restated.total - r1.restated.total * 1.055) < 0.01 * r1.restated.total);
+  // a rejected one changes nothing; withdrawn by its author only
+  const bad = (await call(adm, 'POST', '/api/restatements', { trigger: 'other', title: 'Guess', s3: 999 })).body.id;
+  assert.equal((await call(sa, 'POST', `/api/restatements/${bad}/decide`, { decision: 'reject', note: 'No evidence' })).body.status, 'rejected');
+  const wd = (await call(adm, 'POST', '/api/restatements', { trigger: 'other', title: 'Typo entry', s3: 1 })).body.id;
+  assert.equal((await call(sa, 'DELETE', `/api/restatements/${wd}`)).status, 404);
+  assert.equal((await call(adm, 'DELETE', `/api/restatements/${wd}`)).status, 200);
+  assert.ok(Math.abs((await call(sa, 'GET', '/api/restatements')).body.restated.total - r2.restated.total) < 1e-6);
+  // threshold: super admin only
+  assert.equal((await call(adm, 'PUT', '/api/restatements/settings', { threshold: 3 })).status, 403);
+  assert.equal((await call(sa, 'PUT', '/api/restatements/settings', { threshold: 3 })).status, 200);
+  // reports and verifier pack carry the history; the audit log has each step
+  const rs = (await call(sa, 'GET', '/api/reports/settings')).body;
+  assert.equal(rs.restatements.length, 3); assert.equal(rs.restatements.filter((x: { applied: boolean }) => x.applied).length, 3); assert.equal(rs.restateThreshold, 3);
+  const pack = (await call(sa, 'GET', '/api/assurance/pack?year=2026')).body;
+  assert.equal(pack.restatements.length, 4, 'approved and rejected');
+  // companies kept apart
+  assert.ok(!(await api('GET', '/api/restatements', undefined, tenantB)).body.items.some((x: { id: string }) => x.id === prop.body.id));
+  assert.equal((await api('POST', `/api/restatements/${bad}/decide`, { decision: 'approve' }, tenantB)).status, 404);
+});

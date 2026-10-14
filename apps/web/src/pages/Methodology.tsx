@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react';
 import { useApp } from '../App';
 import { api, tco2e, type ApprovalsData } from '../lib/api';
 import { Prices } from '../components/Prices';
+import { Restatements } from '../components/Restatements';
 
 type Approach = 'operational' | 'financial' | 'equity';
 const CARDS: [Approach, string, string][] = [
@@ -85,7 +86,7 @@ export function Methodology() {
           <select className="input" disabled={!edit} value={tenant?.base_year} onChange={(e) => save({ baseYear: Number(e.target.value) }, `Base year set to ${e.target.value}`)}>
             {[2019, 2020, 2021, 2022, 2023, 2024, 2025, 2026].map((y) => <option key={y}>{y}</option>)}
           </select>
-          <p className="sub">The year targets are measured from. Restatements (when the base year must be recalculated) come with the targets module.</p>
+          <p className="sub">The year targets are measured from. Changes that must be reflected in it (acquisitions, sales, better methods, errors) are recorded under <a href="#restatements">Base year &amp; restatements</a> below.</p>
         </div>
         <div className="card" style={{ display: 'grid', gap: 10 }}>
           <h2>Flights · radiative forcing</h2>
@@ -115,6 +116,7 @@ export function Methodology() {
           <p className="sub">A month’s data is due on this day of the following month. Home shows what is due, overdue and escalated for the categories each facility reports.</p>
         </div>
       </div>
+      <Restatements />
       <ApprovalLevels edit={edit} />
       <Prices canEdit={['platform_admin', 'super_admin', 'admin'].includes(role)} />
       <div className="note info">Standards: GHG Protocol Corporate Standard; factors DESNZ (UK) 2022–2026 and IPCC 2006 where DESNZ has none; kWh on net calorific value unless entered as gross. Vehicles: DESNZ per km / mile by class and powertrain, or by fuel used; electricity for electric vehicles in Scope 2 (location-based grid factor of the facility's country).</div>

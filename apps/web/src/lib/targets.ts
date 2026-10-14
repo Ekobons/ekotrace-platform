@@ -58,11 +58,14 @@ export function taData(d: Data, base: Data | null, t: TargetsData) {
   const cy = d.year, by = t.baseYear ?? cy - 1, Tg = t.target;
   const lastM = Math.max(0, ...d.rows.filter((r) => r.m > 0).map((r) => r.m));
   const k = lastM ? 12 / lastM : 0;
-  const bRows = base?.rows ?? [];
+  // a restated base year: the applied restatements count as one year-long base-year row (never carried into this year)
+  const rst = base?.restated;
+  const bRows: Row[] = [...(base?.rows ?? []), ...(rst ? [{ f: '__restated__', m: 0, span: 12, cat: 'restatement', item: 'Base-year restatements', grp: '', sub: '', unit: '', s1: rst.s1, s2: rst.s2, s3: rst.s3, s33: 0,
+    bio: 0, memo: 0, n: 0, approved: 0, estimated: 0, qty: 0, rec: 0, kind: null, kwh: null, m3: null, route: '', flow: '', gri: '', haz: null, contractor: null } as Row] : [])];
   const yearly = (r: Row) => 12 / Math.max(1, Math.min(12, r.span ?? 12));          // annualise a multi-month entry
   const key = (r: Row) => `${r.f}|${r.cat}`;
   const curAnnual = new Set(d.rows.filter((r) => r.m === 0).map(key));
-  const carried = bRows.filter((r) => r.m === 0 && !curAnnual.has(key(r)));         // not entered yet this year
+  const carried = bRows.filter((r) => r.m === 0 && r.cat !== 'restatement' && !curAnnual.has(key(r)));         // not entered yet this year
   const ann = [
     ...d.rows.map((r) => ({ r, t: r.m === 0 ? T(r) * yearly(r) : T(r) * k, f: r.m === 0 ? yearly(r) : k })),
     ...carried.map((r) => ({ r, t: T(r) * yearly(r), f: yearly(r), carried: true })),

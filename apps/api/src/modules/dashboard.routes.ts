@@ -12,6 +12,7 @@
  */
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
+import { adjustments, isWhole } from '../lib/restate.js';
 import { tenantTx, type Tx } from '../db/pool.js';
 import { requireTenant } from '../lib/auth.js';
 import { scopeOf, subtreeFacilities } from '../lib/access.js';
@@ -115,8 +116,25 @@ export async function dashboardRoutes(app: FastifyInstance) {
       // the base year by month and scope: the target path (base-year month × the straight-line reduction)
       const baseMonthly = t.base_year ? (await c.query(
         `SELECT ${M} AS m, ${t1('a.co2e_direct')} AS s1, ${t1(S2)} AS s2, ${t1('a.co2e_scope3 + a.co2e_wtt + a.co2e_td')} AS s3 ${FROM} GROUP BY 1`, [facs, t.base_year])).rows : [];
-      const base = t.base_year && t.base_year !== year
+      let base = t.base_year && t.base_year !== year
         ? (await c.query(`SELECT ${t1(`a.co2e_direct + ${S2} + a.co2e_scope3 + a.co2e_wtt + a.co2e_td`)} AS total ${FROM}`, [facs, t.base_year])).rows[0]?.total ?? null : null;
+      // base-year restatements (approved and applied) for this view: spread evenly over the base year's months
+      const adj = t.base_year ? await adjustments(c, t.base_year, facs, await isWhole(c, facs, q.node, q.group)) : null;
+      let restated: { s1: number; s2: number; s3: number; items: { title: string; trigger: string; facility: string | null }[] } | null = null;
+      if (adj && adj.items.length) {
+        const a2 = q.scope2 === 'market' ? adj.s2m : adj.s2, r4 = (x: number) => Math.round(x * 10000) / 10000;
+        const spread = (rows: { m: number; s1: number; s2: number; s3: number }[]) => {
+          for (let m = 1; m <= 12; m++) {
+            let row = rows.find((x) => x.m === m);
+            if (!row) { row = { m, s1: 0, s2: 0, s3: 0 }; rows.push(row); }
+            row.s1 = r4(row.s1 + adj.s1 / 12); row.s2 = r4(row.s2 + a2 / 12); row.s3 = r4(row.s3 + adj.s3 / 12);
+          }
+        };
+        spread(baseMonthly);
+        if (cmpYear === t.base_year) spread(prevMonthly);
+        if (base != null) base = r4(base + adj.s1 + a2 + adj.s3);
+        restated = { s1: adj.s1, s2: a2, s3: adj.s3, items: adj.items.map((x) => ({ title: x.title, trigger: x.trigger, facility: x.facility })) };
+      }
       const facilities = (await c.query(
         `SELECT f.id, f.name, p.name AS parent, f.facility_type AS type, f.employees, f.floor_area_m2::float8 AS area, ${W}::float8 AS weight
            FROM org_node f LEFT JOIN org_node p ON p.id = f.parent_id WHERE f.id = ANY($1) AND f.kind = 'facility' ORDER BY f.name`, [facs])).rows;
@@ -142,7 +160,7 @@ export async function dashboardRoutes(app: FastifyInstance) {
             AND a.period_end - a.period_start < 40 AND cat.calc_method NOT IN ('spend', 'travel', 'trip') GROUP BY 1, 2`, [facs, year])).rows as { f: string; m: number; ok: boolean; any_ok: boolean }[];
       return {
         filled: months.map((r) => [r.f, r.m]), waiting: months.filter((r) => !r.ok).map((r) => [r.f, r.m]), approvedIn: months.filter((r) => r.any_ok).map((r) => [r.f, r.m]),
-        year, years, group, pend: q.pend === '1', consolidation: t.consolidation, scope2: q.scope2, baseYear: t.base_year && t.base_year !== year ? { year: t.base_year, total: base } : null,
+        year, years, group, pend: q.pend === '1', consolidation: t.consolidation, scope2: q.scope2, baseYear: t.base_year && t.base_year !== year ? { year: t.base_year, total: base } : null, restated,
         rows, cmpYear, prevRows, prevMonthly, baseMonthly, facilities, categories, s3Names: S3_NAME, purchases,
       };
     });
