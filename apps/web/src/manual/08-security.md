@@ -119,5 +119,6 @@ Every table holding company data carries the company id, and PostgreSQL row-leve
 | `SIEM_SYSLOG`, `SIEM_TLS_CA` | forward audit records, e.g. `tls://siem.example.com:6514` |
 | `BACKUP_RETENTION_DAYS` | stated on certificates of destruction |
 | `SECURITY_CONTACT` | published at `/.well-known/security.txt` for reporting vulnerabilities |
+| Database user | an ordinary role, never a superuser or BYPASSRLS (they would skip company separation): with HTTPS on, the server refuses to start that way |
 
 The field app is a web page opened from the bin's QR label (no app-store app), so the mobile-app rules about stores, key-chains and certificate pinning do not apply to it; it runs over the same HTTPS, sign-in and roles as the rest.

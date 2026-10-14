@@ -42,6 +42,7 @@ Closes the code gaps found against the BEEAH web application security standard.
   - A certificate of destruction is produced: records per table, files, backup expiry and audit retention.
   - The demo reset uses the same routine.
 - **Responsible disclosure:** `/.well-known/security.txt` (SECURITY_CONTACT).
+- **Database role check:** with HTTPS on, the server refuses to start if its database user is a superuser or has BYPASSRLS, because that would skip company separation. It warns on laptops. CI now uses an ordinary role, and the GitHub checks (CI and CodeQL) pass.
 - **CI/CD security (4.5 / 4.8):**
   - A GitHub Actions workflow runs the type check, build, all tests on PostgreSQL, `npm audit` (fails on high), and a CycloneDX SBOM kept with each run.
   - CodeQL code scanning (SAST) runs weekly and on every change.
