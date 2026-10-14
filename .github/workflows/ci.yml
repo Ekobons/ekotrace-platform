@@ -32,8 +32,9 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npm run typecheck
+      # the calculation engine's types come from its build
       - run: npm run build
+      - run: npm run typecheck
       - run: npm test
       - name: Dependency audit (fails on high or critical)
         run: npm audit --omit=dev --audit-level=high
