@@ -36,6 +36,7 @@ import { homeRoutes } from './modules/home.routes.js';
 import { targetsRoutes } from './modules/targets.routes.js';
 import { approvalsRoutes } from './modules/approvals.routes.js';
 import { qrRoutes } from './modules/qr.routes.js';
+import { contractorPublicRoutes, contractorRoutes } from './modules/contractor.routes.js';
 import { reportsRoutes } from './modules/reports.routes.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -73,6 +74,7 @@ export async function buildApp(opts: { logger?: boolean } = {}): Promise<Fastify
   await app.register(purchaseIngestRoutes);
   // Employees answering a survey with their personal code: no session.
   await app.register(surveyPublicRoutes);
+  await app.register(contractorPublicRoutes);
   await app.register(async (secured) => {
     secured.addHook('onRequest', authenticate);
     await secured.register(reviewRoutes);
@@ -82,6 +84,7 @@ export async function buildApp(opts: { logger?: boolean } = {}): Promise<Fastify
     await secured.register(approvalsRoutes);
     await secured.register(reportsRoutes);
     await secured.register(qrRoutes);
+    await secured.register(contractorRoutes);
     await secured.register(orgRoutes);
     await secured.register(peopleRoutes);
     await secured.register(platformRoutes);

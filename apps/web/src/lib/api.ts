@@ -294,6 +294,10 @@ export interface Scan { id: string; bin?: string; item?: string; kind: 'weigh' |
 export interface Rollup { start: string; end: string; rolled: number;
   perBin: { bin: string; item: string; basis: string; actualKg: number; estimatedKg: number; scans: number; manifests: string[] }[];
   groups: { itemId: number; item: string; gri: string | null; hazardous: boolean; contractor: string | null; actual: number; estimated: number; manifests: string[]; bins: string[]; scans: number }[] }
+export interface Contractor { id: string; name: string; email: string; contact: string | null; expiresAt: string | null; revoked: boolean; lastUsed: string | null; hasCode: boolean; bins: number; lastCollection: string | null }
+export interface StatementRec { contractorId: string; contractor: string; ours: number; theirs: number | null; gapPct: number | null; flagged: boolean;
+  statement: { id: string; lines: unknown[]; documentId: string | null; note: string | null; status: 'submitted' | 'accepted' | 'queried'; reviewNote: string | null; reviewedBy: string | null; submittedAt: string } | null;
+  lines: { facility: string; item: string; ours: number; theirs: number | null; gapPct: number | null }[] }
 export type BinInput = { facilityId: string; name: string; location?: string; itemId: number; gri?: string; hazardous: boolean; contractor?: string; capacityL?: number; density?: number };
 
 const qs = (q: Record<string, unknown>) => new URLSearchParams(Object.entries(q).filter(([, v]) => v !== undefined && v !== '' && v !== null).map(([k, v]) => [k, String(v)]));
@@ -512,6 +516,13 @@ export const api = {
   scans: (q: { facilityId: string; year: number; month: number }) => call<{ scans: Scan[] }>('GET', `/api/qr/scans?${qs(q)}`),
   voidScan: (id: string) => call<{ ok: true }>('POST', `/api/qr/scans/${id}/void`, {}),
   rollup: (q: { facilityId: string; year: number; month: number }) => call<Rollup>('GET', `/api/qr/rollup?${qs(q)}`),
+  contractors: () => call<{ contractors: Contractor[] }>('GET', '/api/qr/contractors'),
+  addContractor: (b: { name: string; email: string; contact?: string; months?: number }) => call<{ id: string; code: string; expiresAt: string; bins: number }>('POST', '/api/qr/contractors', b),
+  contractorCode: (id: string, months?: number) => call<{ code: string; expiresAt: string }>('POST', `/api/qr/contractors/${id}/code`, { months }),
+  revokeContractor: (id: string) => call<{ ok: true }>('POST', `/api/qr/contractors/${id}/revoke`, {}),
+  statements: (q: { year: number; month: number }) => call<{ tolerancePct: number; contractors: StatementRec[] }>('GET', `/api/qr/statements?${qs(q)}`),
+  reviewStatement: (id: string, b: { status: 'accepted' | 'queried'; note?: string }) => call<{ ok: true }>('PUT', `/api/qr/statements/${id}`, b),
+  docUrl: (id: string) => `/api/qr/documents/${id}`,
   makeRollup: (q: { facilityId: string; year: number; month: number }) => call<{ made: { item: string; kg: number; dataType: string; id: string | null; warnings: string[] }[] }>('POST', '/api/qr/rollup', q),
   saveApprovalSettings: (b: ApprovalSettings) => call<ApprovalSettings>('PUT', '/api/approvals/settings', b),
   reviewAction: (ids: string[], action: 'submit' | 'withdraw' | 'approve' | 'return', note?: string) => call<{ done: number; skipped: { id: string; reason: string }[]; toLevel2?: number }>('POST', '/api/activities/review', { ids, action, note }),

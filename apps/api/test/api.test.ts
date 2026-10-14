@@ -1805,3 +1805,69 @@ test('waste sent out: GRI 306 operation on the entry, hazardous proxy factor, du
   assert.equal((await api('POST', '/api/qr/rollup', { facilityId: facA, year: y, month: m }, tenantA)).status, 400, 'scans are used once');
   assert.equal((await api('POST', `/api/qr/scans/${big.body.id}/void`, {}, tenantA)).status, 400, 'a rolled-up scan is changed through its entry');
 });
+
+test('waste contractor portal: access code (hashed, expires, revoked), only its own bins, collections with manifest and ticket, statement reconciled against the scans, accept / query', async () => {
+  const id = async (code: string) => (await pq('SELECT id FROM item WHERE code = $1', [code])).rows[0].id as number;
+  const pub = async (method: string, path: string, body?: unknown, tok?: string, raw?: Buffer) => {
+    const headers: Record<string, string> = {}; if (tok) headers['x-contractor-token'] = tok;
+    if (raw) { headers['content-type'] = 'application/octet-stream'; headers['x-filename'] = 'ticket.pdf'; }
+    const r = await app.inject({ method: method as 'GET', url: `/api/public/contractor${path}`, payload: raw ?? ((body ?? (method === 'GET' ? undefined : {})) as object), headers });
+    return { status: r.statusCode, body: r.json() };
+  };
+  const food = await id('waste3:refuse:organic-food-and-drink-waste:composting'), bat = await id('waste3:electrical-items:batteries:open_loop');
+  const b1 = (await api('POST', '/api/qr/bins', { facilityId: facA, name: 'Food 1', itemId: food, contractor: 'Green Haul LLC', capacityL: 240, density: 0.5 }, tenantA)).body;
+  const b2 = (await api('POST', '/api/qr/bins', { facilityId: facA, name: 'Batteries 2', itemId: bat, hazardous: true, contractor: 'green haul llc ' }, tenantA)).body;
+  const other = (await api('POST', '/api/qr/bins', { facilityId: facA, name: 'Other co', itemId: food, contractor: 'Someone Else' }, tenantA)).body;
+  const cr = await api('POST', '/api/qr/contractors', { name: 'Green Haul LLC', email: 'Ops@GreenHaul.example', months: 6 }, tenantA);
+  assert.equal(cr.status, 200, JSON.stringify(cr.body));
+  assert.equal(cr.body.bins, 2, 'bins linked by the contractor name');
+  assert.match(cr.body.code, /^[A-Z0-9]{10}$/);
+  assert.equal((await pq('SELECT code_hash FROM waste_contractor WHERE id = $1', [cr.body.id])).rows[0].code_hash.length, 64, 'only the hash is stored');
+  // sign in
+  assert.equal((await pub('POST', '/login', { email: 'ops@greenhaul.example', code: 'WRONGCODE1' })).status, 401);
+  const li = await pub('POST', '/login', { email: 'OPS@greenhaul.example', code: cr.body.code.toLowerCase() });
+  assert.equal(li.status, 200, JSON.stringify(li.body));
+  const tok = li.body.token as string;
+  assert.equal((await pub('GET', '/me')).status, 401, 'needs the session');
+  const me = (await pub('GET', '/me', undefined, tok)).body;
+  assert.deepEqual(me.bins.map((b: { name: string }) => b.name).sort(), ['Batteries 2', 'Food 1']);
+  // collections: own bins only; hazardous needs the manifest; a ticket; no duplicate manifest
+  const today = new Date().toISOString().slice(0, 10);
+  assert.equal((await pub('POST', '/collections', { binId: other.id, date: today, kg: 50 }, tok)).status, 400, 'not its bin');
+  assert.equal((await pub('POST', '/collections', { binId: b2.id, date: today, kg: 30 }, tok)).status, 400, 'hazardous without manifest');
+  const ev = await pub('POST', '/evidence', undefined, tok, Buffer.from('%PDF-1.4 demo ticket'));
+  assert.equal(ev.status, 200, JSON.stringify(ev.body));
+  assert.equal((await pub('POST', '/evidence', undefined, tok, Buffer.from('not a pdf'))).status, 400);
+  const c1 = await pub('POST', '/collections', { binId: b2.id, date: today, kg: 30, manifest: 'GH-1', documentId: ev.body.documentId }, tok);
+  assert.equal(c1.status, 200, JSON.stringify(c1.body));
+  assert.equal((await pub('POST', '/collections', { code: b2.code, date: today, kg: 31, manifest: 'gh-1' }, tok)).status, 409, 'same manifest twice');
+  const c2 = await pub('POST', '/collections', { code: b1.code, date: today, kg: 400 }, tok);
+  assert.equal(c2.status, 200);
+  const sc = (await pq('SELECT kind, by_user, contractor_id, flags FROM waste_scan WHERE id = $1', [c2.body.id])).rows[0];
+  assert.equal(sc.kind, 'collection'); assert.equal(sc.contractor_id, cr.body.id); assert.deepEqual(sc.flags, ['No ticket attached']);
+  // staff see the ticket
+  const doc = await app.inject({ method: 'GET', url: `/api/qr/documents/${ev.body.documentId}`, headers: { cookie: adminCookie, 'x-tenant-id': tenantA } });
+  assert.equal(doc.statusCode, 200); assert.equal(doc.headers['content-type'], 'application/pdf');
+  // statement: lines for its bins only; reconciliation against the collections (weighbridge)
+  const now = new Date(), y = now.getUTCFullYear(), m = now.getUTCMonth() + 1;
+  assert.equal((await pub('PUT', '/statements', { year: y, month: m, lines: [{ facilityId: facA, itemId: await id('waste3:paper:paper-and-board-mixed:closed_loop'), tonnes: 1 }] }, tok)).status, 400);
+  const st = await pub('PUT', '/statements', { year: y, month: m, lines: [{ facilityId: facA, itemId: food, gri: null, tonnes: 0.3 }, { facilityId: facA, itemId: bat, gri: null, tonnes: 0.03 }], note: 'monthly' }, tok);
+  assert.equal(st.status, 200, JSON.stringify(st.body));
+  const rec = (await api('GET', `/api/qr/statements?year=${y}&month=${m}`, undefined, tenantA)).body.contractors.find((x: { contractor: string }) => x.contractor === 'Green Haul LLC');
+  assert.ok(Math.abs(rec.ours - 0.43) < 1e-9 && Math.abs(rec.theirs - 0.33) < 1e-9, JSON.stringify(rec));
+  assert.equal(rec.flagged, true, 'food 0.3 t against 0.4 t: -25%');
+  assert.equal((await api('PUT', `/api/qr/statements/${rec.statement.id}`, { status: 'queried' }, tenantA)).status, 400, 'a query says why');
+  await api('PUT', `/api/qr/statements/${rec.statement.id}`, { status: 'queried', note: 'Food waste 0.4 t on our weighbridge' }, tenantA);
+  assert.equal((await pub('GET', '/me', undefined, tok)).body.statements[0].reviewNote, 'Food waste 0.4 t on our weighbridge');
+  await pub('PUT', '/statements', { year: y, month: m, lines: [{ facilityId: facA, itemId: food, gri: null, tonnes: 0.4 }, { facilityId: facA, itemId: bat, gri: null, tonnes: 0.03 }] }, tok);
+  await api('PUT', `/api/qr/statements/${rec.statement.id}`, { status: 'accepted' }, tenantA);
+  assert.equal((await pub('PUT', '/statements', { year: y, month: m, lines: [{ facilityId: facA, itemId: food, gri: null, tonnes: 9 }] }, tok)).status, 400, 'accepted: locked');
+  // another company sees nothing of it
+  assert.equal((await api('GET', '/api/qr/contractors', undefined, tenantB)).body.contractors.length, 0);
+  // revoked: the session ends and the code stops working
+  await api('POST', `/api/qr/contractors/${cr.body.id}/revoke`, {}, tenantA);
+  assert.equal((await pub('GET', '/me', undefined, tok)).status, 401);
+  assert.equal((await pub('POST', '/login', { email: 'ops@greenhaul.example', code: cr.body.code })).status, 401);
+  const nc = (await api('POST', `/api/qr/contractors/${cr.body.id}/code`, { months: 1 }, tenantA)).body;
+  assert.equal((await pub('POST', '/login', { email: 'ops@greenhaul.example', code: nc.code })).status, 200);
+});

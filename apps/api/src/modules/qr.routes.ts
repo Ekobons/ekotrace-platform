@@ -27,6 +27,7 @@ import { audit, requireRole, requireTenant } from '../lib/auth.js';
 import { assertCan, scopeOf } from '../lib/access.js';
 import { AppError, notFound } from '../lib/errors.js';
 import { runBatch, tenantSettings } from './activity.routes.js';
+import { linkBins } from './contractor.routes.js';
 
 const GRI = z.enum(['reuse', 'recycling', 'composting', 'ad', 'incin_er', 'incin_noer', 'landfill', 'other']);
 const binSchema = z.object({
@@ -113,7 +114,7 @@ export async function qrRoutes(app: FastifyInstance) {
           `INSERT INTO waste_bin (tenant_id, facility_id, code, name, location, item_id, gri, hazardous, contractor, capacity_l, density, created_by)
            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) ON CONFLICT (code) DO NOTHING RETURNING id`,
           [tenant, b.facilityId, code, b.name, b.location || null, b.itemId, b.gri ?? null, b.hazardous, b.contractor || null, b.capacityL ?? null, b.density ?? null, req.user.name])).rows[0];
-        if (r) { await audit(c, req, 'qr.bin.create', 'waste_bin', r.id, { name: b.name, code }); return binFor(c, req, r.id, 'see'); }
+        if (r) { await linkBins(c); await audit(c, req, 'qr.bin.create', 'waste_bin', r.id, { name: b.name, code }); return binFor(c, req, r.id, 'see'); }
       }
       throw new AppError('Could not make a unique code, try again');
     });
@@ -130,6 +131,7 @@ export async function qrRoutes(app: FastifyInstance) {
       await c.query(`UPDATE waste_bin SET name = COALESCE($2, name), location = COALESCE($3, location), item_id = COALESCE($4, item_id), gri = CASE WHEN $10::boolean THEN $5 ELSE gri END,
                        hazardous = COALESCE($6, hazardous), contractor = COALESCE($7, contractor), capacity_l = COALESCE($8, capacity_l), density = COALESCE($9, density) WHERE id = $1`,
         [id, b.name ?? null, b.location ?? null, b.itemId ?? null, b.gri ?? null, b.hazardous ?? null, b.contractor ?? null, b.capacityL ?? null, b.density ?? null, 'gri' in b]);
+      if (b.contractor !== undefined) { await c.query('UPDATE waste_bin SET contractor_id = NULL WHERE id = $1', [id]); await linkBins(c); }
       await audit(c, req, 'qr.bin.update', 'waste_bin', id, b);
       return binFor(c, req, id, 'see');
     });

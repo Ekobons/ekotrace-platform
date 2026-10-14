@@ -16,6 +16,8 @@ import { storeReadings, syncMeter, type MeterRow } from '../modules/meters.route
 import { bookBill, createBill } from '../modules/bills.routes.js';
 import { PDFDocument, StandardFonts } from 'pdf-lib';
 import { demoPurchases } from './demoPurchases.js';
+import { createHash } from 'node:crypto';
+import { linkBins } from '../modules/contractor.routes.js';
 
 const NAME = 'BEEAH Group (demo)';
 const TREE: [string, [string, string, string][]][] = [
@@ -59,6 +61,7 @@ const FLEET: [string, string, string, string, string, string | null, 'distance' 
 
 async function main() {
   const pw = temporaryPassword();
+  const ccode = temporaryPassword().replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, 10).padEnd(10, 'X');   // contractor portal (demo)
   const hash = await hashPassword(pw);
   let tenantId = '';
   await platformTx(async (c: Tx) => {
@@ -67,7 +70,7 @@ async function main() {
     if (old) {
       // Demo company only (matched by its exact name): remove everything it holds.
       for (const sql of [
-        'DELETE FROM waste_scan WHERE tenant_id = $1', 'DELETE FROM waste_bin WHERE tenant_id = $1', 'DELETE FROM certificate_claim WHERE tenant_id = $1', 'DELETE FROM energy_certificate WHERE tenant_id = $1', 'DELETE FROM supplier_factor WHERE tenant_id = $1',
+        'DELETE FROM waste_scan WHERE tenant_id = $1', 'DELETE FROM waste_bin WHERE tenant_id = $1', 'DELETE FROM contractor_statement WHERE tenant_id = $1', 'DELETE FROM contractor_session WHERE tenant_id = $1', 'DELETE FROM waste_contractor WHERE tenant_id = $1', 'DELETE FROM certificate_claim WHERE tenant_id = $1', 'DELETE FROM energy_certificate WHERE tenant_id = $1', 'DELETE FROM supplier_factor WHERE tenant_id = $1',
         'DELETE FROM job WHERE tenant_id = $1', 'UPDATE purchase_line SET activity_id = NULL WHERE tenant_id = $1', 'DELETE FROM activity_result WHERE tenant_id = $1', 'DELETE FROM activity WHERE tenant_id = $1',
         'DELETE FROM purchase_batch WHERE tenant_id = $1', 'DELETE FROM purchase_rule WHERE tenant_id = $1', 'DELETE FROM purchase_profile WHERE tenant_id = $1', 'DELETE FROM supplier_ef WHERE tenant_id = $1', 'DELETE FROM supplier WHERE tenant_id = $1', 'DELETE FROM fx_rate WHERE tenant_id = $1', 'DELETE FROM vehicle WHERE tenant_id = $1',
         'DELETE FROM bill WHERE tenant_id = $1', 'DELETE FROM document WHERE tenant_id = $1', 'DELETE FROM meter_reading WHERE tenant_id = $1', 'DELETE FROM meter WHERE tenant_id = $1', 'DELETE FROM api_key WHERE tenant_id = $1',
@@ -319,6 +322,13 @@ async function main() {
         if (name.startsWith('Compactor')) for (const d of [3, 10].filter((x) => x < day)) await scan(d, 'collection', 2800 + d * 20, { manifest: `DEMO-WTN-${y}${mo + 1}-${d}` });
         if (haz && day > 5) await scan(5, 'collection', 85, { manifest: `DEMO-HZ-${y}${mo + 1}-05` });
       }
+      // a DEMO contractor with portal access, and its statement for this month (food waste below the site's own figure: flagged)
+      const wc = (await c.query(`INSERT INTO waste_contractor (tenant_id, name, email, contact, code_hash, expires_at, created_by) VALUES ($1,'DEMO Waste Collector LLC','collector@demo.example','DEMO contact · not real',$2,(current_date + interval '12 months')::date,'demo') RETURNING id`,
+        [t, createHash('sha256').update(ccode).digest('hex')])).rows[0].id;
+      await linkBins(c);
+      const zb = (await c.query(`SELECT facility_id, item_id, gri, name FROM waste_bin WHERE contractor_id = $1`, [wc])).rows;
+      const lines = zb.map((b) => ({ facilityId: b.facility_id, itemId: b.item_id, gri: b.gri, tonnes: b.name.startsWith('Compactor') ? Math.round(((2860 + 3000) / 1000) * 1.02 * 1000) / 1000 : 0.8 }));
+      if (lines.length && day > 10) await c.query(`INSERT INTO contractor_statement (tenant_id, contractor_id, year, month, lines, note) VALUES ($1,$2,$3,$4,$5,'DEMO statement — not real')`, [t, wc, y, mo + 1, JSON.stringify(lines)]);
     }
     // ------------------------------------------------------------ business travel --
     // DEMO trips (not real): flights from airports, by type, hotel stays and taxis, Jan–Sep 2026.
@@ -478,6 +488,7 @@ async function main() {
   console.log('\nDemo logins (all with the same password, shown once):');
   for (const [name, email] of PEOPLE) console.log(`  ${email.padEnd(24)} ${name}`);
   console.log(`\n  Password: ${pw}\n`);
+  console.log(`Waste contractor portal (/contractor, DEMO): collector@demo.example · access code ${ccode}\n`);
 }
 
 main().catch((e) => { console.error('Demo not created:', e.message); process.exitCode = 1; }).finally(() => pool.end());

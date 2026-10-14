@@ -64,6 +64,7 @@
 | GRI 306 disposal method | re-use, recycling, composting, anaerobic digestion (diverted from disposal); incineration with or without energy recovery, landfill, other disposal (disposal) |
 | QR label (bin) | a label with a link to the bin's scan page; holds no data; opening it needs a signed-in person with access to the facility |
 | Weighbridge weight | the weight on the collection ticket; replaces the month's field scans for that bin |
+| Contractor portal | the page (/contractor) where a waste contractor, with its email and an access code, records collections and sends its monthly statement for the bins assigned to it |
 | Room-night | One hotel room for one night; 2 rooms for 3 nights = 6 room-nights |
 | Target path | The straight-line route from base-year emissions to the reduction target in the target year; each month is compared with the same base-year month cut by the share due by then |
 | Due day | Day of the next month by which a month's data should be submitted (Methodology → Collection rules) |

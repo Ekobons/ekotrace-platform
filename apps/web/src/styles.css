@@ -981,3 +981,15 @@ input.need { border-color: var(--warn); background: var(--warn-bg); }
 .app.mini .nav a .navb { position: absolute; margin: 0; top: 2px; right: 4px; font-size: 9px; padding: 0 5px; }
 .brand small { white-space: nowrap; letter-spacing: .04em; font-size: 8.5px; display: block; overflow: hidden; text-overflow: ellipsis; }
 .seg.full button { padding: 10px 6px; white-space: nowrap; font-size: 14px; }
+.stmt { border: 1px solid var(--line); border-radius: 12px; padding: 12px; margin-top: 10px; display: grid; gap: 4px; }
+.codebox { border: 2px solid var(--primary); }
+
+/* ---- waste contractor portal ---- */
+.cportal { max-width: 1000px; margin: 0 auto; padding: 16px 16px 48px; display: grid; gap: 14px; align-content: start; min-height: 100vh; }
+.cportal header { display: flex; align-items: center; gap: 10px; }
+.cportal header .mark { width: 32px; height: 32px; border-radius: 10px; background: var(--lime); color: var(--ink); display: grid; place-items: center; font-weight: 700; }
+.cportal header small { display: block; font-size: 11px; color: var(--muted); letter-spacing: .06em; text-transform: uppercase; }
+.cportal .csign { max-width: 420px; margin: 40px auto; display: grid; gap: 12px; }
+.cportal .cform { display: grid; gap: 12px; }
+.cportal .formgrid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+@media (max-width: 700px) { .cportal .formgrid { grid-template-columns: 1fr 1fr; } .cportal .formgrid > * { grid-column: span 2 !important; } }

@@ -3,6 +3,8 @@ import { useState, type FormEvent } from 'react';
 import { api } from '../lib/api';
 
 export function Login({ onDone }: { onDone: () => void }) {
+  // a bin's QR label opened before signing in: a contractor goes to the portal with that bin chosen
+  const binCode = /^\/scan\/([A-Za-z0-9]+)/.exec(window.location.pathname)?.[1] ?? '';
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [err, setErr] = useState<string | null>(null);
@@ -23,6 +25,7 @@ export function Login({ onDone }: { onDone: () => void }) {
         <button className="btn p" disabled={busy} style={{ height: 42 }}>{busy ? 'Checking…' : 'Log in'}</button>
         <p className="sub">Forgot your password? Ask your company's Super admin or Admin to reset it.</p>
         <a className="btn ghost" href="/survey" style={{ justifySelf: 'start' }}>Answering a survey? Enter your code →</a>
+        <a className="btn ghost" href={`/contractor${binCode ? `?bin=${binCode}` : ''}`} style={{ justifySelf: 'start' }}>Waste contractor? Sign in with your access code →</a>
       </form>
     </div>
   );

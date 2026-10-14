@@ -38,3 +38,23 @@ The month's scans for a facility: when, bin, type, kg (estimated marked), manife
 **By bin:** weighed and estimated kg, number of scans and manifests, and the basis — **weighbridge** when the month has collections with a weight for that bin (they replace the field scans), else **field scans**.
 
 **Entries to be made:** one per material, disposal method, hazardous and contractor — weighed and estimated kept as separate entries, so the data quality is right. **Create draft entries** saves them under Waste → sent out (Scope 3.5) with the contractor and the manifests, and marks the scans as used (a scan is used once). Check the totals against the contractor's monthly statement, then submit for approval from Entries & results. Hazardous waste without a manifest is saved but cannot be submitted until the manifest number is added.
+
+## Waste contractors (contractor portal)
+
+Collection and treatment companies record their own collections and send a monthly statement — without a user account. QR & field app → **Contractors**.
+
+**Give access** (managers, admins, super admin): the contractor's name **as written on its bins** (its bins are linked by that name), the work email, a contact, and how long the code is valid (3–24 months). An **access code** is shown once: give it privately (by phone, not in the same email as the link). Ekotrace keeps only a scrambled form of it. **New code** replaces it (the old one stops working at once); **Remove access** ends it and signs the contractor out.
+
+**The contractor** opens **/contractor** (also linked on the sign-in page as "Waste contractor?"; a bin's QR label opened without signing in leads there with that bin chosen), signs in with the email and code (8 hours), and sees **only the bins assigned to it**:
+
+| Tab | What the contractor does |
+|---|---|
+| **Collections** | per collection: bin, date, **weighbridge weight**, **manifest** number (required for hazardous waste; the same manifest twice is refused), vehicle, the **ticket or manifest** as a PDF or photo (up to 10 MB), note. Withdraw one while it is not yet in the site's figures |
+| **Monthly statement** | tonnes per site, material and method of its bins — filled in from its collections, to be corrected to its records — with the statement or treatment certificate and a note. It can be corrected until accepted |
+| **Your bins** | the bins assigned, with their label codes |
+
+A collection recorded by the contractor is a **collection scan** of the bin: its weighbridge weight replaces the site's own scans of that bin in the month roll-up, and a collection without a ticket is marked "No ticket attached".
+
+**Monthly statements** (QR & field app → Contractors): for the month, each contractor's tonnes against Ekotrace's own (weighbridge weights of collections, else the scans), per site, material and method; gaps over **±10%** are flagged. Open the statement file, then **Accept**, or **Query** with what does not match — the contractor sees the query and sends the statement again. An accepted statement is locked.
+
+Nothing a contractor sends goes into the emissions by itself: collections reach the inventory only through the month roll-up (draft entries) and approval by a BEEAH person — the maker–checker split. Every sign-in, upload, collection and statement is in the audit log under the contractor's name.

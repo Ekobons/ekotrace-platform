@@ -6,6 +6,7 @@ import { NavLink, Navigate, Route, Routes, useLocation, useNavigate } from 'reac
 import { api, currentTenant, setTenant, whenLoggedOut, ROLE_LABEL, type Company, type Me, type Role } from './lib/api';
 import { Icon } from './components/Icon';
 import { FieldApp } from './pages/FieldApp';
+import { ContractorPortal } from './pages/ContractorPortal';
 import { ScanPage } from './pages/ScanPage';
 import { Login, ChangePassword } from './pages/Login';
 import { AddData } from './pages/AddData';
@@ -94,6 +95,8 @@ export function App() {
   const toast = (m: string) => { setMsg(m); window.setTimeout(() => setMsg(null), 3500); };
   // employees answering a survey: no sign-in
   if (window.location.pathname === '/survey') return <SurveyAnswerPage />;
+  // waste contractors: email + access code, no user account
+  if (window.location.pathname === '/contractor') return <ContractorPortal />;
   if (me === 'loading') return <div className="empty">Loading…</div>;
   if (me === null) return <Login onDone={reload} />;
   if (me.user.mustChangePassword || mustChange) return <ChangePassword forced onDone={reload} />;

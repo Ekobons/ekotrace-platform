@@ -6,7 +6,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import qrcode from 'qrcode-generator';
 import { useApp } from '../App';
-import { api, num, type Bin, type Category, type Facility, type Rollup, type Scan } from '../lib/api';
+import { api, num, type Bin, type Category, type Contractor, type Facility, type Rollup, type Scan, type StatementRec } from '../lib/api';
 import { OPS, firstOp, griOf, materialsOf, methodName, opsOf } from '../lib/waste';
 import { Icon } from '../components/Icon';
 import { MN } from '../components/DashCharts';
@@ -32,7 +32,7 @@ export function FieldApp() {
   const nav = useNavigate();
   const [facs, setFacs] = useState<Facility[]>([]);
   const [fac, setFac] = useState('');
-  const [tab, setTab] = useState<'bins' | 'scans' | 'roll'>('bins');
+  const [tab, setTab] = useState<'bins' | 'scans' | 'roll' | 'con'>('bins');
   const [bins, setBins] = useState<Bin[] | null>(null);
   const [cat, setCat] = useState<Category | null>(null);
   const [tick, setTick] = useState(0);
@@ -73,7 +73,7 @@ export function FieldApp() {
       <div className="row" style={{ gap: 12 }}>
         <select className="input" style={{ width: 280 }} aria-label="Facility" value={fac} onChange={(e) => setFac(e.target.value)}>{facs.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}</select>
         <div className="seg strong" role="tablist">
-          {([['bins', '▦ Bins & labels'], ['scans', '◉ Scans'], ['roll', '⇪ Month roll-up']] as const).map(([k, l]) => <button key={k} role="tab" aria-selected={tab === k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>{l}</button>)}</div>
+          {([['bins', '▦ Bins & labels'], ['scans', '◉ Scans'], ['roll', '⇪ Month roll-up'], ['con', '🚚 Contractors']] as const).map(([k, l]) => <button key={k} role="tab" aria-selected={tab === k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>{l}</button>)}</div>
         <span className="grow" />
         {tab !== 'bins' && <div className="row" style={{ gap: 6 }}>
           <select className="input sm" style={{ width: 'auto' }} aria-label="Month" value={ym.m} onChange={(e) => setYm({ ...ym, m: Number(e.target.value) })}>{MN.map((n, i) => <option key={n} value={i + 1}>{n}</option>)}</select>
@@ -82,6 +82,7 @@ export function FieldApp() {
       {tab === 'bins' && <Bins bins={bins} cat={cat} fac={fac} canManage={canManage} reload={() => setTick((t) => t + 1)} print={printLabels} />}
       {tab === 'scans' && fac && <Scans fac={fac} ym={ym} />}
       {tab === 'roll' && fac && <Roll fac={fac} ym={ym} />}
+      {tab === 'con' && <Contractors ym={ym} canManage={canManage} />}
     </div>
   );
 }
@@ -92,6 +93,8 @@ function Bins({ bins, cat, fac, canManage, reload, print }: { bins: Bin[] | null
   const blank = { name: '', location: '', material: '', op: 'landfill', haz: false, contractor: '', size: '240', density: '' };
   const [f, setF] = useState(blank);
   const [open, setOpen] = useState(false);
+  const [cons, setCons] = useState<string[]>([]);
+  useEffect(() => { api.contractors().then((r) => setCons(r.contractors.filter((x) => !x.revoked).map((x) => x.name))).catch(() => {}); }, []);
   const m = mats.get(f.material);
   const dn = densityFor(m?.name ?? '');
   const add = async () => {
@@ -115,7 +118,8 @@ function Bins({ bins, cat, fac, canManage, reload, print }: { bins: Bin[] | null
         <label className="field"><span>Usual disposal method</span><select className="input" value={f.op} disabled={!m} onChange={(e) => setF({ ...f, op: e.target.value })}>
           {(['Diverted from disposal', 'Disposal'] as const).map((g) => <optgroup key={g} label={g}>{(m ? opsOf(m) : OPS).filter((o) => o.group === g).map((o) => <option key={o.key} value={o.key}>{o.name}</option>)}</optgroup>)}</select></label>
         <label className="field"><span>Hazardous?</span><select className="input" value={f.haz ? 'y' : 'n'} onChange={(e) => setF({ ...f, haz: e.target.value === 'y' })}><option value="n">Non-hazardous</option><option value="y">Hazardous (manifest needed at collection)</option></select></label>
-        <label className="field"><span>Contractor</span><input className="input" placeholder="Collector or treatment company" value={f.contractor} maxLength={120} onChange={(e) => setF({ ...f, contractor: e.target.value })} /></label>
+        <label className="field"><span>Contractor</span><input className="input" list="bin-contractors" placeholder="Collector or treatment company" value={f.contractor} maxLength={120} onChange={(e) => setF({ ...f, contractor: e.target.value })} />
+          <datalist id="bin-contractors">{cons.map((x) => <option key={x} value={x} />)}</datalist></label>
         <label className="field"><span>Container</span><select className="input" value={f.size} onChange={(e) => setF({ ...f, size: e.target.value })}>{SIZES.map(([n, l]) => <option key={l} value={l}>{n}</option>)}</select></label>
         <label className="field"><span>Density kg/L (for fill levels)</span><input className="input num" inputMode="decimal" placeholder={`${dn[1]} · ${dn[2]}`} value={f.density} onChange={(e) => setF({ ...f, density: e.target.value.replace(/[^0-9.]/g, '') })} /></label>
         <div className="row" style={{ gridColumn: '1 / -1' }}><span className="muted small">The fill-level estimate is capacity × % full × density; weighing is better and the weighbridge weight at collection replaces both.</span><span className="grow" /><button className="btn p" onClick={() => void add()}>Add bin</button></div>
@@ -204,5 +208,74 @@ function Roll({ fac, ym }: { fac: string; ym: { y: number; m: number } }) {
           <td className="small">{g.contractor ?? '—'}</td><td className="num">{num(g.actual)}</td><td className="num">{num(g.estimated)}</td><td className="small mono">{g.manifests.join(', ')}</td></tr>)}</tbody></table></div>
       <p className="muted small">Saved as drafts under Waste → sent out (Scope 3.5), weighed and estimated kept apart, with the contractor and manifests. Check the totals against the contractor’s monthly statement, then submit for approval from <Link to="/entries">Entries & results</Link>.</p>
     </section>}
+  </>;
+}
+
+/** Contractors with portal access, and their monthly statements checked against the scans. */
+function Contractors({ ym, canManage }: { ym: { y: number; m: number }; canManage: boolean }) {
+  const { toast } = useApp();
+  const [list, setList] = useState<Contractor[] | null>(null);
+  const [st, setSt] = useState<{ tolerancePct: number; contractors: StatementRec[] } | null>(null);
+  const [tick, setTick] = useState(0);
+  const [f, setF] = useState({ name: '', email: '', contact: '', months: '12' });
+  const [shown, setShown] = useState<{ name: string; email: string; code: string; expiresAt: string } | null>(null);
+  const [q, setQ] = useState<{ id: string; note: string } | null>(null);
+  useEffect(() => { api.contractors().then((r) => setList(r.contractors)).catch((e) => toast((e as Error).message)); }, [tick]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { setSt(null); api.statements({ year: ym.y, month: ym.m }).then(setSt).catch(() => {}); }, [ym.y, ym.m, tick]);
+  const reload = () => setTick((t) => t + 1);
+  const run = async (fn: () => Promise<unknown>) => { try { await fn(); reload(); } catch (e) { toast((e as Error).message); } };
+  const add = () => run(async () => {
+    const r = await api.addContractor({ name: f.name.trim(), email: f.email.trim(), contact: f.contact.trim() || undefined, months: Number(f.months) });
+    setShown({ name: f.name.trim(), email: f.email.trim(), code: r.code, expiresAt: r.expiresAt }); setF({ name: '', email: '', contact: '', months: '12' });
+    if (!r.bins) toast('No bins use this contractor yet: set it as the contractor of its bins');
+  });
+  const portal = `${window.location.origin}/contractor`;
+  const d = (x: string | null) => (x ? new Date(x).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '—');
+  return <>
+    {shown && <div className="note ok codebox">
+      <div><b>Access for {shown.name}</b> — shown once. Give it to them privately (not by the same email as the link), e.g. by phone.</div>
+      <div className="row" style={{ gap: 18, marginTop: 6 }}><span>Portal: <span className="mono">{portal}</span></span><span>Email: <span className="mono">{shown.email}</span></span>
+        <span>Code: <b className="mono" style={{ fontSize: 16, letterSpacing: '.12em' }}>{shown.code}</b></span><span className="muted">valid until {d(shown.expiresAt)}</span>
+        <span className="grow" /><button className="btn sm" onClick={() => setShown(null)}>Done</button></div>
+    </div>}
+    <section className="card tacard">
+      <div className="row"><h2>Contractors with portal access</h2><span className="grow" /><span className="muted small">They sign in at <span className="mono">/contractor</span> with their email and code — no password, no user account. They see only their own bins.</span></div>
+      {canManage && <div className="row" style={{ gap: 8, alignItems: 'flex-end' }}>
+        <label className="field grow"><span>Contractor (as named on its bins)</span><input className="input" value={f.name} maxLength={120} onChange={(e) => setF({ ...f, name: e.target.value })} /></label>
+        <label className="field" style={{ width: 240 }}><span>Work email</span><input className="input" type="email" value={f.email} maxLength={200} onChange={(e) => setF({ ...f, email: e.target.value })} /></label>
+        <label className="field" style={{ width: 200 }}><span>Contact person / phone</span><input className="input" value={f.contact} maxLength={200} onChange={(e) => setF({ ...f, contact: e.target.value })} /></label>
+        <label className="field" style={{ width: 130 }}><span>Code valid for</span><select className="input" value={f.months} onChange={(e) => setF({ ...f, months: e.target.value })}>{[3, 6, 12, 24].map((x) => <option key={x} value={x}>{x} months</option>)}</select></label>
+        <button className="btn p" disabled={!f.name.trim() || !f.email.includes('@')} onClick={() => void add()}>Give access</button></div>}
+      {!list ? <div className="muted">Loading…</div> : !list.length ? <div className="muted">No contractor has access yet.</div> : (
+        <div className="scrollx"><table className="t">
+          <thead><tr><th>Contractor</th><th>Email</th><th className="num">Bins</th><th>Code valid until</th><th>Last sign-in</th><th>Last collection</th><th /></tr></thead>
+          <tbody>{list.map((c) => <tr key={c.id} style={c.revoked ? { opacity: 0.55 } : undefined}>
+            <td><b>{c.name}</b><div className="muted small">{c.contact ?? ''}</div></td><td className="small mono">{c.email}</td><td className="num">{c.bins}</td>
+            <td className="small">{c.revoked ? <span className="chip grey">Access removed</span> : d(c.expiresAt)}</td><td className="small muted">{d(c.lastUsed)}</td><td className="small muted">{d(c.lastCollection)}</td>
+            <td className="nowrap">{canManage && <><button className="btn xs" onClick={() => void run(async () => { const r = await api.contractorCode(c.id); setShown({ name: c.name, email: c.email, code: r.code, expiresAt: r.expiresAt }); })}>{c.revoked ? 'Give access again' : 'New code'}</button>
+              {!c.revoked && <> <button className="btn xs ghost" onClick={() => void run(() => api.revokeContractor(c.id))}>Remove access</button></>}</>}</td></tr>)}</tbody></table></div>)}
+    </section>
+    <section className="card tacard">
+      <div className="row"><h2>Monthly statements · {MN[ym.m - 1]} {ym.y}</h2><span className="grow" /><span className="muted small">The contractor's tonnes against Ekotrace's (weighbridge weights of collections, else the scans) · gaps over ±{st?.tolerancePct ?? 10}% flagged</span></div>
+      {!st ? <div className="muted">Loading…</div> : !st.contractors.length ? <div className="muted">No contractor has bins or a statement for this month.</div> : st.contractors.map((r) => (
+        <div key={r.contractorId} className="stmt">
+          <div className="row" style={{ gap: 10 }}><b>{r.contractor}</b>
+            {r.statement ? <span className={`chip ${r.statement.status === 'accepted' ? '' : r.statement.status === 'queried' ? 'bad' : 'info'}`}>{r.statement.status === 'accepted' ? `Accepted · ${r.statement.reviewedBy ?? ''}` : r.statement.status === 'queried' ? 'Queried' : 'Submitted'}</span> : <span className="chip grey">No statement yet</span>}
+            {r.flagged && <span className="chip warn">Gap over ±{st.tolerancePct}%</span>}
+            <span className="muted small">Ekotrace {num(Math.round(r.ours * 100) / 100)} t{r.theirs != null ? ` · contractor ${num(Math.round(r.theirs * 100) / 100)} t` : ''}{r.gapPct != null ? ` · ${r.gapPct >= 0 ? '+' : ''}${r.gapPct.toFixed(1)}%` : ''}</span>
+            <span className="grow" />
+            {r.statement?.documentId && <a className="btn xs ghost" href={api.docUrl(r.statement.documentId)} target="_blank" rel="noreferrer">Statement file</a>}
+            {canManage && r.statement && r.statement.status !== 'accepted' && <><button className="btn xs p" onClick={() => void run(() => api.reviewStatement(r.statement!.id, { status: 'accepted' }))}>Accept</button>
+              <button className="btn xs" onClick={() => setQ({ id: r.statement!.id, note: '' })}>Query</button></>}
+          </div>
+          {q && q.id === r.statement?.id && <div className="row" style={{ gap: 6, marginTop: 6 }}><input className="input sm grow" autoFocus placeholder="What does not match?" value={q.note} onChange={(e) => setQ({ ...q, note: e.target.value })} />
+            <button className="btn sm danger" disabled={!q.note.trim()} onClick={() => void run(async () => { await api.reviewStatement(q.id, { status: 'queried', note: q.note.trim() }); setQ(null); })}>Send query</button><button className="btn sm ghost" onClick={() => setQ(null)}>Cancel</button></div>}
+          {r.statement?.note && <div className="muted small">Contractor's note: {r.statement.note}</div>}
+          {r.statement?.reviewNote && <div className="small" style={{ color: 'var(--bad)' }}>Query: {r.statement.reviewNote}</div>}
+          <table className="t dt" style={{ marginTop: 6 }}><thead><tr><th>Site</th><th>Material · method</th><th className="num">Ekotrace t</th><th className="num">Contractor t</th><th className="num">Gap</th></tr></thead>
+            <tbody>{r.lines.map((l, i) => <tr key={i}><td className="small">{l.facility}</td><td className="small">{l.item}</td><td className="num">{num(Math.round(l.ours * 1000) / 1000)}</td>
+              <td className="num">{l.theirs == null ? '—' : num(l.theirs)}</td><td className="num" style={{ color: l.gapPct != null && Math.abs(l.gapPct) > st.tolerancePct ? 'var(--warn)' : undefined }}>{l.gapPct == null ? '' : `${l.gapPct >= 0 ? '+' : ''}${l.gapPct.toFixed(1)}%`}</td></tr>)}</tbody></table>
+        </div>))}
+    </section>
   </>;
 }

@@ -2,6 +2,30 @@
 
 Newest first.
 
+## 2026-10-14 · Waste contractor portal
+
+- **Contractor portal at /contractor:** collection and treatment companies sign in with their work email and an access code.
+  - No user account and no password.
+  - The code is shown once, stored only as a hash, expires after 3–24 months, and can be replaced or removed. Sessions last 8 hours.
+  - The contractor sees only the bins assigned to it; bins are linked by the contractor name.
+- **Collections:** bin, date, weighbridge weight, manifest number, vehicle, ticket or manifest (PDF or photo up to 10 MB), note.
+  - Hazardous waste needs the manifest; the same manifest twice is refused.
+  - A contractor's collection is a collection scan of the bin, so its weighbridge weight replaces the site's scans in the month roll-up.
+  - A collection without a ticket is marked.
+- **Monthly statement:** tonnes per site, material and method, pre-filled from the collections, with the statement or certificate. It can be corrected until it is accepted.
+- **Staff (QR & field app → Contractors):**
+  - Give access, issue a new code, remove access.
+  - Statements are reconciled against Ekotrace's own tonnes per site, material and method; gaps over ±10% are flagged.
+  - Open the file, then Accept or Query (with a reason the contractor sees).
+- **Controls:**
+  - Nothing a contractor sends enters the inventory without the roll-up and approval by BEEAH (maker–checker).
+  - Every action is in the audit log under the contractor's name.
+  - Sign-in is rate-limited.
+- **Login page:** new link "Waste contractor?". A bin label opened without signing in leads to the portal with that bin chosen.
+- **DEMO:** contractor "DEMO Waste Collector LLC" (the access code is printed once by `npm run demo`) with a statement for this month; the food waste line is flagged.
+- **Tests:** 61 API tests pass.
+- **Manual:** QR & field app → Waste contractors; Glossary.
+
 ## 2026-10-14 · Waste by GRI 306 method, hazardous and manifest rules; QR & field app; coloured sub-tabs; collapsible menu
 
 - **Waste sent out (Scope 3.5):**
