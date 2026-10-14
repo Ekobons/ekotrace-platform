@@ -11,6 +11,7 @@ import { readdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { pool, platformTx } from './pool.js';
+import { config } from '../config.js';
 import { migrate } from './migrate.js';
 import { seed, seedGrid, gridSourceCodes } from './seed.js';
 import { IMPORTER_VERSION } from '../import/desnzWrite.js';
@@ -31,7 +32,17 @@ async function emptySubcategories(): Promise<string[]> {
         AND NOT EXISTS (SELECT 1 FROM item i JOIN factor f ON f.item_id = i.id AND f.status = 'active' WHERE i.subcategory_id = s.id)`, [MUST_HAVE])).rows.map((r) => r.code);
 }
 
+/** Row-level security keeps companies apart only when the application is NOT a superuser (or BYPASSRLS). */
+export async function checkDbRole(log: (m: string) => void) {
+  const r = (await pool.query(`SELECT rolsuper, rolbypassrls FROM pg_roles WHERE rolname = current_user`)).rows[0];
+  if (!r?.rolsuper && !r?.rolbypassrls) return;
+  const msg = 'The database user is a superuser or has BYPASSRLS: row-level security (company separation) would not apply. Connect as an ordinary role (see README).';
+  if (config.https) throw new Error(msg);
+  log(`[security] WARNING: ${msg}`);
+}
+
 export async function autoSetup(log: (m: string) => void) {
+  await checkDbRole(log);
   if (process.env.AUTO_SETUP === 'false') return;
   const ran = await migrate(log);
   if (ran.length) log(`[setup] ${ran.length} migration(s) applied`);
