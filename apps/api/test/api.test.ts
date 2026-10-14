@@ -2106,11 +2106,16 @@ test('security: MFA sign-in (code, replay, recovery code), company MFA policy fo
   const co = (await api('POST', '/api/platform/companies', { name: 'Secure Co', country: 'AU', gwpSet: 'AR6', superAdmin: { name: 'Sam Secure', email: 'sam@secure.test' } })).body;
   const raw = (method: string, url: string, payload?: object, cookie?: string) => app.inject({ method: method as 'POST', url, payload, headers: cookie ? { cookie } : {} });
   const cookieOf = (r: { headers: Record<string, unknown> }) => String(r.headers['set-cookie']).split(';')[0]!;
+  assert.ok(co.superAdmin?.temporaryPassword, JSON.stringify(co));
   let r = await raw('POST', '/api/auth/login', { email: 'sam@secure.test', password: co.superAdmin.temporaryPassword });
+  assert.equal(r.statusCode, 200, r.body);
   let sam = cookieOf(r);
-  await call(sam, 'POST', '/api/auth/password', { current: co.superAdmin.temporaryPassword, next: 'sam long password 1' });
+  const pw = await call(sam, 'POST', '/api/auth/password', { current: co.superAdmin.temporaryPassword, next: 'sam long password 1' });
+  assert.equal(pw.status, 200, JSON.stringify(pw.body));
   // set up: secret + QR; a wrong code refused; the right one gives 10 recovery codes
-  const setup = (await call(sam, 'POST', '/api/auth/mfa/setup')).body;
+  const su = await call(sam, 'POST', '/api/auth/mfa/setup');
+  assert.equal(su.status, 200, JSON.stringify(su.body));
+  const setup = su.body;
   assert.match(setup.uri, /^otpauth:\/\/totp\/.+secret=/);
   assert.equal((await call(sam, 'POST', '/api/auth/mfa/enable', { code: '000000' })).status, 400);
   const en = await call(sam, 'POST', '/api/auth/mfa/enable', { code: codeAt(setup.secret, stepNow()) });
