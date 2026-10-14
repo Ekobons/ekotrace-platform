@@ -2714,3 +2714,67 @@ const tenantRow = async (T: string, sql: string, params: unknown[]) => {
   const { tenantTx } = await import('../src/db/pool.js');
   return tenantTx(T, async (c) => (await c.query(sql, params)).rows[0]);
 };
+
+test('carbon credits: lots, retirements from delivered credits only, second-person approval, net after credits beside gross, removals only for neutralisation, reports and verifier pack; companies kept apart', async () => {
+  const co = await api('POST', '/api/platform/companies', { name: 'Credit Co', country: 'AE', superAdmin: { name: 'Cara Super', email: 'super@credit.test' } });
+  let sa = await login('super@credit.test', co.body.superAdmin.temporaryPassword);
+  await call(sa, 'POST', '/api/auth/password', { current: co.body.superAdmin.temporaryPassword, next: 'a long enough pass' });
+  sa = await login('super@credit.test', 'a long enough pass');
+  await call(sa, 'PATCH', '/api/tenant', { baseYear: 2025 });
+  const group = (await call(sa, 'GET', '/api/org')).body.nodes.find((n: { kind: string }) => n.kind === 'group').id;
+  const p1 = (await call(sa, 'POST', '/api/org/nodes', { parentId: group, kind: 'facility', name: 'Credit plant' })).body.id as string;
+  const a = (await call(sa, 'POST', '/api/activities', { facilityId: p1, itemId: await diesel(), quantity: 40000, unit: 'L', periodStart: '2025-03-01', periodEnd: '2025-03-31' })).body.id;
+  await call(sa, 'POST', '/api/activities/review', { ids: [a], action: 'submit' });
+  await call(sa, 'POST', '/api/activities/review', { ids: [a], action: 'approve' });
+  const ad = await call(sa, 'POST', '/api/users', { name: 'Cal Admin', email: 'admin@credit.test', role: 'admin', scopeNodeId: group });
+  let adm = await login('admin@credit.test', ad.body.temporaryPassword);
+  await call(adm, 'POST', '/api/auth/password', { current: ad.body.temporaryPassword, next: 'a long enough pass' });
+  adm = await login('admin@credit.test', 'a long enough pass');
+  const mg = await call(sa, 'POST', '/api/users', { name: 'Max Manager', email: 'mgr@credit.test', role: 'manager', facilityIds: [p1] });
+  let man = await login('mgr@credit.test', mg.body.temporaryPassword);
+  await call(man, 'POST', '/api/auth/password', { current: mg.body.temporaryPassword, next: 'a long enough pass' });
+  man = await login('mgr@credit.test', 'a long enough pass');
+
+  const g0 = (await call(adm, 'GET', '/api/credits?year=2025')).body;
+  assert.ok(g0.summary.gross.total > 50, JSON.stringify(g0.summary.gross)); assert.equal(g0.summary.retired, 0); assert.equal(g0.summary.net, g0.summary.gross.total);
+  const lot = { project: 'Test landfill gas', registry: 'Gold Standard', category: 'avoidance', vintage: 2024, quantity: 50, price: 10 };
+  assert.equal((await call(man, 'POST', '/api/credits/lots', lot)).status, 403, 'managers do not record credits');
+  const av = (await call(adm, 'POST', '/api/credits/lots', lot)).body.id as string;
+  const rm = (await call(adm, 'POST', '/api/credits/lots', { ...lot, project: 'Test biochar', registry: 'Puro.earth', category: 'removal_technical', quantity: 20, price: 150, status: 'delivered', deliveredOn: '2026-01-10' })).body.id as string;
+  // contracted credits cannot be retired; delivered ones up to what is available
+  const ret = (id: string, b: Record<string, unknown>, ck = adm) => call(ck, 'POST', `/api/credits/lots/${id}/retire`, { quantity: 10, retiredOn: '2026-03-01', claimYear: 2025, purpose: 'voluntary', ...b });
+  assert.equal((await ret(av, {})).status, 400);
+  assert.equal((await call(adm, 'PUT', `/api/credits/lots/${av}`, { ...lot, status: 'delivered', deliveredOn: '2026-02-01' })).status, 200);
+  assert.equal((await ret(av, { quantity: 51 })).status, 400);
+  assert.match(JSON.stringify((await ret(av, { purpose: 'neutralisation' })).body), /removals/);
+  const r1 = (await ret(av, { quantity: 30 })).body.id as string;
+  const r2 = (await ret(rm, { quantity: 5, purpose: 'neutralisation' })).body.id as string;
+  assert.equal((await ret(av, { quantity: 25 })).status, 400, 'waiting retirements hold their credits');
+  // only approved retirements count; the recorder and platform staff do not approve; a reason to reject
+  assert.equal((await call(adm, 'GET', '/api/credits?year=2025')).body.summary.retired, 0);
+  assert.ok((await call(sa, 'GET', '/api/inbox')).body.credits >= 2);
+  assert.equal((await call(adm, 'POST', `/api/credits/retirements/${r1}/decide`, { decision: 'approve' })).status, 403);
+  assert.equal((await api('POST', `/api/credits/retirements/${r1}/decide`, { decision: 'approve' }, co.body.company.id)).status, 403);
+  assert.equal((await call(sa, 'POST', `/api/credits/retirements/${r1}/decide`, { decision: 'reject' })).status, 400);
+  assert.equal((await call(sa, 'POST', `/api/credits/retirements/${r1}/decide`, { decision: 'approve' })).body.status, 'approved');
+  assert.equal((await call(sa, 'POST', `/api/credits/retirements/${r2}/decide`, { decision: 'approve' })).body.status, 'approved');
+  const g1 = (await call(man, 'GET', '/api/credits?year=2025')).body;
+  assert.equal(g1.summary.retired, 35); assert.ok(Math.abs(g1.summary.net - (g0.summary.gross.total - 35)) < 1e-6);
+  assert.equal(g1.summary.gross.total, g0.summary.gross.total, 'gross emissions are never changed by credits');
+  assert.equal(g1.summary.byCategory.avoidance, 30); assert.equal(g1.summary.byCategory.removal_technical, 5); assert.ok(Math.abs(g1.summary.removalShare - 5 / 35) < 1e-9);
+  assert.equal(g1.lots.find((l: { id: string }) => l.id === av).available, 20);
+  assert.equal(g1.canEdit, false);
+  // a lot in use keeps its quantity and cannot be removed; withdrawn by its author only
+  assert.equal((await call(adm, 'PUT', `/api/credits/lots/${av}`, { ...lot, quantity: 20, status: 'delivered' })).status, 400);
+  assert.equal((await call(adm, 'DELETE', `/api/credits/lots/${av}`)).status, 409);
+  const r3 = (await ret(av, { quantity: 1 })).body.id as string;
+  assert.equal((await call(sa, 'DELETE', `/api/credits/retirements/${r3}`)).status, 404);
+  assert.equal((await call(adm, 'DELETE', `/api/credits/retirements/${r3}`)).status, 200);
+  // reports and the verifier pack list them; the audit log has each step
+  assert.equal((await call(sa, 'GET', '/api/reports/settings')).body.credits.length, 2);
+  assert.equal((await call(sa, 'GET', '/api/assurance/pack?year=2025')).body.credits.length, 2);
+  assert.ok((await call(sa, 'GET', '/api/audit?q=credits')).status < 500);
+  // companies kept apart
+  assert.equal((await api('GET', '/api/credits?year=2025', undefined, tenantB)).body.lots.length, 0);
+  assert.equal((await api('POST', `/api/credits/retirements/${r1}/decide`, { decision: 'reject', note: 'x' }, tenantB)).status, 404);
+});

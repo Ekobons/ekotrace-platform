@@ -25,7 +25,7 @@ The line under **Dashboards** repeats the choice: what you view · year · month
 | Waste | waste generated (sent to others, t), diverted from landfill (re-use, recycling, composting, waste-to-energy), recovered (GRI 306-4: without waste-to-energy), hazardous, waste emissions (Scope 3.5), treatment at own sites (Scope 1); by month and route, by route, the GRI 306 table (hazardous and non-hazardous by operation), by contractor, diversion by month, by facility |
 | Mobility & travel | company fleet, business travel and employee commuting: emissions, fleet fuel (L), distance driven (km); by month, split, and every activity with its quantity and kg CO₂e per unit |
 | Value chain | Scope 3 by category, purchases by category (boxes), top suppliers, share of purchase emissions on supplier-specific factors |
-| Net zero | gross emissions, credits retired, net after credits (shown beside gross, never instead); last year against this year (annualised); good practice. Credits and reduction actions come with the targets and net zero module |
+| Net zero | gross emissions, credits retired (from Carbon credits, whole company), net after credits (shown beside gross, never instead), credits in the pipeline; emissions vs offsets by year; the credit portfolio by type; good practice |
 
 ## Complete months and the comparison
 

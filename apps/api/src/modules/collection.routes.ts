@@ -347,10 +347,12 @@ export async function collectionRoutes(app: FastifyInstance) {
         ? Number((await c.query(`SELECT count(*)::int AS n FROM assurance_finding WHERE status = 'open'`)).rows[0].n) : 0;
       const restatements = ['super_admin', 'admin', 'platform_admin'].includes(req.user.role)
         ? Number((await c.query(`SELECT count(*)::int AS n FROM base_restatement WHERE status = 'pending' AND proposed_by IS DISTINCT FROM $1`, [req.user.id])).rows[0].n) : 0;
+      const credits = ['super_admin', 'admin'].includes(req.user.role)
+        ? Number((await c.query(`SELECT count(*)::int AS n FROM carbon_credit_retirement WHERE status = 'pending' AND proposed_by IS DISTINCT FROM $1`, [req.user.id])).rows[0].n) : 0;
       const notes = (await c.query(`SELECT id, kind, title, body, link, at, read_at FROM notification WHERE user_id = $1 ORDER BY at DESC LIMIT 150`, [req.user.id])).rows;
       const u = (await c.query(`SELECT email_notify FROM app_user WHERE id = $1`, [req.user.id])).rows[0];
       return {
-        today: ob.today, mine: ob.mine, escalations: ob.escalations, upcoming: ob.upcoming, approvals, returned, drafts, metricChanges, findings, restatements,
+        today: ob.today, mine: ob.mine, escalations: ob.escalations, upcoming: ob.upcoming, approvals, returned, drafts, metricChanges, findings, restatements, credits,
         notifications: notes, unread: notes.filter((n) => !n.read_at).length, emailNotify: u?.email_notify ?? true, mailOn: mailOn(),
       };
     });

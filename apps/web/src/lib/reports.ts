@@ -55,13 +55,13 @@ export const lineT = (l: RepLine, mb: boolean) => (l.s1 + (mb ? l.s2m : l.s2) + 
 // ---------------------------------------------------------------- report sections --
 export const RSECS: [string, string][] = [['cover', 'Cover & reporting entity'], ['boundary', 'Organisational boundary & consolidation'], ['summary', 'Emissions summary by scope'], ['ghgcat', 'Emissions by GHG Protocol category'],
   ['byfac', 'Emissions by facility'], ['byasset', 'Emissions by asset (meters, vehicles, sites)'], ['bymonth', 'Emissions by month'], ['activity', 'Activity data and emission factors by source'], ['intensity', 'Intensity metrics'],
-  ['dtype', 'Data type: actual, estimated, proxy'], ['method', 'Methodology statement'], ['excl', 'Exclusions and justifications'], ['base', 'Base year and restatements'], ['dq', 'Data quality controls'],
+  ['dtype', 'Data type: actual, estimated, proxy'], ['method', 'Methodology statement'], ['excl', 'Exclusions and justifications'], ['base', 'Base year and restatements'], ['credits', 'Carbon credits (reported separately)'], ['dq', 'Data quality controls'],
   ['targets', 'Targets and progress'], ['actions', 'Decarbonisation actions and cost-benefit'], ['verif', 'Declaration, verification and sign-off'], ...FW_SECS];
 export const RTPL_DEF: RepTemplate[] = [
-  { id: 'board', base: 'board', name: 'Board summary', audience: 'Internal management', note: null, sections: ['cover', 'summary', 'ghgcat', 'byfac', 'intensity', 'targets', 'actions'] },
-  { id: 'ghgp', base: 'ghgp', name: 'GHG Protocol inventory report', audience: 'Verifier / public disclosure', note: null, sections: ['cover', 'boundary', 'summary', 'ghgcat', 'byfac', 'activity', 'dtype', 'method', 'excl', 'base', 'dq', 'verif'] },
+  { id: 'board', base: 'board', name: 'Board summary', audience: 'Internal management', note: null, sections: ['cover', 'summary', 'ghgcat', 'byfac', 'intensity', 'targets', 'actions', 'credits'] },
+  { id: 'ghgp', base: 'ghgp', name: 'GHG Protocol inventory report', audience: 'Verifier / public disclosure', note: null, sections: ['cover', 'boundary', 'summary', 'ghgcat', 'byfac', 'activity', 'dtype', 'method', 'excl', 'base', 'credits', 'dq', 'verif'] },
   { id: 'iso', base: 'iso', name: 'ISO 14064-1:2018 GHG report', audience: 'Global standard · public report, verifier (ISO 14064-3)', note: null, sections: ['iso_report'] },
-  { id: 'esrs', base: 'esrs', name: 'ESRS E1 climate disclosure (CSRD, EU)', audience: 'EU · CSRD sustainability statement', note: null, sections: ['cover', 'boundary', 'esrs_e1', 'ghgcat', 'bygas', 'method', 'excl', 'base', 'targets', 'verif'] },
+  { id: 'esrs', base: 'esrs', name: 'ESRS E1 climate disclosure (CSRD, EU)', audience: 'EU · CSRD sustainability statement', note: null, sections: ['cover', 'boundary', 'esrs_e1', 'ghgcat', 'bygas', 'method', 'excl', 'base', 'targets', 'credits', 'verif'] },
   { id: 'ifrs', base: 'ifrs', name: 'IFRS S2 GHG metrics (ISSB)', audience: 'Global · ISSB and adopting jurisdictions (AU, SG, JP, UK…)', note: null, sections: ['cover', 'boundary', 'ifrs_s2', 'ghgcat', 'method', 'excl', 'verif'] },
   { id: 'cdp', base: 'cdp', name: 'CDP climate questionnaire — emissions', audience: 'Global · CDP disclosure', note: null, sections: ['cover', 'cdp', 'bygas', 'bycountry', 'method', 'verif'] },
   { id: 'gri', base: 'gri', name: 'GRI 305 Emissions', audience: 'Global · sustainability report', note: null, sections: ['cover', 'boundary', 'gri305', 'ghgcat', 'bygas', 'intensity', 'method', 'base'] },
@@ -140,6 +140,17 @@ export function section(k: string, x: RepCtx): string {
             z.applied ? 'Restated' : 'Recorded (below threshold)', esc(`${z.proposed_name ?? ''} / ${z.decided_name ?? ''}`)]), ['Approved', 'Change', 'Trigger', 'Facility', 'tCO₂e', '% of base', 'Effect', 'Recorded / approved by'])
         : '<p>No restatements recorded.</p>';
       return h + `<p class="small">Policy: the base year is recalculated for structural changes (acquisitions, divestments, in- and outsourcing), changes in calculation methods or emission factors, and errors, when their effect reaches ${thr}% of base-year emissions, alone or together with earlier changes (GHG Protocol Corporate Standard ch. 5; ISO 14064-1 §6.4.1). Each recalculation is approved by a second person; the figures as first measured are kept.</p>`;
+    }
+    case 'credits': {
+      const cr = (x.settings.credits ?? []).filter((z) => z.claim_year === d.year), ret = cr.reduce((a, z) => a + z.t, 0);
+      const CAT: Record<string, string> = { avoidance: 'Avoidance / reduction', removal_nature: 'Removal — nature-based', removal_technical: 'Removal — technical' };
+      const PUR: Record<string, string> = { voluntary: 'Voluntary claim', neutralisation: 'Neutralising residual emissions', bvcm: 'Beyond value chain mitigation', corsia: 'CORSIA', compliance: 'Compliance scheme' };
+      let h = `<h2>Carbon credits ${d.year}</h2>` + T([['Gross emissions (Scopes 1, 2, 3)', `<b>${f1(inv.tot)}</b>`], ['Carbon credits retired for the year', f1(ret)], ...Object.keys(CAT).map((k) => [`&nbsp;&nbsp;of which ${CAT[k]!.toLowerCase()}`, f1(cr.filter((z) => z.category === k).reduce((a, z) => a + z.t, 0))]),
+        ['Net after credits (shown for information)', f1(inv.tot - ret)]], ['', 'tCO₂e']);
+      h += cr.length ? T(cr.map((z) => [new Date(z.retired_on).toLocaleDateString('en-GB'), esc(z.project) + (z.project_id ? ` (${esc(z.project_id)})` : ''), esc(z.registry), CAT[z.category] ?? z.category, z.vintage, f1(z.t), PUR[z.purpose] ?? z.purpose,
+          [z.ccp && 'CCP', z.ca && 'Corresponding adj.', z.corsia && 'CORSIA'].filter(Boolean).join(', ') || '—', esc(z.serials ?? '')]), ['Retired', 'Project', 'Registry', 'Type', 'Vintage', 'tCO₂e', 'Purpose', 'Labels', 'Serials'])
+        : '<p>No carbon credits retired for this year.</p>';
+      return h + '<p class="small">Carbon credits are reported separately from the GHG inventory and are not deducted from gross emissions or counted towards reduction targets (GHG Protocol; SBTi Corporate Net-Zero Standard; ESRS E1-7). Only retirements cancelled on a registry and approved by a second person are listed.</p>';
     }
     case 'dq': return x.checks ? '<h2>Data quality controls</h2>' + T(x.checks.map((c) => [esc(c.name), esc(c.area), !c.n ? 'OK' : c.justified ? `Justified: ${esc(c.justified.text)}` : 'To check', c.n]), ['Control', 'Area', 'Status', 'Warnings']) : '';
     case 'targets': { const t = x.targets; if (!t) return ''; return '<h2>Targets</h2>' + T([['Scope 1+2', `−${t.target.s12}% by ${t.target.year} vs ${t.baseYear ?? ''}`], ['Scope 3', `−${t.target.s3}% by ${t.target.year}`], ['Net Zero', `${t.sbti.nzYear} (residual ≤ ${t.sbti.resid}%)`], ['SBTi status', esc(t.sbti.status)]], ['Target', 'Ambition']); }

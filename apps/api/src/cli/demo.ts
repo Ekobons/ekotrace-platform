@@ -637,8 +637,26 @@ async function main() {
         [t, by, 'DEMO — Acquisition of a fleet services company (not real)', 'DEMO — its 2025 fuel and electricity from its own records, added as if it had always been part of the group.',
          Math.round(bm.total * 0.041), Math.round(bm.total * 0.006), Math.round(bm.total * 0.012), U.get('admin')!.id, U.get('admin')!.name]);
     }
+    // carbon credits (DEMO projects, not real): four purchases, three approved retirements for the base year, one waiting
+    const lot = async (v: unknown[]) => (await c.query(`INSERT INTO carbon_credit_lot (tenant_id, project, project_id, registry, methodology, category, project_type, country, vintage, quantity, price, supplier,
+                                                        contract_date, status, delivered_on, serials, ccp, corsia, ca, permanence, notes, created_by, created_name)
+                                                       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,'DEMO — not a real project or purchase',$21,$22) RETURNING id`,
+      [t, ...v, U.get('admin')!.id, U.get('admin')!.name])).rows[0].id as string;
+    const scale = Math.max(1, Math.round(bm.total / 100000));
+    const lg = await lot(['DEMO — Landfill gas capture (not real)', 'GS-DEMO-1', 'Gold Standard', 'AMS-III.G', 'avoidance', 'Landfill gas capture', 'India', 2024, 8000 * scale, 9.5, 'DEMO broker', '2025-11-10', 'delivered', '2025-12-01', 'DEMO-GS-0001…', true, false, false, null]);
+    const mg = await lot(['DEMO — Mangrove restoration (not real)', 'VCS-DEMO-2', 'Verra (VCS)', 'VM0033', 'removal_nature', 'Blue carbon (mangroves)', 'Pakistan', 2023, 3000 * scale, 27, 'DEMO developer', '2025-10-02', 'delivered', '2025-10-20', 'DEMO-VCS-0002…', true, false, false, '40 years, 20% buffer pool']);
+    const bc = await lot(['DEMO — Biochar from date-palm waste (not real)', 'PURO-DEMO-3', 'Puro.earth', 'Puro Biochar 2022', 'removal_technical', 'Biochar', 'United Arab Emirates', 2025, 1200 * scale, 140, 'DEMO producer', '2025-09-15', 'delivered', '2026-01-15', 'DEMO-PURO-0003…', false, false, false, '1,000+ years']);
+    await lot(['DEMO — Direct air capture offtake (not real)', null, 'Isometric', 'Isometric DAC protocol', 'removal_technical', 'DACCS', 'Oman', 2029, 1500 * scale, 410, 'DEMO DAC company', '2026-03-01', 'contracted', null, null, false, false, false, '10,000+ years']);
+    const ret = async (lotId: string, q: number, on: string, y: number, purpose: string, approved: boolean) => c.query(
+      `INSERT INTO carbon_credit_retirement (tenant_id, lot_id, quantity, retired_on, claim_year, purpose, serials, beneficiary, note, status, proposed_by, proposed_name, proposed_at, decided_by, decided_name, decided_at)
+       VALUES ($1,$2,$3,$4,$5,$6,'DEMO serials','DEMO group (not real)','DEMO',$7,$8,$9,now() - interval '30 days',$10,$11,CASE WHEN $7 = 'approved' THEN now() - interval '28 days' END)`,
+      [t, lotId, q, on, y, purpose, approved ? 'approved' : 'pending', U.get('admin')!.id, U.get('admin')!.name, approved ? U.get('super_admin')!.id : null, approved ? U.get('super_admin')!.name : null]);
+    await ret(lg, 6000 * scale, '2026-03-20', by, 'voluntary', true);
+    await ret(mg, 2000 * scale, '2026-03-20', by, 'bvcm', true);
+    await ret(bc, 400 * scale, '2026-03-20', by, 'voluntary', true);
+    await ret(bc, 300 * scale, '2026-10-01', by + 1, 'neutralisation', false);
     const r = await remindTenant(c, t);
-    console.log(`Base year: 1 DEMO restatement applied (landfill method), 1 waiting for approval (acquisition). Metric registry: ${M.size} metrics, 3 changed (versions), 1 change waiting for approval. Calendar: reminders ${r.due_soon} due soon, ${r.overdue} overdue, ${r.escalated} escalated → ${r.people} DEMO notices (e-mail held: no mail server).`);
+    console.log(`Carbon credits: 4 DEMO purchases, 3 retirements approved for ${by}, 1 waiting. Base year: 1 DEMO restatement applied (landfill method), 1 waiting for approval (acquisition). Metric registry: ${M.size} metrics, 3 changed (versions), 1 change waiting for approval. Calendar: reminders ${r.due_soon} due soon, ${r.overdue} overdue, ${r.escalated} escalated → ${r.people} DEMO notices (e-mail held: no mail server).`);
   });
   console.log('\nDemo logins (all with the same password, shown once):');
   for (const [name, email] of PEOPLE) console.log(`  ${email.padEnd(24)} ${name}`);

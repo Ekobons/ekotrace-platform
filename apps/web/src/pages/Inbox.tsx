@@ -31,7 +31,7 @@ export function Inbox({ onSeen }: { onSeen?: () => void }) {
   const openNote = (n: Notice) => { if (!n.read_at) void api.inboxRead({ ids: [n.id] }).then(() => onSeen?.()); if (n.link) nav(n.link); else reload(); };
   if (!d) return <div className="page"><div className="card empty">Loading…</div></div>;
   const late = d.mine.filter((o) => o.timing === 'overdue' || o.timing === 'escalated'), soon = d.mine.filter((o) => o.timing === 'due_soon');
-  const todo = late.length + soon.length + d.escalations.length + d.returned.length + d.approvals + d.metricChanges + d.findings + (d.restatements ?? 0);
+  const todo = late.length + soon.length + d.escalations.length + d.returned.length + d.approvals + d.metricChanges + d.findings + (d.restatements ?? 0) + (d.credits ?? 0);
   const notes = d.notifications.filter((n) => only === 'all' || !n.read_at);
   return (
     <div className="page">
@@ -56,11 +56,12 @@ export function Inbox({ onSeen }: { onSeen?: () => void }) {
                   <span className="chip bad">Fix</span><span className="grow"><b>{r.facility} · {r.item}</b> <span className="muted small">{r.month.slice(0, 7)}</span>
                     {r.note && <div className="small">“{r.note}” <span className="muted">— {r.by}</span></div>}</span><Icon name="chevron" /></Link>))}
             </div>)}
-          {(d.approvals > 0 || d.metricChanges > 0 || d.findings > 0 || d.drafts > 0 || (d.restatements ?? 0) > 0) && (
+          {(d.approvals > 0 || d.metricChanges > 0 || d.findings > 0 || d.drafts > 0 || (d.restatements ?? 0) > 0 || (d.credits ?? 0) > 0) && (
             <div className="ibgrp"><div className="eyebrow">Other work</div>
               {d.approvals > 0 && <Link className="ibrow" to="/approvals"><span className="chip info">{d.approvals}</span><span className="grow">entr{d.approvals > 1 ? 'ies' : 'y'} waiting for your approval</span><Icon name="chevron" /></Link>}
               {d.metricChanges > 0 && <Link className="ibrow" to="/metrics?tab=changes"><span className="chip info">{d.metricChanges}</span><span className="grow">metric registry change{d.metricChanges > 1 ? 's' : ''} to approve or reject</span><Icon name="chevron" /></Link>}
               {(d.restatements ?? 0) > 0 && <Link className="ibrow" to="/methodology#restatements"><span className="chip info">{d.restatements}</span><span className="grow">base-year change{d.restatements! > 1 ? 's' : ''} to approve or reject</span><Icon name="chevron" /></Link>}
+              {(d.credits ?? 0) > 0 && <Link className="ibrow" to="/credits?tab=retirements"><span className="chip info">{d.credits}</span><span className="grow">carbon credit retirement{d.credits! > 1 ? 's' : ''} to approve or reject</span><Icon name="chevron" /></Link>}
               {d.findings > 0 && <Link className="ibrow" to="/assurance"><span className="chip info">{d.findings}</span><span className="grow">open audit finding{d.findings > 1 ? 's' : ''} to answer</span><Icon name="chevron" /></Link>}
               {d.drafts > 0 && <Link className="ibrow" to="/entries"><span className="chip grey">{d.drafts}</span><span className="grow">draft{d.drafts > 1 ? 's' : ''} of yours not submitted yet</span><Icon name="chevron" /></Link>}
             </div>)}

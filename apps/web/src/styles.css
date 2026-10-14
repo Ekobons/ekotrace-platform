@@ -1231,3 +1231,18 @@ ul.plain { list-style: none; margin: 0; padding: 0; }
   .signin-form { place-items: start center; padding: 28px 20px 40px; }
 }
 .sf .field > span { text-transform: none; letter-spacing: 0; font-size: 13.5px; font-weight: 600; color: var(--fg); }
+
+/* carbon credits */
+.ccgrid { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 12px; }
+@media (max-width: 900px) { .ccgrid { grid-template-columns: 1fr; } }
+.ccbar { display: grid; gap: 8px; }
+.ccrow { display: grid; grid-template-columns: 120px minmax(0, 1fr) 90px; gap: 10px; align-items: center; font-size: 12.5px; }
+.ccrow > div { display: flex; height: 16px; background: #EEF2EF; border-radius: 6px; overflow: hidden; }
+.ccrow > div i { display: block; height: 100%; }
+.ccrow b { text-align: right; font-variant-numeric: tabular-nums; }
+.ccmeter { height: 10px; background: #EEF2EF; border-radius: 6px; overflow: hidden; margin: 8px 0 4px; }
+.ccmeter i { display: block; height: 100%; background: #6B4FA8; border-radius: 6px; }
+.ccuse { display: flex; height: 6px; background: #EEF2EF; border-radius: 4px; overflow: hidden; margin: 3px 0 4px; }
+.ccuse i { display: block; height: 100%; }
+.ccdot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; vertical-align: 1px; }
+.cctable td { vertical-align: top; }

@@ -46,6 +46,7 @@ import { contractorPublicRoutes, contractorRoutes } from './modules/contractor.r
 import { reportsRoutes } from './modules/reports.routes.js';
 import { collectionRoutes } from './modules/collection.routes.js';
 import { restatementRoutes } from './modules/restatement.routes.js';
+import { creditRoutes } from './modules/credits.routes.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const BRANDS = join(HERE, '../../../brands');
@@ -112,6 +113,7 @@ export async function buildApp(opts: { logger?: boolean; rateLimit?: Limits | nu
     await secured.register(reportsRoutes);
     await secured.register(collectionRoutes);
     await secured.register(restatementRoutes);
+    await secured.register(creditRoutes);
     await secured.register(qrRoutes);
     await secured.register(contractorRoutes);
     await secured.register(assuranceRoutes);

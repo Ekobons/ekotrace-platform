@@ -15,7 +15,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useApp } from '../App';
-import { api, type DashGroup, type OrgNode, type TargetsData } from '../lib/api';
+import { api, type CreditData, type DashGroup, type OrgNode, type TargetsData } from '../lib/api';
 import { Icon } from '../components/Icon';
 import { Bars, DCard, Donut, Dot, DStat, HBars, Legend, MN, PAL, SC, Treemap, fmt, fmt0, fmtT, type BarRow, type Part } from '../components/DashCharts';
 import { CONS, S, ViewBar, pc, range, signPct, sum, tot, useView, type Ctx, type Data, type Row } from '../components/ViewBar';
@@ -100,7 +100,17 @@ const mapSum = (m: Map<string, number>) => [...m.values()].reduce((a, v) => a + 
 const T = (v: number) => `${fmtT(v)} t`;
 
 // ------------------------------------------------------------ overview --
+/** The company's carbon credits for a year (retired, approved), for the Net zero cards. Company-wide: credits are not split by facility. */
+function useCredits(year: number | null) {
+  const [cr, setCr] = useState<CreditData | null>(null);
+  useEffect(() => { if (year) api.credits(year).then(setCr).catch(() => setCr(null)); else setCr(null); }, [year]);
+  return cr;
+}
+const CC: Record<string, string> = { avoidance: '#E9B44C', removal_nature: '#3E9B5F', removal_technical: '#6B4FA8' };
+
 function Overview({ d, c, go }: { d: Data; c: Ctx; go: (t: Tab) => void }) {
+  const cr = useCredits(d.year), ret = cr?.summary.retired ?? 0, off = Math.min(ret, c.total);
+  const nzParts: Part[] = [{ v: Math.max(0, c.total - off), c: 'var(--s2)', n: 'Net emissions' }, ...(off ? [{ v: off, c: '#6B4FA8', n: 'Offset by retired credits' }] : [])];
   const w = (v: number) => pc(v, c.total);
   const rows = monthRows(c, (rs) => [0, 1, 2].map((i) => ({ v: sum(rs, S[i]!), c: SC[i]!, n: `Scope ${i + 1}` })), c.cmpOn ? c.prevBy : undefined);
   const parts: Part[] = [0, 1, 2].map((i) => ({ v: c.s[i]!, c: SC[i]!, n: `Scope ${i + 1}` }));
@@ -159,9 +169,9 @@ function Overview({ d, c, go }: { d: Data; c: Ctx; go: (t: Tab) => void }) {
         </div>
       </DCard>
       <DCard title="Net zero · emissions vs offsets">
-        <div className="dsplit"><Donut parts={[{ v: c.total, c: 'var(--s2)', n: 'Net emissions' }]} center="0%" sub="offset" size={118} />
-          <Legend parts={[{ v: c.total, c: 'var(--s2)', n: 'Net emissions' }]} unit="t" /></div>
-        <div className="muted" style={{ fontSize: 12 }}>No retired carbon credits or completed reduction actions recorded for {d.year}.</div>
+        <div className="dsplit"><Donut parts={nzParts} center={pc(off, c.total)} sub="offset" size={118} />
+          <Legend parts={nzParts} unit="t" /></div>
+        <div className="muted" style={{ fontSize: 12 }}>{ret ? `${fmt0(ret)} t of credits retired for ${d.year} (whole company), reported beside gross emissions, never instead.` : `No retired carbon credits recorded for ${d.year}.`}</div>
         <button className="btn sm ghost" style={{ alignSelf: 'flex-start' }} onClick={() => go('netzero')}>Net zero detail →</button>
       </DCard>
     </div>
@@ -386,10 +396,15 @@ function Chain({ d, c }: { d: Data; c: Ctx }) {
 }
 
 // ---------------------------------------------------------------- net zero --
+const nzOk = (S: CreditData['summary']) => S.netZero.residual > 0;
 function NetZero({ d, c }: { d: Data; c: Ctx }) {
   const allNow = sum(d.rows, tot), ann = c.nMax < 12 ? (allNow * 12) / c.nMax : allNow, prev = sum(d.prevRows, tot);
-  const rows: BarRow[] = [...(d.prevRows.length ? [{ lbl: String(d.cmpYear), parts: [{ v: prev, c: 'var(--s2)', n: 'Net emissions' }] }] : []),
-    { lbl: c.nMax < 12 ? `${d.year} (annualised)` : String(d.year), parts: [{ v: ann, c: 'var(--s2)', n: 'Net emissions' }] }];
+  const cr = useCredits(d.year), crPrev = useCredits(d.prevRows.length ? d.cmpYear : null);
+  const ret = cr?.summary.retired ?? 0, retPrev = crPrev?.summary.retired ?? 0;
+  const split = (g: number, r: number) => [{ v: Math.max(0, g - Math.min(r, g)), c: 'var(--s2)', n: 'Net emissions' }, { v: Math.min(r, g), c: '#6B4FA8', n: 'Offset by retired credits' }];
+  const rows: BarRow[] = [...(d.prevRows.length ? [{ lbl: String(d.cmpYear), parts: split(prev, retPrev) }] : []),
+    { lbl: c.nMax < 12 ? `${d.year} (annualised)` : String(d.year), parts: split(ann, ret) }];
+  const S = cr?.summary, pipe = cr ? cr.lots.reduce((a, l) => a + l.available, 0) + cr.summary.pipeline.contracted : null;
   // reductions delivered (actions done, from Targets & actions), counted for the months viewed
   const [tg, setTg] = useState<TargetsData | null>(null);
   useEffect(() => { api.targets(d.year).then(setTg).catch(() => setTg(null)); }, [d.year]);
@@ -398,13 +413,16 @@ function NetZero({ d, c }: { d: Data; c: Ctx }) {
   const red = (doneT * c.months.length) / 12, resid = tg ? (sum(d.prevRows, tot) * (tg.sbti.resid ?? 10)) / 100 : null;
   const path = [{ v: c.total, c: 'var(--s2)', n: 'Emissions' }, { v: red, c: '#E9B44C', n: 'Reduced & avoided' }];
   return <>
-    <DStat cells={[[`Gross emissions ${d.year}`, <>{fmt0(c.total)} <small>t</small></>, c.periodLabel], [`Credits retired ${d.year}`, '0 t', 'removals and avoidance', '#6B4FA8'],
-      ['Net after credits', T(c.total), 'shown alongside gross, never instead'], ['Reductions delivered', tg ? `${fmt0(doneT)} t/yr` : '—', 'completed actions'], ['Credits in pipeline', '—', 'contracted, not retired']]} />
+    <DStat cells={[[`Gross emissions ${d.year}`, <>{fmt0(c.total)} <small>t</small></>, c.periodLabel], [`Credits retired ${d.year}`, `${fmt0(ret)} t`, S && ret ? `${Math.round(S.removalShare * 100)}% removals · whole company` : 'removals and avoidance', '#6B4FA8'],
+      ['Net after credits', T(Math.max(0, c.total - ret)), 'shown alongside gross, never instead'], ['Reductions delivered', tg ? `${fmt0(doneT)} t/yr` : '—', 'completed actions'], ['Credits in pipeline', pipe === null ? '—' : `${fmt0(pipe)} t`, 'held or contracted, not retired']]} />
     <div className="dgrid">
       <DCard title="Emissions vs offsets by year (tCO₂e)" span={2}><Bars rows={rows} unit="t" h={175} label="Emissions by year" />
-        <div className="lgd"><span><i style={{ background: 'var(--s2)' }} />Net emissions</span><span><i style={{ background: '#6B4FA8' }} />Offset by retired credits</span>{tg && resid !== null && <span className="muted">Net zero {tg.sbti.nzYear}: residual ≤ {fmt0(resid)} t neutralised by permanent removals</span>}</div></DCard>
+        <div className="lgd"><span><i style={{ background: 'var(--s2)' }} />Net emissions</span><span><i style={{ background: '#6B4FA8' }} />Offset by retired credits</span>{S ? <span className="muted">Net zero {S.netZero.year}: residual ≤ {fmt0(S.netZero.residual)} t a year ({S.netZero.residPct}% of the {S.netZero.baseYear} base year) neutralised by permanent removals</span> : tg && resid !== null && <span className="muted">Net zero {tg.sbti.nzYear}: residual ≤ {fmt0(resid)} t neutralised by permanent removals</span>}</div></DCard>
       <DCard title="Path to net zero" right={<Link className="btn sm ghost" to="/targets?ttab=track">Targets →</Link>}><div className="dsplit"><Donut parts={path} center={`${Math.round(c.total + red ? (red / (c.total + red)) * 100 : 0)}%`} sub="addressed" size={118} /><Legend parts={path} unit="t" /></div></DCard>
-      <DCard title="Credit portfolio" span={2}><div className="muted" style={{ fontSize: 13 }}>No carbon credits recorded (Carbon credits is coming in stage 4); until then gross and net are the same. Reduction actions are planned and tracked under Targets &amp; actions.</div></DCard>
+      <DCard title="Credit portfolio" span={2} sub={`retired for ${d.year} by type`} right={<Link className="btn sm ghost" to={`/credits?year=${d.year}`}>Carbon credits →</Link>}>
+        {S && ret ? <HBars unit="t" c="#6B4FA8" items={Object.entries(S.byCategory).filter(([, v]) => v > 0).map(([k, v]) => ({ n: cr!.categories[k]!, v, d: 0, c: CC[k] }))} />
+          : <div className="muted" style={{ fontSize: 13 }}>No credits retired for {d.year}{cr?.lots.length ? ` (${cr.lots.length} purchase${cr.lots.length === 1 ? '' : 's'} in the register)` : ''}; gross and net are the same. Record purchases and retirements under Carbon credits.</div>}
+        {S && nzOk(S) && <div className="muted" style={{ fontSize: 12 }}>Removals held or contracted for the residual at net zero: {fmt0(S.netZero.removalsHeld)} t of {fmt0(S.netZero.residual)} t a year.</div>}</DCard>
       <DCard title="Good practice"><ul style={{ margin: 0, paddingLeft: 18, fontSize: 12.5, lineHeight: 1.6 }}><li>Report gross emissions first; credits separately.</li><li>SBTi targets count reductions only — credits do not.</li><li>Use permanent removals for the residual at net zero.</li></ul></DCard>
     </div>
   </>;

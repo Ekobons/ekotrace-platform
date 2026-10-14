@@ -151,8 +151,12 @@ export async function reportsRoutes(app: FastifyInstance) {
                 r.pct::float8 AS pct, r.applied, r.proposed_name, r.decided_name, r.decided_at
            FROM base_restatement r LEFT JOIN org_node f ON f.id = r.facility_id WHERE r.status = 'approved' AND r.base_year = $1 ORDER BY r.decided_at`, [t.base_year])).rows;
       const threshold = Number((await c.query(`SELECT restate_threshold FROM tenant WHERE id = $1`, [tenant])).rows[0].restate_threshold);
+      // carbon credits retired (approved), reported separately from the inventory, by the year they are used for
+      const credits = (await c.query(
+        `SELECT r.claim_year, r.quantity::float8 AS t, r.retired_on::text, r.purpose, r.serials, r.registry_url, l.project, l.project_id, l.registry, l.category, l.vintage, l.ccp, l.ca, l.corsia
+           FROM carbon_credit_retirement r JOIN carbon_credit_lot l ON l.id = r.lot_id WHERE r.status = 'approved' ORDER BY r.claim_year, r.retired_on`)).rows;
       return {
-        restatements, restateThreshold: threshold,
+        restatements, restateThreshold: threshold, credits,
         company: { name: t.name, country: t.country, consolidation: t.consolidation, gwp: t.gwp_set, baseYear: t.base_year, currency: t.currency, hasLogo: !!t.logo_id },
         entity: (({ emirate, ...e }) => ({ ...e, region: e.region ?? emirate }))(t.report?.entity ?? {}), excl: t.report?.excl ?? {}, templates, versions,
         canEntity: ['super_admin', 'platform_admin'].includes(req.user.role), canEdit: ['super_admin', 'admin', 'platform_admin'].includes(req.user.role),

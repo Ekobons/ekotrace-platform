@@ -175,7 +175,7 @@ export interface CycleSettings { dueDay: number; remindDays: number; escalateDay
 export interface CalendarData { year: number; today: string; settings: CycleSettings; mailOn: boolean; me: string; obligations: Obligation[]; canSettings: boolean }
 export interface Notice { id: number; kind: string; title: string; body: string | null; link: string | null; at: string; read_at: string | null }
 export interface InboxData {
-  today: string; mine: Obligation[]; escalations: Obligation[]; upcoming: Obligation[]; approvals: number; drafts: number; metricChanges: number; findings: number; restatements?: number;
+  today: string; mine: Obligation[]; escalations: Obligation[]; upcoming: Obligation[]; approvals: number; drafts: number; metricChanges: number; findings: number; restatements?: number; credits?: number;
   returned: { id: string; f: string; facility: string; cat: string; category: string; item: string; month: string; note: string | null; by: string | null; at: string | null }[];
   notifications: Notice[]; unread: number; emailNotify: boolean; mailOn: boolean;
 }
@@ -190,6 +190,33 @@ export interface RestatementData {
   baseYear: number; threshold: number; measured: { s1: number; s2: number; s2m: number; s3: number; total: number }; restated: { s1: number; s2: number; s2m: number; s3: number; total: number };
   recorded: { n: number; net: number; pct: number }; items: Restatement[]; triggers: Record<string, string>; facilities: { id: string; name: string; active: boolean }[]; documents: { id: string; name: string }[];
   canPropose: boolean; canDecide: boolean; canSettings: boolean;
+}
+
+// ------------------------------------------------------------ carbon credits --
+export interface CreditLot {
+  id: string; project: string; project_id: string | null; registry: string; methodology: string | null; category: 'avoidance' | 'removal_nature' | 'removal_technical'; project_type: string | null; country: string | null;
+  vintage: number; quantity: number; price: number | null; currency: string; supplier: string | null; contract_date: string | null; status: 'contracted' | 'delivered' | 'cancelled'; delivered_on: string | null;
+  serials: string | null; ccp: boolean; corsia: boolean; ca: boolean; permanence: string | null; document_id: string | null; document: string | null; notes: string;
+  created_name: string | null; created_at: string; updated_name: string | null; updated_at: string | null; retired: number; waiting: number; available: number;
+}
+export interface CreditRetirement {
+  id: string; lot_id: string; project: string; registry: string; category: CreditLot['category']; vintage: number; quantity: number; retired_on: string; claim_year: number; purpose: string;
+  serials: string | null; beneficiary: string | null; registry_url: string | null; document_id: string | null; document: string | null; note: string; status: 'pending' | 'approved' | 'rejected' | 'withdrawn';
+  proposed_name: string | null; proposed_at: string; decided_name: string | null; decided_at: string | null; decision_note: string | null; mine: boolean;
+}
+export interface CreditSummary {
+  year: number; gross: { s1: number; s2: number; s2m: number; s3: number; total: number }; retired: number; pending: number; net: number; byCategory: Record<string, number>; byPurpose: Record<string, number>;
+  removalShare: number; cost: number; pipeline: { contracted: number; held: number; spend: number };
+  netZero: { year: number; residPct: number; baseYear: number; baseTotal: number; residual: number; removalsHeld: number };
+}
+export interface CreditData {
+  year: number; years: number[]; lots: CreditLot[]; retirements: CreditRetirement[]; summary: CreditSummary; categories: Record<string, string>; purposes: Record<string, string>; registries: string[];
+  documents: { id: string; name: string }[]; canEdit: boolean; canDecide: boolean;
+}
+export interface CreditLotBody {
+  project: string; projectId: string | null; registry: string; methodology: string | null; category: string; projectType: string | null; country: string | null; vintage: number; quantity: number;
+  price: number | null; currency: string; supplier: string | null; contractDate: string | null; status: string; deliveredOn: string | null; serials: string | null; ccp: boolean; corsia: boolean; ca: boolean;
+  permanence: string | null; documentId: string | null; notes: string;
 }
 
 // ------------------------------------------------------------ document vault --
@@ -299,6 +326,7 @@ export interface RepEntity { legal?: string; licence?: string; lei?: string; reg
 export interface RepSettings {
   company: { name: string; country: string; consolidation: string; gwp: string; baseYear: number | null; currency?: string; hasLogo?: boolean }; entity: RepEntity; excl: Record<string, string>;
   restatements?: { title: string; trigger: string; facility: string | null; effective: string | null; s1: number; s2: number; s2m: number; s3: number; pct: number | null; applied: boolean; proposed_name: string | null; decided_name: string | null; decided_at: string }[]; restateThreshold?: number;
+  credits?: { claim_year: number; t: number; retired_on: string; purpose: string; serials: string | null; registry_url: string | null; project: string; project_id: string | null; registry: string; category: string; vintage: number; ccp: boolean; ca: boolean; corsia: boolean }[];
   templates: RepTemplate[]; versions: RepVersion[]; canEntity: boolean; canEdit: boolean;
 }
 export interface ApprovalSettings { l2: boolean; minT: number; cats: string[]; checkPct: number; selfApproval: boolean; selfMaxT: number | null }
@@ -392,6 +420,7 @@ export interface SampleItem { id: string; key: boolean; result: 'agreed' | 'exce
   qty: number; unit: string; t: number; source: string | null; dataType: string; entryNote: string | null; evidence: boolean; evidenceKind: string | null; enteredBy: string | null; approvedBy: string | null; approvedAt: string | null }
 export interface AssurancePack { company: string; consolidation: string; gwp: string; baseYear: number | null; totals: { s1: number; s2l: number; s2m: number; s3: number; bio: number; n: number; self?: number };
   restatements?: { title: string; trigger: string; facility: string | null; t: number; pct: number | null; status: string; applied: boolean; proposed_name: string | null; decided_name: string | null; decided_at: string; decision_note: string | null }[];
+  credits?: { retired_on: string; t: number; purpose: string; serials: string | null; registry_url: string | null; status: string; project: string; registry: string; category: string; vintage: number; proposed_name: string | null; decided_name: string | null }[];
   sources: { source: string; n: number }[]; trail: { at: string; user: string | null; action: string; entityId: string | null; detail: unknown }[] }
 export type BinInput = { facilityId: string; name: string; location?: string; itemId: number; gri?: string; hazardous: boolean; contractor?: string; capacityL?: number; density?: number };
 
@@ -672,6 +701,13 @@ export const api = {
   restatementDecide: (id: string, decision: 'approve' | 'reject', note?: string) => call<{ status: string; applied: boolean; before: number; after: number; pct: number; cumulativePct: number; alsoApplied: number }>('POST', `/api/restatements/${id}/decide`, { decision, note }),
   restatementWithdraw: (id: string) => call<{ ok: true }>('DELETE', `/api/restatements/${id}`),
   restatementSettings: (threshold: number) => call<{ threshold: number }>('PUT', '/api/restatements/settings', { threshold }),
+  // carbon credits
+  credits: (year?: number) => call<CreditData>('GET', `/api/credits${year ? `?year=${year}` : ''}`),
+  creditLotSave: (b: CreditLotBody, id?: string) => call<{ id?: string; ok?: true }>(id ? 'PUT' : 'POST', id ? `/api/credits/lots/${id}` : '/api/credits/lots', b),
+  creditLotDelete: (id: string) => call<{ ok: true }>('DELETE', `/api/credits/lots/${id}`),
+  creditRetire: (lotId: string, b: { quantity: number; retiredOn: string; claimYear: number; purpose: string; serials: string | null; beneficiary: string | null; registryUrl: string | null; documentId: string | null; note: string }) => call<{ id: string }>('POST', `/api/credits/lots/${lotId}/retire`, b),
+  creditDecide: (id: string, decision: 'approve' | 'reject', note?: string) => call<{ status: string }>('POST', `/api/credits/retirements/${id}/decide`, { decision, note }),
+  creditWithdraw: (id: string) => call<{ ok: true }>('DELETE', `/api/credits/retirements/${id}`),
   // metric registry, collection calendar, inbox
   metrics: () => call<MetricList>('GET', '/api/metrics'),
   metricHistory: (id: string) => call<{ metric: { id: string; code: string; name: string }; versions: MetricVersion[]; labels: Record<string, string> }>('GET', `/api/metrics/${id}/history`),

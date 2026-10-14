@@ -5,7 +5,7 @@
 import type { Tx } from './pool.js';
 
 const ORDERED = [
-  'DELETE FROM base_restatement WHERE tenant_id = $1', 'DELETE FROM notification WHERE tenant_id = $1', 'DELETE FROM reminder_log WHERE tenant_id = $1', 'DELETE FROM email_outbox WHERE tenant_id = $1', 'DELETE FROM collection_exception WHERE tenant_id = $1',
+  'DELETE FROM carbon_credit_retirement WHERE tenant_id = $1', 'DELETE FROM carbon_credit_lot WHERE tenant_id = $1', 'DELETE FROM base_restatement WHERE tenant_id = $1', 'DELETE FROM notification WHERE tenant_id = $1', 'DELETE FROM reminder_log WHERE tenant_id = $1', 'DELETE FROM email_outbox WHERE tenant_id = $1', 'DELETE FROM collection_exception WHERE tenant_id = $1',
   'DELETE FROM metric_change WHERE tenant_id = $1', 'DELETE FROM metric_version WHERE tenant_id = $1', 'DELETE FROM metric WHERE tenant_id = $1',
   'DELETE FROM announcement_read WHERE user_id IN (SELECT id FROM app_user WHERE tenant_id = $1)', 'DELETE FROM announcement WHERE $1 = ANY(tenant_ids) AND cardinality(tenant_ids) = 1',
   'DELETE FROM message_read WHERE tenant_id = $1', 'DELETE FROM message WHERE tenant_id = $1', 'DELETE FROM message_thread WHERE tenant_id = $1',

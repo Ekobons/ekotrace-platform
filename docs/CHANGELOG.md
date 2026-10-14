@@ -2,6 +2,18 @@
 
 Newest first.
 
+## 2026-10-15 · Carbon credits register (Net zero)
+
+- **Carbon credits** (Menu → Net zero, was a stage-4 placeholder): `/credits`.
+  - **Purchases (lots):** project, registry and project ID, methodology, type (avoidance / nature-based removal / technical removal), project type, country, vintage, tonnes, price and currency, supplier, contract date, status (contracted / delivered / cancelled), serials, ICVCM CCP, CORSIA, Article 6 corresponding adjustment, permanence, contract from the vault, notes. Super admin and admin.
+  - **Retirements:** from delivered lots only, never more than available (waiting retirements hold their credits); reporting year, purpose (voluntary, neutralisation, BVCM, CORSIA, compliance), serials, beneficiary, registry link, statement. Neutralisation needs removals. A second super admin or admin approves; platform staff never do; rejection needs a reason; the author can withdraw. Only approved retirements count. Notifications, inbox to-do, audit (`credits.*`).
+  - **Year view:** gross (whole company, approved) beside credits retired by type and purpose, net after credits, cost, held and contracted pipeline, residual at net zero (resid % of the restated base year) against removals held or contracted.
+  - A lot in use keeps its type, vintage and status and cannot go below what is retired; it cannot be removed.
+- **Dashboards → Net zero** and the Overview card now use the register: credits retired, net after credits, pipeline, emissions-vs-offsets bars split into net and offset, credit portfolio by type, residual from the restated base year.
+- **Reports:** new section "Carbon credits (reported separately)" (Board summary, GHG Protocol, ESRS E1 templates). **Verifier pack:** the year's retirements; `credits.*` in the trail.
+- DEMO data: four DEMO projects (not real), three approved retirements for the base year, one waiting.
+- Migration 042 (`carbon_credit_lot`, `carbon_credit_retirement`, RLS, purge). Manual chapter "Carbon credits". Test added (75 API tests pass).
+
 ## 2026-10-15 · Self-approval setting (off by default); platform staff no longer approve company data
 
 - **Self-approval** (Methodology → Approval levels → Self-approval, super admin): "Allow super admins, admins and managers to approve their own entries", optionally only below a size in tCO₂e. Off by default.
