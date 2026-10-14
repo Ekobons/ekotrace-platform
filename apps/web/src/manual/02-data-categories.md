@@ -10,7 +10,7 @@ What each category covers, which scope it counts in, what to enter and how it is
 
 - Six fuel classes: liquid, solid, gaseous, biofuel, biomass, biogas. For **bioenergy**, CH₄ and N₂O count in Scope 1 and the CO₂ is reported as biogenic, outside the scopes.
 - **Own calorific value:** when the supplier's certificate or a lab gives the fuel's energy content, tick "Use our own calorific value": the quantity is converted to energy with that value and the energy factors are used. The DESNZ value is offered as the default.
-- Diesel and petrol default to "100% mineral" (no biofuel blend in the UAE).
+- Diesel and petrol default to "100% mineral" (no biofuel blend). Where pump fuel contains biofuel (e.g. B7 / E10 in the EU and UK), choose the "average biofuel blend" fuel instead: its biogenic part is reported outside the scopes.
 
 ## Vehicles — Scope 1 (electric driving: Scope 2)
 
@@ -76,19 +76,19 @@ Only the methods with a factor for the material are offered (no "glass → compo
 
 - the contractor's tonnes are checked against its invoice or monthly statement, and its treatment certificate confirms the disposal method;
 - the manifest links the tonnes to a signed document — the evidence an assurer asks for — and usually carries the weighbridge weight;
-- **hazardous waste needs its manifest number to be submitted** (in the UAE it always travels with one); the same manifest with the same material and quantity entered twice is flagged as a possible duplicate.
+- **hazardous waste needs its manifest number to be submitted** (in most jurisdictions — EU, UK, US, UAE and others — it travels with a manifest or consignment note); the same manifest with the same material and quantity entered twice is flagged as a possible duplicate.
 
 They feed the Waste dashboard (GRI 306): waste generated, hazardous and non-hazardous, diverted from disposal (re-use, recycling, composting / digestion) or directed to disposal (incineration with or without energy recovery, landfill, other), by contractor and by facility.
 
 **From QR scans:** waste weighed at the bins (Capture → QR & field app) becomes these entries at month end — see *QR & field app*.
 
-- *Diverted from landfill* (the usual UAE measure) counts waste-to-energy as diverted; GRI 306 counts incineration with energy recovery as disposal. The dashboard shows both.
+- *Diverted from landfill* (a common municipal measure) counts waste-to-energy as diverted; GRI 306 counts incineration with energy recovery as disposal. The dashboard shows both.
 - Waste the company treats **for others** at its own sites (landfill, waste-to-energy plant) is operations, not waste it generated: its emissions are Scope 1, and its tonnes are not in "waste generated".
 
 ## Water — Scope 3.1 and 3.5, and water accounting
 
 **What:** all water a facility takes in (by source), recycles on site, and lets out (by destination), in m³ — or litres, kL, megalitres, imperial gallons or thousand imperial gallons as on the bill.
-**Enter:** Add data → **Water**, with the same three ways as electricity: **Type in** (a month, the whole year or month by month), **Bills** (water bills; a combined electricity & water bill from DEWA or SEWA can be dropped under both — under Water its water consumption is read, under Electricity its kWh — and the two are separate bills, each matched to its own meter of the same account), **Meter readings** (water meters through the API).
+**Enter:** Add data → **Water**, with the same three ways as electricity: **Type in** (a month, the whole year or month by month), **Bills** (water bills; a combined electricity & water bill from one utility can be dropped under both — under Water its water consumption is read, under Electricity its kWh — and the two are separate bills, each matched to its own meter of the same account), **Meter readings** (water meters through the API).
 
 | | Sources / destinations | Scope 3 |
 |---|---|---|
@@ -108,7 +108,7 @@ They feed the Waste dashboard (GRI 306): waste generated, hazardous and non-haza
 **Enter:** the quantity (kWh, MWh, TRh…). Readings can also come from a **meter** or from **bills**.
 
 ```flow
-> Location-based | quantity × grid factor of the facility's grid region (emirate, state, or the country average)
+> Location-based | quantity × grid factor of the facility's grid region (state, province, grid sub-region, or the country average)
 > Market-based, in order | 1. certificates and contracts claimed (I-REC, REC, PPA, green tariff) → 2. the supplier's factor → 3. the region's residual mix → 4. the grid average, with a note
 > Scope 3.3 | transmission & distribution losses and upstream emissions of generation, from the same entry
 ```
@@ -139,7 +139,7 @@ They feed the Waste dashboard (GRI 306): waste generated, hazardous and non-haza
 
 | Way | What you give | How it is counted |
 |---|---|---|
-| **Flights** | from / to airports (code or city, e.g. DXB, Riyadh), with **+ via** for a connecting airport — or just the flight type; class; return; trips (journeys × people) | distance × trips × the DESNZ air factor for the flight type and class, per passenger-km |
+| **Flights** | from / to airports (code or city, e.g. LHR, Singapore), with **+ via** for a connecting airport — or just the flight type; class; return; trips (journeys × people) | distance × trips × the DESNZ air factor for the flight type and class, per passenger-km |
 | **Hotel stays → Room stays** | country, hotel type (2- to 5-star, or not known), rooms, nights | room-nights × the hotel type's factor from the factor library, or the DESNZ hotel-stay factor of the country |
 | **Hotel stays → Meetings / events** | country, hotel type, kind of room (fills in a typical size) or the m², hours | m² × hours × the meeting-space factor for the hotel type, or for any hotel type |
 | **Other transport** | train, metro, bus, coach, taxi, hire car (by size and fuel) or ferry; one-way km; return; trips | DESNZ business travel – land and sea, per passenger-km (hire cars per km) |
@@ -158,9 +158,9 @@ They feed the Waste dashboard (GRI 306): waste generated, hazardous and non-haza
 
 | Type | Typical one-way distance | Examples |
 |---|---|---|
-| Domestic | 450 km | within one country: Riyadh–Jeddah |
-| Short-haul | 1,500 km | under 3,700 km: Dubai–Riyadh, Dubai–Mumbai, Dubai–Cairo |
-| Long-haul | 6,500 km | 3,700 km or more: Dubai–London, Dubai–Singapore |
+| Domestic | 450 km | within one country: New York–Chicago, Mumbai–Delhi |
+| Short-haul | 1,500 km | under 3,700 km: London–Rome, Dubai–Mumbai, Singapore–Jakarta |
+| Long-haul | 6,500 km | 3,700 km or more: London–New York, Sydney–Los Angeles |
 | International | 3,000 km | not sure: the average of international flights |
 
 The calculation steps of the entry show the distance used.

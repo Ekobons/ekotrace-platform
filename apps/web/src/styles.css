@@ -993,3 +993,16 @@ input.need { border-color: var(--warn); background: var(--warn-bg); }
 .cportal .cform { display: grid; gap: 12px; }
 .cportal .formgrid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
 @media (max-width: 700px) { .cportal .formgrid { grid-template-columns: 1fr 1fr; } .cportal .formgrid > * { grid-column: span 2 !important; } }
+
+/* ---- audit & assurance ---- */
+.kgrid4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.kgrid4 .kpi { display: grid; gap: 2px; } .kgrid4 .kpi b { font-size: 26px; }
+@media (max-width: 900px) { .kgrid4 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.lockgrid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; }
+.lockm { border: 1.5px solid var(--line); border-radius: 12px; padding: 10px; display: grid; gap: 3px; align-content: start; }
+.lockm.locked { background: var(--primary-soft); border-color: var(--primary); }
+.lockm.ready { border-color: var(--ok); }
+.lockm.open { border-color: var(--warn-bg); background: #FFFBF2; }
+.lockm.empty { opacity: .6; }
+@media (max-width: 900px) { .lockgrid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.logobox { border: 1px dashed var(--line2); border-radius: 12px; min-height: 120px; display: grid; place-items: center; padding: 14px; background: #fff; } .logobox img { max-width: 100%; max-height: 110px; }

@@ -50,7 +50,7 @@ export function ChangePassword({ forced, onDone }: { forced?: boolean; onDone: (
       <label className="field"><span>{forced ? 'Temporary password' : 'Current password'}</span><input className="input" type="password" autoComplete="current-password" required value={current} onChange={(e) => setCurrent(e.target.value)} /></label>
       <label className="field"><span>New password (at least 12 characters)</span><input className="input" type="password" autoComplete="new-password" required minLength={12} value={next} onChange={(e) => setNext(e.target.value)} /></label>
       <label className="field"><span>New password again</span><input className="input" type="password" autoComplete="new-password" required value={again} onChange={(e) => setAgain(e.target.value)} /></label>
-      <p className="sub">Tip: a short sentence you will remember is long and strong, e.g. “sharjah sunrise over the gulf”.</p>
+      <p className="sub">Tip: a short sentence you will remember is long and strong, e.g. “sunrise over the quiet harbour”.</p>
       {err && <div className="note bad">{err}</div>}
       {ok && <div className="note ok">Password changed.</div>}
       <button className="btn p" style={{ height: 42 }}>Save password</button>

@@ -6,7 +6,7 @@
 |---|---|---|
 | Fuels, vehicles, refrigerants, UK electricity and heat, waste sent to others | UK DESNZ greenhouse gas conversion factors (2022 onwards) | each June, by Ekobon (preview before loading) |
 | Waste treated at own sites | IPCC 2006 Guidelines Vol. 5 and 2019 Refinement | defaults in the tool; replaceable per site |
-| UAE and other grids, residual mixes, T&D losses | entered by the platform admin with their source (utility, national inventory) | as published |
+| National and sub-national grids outside the UK, residual mixes, T&D losses | entered by the platform admin with their source (utility, national inventory) | as published |
 | Supplier factors, certificates | the company or the platform admin, with their source | per contract / period |
 | GWP values | IPCC AR4, AR5, AR6 | fixed per set |
 

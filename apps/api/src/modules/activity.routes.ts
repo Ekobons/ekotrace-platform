@@ -7,6 +7,7 @@
  */
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
+import { createHash } from 'node:crypto';
 import { query, tenantTx } from '../db/pool.js';
 import { audit, requireRole, requireTenant } from '../lib/auth.js';
 import { assertCan, scopeOf } from '../lib/access.js';
@@ -170,7 +171,7 @@ function recalcInput(a: Record<string, any>, periodStart: string, periodEnd: str
 }
 
 export async function tenantSettings(tenantId: string) {
-  const [t] = await query(`SELECT id, name, country, gwp_set, consolidation, base_year, plan, status, access_expiry, timezone, flight_rf, target_year, target_s12_pct::float8 AS target_s12, target_s3_pct::float8 AS target_s3, due_day, remind_days, escalate_days FROM tenant WHERE id = $1`, [tenantId]);
+  const [t] = await query(`SELECT id, name, country, gwp_set, consolidation, base_year, plan, status, access_expiry, timezone, currency, logo_id IS NOT NULL AS has_logo, flight_rf, target_year, target_s12_pct::float8 AS target_s12, target_s3_pct::float8 AS target_s3, due_day, remind_days, escalate_days FROM tenant WHERE id = $1`, [tenantId]);
   if (!t) throw notFound('Company');
   return t as { id: string; name: string; country: string; gwp_set: string; consolidation: string; base_year: number; timezone: string; flight_rf: boolean };
 }
@@ -178,6 +179,35 @@ export async function tenantSettings(tenantId: string) {
 export async function activityRoutes(app: FastifyInstance) {
   // ------------------------------------------------ company settings --
   app.get('/api/tenant', async (req) => tenantSettings(requireTenant(req)));
+
+  /** Company logo (PNG or JPEG, up to 1 MB), printed on reports. */
+  app.post('/api/tenant/logo', { bodyLimit: 1024 * 1024 }, async (req) => {
+    const tenant = requireTenant(req);
+    requireRole(req, 'super_admin', 'admin');
+    const buf = req.body as Buffer;
+    if (!Buffer.isBuffer(buf) || !buf.length) throw new AppError('Send the logo file');
+    const type = buf[0] === 0xff && buf[1] === 0xd8 ? 'image/jpeg' : buf.subarray(1, 4).toString('latin1') === 'PNG' ? 'image/png' : null;
+    if (!type) throw new AppError('Use a PNG or JPEG file');
+    const h = createHash('sha256').update(buf).digest('hex');
+    return tenantTx(tenant, async (c) => {
+      const id = (await c.query('SELECT id FROM document WHERE sha256 = $1', [h])).rows[0]?.id ?? (await c.query(
+        `INSERT INTO document (tenant_id, kind, filename, content_type, size, sha256, data, uploaded_by) VALUES ($1,'logo','logo',$2,$3,$4,$5,$6) RETURNING id`, [tenant, type, buf.length, h, buf, req.user.name])).rows[0].id;
+      await c.query('UPDATE tenant SET logo_id = $2 WHERE id = $1', [tenant, id]);
+      await audit(c, req, 'company.logo', 'tenant', tenant, { size: buf.length });
+      return { ok: true };
+    });
+  });
+  app.delete('/api/tenant/logo', async (req) => {
+    const tenant = requireTenant(req);
+    requireRole(req, 'super_admin', 'admin');
+    return tenantTx(tenant, async (c) => { await c.query('UPDATE tenant SET logo_id = NULL WHERE id = $1', [tenant]); await audit(c, req, 'company.logo.remove', 'tenant', tenant); return { ok: true }; });
+  });
+  app.get('/api/tenant/logo', async (req, reply) => {
+    const tenant = requireTenant(req);
+    const d = await tenantTx(tenant, async (c) => (await c.query('SELECT d.content_type, d.data FROM tenant t JOIN document d ON d.id = t.logo_id WHERE t.id = $1', [tenant])).rows[0]);
+    if (!d) throw notFound('Logo');
+    return reply.header('content-type', d.content_type).header('cache-control', 'private, max-age=60').send(d.data);
+  });
 
   /** Methodology & boundaries (Super admin): consolidation approach, GWP set, base year, country. */
   app.patch('/api/tenant', async (req) => {

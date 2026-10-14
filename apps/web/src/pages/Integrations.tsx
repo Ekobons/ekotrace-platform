@@ -7,7 +7,8 @@ import { useApp } from '../App';
 import { api, type ApiKey } from '../lib/api';
 import { Icon } from '../components/Icon';
 
-const ZONES = ['Asia/Dubai', 'Asia/Riyadh', 'Asia/Qatar', 'Asia/Muscat', 'Asia/Kuwait', 'Asia/Bahrain', 'Africa/Cairo', 'Asia/Kolkata', 'Asia/Singapore', 'Europe/London', 'UTC'];
+/** Every IANA time zone the browser knows (e.g. Europe/Berlin, America/New_York, Asia/Singapore). */
+const ZONES: string[] = (() => { try { return (Intl as unknown as { supportedValuesOf(k: string): string[] }).supportedValuesOf('timeZone'); } catch { return ['UTC', 'Europe/London', 'Europe/Berlin', 'America/New_York', 'Asia/Dubai', 'Asia/Kolkata', 'Asia/Singapore', 'Australia/Sydney']; } })();
 
 export function Integrations() {
   const { toast, role, tenant } = useApp();
@@ -19,7 +20,7 @@ export function Integrations() {
   const [err, setErr] = useState<string | null>(null);
   const admin = ['platform_admin', 'super_admin'].includes(role);
   const load = () => api.apiKeys().then((r) => setKeys(r.keys)).catch((e) => setErr(e.message));
-  useEffect(() => { if (admin) load(); api.tenant().then((t) => setTz(t.timezone ?? 'Asia/Dubai')).catch(() => {}); }, [tenant?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (admin) load(); api.tenant().then((t) => setTz(t.timezone ?? 'UTC')).catch(() => {}); }, [tenant?.id]); // eslint-disable-line react-hooks/exhaustive-deps
   const origin = window.location.origin;
 
   return (
@@ -33,7 +34,7 @@ export function Integrations() {
           <h2>API clients</h2>
           <p className="sub">Each sending system gets its own client id and secret. The secret is shown once; only a fingerprint of it is kept. Revoke a client to stop it at once.</p>
           <div className="row" style={{ gap: 8 }}>
-            <input className="input grow" value={name} maxLength={80} placeholder="Name of the system, e.g. BMS Al Saja'a, DEWA portal export" onChange={(e) => setName(e.target.value)} />
+            <input className="input grow" value={name} maxLength={80} placeholder="Name of the system, e.g. BMS main plant, utility portal export" onChange={(e) => setName(e.target.value)} />
             {[['meter_readings', 'Meter readings'], ['purchases', 'Purchase lines']].map(([k, l]) => (
               <label key={k} className="row" style={{ gap: 4, fontSize: 13 }}><input type="checkbox" checked={scopes.includes(k!)} onChange={(e) => setScopes((s) => (e.target.checked ? [...s, k!] : s.filter((x) => x !== k)))} />{l}</label>))}
             <button className="btn p" disabled={name.trim().length < 2 || !scopes.length} onClick={async () => { try { setFresh(await api.addApiKey(name.trim(), scopes)); setName(''); load(); } catch (e) { setErr((e as Error).message); } }}><Icon name="plus" />New client</button>
@@ -76,7 +77,7 @@ Content-Type: application/json
 
 { "readings": [
   { "meterId": "BMS-GAS-01", "timestamp": "2026-03-01T01:00:00+04:00", "value": 10.4 },
-  { "meterId": "DEWA-2001458876", "timestamp": "2026-04-01T00:00:00+04:00", "value": 45500, "start": "2026-03-01T00:00:00+04:00" }
+  { "meterId": "ELEC-2001458876", "timestamp": "2026-04-01T00:00:00+01:00", "value": 45500, "start": "2026-03-01T00:00:00+01:00" }
 ] }`}</pre></li>
           <li>The answer gives the batch id and what it holds — new readings, corrections, duplicates (skipped), conflicts with booked bills (skipped), refused (with the reason). The batch waits for review under Add data → the category → Meter readings and counts once published (a super admin can switch review off). List the meters and their ids with <span className="mono">GET /api/v1/meters</span>.</li>
         </ol>
@@ -95,9 +96,9 @@ Content-Type: application/json
 Authorization: Bearer <access token>
 Content-Type: application/json
 
-{ "reference": "SAP-2026-03", "currency": "AED", "facility": "BEEAH Headquarters", "complete": false,
+{ "reference": "SAP-2026-03", "currency": "EUR", "facility": "Head office", "complete": false,
   "lines": [
-    { "date": "2026-03-10", "description": "Copier paper A4 80gsm", "amount": 4250, "supplier": "Gulf Stationery LLC",
+    { "date": "2026-03-10", "description": "Copier paper A4 80gsm", "amount": 4250, "supplier": "Office Supplies Ltd",
       "supplierRef": "V100231", "supplierCountry": "AE", "category": "Office supplies", "glAccount": "Office expenses", "poNumber": "4500123", "quantity": 50, "unit": "box" },
     { "date": "2026-03-12", "description": "Ready mix concrete C40", "amount": 182000, "facility": "Al Saja'a Recycling Complex",
       "supplierEf": 210, "supplierEfUnit": "m3", "quantity": 400, "unit": "m3", "capital": true }

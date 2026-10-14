@@ -877,6 +877,7 @@ const CPI_24_22 = 292.655 / 313.689;
 const pq = async (sql: string, params: unknown[] = []) => {
   const c = await pool.connect();
   try { await c.query('BEGIN'); await c.query(`SELECT set_config('app.platform','on',true)`); const r = await c.query(sql, params); await c.query('COMMIT'); return r; }
+  catch (e) { await c.query('ROLLBACK').catch(() => {}); throw e; }
   finally { c.release(); }
 };
 
@@ -1870,4 +1871,66 @@ test('waste contractor portal: access code (hashed, expires, revoked), only its 
   assert.equal((await pub('POST', '/login', { email: 'ops@greenhaul.example', code: cr.body.code })).status, 401);
   const nc = (await api('POST', `/api/qr/contractors/${cr.body.id}/code`, { months: 1 }, tenantA)).body;
   assert.equal((await pub('POST', '/login', { email: 'ops@greenhaul.example', code: nc.code })).status, 200);
+});
+
+test('audit & assurance: engagement, period lock enforced by the database (no entry, edit, review or delete), unlock with a reason, reproducible samples with key items, tests, findings respond / close; logo and reporting entity', async () => {
+  const id = async (code: string) => (await pq('SELECT id FROM item WHERE code = $1', [code])).rows[0].id as number;
+  const Y = 2023, p = { facilityId: facA, periodStart: `${Y}-04-01`, periodEnd: `${Y}-04-30`, dataType: 'actual' };
+  const diesel = (await pq(`SELECT i.id FROM item i JOIN subcategory s ON s.id = i.subcategory_id JOIN category c ON c.id = s.category_id WHERE c.code = 'stationary_combustion' AND i.name ILIKE 'diesel%' ORDER BY i.id LIMIT 1`)).rows[0].id;
+  const saved = await api('POST', '/api/activities/batch', { dryRun: false, entries: [1000, 2000, 50, 60, 70, 80].map((q) => ({ ...p, itemId: diesel, unit: 'L', quantity: q })) }, tenantA);
+  assert.ok(saved.body.results.every((r: { ok: boolean }) => r.ok), JSON.stringify(saved.body));
+  const ids = saved.body.results.map((r: { id: string }) => r.id);
+  // not approved yet: cannot lock
+  assert.equal((await api('POST', '/api/assurance/locks', { month: `${Y}-04` }, tenantA)).status, 400);
+  const sa = await login(superA.email, superA.temporaryPassword);
+  await api('POST', '/api/activities/review', { ids, action: 'submit' }, tenantA);
+  const ap = await call(sa, 'POST', '/api/activities/review', { ids, action: 'approve' });
+  assert.equal(ap.body.done, 6, JSON.stringify(ap.body));
+  const mo = (await api('GET', `/api/assurance?year=${Y}`, undefined, tenantA)).body.months.find((m: { month: string }) => m.month === `${Y}-04`);
+  assert.equal(mo.ready, true);
+  assert.equal((await api('POST', '/api/assurance/locks', { month: `${Y}-04` }, tenantA)).status, 200);
+  // locked: nothing changes
+  const add = await api('POST', '/api/activities', { ...p, itemId: diesel, unit: 'L', quantity: 5 }, tenantA);
+  assert.equal(add.status, 409, JSON.stringify(add.body)); assert.equal(add.body.error, 'PERIOD_LOCKED');
+  const ret = await call(sa, 'POST', '/api/activities/review', { ids: [ids[0]], action: 'return', note: 'x' });
+  assert.equal(ret.body.skipped[0]?.reason, 'the month is locked for assurance');
+  assert.equal((await api('POST', '/api/activities/recalculate', { ids, onlyWithWarnings: false }, tenantA)).status === 200 ? 'ok' : 'err', 'ok');
+  assert.equal((await pq('SELECT count(*)::int AS n FROM activity WHERE id = ANY($1)', [ids])).rows[0].n, 6);
+  { const cl = await pool.connect(); try { await cl.query('BEGIN'); await cl.query(`SELECT set_config('app.platform', 'on', true)`);
+      await assert.rejects(cl.query(`UPDATE activity SET quantity = 1 WHERE id = $1`, [ids[0]]), /locked for assurance/, 'even directly in the database'); } finally { await cl.query('ROLLBACK'); cl.release(); } }
+  // sampling: key items always in; the same seed draws the same sample
+  const eng = await api('PUT', '/api/assurance/engagement', { year: Y, standard: 'ISO 14064-3', level: 'limited', status: 'fieldwork', materiality: 5 }, tenantA);
+  assert.equal(eng.status, 200, JSON.stringify(eng.body));
+  const s1 = (await api('POST', '/api/assurance/samples', { year: Y, method: 'value', size: 4, seed: 42, keyPct: 20 }, tenantA)).body;
+  const s2 = (await api('POST', '/api/assurance/samples', { year: Y, method: 'value', size: 4, seed: 42, keyPct: 20 }, tenantA)).body;
+  const it1 = (await api('GET', `/api/assurance/samples/${s1.id}`, undefined, tenantA)).body.items, it2 = (await api('GET', `/api/assurance/samples/${s2.id}`, undefined, tenantA)).body.items;
+  assert.ok(s1.keyItems >= 1, JSON.stringify(s1));
+  assert.deepEqual(it1.map((x: { id: string }) => x.id).sort(), it2.map((x: { id: string }) => x.id).sort(), 'reproducible with the seed');
+  assert.ok(it1.some((x: { key: boolean; qty: number }) => x.key && x.qty === 2000), 'the 2,000 L entry is a key item');
+  assert.equal((await api('PUT', `/api/assurance/samples/${s1.id}/tests/${it1[0].id}`, { result: 'exception' }, tenantA)).status, 400, 'an exception says why');
+  await api('PUT', `/api/assurance/samples/${s1.id}/tests/${it1[0].id}`, { result: 'agreed' }, tenantA);
+  // findings: raised, responded by the company, closed by the verifier side
+  const f = (await api('POST', '/api/assurance/findings', { year: Y, activityId: ids[1], severity: 'medium', kind: 'evidence', text: 'Delivery note missing', impactT: 0.5 }, tenantA)).body;
+  assert.equal((await call(sa, 'PUT', `/api/assurance/findings/${f.id}/respond`, { response: 'Delivery note attached' })).status, 200);
+  assert.equal((await call(sa, 'PUT', `/api/assurance/findings/${f.id}/close`, {})).status, 200);
+  const A = (await api('GET', `/api/assurance?year=${Y}`, undefined, tenantA)).body;
+  assert.equal(A.findings[0].status, 'closed'); assert.equal(A.kpis.openFindings, 0); assert.equal(A.engagement.standard, 'ISO 14064-3');
+  const pack = (await api('GET', `/api/assurance/pack?year=${Y}`, undefined, tenantA)).body;
+  assert.ok(pack.totals.s1 > 0 && pack.trail.some((t: { action: string }) => t.action === 'period.lock'), JSON.stringify(pack.totals));
+  // unlock needs a reason; then changes are possible again
+  assert.equal((await api('POST', `/api/assurance/locks/${Y}-04/unlock`, { reason: '' }, tenantA)).status, 400);
+  assert.equal((await api('POST', `/api/assurance/locks/${Y}-04/unlock`, { reason: 'Correction agreed with the verifier' }, tenantA)).status, 200);
+  assert.equal((await api('POST', '/api/activities', { ...p, itemId: diesel, unit: 'L', quantity: 5 }, tenantA)).status, 200);
+  // logo and reporting entity
+  const png = Buffer.from('89504e470d0a1a0a0000000d4948445200000001000000010806000000', 'hex');
+  const lg = await app.inject({ method: 'POST', url: '/api/tenant/logo', payload: png, headers: { cookie: adminCookie, 'x-tenant-id': tenantA, 'content-type': 'application/octet-stream' } });
+  assert.equal(lg.statusCode, 200, lg.body);
+  assert.equal((await app.inject({ method: 'GET', url: '/api/tenant/logo', headers: { cookie: adminCookie, 'x-tenant-id': tenantA } })).headers['content-type'], 'image/png');
+  await call(sa, 'PUT', '/api/reports/settings', { entity: { lei: '529900T8BM49AURSDO55', region: 'Bavaria', revenue: 1200000, revenueCurrency: 'EUR' } });
+  const st = (await api('GET', '/api/reports/settings', undefined, tenantA)).body;
+  assert.equal(st.entity.lei, '529900T8BM49AURSDO55'); assert.equal(st.company.hasLogo, true); assert.ok(st.company.currency);
+  // a new company takes its currency and time zone from its country
+  const de = (await api('POST', '/api/platform/companies', { name: 'Berlin GmbH', country: 'de', superAdmin: { name: 'Dora', email: 'dora@de.test' } })).body.company;
+  assert.equal(de.currency, 'EUR'); assert.equal(de.timezone, 'Europe/Berlin');
+  void id;
 });

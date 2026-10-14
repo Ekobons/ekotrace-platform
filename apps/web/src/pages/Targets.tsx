@@ -57,7 +57,7 @@ export function Targets() {
   // the actions in the viewed selection: company-wide, or for a facility viewed
   const acts = useMemo(() => (t && d ? t.actions.filter((a) => !a.facilityId || d.facilities.some((f) => f.id === a.facilityId)) : []), [t, d]);
   const sid = sid0 && t?.scenarios.some((s) => s.id === sid0) ? sid0 : t?.defaultScenario ?? '';
-  const money = (val: number, m = false) => <span className="nowrap">{val < 0 ? '−' : ''}{t?.currency ?? 'AED'} {m || Math.abs(val) >= 1e6 ? `${fmt(Math.abs(val) / 1e6, m ? 1 : 2)}m` : fmt0(Math.abs(val))}</span>;
+  const money = (val: number, m = false) => <span className="nowrap">{val < 0 ? '−' : ''}{t?.currency ?? ''} {m || Math.abs(val) >= 1e6 ? `${fmt(Math.abs(val) / 1e6, m ? 1 : 2)}m` : fmt0(Math.abs(val))}</span>;
   const names = useMemo(() => new Map((d?.facilities ?? []).map((f) => [f.id, f.name])), [d]);
   const facName = (id: string | null) => (id ? names.get(id) ?? 'Facility' : 'Company-wide');
 

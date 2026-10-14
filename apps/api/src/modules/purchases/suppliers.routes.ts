@@ -282,7 +282,7 @@ export async function supplierRoutes(app: FastifyInstance) {
     return tenantTx(tenant, async (c) => {
       if (!(await c.query('SELECT 1 FROM supplier WHERE id = $1', [id])).rowCount) throw notFound('Supplier');
       const unit = (await c.query(`SELECT code, dimension FROM unit WHERE code = $1 OR $1 = ANY(aliases)`, [b.unit])).rows[0];
-      if (!unit) throw new AppError(`Unit "${b.unit}" not known: use kg, t, L, m3, kWh, pcs or a currency (AED, USD…)`);
+      if (!unit) throw new AppError(`Unit "${b.unit}" not known: use kg, t, L, m3, kWh, pcs or a currency (USD, EUR…)`);
       const r = (await c.query(
         `INSERT INTO supplier_ef (tenant_id, supplier_id, item_id, co2e, unit, price_year, valid_from, valid_to, source, boundary, created_by)
          VALUES ($1,$2,$3,$4,$5,$6,coalesce($7::date,'2000-01-01'),coalesce($8::date,'2100-12-31'),$9,$10,$11) RETURNING id`,

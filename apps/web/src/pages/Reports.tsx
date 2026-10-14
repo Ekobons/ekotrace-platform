@@ -6,7 +6,9 @@
  *   GHG Protocol inventory  every category 1.1–3.15: measured, no data or excluded (with a justification)
  *   Granular audit view     every approved entry with its factor, quality and how it was captured
  *   Data quality            actual / estimated / proxy, data-quality gauges, quality controls to fix or justify
- *   Templates & regulatory  report templates (board, GHG Protocol, MOCCAE layout, your own), MRV dataset
+ *   Templates & regulatory  report formats used around the world — ISO 14064-1 (designed, with charts), GHG Protocol,
+ *                           ESRS E1 (CSRD), IFRS S2 (ISSB), CDP, GRI 305, UK SECR, California SB 253, regional layouts —
+ *                           your own templates, datapoints per format (CSV) and the entry-level dataset
  *   Versions                freeze the inventory and compare it with today
  *
  * Location- or market-based Scope 2 is switched at the top; "Download report" gives the GHG Protocol report.
@@ -14,7 +16,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useApp } from '../App';
 import { api, num, unitLabel, type RepCheck, type RepLine, type RepSettings, type RepTemplate, type TargetsData } from '../lib/api';
-import { CAPTURED, DT_C, EXCL_DEFAULT, GHG_CATS, RSECS, dtypeOf, download, factorsCsv, ghgName, inventory, inventoryCsv, lineConf, lineT, mrvCsv, reportBody, reportHtml, templateList, type RepCtx } from '../lib/reports';
+import { ISO_CSS, datapoints } from '../lib/frameworks';
+import { Link } from 'react-router-dom';
+import { CAPTURED, DT_C, EXCL_DEFAULT, GHG_CATS, RSECS, TPL_GROUP, csv, dtypeOf, download, factorsCsv, ghgName, inventory, inventoryCsv, lineConf, lineT, mrvCsv, reportBody, reportHtml, templateList, type RepCtx } from '../lib/reports';
 import { fmt, fmt0 } from '../components/DashCharts';
 import { CONS, ViewBar, useView } from '../components/ViewBar';
 import { ENERGY_UNITS, Result } from '../components/Result';
@@ -22,7 +26,7 @@ import { Icon } from '../components/Icon';
 
 type Tab = 'sum' | 'inv' | 'audit' | 'dq' | 'tpl' | 'ver';
 const TABS: [Tab, string][] = [['sum', 'Summary'], ['inv', 'GHG Protocol inventory'], ['audit', 'Granular audit view'], ['dq', 'Data quality'], ['tpl', 'Templates & regulatory'], ['ver', 'Versions']];
-const EQUIV: [string, string, number][] = [['🚗', 'cars driven for a year', 4.6], ['✈️', 'return flights Dubai–London (economy)', 1.1], ['🏠', 'UAE residents’ yearly footprint', 21], ['🌳', 'trees growing for a year to absorb it', 0.022]];
+const EQUIV: [string, string, number][] = [['🚗', 'cars driven for a year', 4.6], ['✈️', 'return flights London–New York (economy, per passenger)', 1.0], ['🌍', 'people’s yearly fossil CO₂ (world average)', 4.7], ['🌳', 'trees growing for a year to absorb it', 0.022]];
 
 export function Reports() {
   const v = useView();
@@ -50,7 +54,13 @@ export function Reports() {
   const inv = useMemo(() => (d ? inventory(rows, d.categories) : null), [rows, d]);
   const period = d && c ? `${d.year} · ${c.periodLabel}` : '';
   const consolidation = d ? CONS[d.consolidation] ?? d.consolidation : '';
-  const ctx: RepCtx | null = d && inv && st ? { d, rows, prev, months, inv, lines: pLines, mb, label: v.name, period, settings: st, checks: checks?.checks ?? null, targets: tg, preparedBy: me.user.name, consolidation } : null;
+  // the company logo, embedded in the report (so the downloaded file shows it offline)
+  const [logo, setLogo] = useState<string | undefined>();
+  useEffect(() => {
+    if (!st?.company.hasLogo) { setLogo(undefined); return; }
+    fetch('/api/tenant/logo').then((r) => (r.ok ? r.blob() : null)).then((b) => { if (!b) return; const fr = new FileReader(); fr.onload = () => setLogo(String(fr.result)); fr.readAsDataURL(b); }).catch(() => {});
+  }, [st?.company.hasLogo]);
+  const ctx: RepCtx | null = d && inv && st ? { d, rows, prev, months, inv, lines: pLines, mb, label: v.name, period, settings: st, checks: checks?.checks ?? null, targets: tg, preparedBy: me.user.name, consolidation, logo } : null;
   const exportOk = me.company?.planLimits?.export !== false;
   const getReport = (t: RepTemplate) => { if (!ctx) return; download(`${t.name} – ${v.name} – ${period}.html`.replace(/[\\/:*?"<>|]/g, '-'), reportHtml(t, ctx), 'text/html;charset=utf-8'); };
   const printReport = (t: RepTemplate) => { if (!ctx) return; const w = window.open('', '_blank'); if (!w) { toast('Allow pop-ups to print the report'); return; } w.document.write(reportHtml(t, ctx)); w.document.close(); w.focus(); setTimeout(() => w.print(), 400); };
@@ -97,7 +107,7 @@ function Summary({ ctx }: { ctx: RepCtx }) {
       </section>
       <section className="card tacard"><h2>Is equivalent to</h2>
         <div className="hk">{EQUIV.map(([ic, n, k]) => <div key={n} className="soft"><span style={{ fontSize: 24 }}>{ic}</span><b style={{ fontSize: 21 }}>{fmt0(inv.tot / k)}</b><span className="muted small">{n}</span></div>)}</div>
-        <span className="muted" style={{ fontSize: 11.5 }}>Indicative conversions: car 4.6 t/yr (US EPA), Dubai–London return ~1.1 t, UAE per-capita ~21 t, tree ~22 kg/yr.</span></section>
+        <span className="muted" style={{ fontSize: 11.5 }}>Indicative conversions: car 4.6 t/yr (US EPA), London–New York return ~1 t per economy passenger (DESNZ, with radiative forcing), world average ~4.7 t fossil CO₂ per person per year (Global Carbon Project), tree ~22 kg/yr.</span></section>
       <div className="tagrid2 even">
         <section className="card tacard">
           <h2>{ctx.period} vs same months of {d.cmpYear}</h2>
@@ -246,10 +256,9 @@ function Templates({ ctx, reload, getReport, printReport, exportOk }: { ctx: Rep
   const { settings: st } = ctx;
   const { toast } = useApp();
   const list = templateList(st.templates);
-  const [cur, setCur] = useState(list[0]!.id);
+  const [cur, setCur] = useState(list.find((x) => x.base === "iso")?.id ?? list[0]!.id);
   const [E, setE] = useState<(RepTemplate & { isNew?: boolean }) | null>(null);
-  const [ent, setEnt] = useState(st.entity);
-  const t = list.find((x) => x.id === cur) ?? list[0]!;
+    const t = list.find((x) => x.id === cur) ?? list[0]!;
   const saveT = async () => {
     if (!E || !E.name.trim() || !E.sections.length) { toast('Name the template and include at least one section.'); return; }
     try { const r = await api.saveTemplate({ id: E.isNew || !st.templates.some((s) => s.id === E.id) ? undefined : E.id, base: st.templates.some((s) => s.id === E.id) ? E.base : E.isNew ? null : E.base, name: E.name.trim(), audience: E.audience, note: E.note, sections: E.sections });
@@ -262,16 +271,15 @@ function Templates({ ctx, reload, getReport, printReport, exportOk }: { ctx: Rep
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         <section className="card tacard">
           <div className="row"><h2>Report templates</h2><span className="grow" />{st.canEdit && <button className="btn sm" onClick={() => setE({ id: '', base: null, name: '', audience: '', note: '', sections: ['cover', 'summary'], isNew: true })}>+ New</button>}</div>
-          {list.map((x) => <button key={x.id} className={`tplitem${x.id === t.id ? ' on' : ''}`} onClick={() => { setCur(x.id); setE(null); }}><b>{x.name}</b><span className="muted small">{x.audience} · {x.sections.length} sections{x.builtin ? ' · built-in' : ''}</span></button>)}
-          <div className="tipbox"><b>MRV dataset</b><div className="small">One row per approved entry with facility, scope, category, activity, unit, factor, source, data type and evidence — for upload to the MOCCAE MRV platform or a verifier.</div>
-            <button className="btn sm" style={{ marginTop: 6 }} disabled={!exportOk} onClick={() => download(fname, mrvCsv(ctx.lines, ctx.mb))}>Export MRV dataset (CSV)</button></div>
+          {['Global standards', 'European Union', 'Country & regional', 'Internal', 'Your templates'].map((g) => { const xs = list.filter((x) => (x.builtin || x.base ? TPL_GROUP[x.base ?? ''] ?? 'Your templates' : 'Your templates') === g); return xs.length ? <div key={g} style={{ display: 'grid', gap: 6 }}>
+            <span className="lbl">{g}</span>{xs.map((x) => <button key={x.id} className={`tplitem${x.id === t.id ? ' on' : ''}`} onClick={() => { setCur(x.id); setE(null); }}><b>{x.name}</b><span className="muted small">{x.audience}{x.builtin ? ' · built-in' : ''}</span></button>)}</div> : null; })}
+          <div className="tipbox"><b>Entry-level dataset</b><div className="small">One row per approved entry with facility, scope, category, activity, unit, factor, source, data type and evidence — for a regulator’s MRV platform, a verifier or a data room.</div>
+            <button className="btn sm" style={{ marginTop: 6 }} disabled={!exportOk} onClick={() => download(fname, mrvCsv(ctx.lines, ctx.mb))}>Export dataset (CSV)</button></div>
         </section>
         <section className="card tacard"><h2>Reporting entity</h2>
-          {(['legal', 'licence', 'emirate', 'sector', 'mrvId', 'contact'] as const).map((k) => (
-            <label key={k} className="field"><span>{{ legal: 'Legal name', licence: 'Trade licence', emirate: 'Emirate', sector: 'Sector', mrvId: 'MOCCAE / MRV ID', contact: 'Reporting contact' }[k]}</span>
-              <input className="input" disabled={!st.canEntity} value={ent[k] ?? ''} placeholder={k === 'legal' ? st.company.name : 'to be completed'} onChange={(e) => setEnt({ ...ent, [k]: e.target.value })} /></label>))}
-          {st.canEntity && <div><button className="btn" onClick={async () => { try { await api.saveReportSettings({ entity: ent }); toast('Saved'); reload(); } catch (e) { toast((e as Error).message); } }}>Save</button></div>}
-          <span className="muted small">Printed on the report cover.</span>
+          <div className="small"><b>{st.entity.legal || st.company.name}</b>{st.entity.lei ? ` · LEI ${st.entity.lei}` : ''}<br />{[st.company.country, st.entity.region, st.entity.sector].filter(Boolean).join(' · ')}{st.entity.revenue ? ` · revenue ${st.entity.revenue.toLocaleString('en')} ${st.entity.revenueCurrency ?? ''}` : ''}</div>
+          <span className="muted small">Logo {st.company.hasLogo ? 'set' : 'not set'} · printed on the cover of every format.</span>
+          <Link className="btn sm" to="/organisation?tab=company">Edit company details & logo →</Link>
         </section>
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12, minWidth: 0 }}>
@@ -293,13 +301,16 @@ function Templates({ ctx, reload, getReport, printReport, exportOk }: { ctx: Rep
           <div className="row"><div className="grow"><h2>{t.name}</h2><div className="muted small">{ctx.label} · {ctx.period} · {ctx.mb ? 'market' : 'location'}-based Scope 2</div></div>
             {st.canEdit && <button className="btn sm" onClick={() => setE({ ...t })}>Edit sections</button>}
             {st.canEdit && !t.builtin && <button className="btn sm ghost danger" onClick={async () => { await api.removeTemplate(t.id).catch(() => {}); setCur(RTPL_FIRST); reload(); }}>Delete</button>}
+            {FW_BASES.includes(t.base ?? '') && <button className="btn sm" disabled={!exportOk} onClick={() => download(`${t.name} datapoints – ${ctx.label} – ${ctx.period}.csv`, csv(['Reference', 'Datapoint', 'Value', 'Unit'], datapoints(t.base!, ctx)))}>Datapoints (CSV)</button>}
             <button className="btn sm" onClick={() => printReport(t)}>Print / PDF</button><button className="btn sm p" onClick={() => getReport(t)}>Download report</button></div>
+          <style>{ISO_CSS}</style>
           <div className="rprev" dangerouslySetInnerHTML={{ __html: reportBody(t, ctx) }} />
         </section>
       </div>
     </div>);
 }
-const RTPL_FIRST = 'board';
+const RTPL_FIRST = 'iso';
+const FW_BASES = ['iso', 'esrs', 'ifrs', 'cdp', 'gri', 'secr', 'sb253'];
 
 // ------------------------------------------------------------------ versions --
 function Versions({ ctx, reload }: { ctx: RepCtx; reload: () => void }) {

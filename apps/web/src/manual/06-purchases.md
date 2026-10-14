@@ -88,7 +88,7 @@ An account can also move its lines (e.g. account “Travel” → business trave
 
 ```flow
 > 1. Supplier factor per unit | the line has a quantity in the factor's unit (kg, t, L, m³, kWh, piece)
-> 2. Supplier factor per money | kg CO₂e per AED, USD… spent with that supplier
+> 2. Supplier factor per money | kg CO₂e per USD, EUR… spent with that supplier
 > 3. Spend-based | US EPA Supply Chain GHG Emission Factors v1.3: kg CO₂e per 2022 US dollar, purchaser price (with margins)
 ```
 

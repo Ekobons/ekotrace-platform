@@ -36,6 +36,7 @@ import { homeRoutes } from './modules/home.routes.js';
 import { targetsRoutes } from './modules/targets.routes.js';
 import { approvalsRoutes } from './modules/approvals.routes.js';
 import { qrRoutes } from './modules/qr.routes.js';
+import { assuranceRoutes } from './modules/assurance.routes.js';
 import { contractorPublicRoutes, contractorRoutes } from './modules/contractor.routes.js';
 import { reportsRoutes } from './modules/reports.routes.js';
 
@@ -85,6 +86,7 @@ export async function buildApp(opts: { logger?: boolean } = {}): Promise<Fastify
     await secured.register(reportsRoutes);
     await secured.register(qrRoutes);
     await secured.register(contractorRoutes);
+    await secured.register(assuranceRoutes);
     await secured.register(orgRoutes);
     await secured.register(peopleRoutes);
     await secured.register(platformRoutes);

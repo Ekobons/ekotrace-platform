@@ -53,10 +53,10 @@ Per meter the preview shows the period covered and the quantity per month. **Pub
 
 ## What the reader looks for
 
-- **Supplier:** recognised for DEWA, SEWA, TAQA (ADDC / AADC), Etihad WE, Empower, Tabreed, Emicool and Emirates Gas; other bills work with the generic rules.
-- **Consumption:** the figure next to words like *consumption*, *units consumed*, *total kWh* — not meter readings, rates (AED/kWh) or water (IG). If the total is not printed, previous and current readings are used. Other figures found on the bill are offered as one-click alternatives.
-- **Water bills** (Add data → Water → Bills): the water consumption in m³, imperial gallons (IG) or thousand imperial gallons, not the kWh. A combined DEWA / SEWA bill can be dropped under Electricity and under Water: the same file becomes two bills (one per kind, so the same bill number is not a duplicate there), each matched to its own meter of the account.
-- **Billing period:** "Period 15/02/2026 – 14/03/2026", "From … To …", or the previous and current reading dates. Numeric dates are read day first (UAE).
+- **Supplier:** layouts with special rules so far: DEWA, SEWA, TAQA (ADDC / AADC), Etihad WE, Empower, Tabreed, Emicool and Emirates Gas; bills from any other utility, in any country, work with the generic rules (consumption, period, amount).
+- **Consumption:** the figure next to words like *consumption*, *units consumed*, *total kWh* — not meter readings, rates (per kWh) or water (IG). If the total is not printed, previous and current readings are used. Other figures found on the bill are offered as one-click alternatives.
+- **Water bills** (Add data → Water → Bills): the water consumption in m³, imperial gallons (IG) or thousand imperial gallons, not the kWh. A combined electricity & water bill can be dropped under Electricity and under Water: the same file becomes two bills (one per kind, so the same bill number is not a duplicate there), each matched to its own meter of the account.
+- **Billing period:** "Period 15/02/2026 – 14/03/2026", "From … To …", or the previous and current reading dates. Numeric dates are read day first (as on most bills outside the US); written months ("15 Feb 2026") always work.
 - **Not found?** The field stays empty and is listed in yellow: fill it in from the preview.
 
 ## Publishing

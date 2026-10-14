@@ -8,7 +8,7 @@ A meter brings readings from another system — a building management system (BM
 > Readings arrive | through the API (hourly, daily, weekly, monthly or irregular), pasted on the meter's page, or from a booked bill
 ! Each reading checked | known meter of this company, valid time, not in the future, no negative consumption — refused readings are listed with the reason
 > Stored | the same meter and time sent again replaces the earlier value (a correction)
-> Split into months | in the company time zone (Asia/Dubai by default); periods across a month end are split by time
+> Split into months | in the company time zone (set from the company’s country; changed under Integrations); periods across a month end are split by time
 > Coverage worked out | share of each month that readings cover; gaps, resets and unusual values flagged
 ? Has the month ended? | Yes: the month's entry is created or updated | No: shown as “month not ended”, nothing booked yet
 ! Approved entries | never changed by new readings — the difference is reported instead

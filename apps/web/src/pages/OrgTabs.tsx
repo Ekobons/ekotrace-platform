@@ -121,7 +121,7 @@ export function GroupsTab({ nodes }: { nodes: OrgNode[] }) {
     <div className="orggrid">
       <div className="card" style={{ display: 'grid', gap: 8 }}>
         <h2 style={{ fontSize: 16 }}>Dashboard groups</h2>
-        <p className="sub" style={{ margin: 0 }}>Any mix of facilities to view together — for example “Sharjah sites” or the SBTi boundary. They never change the organisation. People only see a group if they can see every facility in it, so totals are never partial. Open one in Dashboards (it is also in the “part of the group” list there).</p>
+        <p className="sub" style={{ margin: 0 }}>Any mix of facilities to view together — for example “European sites” or the SBTi boundary. They never change the organisation. People only see a group if they can see every facility in it, so totals are never partial. Open one in Dashboards (it is also in the “part of the group” list there).</p>
         {d.groups.map((g) => (
           <div key={g.id} className="row" style={{ padding: '10px 0', borderTop: '1px solid var(--line)', gap: 8 }}>
             <span style={{ flex: 1, minWidth: 0 }}><b>{g.name}</b><div className="muted small">{g.facilities.map((f) => f.name).join(' · ')}</div></span>
@@ -135,7 +135,7 @@ export function GroupsTab({ nodes }: { nodes: OrgNode[] }) {
       {role !== 'verifier' && (
         <div className="card" style={{ display: 'grid', gap: 10 }}>
           <h2 style={{ fontSize: 16 }}>New group</h2>
-          <label className="field"><span>Name</span><input className="input" value={name} placeholder="e.g. Sharjah sites" onChange={(e) => setName(e.target.value)} /></label>
+          <label className="field"><span>Name</span><input className="input" value={name} placeholder="e.g. European sites" onChange={(e) => setName(e.target.value)} /></label>
           <div className="sub">{ticks.size} of {vis.length} facilities ticked</div>
           <div style={{ maxHeight: 360, overflow: 'auto', display: 'grid' }}>{vis.map((f) => (
             <label key={f.id} className="row" style={{ padding: '5px 0', gap: 8 }}>

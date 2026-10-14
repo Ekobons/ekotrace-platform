@@ -21,9 +21,9 @@ import { tenantSettings } from './activity.routes.js';
 
 export const TRIP_CLASSES = [['economy', 'Economy'], ['premium', 'Premium economy'], ['business', 'Business'], ['first', 'First'], ['average', 'Not known (average)']] as const;
 export const TRIP_HAULS = [
-  ['domestic', 'Domestic', 'Within one country · e.g. Riyadh–Jeddah, Abu Dhabi–Sir Bani Yas'],
-  ['short', 'Short-haul', 'Under 3,700 km · e.g. Dubai–Riyadh, Dubai–Mumbai, Dubai–Cairo'],
-  ['long', 'Long-haul', '3,700 km or more · e.g. Dubai–London, Dubai–Singapore, Dubai–New York'],
+  ['domestic', 'Domestic', 'Within one country · e.g. New York–Chicago, Mumbai–Delhi, Sydney–Melbourne'],
+  ['short', 'Short-haul', 'Under 3,700 km · e.g. London–Rome, Dubai–Mumbai, Singapore–Jakarta'],
+  ['long', 'Long-haul', '3,700 km or more · e.g. London–New York, Dubai–Singapore, Sydney–Los Angeles'],
   ['intl', 'International', 'Average of all international flights · when not sure'],
 ] as const;
 /** Typical meeting-room sizes, to help fill in the m² (a guide: about 1.5–2 m² per person seated at tables, 1 m² theatre style). */

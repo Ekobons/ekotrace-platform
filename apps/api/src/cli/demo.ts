@@ -70,7 +70,7 @@ async function main() {
     if (old) {
       // Demo company only (matched by its exact name): remove everything it holds.
       for (const sql of [
-        'DELETE FROM waste_scan WHERE tenant_id = $1', 'DELETE FROM waste_bin WHERE tenant_id = $1', 'DELETE FROM contractor_statement WHERE tenant_id = $1', 'DELETE FROM contractor_session WHERE tenant_id = $1', 'DELETE FROM waste_contractor WHERE tenant_id = $1', 'DELETE FROM certificate_claim WHERE tenant_id = $1', 'DELETE FROM energy_certificate WHERE tenant_id = $1', 'DELETE FROM supplier_factor WHERE tenant_id = $1',
+        'DELETE FROM period_lock WHERE tenant_id = $1', 'DELETE FROM assurance_finding WHERE tenant_id = $1', 'DELETE FROM assurance_sample WHERE tenant_id = $1', 'DELETE FROM assurance_engagement WHERE tenant_id = $1', 'DELETE FROM waste_scan WHERE tenant_id = $1', 'DELETE FROM waste_bin WHERE tenant_id = $1', 'DELETE FROM contractor_statement WHERE tenant_id = $1', 'DELETE FROM contractor_session WHERE tenant_id = $1', 'DELETE FROM waste_contractor WHERE tenant_id = $1', 'DELETE FROM certificate_claim WHERE tenant_id = $1', 'DELETE FROM energy_certificate WHERE tenant_id = $1', 'DELETE FROM supplier_factor WHERE tenant_id = $1',
         'DELETE FROM job WHERE tenant_id = $1', 'UPDATE purchase_line SET activity_id = NULL WHERE tenant_id = $1', 'DELETE FROM activity_result WHERE tenant_id = $1', 'DELETE FROM activity WHERE tenant_id = $1',
         'DELETE FROM purchase_batch WHERE tenant_id = $1', 'DELETE FROM purchase_rule WHERE tenant_id = $1', 'DELETE FROM purchase_profile WHERE tenant_id = $1', 'DELETE FROM supplier_ef WHERE tenant_id = $1', 'DELETE FROM supplier WHERE tenant_id = $1', 'DELETE FROM fx_rate WHERE tenant_id = $1', 'DELETE FROM vehicle WHERE tenant_id = $1',
         'DELETE FROM bill WHERE tenant_id = $1', 'DELETE FROM document WHERE tenant_id = $1', 'DELETE FROM meter_reading WHERE tenant_id = $1', 'DELETE FROM meter WHERE tenant_id = $1', 'DELETE FROM api_key WHERE tenant_id = $1',
@@ -485,6 +485,22 @@ async function main() {
   // purchases run after the company exists (the pipeline commits in chunks, like a real upload)
   const sa = (await platformTx((c: Tx) => c.query(`SELECT id, name, email, role, tenant_id, scope_node_id FROM app_user WHERE tenant_id = $1 AND role = 'super_admin' LIMIT 1`, [tenantId]))).rows[0];
   await demoPurchases(tenantId, { id: sa.id, name: sa.name, email: sa.email, role: 'super_admin', tenantId, scopeNodeId: null, mustChangePassword: false });
+  // Audit & assurance (DEMO, not real): 2025 assured and locked month by month; 2026 engagement in planning.
+  await platformTx(async (c: Tx) => {
+    const t = tenantId;
+    await c.query(`INSERT INTO assurance_engagement (tenant_id, year, standard, level, provider, lead, scope, materiality, status, opinion, issued_on, updated_by)
+                   VALUES ($1, 2025, 'ISAE 3410', 'limited', 'DEMO Assurance Partners (not real)', 'DEMO lead verifier', 'Scope 1, Scope 2 (location- and market-based), Scope 3 categories 1, 3, 5, 6 and 7', 5, 'issued',
+                           'DEMO — Based on the procedures performed and the evidence obtained, nothing has come to our attention that causes us to believe that the GHG statement is not prepared, in all material respects, in accordance with the GHG Protocol Corporate Standard.', '2026-03-31', 'demo'),
+                          ($1, 2026, 'ISSA 5000', 'limited', 'DEMO Assurance Partners (not real)', 'DEMO lead verifier', 'Scope 1, Scope 2 and Scope 3', 5, 'planning', NULL, NULL, 'demo')`, [t]);
+    const ready = (await c.query(`SELECT to_char(mo.d, 'YYYY-MM') AS m FROM generate_series('2025-01-01'::date, '2025-12-01'::date, interval '1 month') mo(d)
+                                   WHERE NOT EXISTS (SELECT 1 FROM activity a WHERE a.tenant_id = $1 AND a.status <> 'approved' AND mo.d BETWEEN date_trunc('month', a.period_start) AND date_trunc('month', a.period_end))`, [t])).rows;
+    for (const r of ready) await c.query(`INSERT INTO period_lock (tenant_id, month, locked_by, reason) VALUES ($1, $2::date, 'demo', 'DEMO — 2025 assured')`, [t, `${r.m}-01`]);
+    const a = (await c.query(`SELECT a.id, a.facility_id FROM activity a JOIN category k ON k.id = a.category_id WHERE a.tenant_id = $1 AND a.status = 'approved' AND k.code = 'purchased_electricity'
+                               AND a.period_start >= '2026-01-01' ORDER BY a.period_start LIMIT 1`, [t])).rows[0];
+    if (a) await c.query(`INSERT INTO assurance_finding (tenant_id, year, activity_id, severity, kind, text, impact_t, raised_by) VALUES ($1, 2026, $2, 'medium', 'evidence',
+                          'DEMO — Electricity for this month was typed in: attach the utility bill (or the meter export) so the quantity can be agreed.', 0, 'DEMO verifier')`, [t, a.id]);
+    console.log(`Assurance: 2025 issued (DEMO), ${ready.length} months of 2025 locked; 2026 in planning with one DEMO finding.`);
+  });
   console.log('\nDemo logins (all with the same password, shown once):');
   for (const [name, email] of PEOPLE) console.log(`  ${email.padEnd(24)} ${name}`);
   console.log(`\n  Password: ${pw}\n`);

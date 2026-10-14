@@ -70,4 +70,4 @@ Every entry keeps: what was entered, the result per gas and per scope, **the emi
 
 The year's totals per scope, the split by gas, and every entry. Click an entry to see exactly how it was calculated.
 
-**Recalculate entries with warnings** re-runs entries saved before a factor existed (e.g. the UAE grid factor, or next year's DESNZ set) — each change is in the audit log with the old and new totals. Entries that come from a meter are recalculated from the meter's readings.
+**Recalculate entries with warnings** re-runs entries saved before a factor existed (e.g. a national grid factor added later, or next year's DESNZ set) — each change is in the audit log with the old and new totals. Entries that come from a meter are recalculated from the meter's readings.

@@ -21,7 +21,7 @@ export interface FactorUsed {
 export interface CvUsed { value: number; energyUnit: string; perUnit: string; energyUnitName: string; perUnitName: string; basis: 'net' | 'gross'; convertedQuantity: number; convertedUnit: string; convertedUnitName: string }
 export interface CalcResponse { cv?: CvUsed; stored?: { quantity: number; unit: string; inputs: Record<string, unknown> }; item: { id: number; name: string; category: string }; gwpSet: string; lines: ResultLine[]; factors: FactorUsed[]; totals: Record<Basis, number>; steps: string[]; warnings: string[] }
 export interface PlanLimits { code: string; name: string; facilities: number | null; users: number | null; ai: boolean; export: boolean; groups: boolean; note: string }
-export interface Tenant { id: string; name: string; country: string; gwp_set: string; timezone?: string; consolidation?: string; base_year?: number; plan?: string; status?: string; access_expiry?: string; planLimits?: PlanLimits | null; flight_rf?: boolean; target_year?: number; target_s12?: number; target_s3?: number; due_day?: number; remind_days?: number; escalate_days?: number }
+export interface Tenant { id: string; name: string; country: string; gwp_set: string; timezone?: string; currency?: string; has_logo?: boolean; consolidation?: string; base_year?: number; plan?: string; status?: string; access_expiry?: string; planLimits?: PlanLimits | null; flight_rf?: boolean; target_year?: number; target_s12?: number; target_s3?: number; due_day?: number; remind_days?: number; escalate_days?: number }
 export type Role = 'platform_admin' | 'super_admin' | 'admin' | 'manager' | 'preparer' | 'verifier';
 export interface Me { user: { id: string; name: string; email: string; role: Role; tenantId: string | null; scopeNodeId: string | null; mustChangePassword: boolean }; company: (Tenant & { scope_name: string | null }) | null }
 export interface OrgNode { id: string; parent_id: string | null; kind: 'group' | 'subgroup' | 'facility'; name: string; facility_type: string | null; location: string | null; country: string; floor_area_m2: number | null; employees: number | null; ownership_pct: number; operational_control: boolean; financial_control: boolean; active: boolean; sort: number; manager_user_id: string | null; manager_name: string | null; grid_region?: string | null; entries: number; canEdit: boolean; canSee: boolean; canEnter: boolean }
@@ -214,13 +214,14 @@ export interface RepLine {
   id: string; f: string; facility: string; m: number; from: string; to: string; cat: string; category: string; scope: number; g3: number | null; code: string; item: string; note: string | null;
   qty: number; unit: string; dataType: string; method: string | null; s1: number; s2: number; s2m: number; s3: number; s33: number; w: number;
   captured: 'meter' | 'batch' | 'commute' | 'fleet' | 'form'; evidence: boolean; source: string | null; status: string; asset: string | null;
+  country?: string | null; division?: string | null; bio?: number; gases?: Record<string, number> | null;
 }
 export interface RepCheck { id: string; name: string; area: string; n: number; items: string[]; justified: { text: string; by: string | null; at: string } | null }
 export interface RepTemplate { id: string; base: string | null; name: string; audience: string | null; note: string | null; sections: string[] }
 export interface RepVersion { id: string; name: string; label: string; period: string; scope2: 'location' | 'market'; s1: number; s2: number; s3: number; byCode: Record<string, number>; by: string | null; at: string }
-export interface RepEntity { legal?: string; licence?: string; emirate?: string; sector?: string; mrvId?: string; contact?: string }
+export interface RepEntity { legal?: string; licence?: string; lei?: string; region?: string; emirate?: string; sector?: string; sectorCode?: string; mrvId?: string; contact?: string; website?: string; revenue?: number | null; revenueCurrency?: string; fyEnd?: string }
 export interface RepSettings {
-  company: { name: string; country: string; consolidation: string; gwp: string; baseYear: number | null }; entity: RepEntity; excl: Record<string, string>;
+  company: { name: string; country: string; consolidation: string; gwp: string; baseYear: number | null; currency?: string; hasLogo?: boolean }; entity: RepEntity; excl: Record<string, string>;
   templates: RepTemplate[]; versions: RepVersion[]; canEntity: boolean; canEdit: boolean;
 }
 export interface ApprovalSettings { l2: boolean; minT: number; cats: string[]; checkPct: number }
@@ -298,6 +299,22 @@ export interface Contractor { id: string; name: string; email: string; contact: 
 export interface StatementRec { contractorId: string; contractor: string; ours: number; theirs: number | null; gapPct: number | null; flagged: boolean;
   statement: { id: string; lines: unknown[]; documentId: string | null; note: string | null; status: 'submitted' | 'accepted' | 'queried'; reviewNote: string | null; reviewedBy: string | null; submittedAt: string } | null;
   lines: { facility: string; item: string; ours: number; theirs: number | null; gapPct: number | null }[] }
+export interface AssuranceData {
+  standards: string[];
+  engagement: { standard: string; level: 'limited' | 'reasonable'; provider: string | null; lead: string | null; scope: string | null; materiality: number | null; status: 'planning' | 'fieldwork' | 'reporting' | 'issued';
+    opinion: string | null; issuedOn: string | null; statementId: string | null; statementName: string | null; updatedBy: string | null; updatedAt: string } | null;
+  kpis: { approved: number; evidencePct: number; totalT: number; openFindings: number; openImpactT: number };
+  months: { month: string; approved: number; open: number; ready: boolean; lock: { lockedBy: string | null; lockedAt: string; reason: string | null } | null }[];
+  samples: { id: string; method: 'random' | 'value'; seed: number; size: number; keyItems: number; population: number; populationT: number; by: string | null; at: string; tested: number; exceptions: number }[];
+  findings: AFinding[];
+  can: { admin: boolean; verify: boolean; respond: boolean };
+}
+export interface AFinding { id: string; severity: 'low' | 'medium' | 'high'; kind: string; text: string; impactT: number | null; status: 'open' | 'responded' | 'closed'; response: string | null; respondedBy: string | null; respondedAt: string | null;
+  raisedBy: string | null; raisedAt: string; closedBy: string | null; closedAt: string | null; closeNote: string | null; activityId: string | null; facility: string | null; item: string | null; period: string | null }
+export interface SampleItem { id: string; key: boolean; result: 'agreed' | 'exception' | null; note: string | null; testedBy: string | null; testedAt: string | null; facility: string; from: string; to: string; category: string; item: string;
+  qty: number; unit: string; t: number; source: string | null; dataType: string; entryNote: string | null; evidence: boolean; evidenceKind: string | null; enteredBy: string | null; approvedBy: string | null; approvedAt: string | null }
+export interface AssurancePack { company: string; consolidation: string; gwp: string; baseYear: number | null; totals: { s1: number; s2l: number; s2m: number; s3: number; bio: number; n: number };
+  sources: { source: string; n: number }[]; trail: { at: string; user: string | null; action: string; entityId: string | null; detail: unknown }[] }
 export type BinInput = { facilityId: string; name: string; location?: string; itemId: number; gri?: string; hazardous: boolean; contractor?: string; capacityL?: number; density?: number };
 
 const qs = (q: Record<string, unknown>) => new URLSearchParams(Object.entries(q).filter(([, v]) => v !== undefined && v !== '' && v !== null).map(([k, v]) => [k, String(v)]));
@@ -523,6 +540,20 @@ export const api = {
   statements: (q: { year: number; month: number }) => call<{ tolerancePct: number; contractors: StatementRec[] }>('GET', `/api/qr/statements?${qs(q)}`),
   reviewStatement: (id: string, b: { status: 'accepted' | 'queried'; note?: string }) => call<{ ok: true }>('PUT', `/api/qr/statements/${id}`, b),
   docUrl: (id: string) => `/api/qr/documents/${id}`,
+  assurance: (year: number) => call<AssuranceData>('GET', `/api/assurance?year=${year}`),
+  saveEngagement: (b: Record<string, unknown>) => call<{ ok: true }>('PUT', '/api/assurance/engagement', b),
+  uploadStatement: (year: number, f: File) => call<{ id: string; filename: string }>('POST', '/api/assurance/statement', undefined, f, { 'x-year': String(year), 'x-filename': encodeURIComponent(f.name) }),
+  lockMonth: (month: string, reason?: string) => call<{ ok: true }>('POST', '/api/assurance/locks', { month, reason }),
+  unlockMonth: (month: string, reason: string) => call<{ ok: true }>('POST', `/api/assurance/locks/${month}/unlock`, { reason }),
+  drawSample: (b: { year: number; method: 'random' | 'value'; size: number; seed?: number; keyPct?: number }) => call<{ id: string; seed: number; size: number; keyItems: number; keyPct: number }>('POST', '/api/assurance/samples', b),
+  sample: (id: string) => call<{ items: SampleItem[] }>('GET', `/api/assurance/samples/${id}`),
+  testItem: (sid: string, aid: string, b: { result: 'agreed' | 'exception' | null; note?: string }) => call<{ ok: true }>('PUT', `/api/assurance/samples/${sid}/tests/${aid}`, b),
+  raiseFinding: (b: { year: number; activityId?: string; severity: string; kind: string; text: string; impactT?: number }) => call<{ id: string }>('POST', '/api/assurance/findings', b),
+  respondFinding: (id: string, response: string) => call<{ ok: true }>('PUT', `/api/assurance/findings/${id}/respond`, { response }),
+  closeFinding: (id: string, b: { note?: string; reopen?: boolean }) => call<{ ok: true }>('PUT', `/api/assurance/findings/${id}/close`, b),
+  assurancePack: (year: number) => call<AssurancePack>('GET', `/api/assurance/pack?year=${year}`),
+  uploadLogo: (f: File) => call<{ ok: true }>('POST', '/api/tenant/logo', undefined, f),
+  removeLogo: () => call<{ ok: true }>('DELETE', '/api/tenant/logo'),
   makeRollup: (q: { facilityId: string; year: number; month: number }) => call<{ made: { item: string; kg: number; dataType: string; id: string | null; warnings: string[] }[] }>('POST', '/api/qr/rollup', q),
   saveApprovalSettings: (b: ApprovalSettings) => call<ApprovalSettings>('PUT', '/api/approvals/settings', b),
   reviewAction: (ids: string[], action: 'submit' | 'withdraw' | 'approve' | 'return', note?: string) => call<{ done: number; skipped: { id: string; reason: string }[]; toLevel2?: number }>('POST', '/api/activities/review', { ids, action, note }),

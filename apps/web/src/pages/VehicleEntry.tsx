@@ -60,7 +60,7 @@ export function VehicleEntry({ cat, facilityId, period, onSaved, monthly, mode: 
 
 // ------------------------------------------------------------------ one entry --
 function OneEntry({ cat, facilityId, period, fleet, onSaved, monthly }: { cat: Category; facilityId: string; period: { periodStart: string; periodEnd: string }; fleet: Vehicle[]; onSaved: () => void; monthly?: number }) {
-  const { toast } = useApp();
+  const { toast, tenant } = useApp();
   const fuels = useFuels();
   const [vehicleId, setVehicleId] = useState('');
   const [subId, setSubId] = useState<number | null>(cat.subcategories[0]?.id ?? null);
@@ -71,7 +71,7 @@ function OneEntry({ cat, facilityId, period, fleet, onSaved, monthly }: { cat: C
   const [unit, setUnit] = useState('km');
   const [fuelId, setFuelId] = useState<number | null>(null);
   const [charging, setCharging] = useState<'site' | 'elsewhere'>('elsewhere');
-  const [currency, setCurrency] = useState('AED');
+  const [currency, setCurrency] = useState(tenant?.currency ?? 'USD');
   const [price, setPrice] = useState('');
   const [dataType, setDataType] = useState('actual');
   const [note, setNote] = useState('');
@@ -221,7 +221,8 @@ function OneEntry({ cat, facilityId, period, fleet, onSaved, monthly }: { cat: C
 interface Line { method: VehicleMethod; quantity: string; unit: string; currency: string; charging: 'site' | 'elsewhere' }
 
 function FleetGrid({ facilityId, period, fleet, onSaved }: { facilityId: string; period: { periodStart: string; periodEnd: string }; fleet: Vehicle[]; onSaved: () => void }) {
-  const { toast } = useApp();
+  const { toast, tenant } = useApp();
+  const cur0 = tenant?.currency ?? 'USD';
   const [lines, setLines] = useState<Record<string, Line>>({});
   const [results, setResults] = useState<Record<string, { totals?: Record<Basis, number>; error?: string; warnings?: string[] }>>({});
   const [entered, setEntered] = useState<Record<string, number>>({});
@@ -232,7 +233,7 @@ function FleetGrid({ facilityId, period, fleet, onSaved }: { facilityId: string;
     const init: Record<string, Line> = {};
     for (const v of fleet) {
       const m = v.default_method;
-      init[v.id] = { method: m, quantity: '', unit: m === 'spend' ? (v.attrs.electric ? 'kWh_e' : 'L') : unitsFor(m)[0]![0], currency: 'AED', charging: v.charging ?? 'elsewhere' };
+      init[v.id] = { method: m, quantity: '', unit: m === 'spend' ? (v.attrs.electric ? 'kWh_e' : 'L') : unitsFor(m)[0]![0], currency: cur0, charging: v.charging ?? 'elsewhere' };
     }
     setLines(init); setResults({});
     if (facilityId) {
@@ -367,7 +368,8 @@ const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct
  * into any cell. Months outside a vehicle's service are closed.
  */
 function FleetYearGrid({ facilityId, year, fleet, onSaved }: { facilityId: string; year: number; fleet: Vehicle[]; onSaved: () => void }) {
-  const { toast } = useApp();
+  const { tenant: tn2, toast } = useApp();
+  const cur0 = tn2?.currency ?? 'USD';
   const [lines, setLines] = useState<Record<string, Line>>({});
   const [vals, setVals] = useState<Record<string, string[]>>({});
   const [res, setRes] = useState<Record<string, { totals?: Record<Basis, number>; error?: string }>>({});
@@ -380,7 +382,7 @@ function FleetYearGrid({ facilityId, year, fleet, onSaved }: { facilityId: strin
   };
   useEffect(() => {
     const init: Record<string, Line> = {};
-    for (const v of fleet) { const m = v.default_method; init[v.id] = { method: m, quantity: '', unit: m === 'spend' ? (v.attrs.electric ? 'kWh_e' : 'L') : unitsFor(m)[0]![0], currency: 'AED', charging: v.charging ?? 'elsewhere' }; }
+    for (const v of fleet) { const m = v.default_method; init[v.id] = { method: m, quantity: '', unit: m === 'spend' ? (v.attrs.electric ? 'kWh_e' : 'L') : unitsFor(m)[0]![0], currency: cur0, charging: v.charging ?? 'elsewhere' }; }
     setLines(init); setVals({}); setRes({});
     if (facilityId) api.activities({ facilityId, year, category: 'mobile_combustion', limit: 1000 }).then((r) => {
       setTaken(new Set(r.activities.filter((a) => a.vehicle_id && a.period_start.slice(0, 7) === a.period_end.slice(0, 7)).map((a) => `${a.vehicle_id}|${Number(a.period_start.slice(5, 7)) - 1}`)));

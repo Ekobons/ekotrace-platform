@@ -29,7 +29,7 @@ Example:
 
     { "readings": [
       { "meterId": "BMS-DC-MAIN", "timestamp": "2026-03-01T01:00:00+04:00", "value": 512.4 },
-      { "meterId": "DEWA-2001458876", "timestamp": "2026-04-01T00:00:00+04:00", "value": 45500, "start": "2026-03-01T00:00:00+04:00" }
+      { "meterId": "ELEC-2001458876", "timestamp": "2026-04-01T00:00:00+01:00", "value": 45500, "start": "2026-03-01T00:00:00+01:00" }
     ] }
 
 `GET /api/v1/meters` lists the company's meters with their ids, units and last reading.
@@ -47,9 +47,9 @@ Example:
 The client needs the **Purchase lines** permission (tick it when creating the client). Send the lines of a period under one reference, in as many calls as needed, then complete it:
 
     POST /api/v1/purchases
-    { "reference": "SAP-2026-03", "currency": "AED", "facility": "BEEAH Headquarters",
+    { "reference": "SAP-2026-03", "currency": "EUR", "facility": "Head office",
       "lines": [ { "date": "2026-03-10", "description": "Copier paper A4", "amount": 4250,
-                   "supplier": "Gulf Stationery LLC", "supplierRef": "V100231", "supplierCountry": "AE", "category": "Office supplies", "glAccount": "Office expenses",
+                   "supplier": "Office Supplies Ltd", "supplierRef": "V100231", "supplierCountry": "DE", "category": "Office supplies", "glAccount": "Office expenses",
                    "poNumber": "4500123", "quantity": 50, "unit": "box" } ] }
 
     POST /api/v1/purchases/SAP-2026-03/complete      (or "complete": true on the last call)

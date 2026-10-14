@@ -6,6 +6,7 @@
 import { useEffect, useState } from 'react';
 import { api, num, type Price } from '../lib/api';
 import { Icon } from './Icon';
+import { useApp } from '../App';
 
 const month = () => new Date().toISOString().slice(0, 7);
 const lastDay = (ym: string) => { const [y, m] = ym.split('-').map(Number); return new Date(Date.UTC(y!, m!, 0)).toISOString().slice(0, 10); };
@@ -13,7 +14,8 @@ const lastDay = (ym: string) => { const [y, m] = ym.split('-').map(Number); retu
 export function Prices({ platform, canEdit = true }: { platform?: boolean; canEdit?: boolean }) {
   const [items, setItems] = useState<{ id: number; name: string; default_unit: string | null; sub: string }[]>([]);
   const [rows, setRows] = useState<Price[]>([]);
-  const [f, setF] = useState({ itemId: 0, region: 'AE', currency: 'AED', price: '', unit: 'L', from: month(), to: month(), source: '' });
+  const { tenant: tn } = useApp();
+  const [f, setF] = useState({ itemId: 0, region: tn?.country ?? 'GLOBAL', currency: tn?.currency ?? 'USD', price: '', unit: 'L', from: month(), to: month(), source: '' });
   const [err, setErr] = useState<string | null>(null);
   const load = () => api.prices().then((r) => setRows(r.prices)).catch((e) => setErr(e.message));
   useEffect(() => { api.priceItems().then((r) => { setItems(r.items); const d = r.items.find((i) => /diesel \(100%/i.test(i.name)) ?? r.items[0]; if (d) setF((x) => ({ ...x, itemId: d.id, unit: d.default_unit ?? 'L' })); }); load(); }, []);

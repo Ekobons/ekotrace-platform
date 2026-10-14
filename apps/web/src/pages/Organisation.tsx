@@ -3,6 +3,7 @@
  * main entity → sub-groups → facilities. Click a row to open its profile.
  * Super admin edits everything; an Admin edits inside their own sub-group.
  */
+import { CompanyDetails } from '../components/CompanyDetails';
 import { Fragment, useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useApp } from '../App';
@@ -23,7 +24,7 @@ const readView = (): 'list' | 'chart' => { try { return localStorage.getItem(VIE
 export function Organisation() {
   const { toast, tenant } = useApp();
   const [params, setParams] = useSearchParams();
-  const [tab, setTab] = useState<'tree' | 'facs' | 'subs' | 'groups'>('tree');
+  const [tab, setTab] = useState<'tree' | 'facs' | 'subs' | 'groups' | 'company'>((new URLSearchParams(window.location.search).get('tab') === 'company' ? 'company' : 'tree'));
   const groupsOn = tenant?.planLimits?.groups !== false;
   const [nodes, setNodes] = useState<OrgNode[]>([]);
   const [people, setPeople] = useState<Person[]>([]);
@@ -137,12 +138,13 @@ export function Organisation() {
           {root?.canEdit && <><button className="btn" onClick={() => setAdding({ parent: root, kind: 'facility' })}><Icon name="plus" size={14} />Facility</button><button className="btn" onClick={() => setAdding({ parent: root, kind: 'subgroup' })}><Icon name="plus" size={14} />Sub-group</button></>}</div>
       </div>
       <div className="tabs">
-        {([['tree', 'Tree'], ['facs', 'Facilities'], ['subs', 'Sub-groups'], ...(groupsOn ? [['groups', 'Dashboard groups']] : [])] as [typeof tab, string][]).map(([k, l]) => <button key={k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>{l}</button>)}
+        {([['tree', 'Tree'], ['facs', 'Facilities'], ['subs', 'Sub-groups'], ...(groupsOn ? [['groups', 'Dashboard groups']] : []), ['company', 'Company details & logo']] as [typeof tab, string][]).map(([k, l]) => <button key={k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>{l}</button>)}
         {!groupsOn && <button disabled title="Dashboard groups come with the Professional plan and above">Dashboard groups (Professional plan +)</button>}
       </div>
       {tab === 'facs' && <FacilitiesTab nodes={nodes} onOpen={(n) => openNode(n)} />}
       {tab === 'subs' && <SubgroupsTab nodes={nodes} onOpen={(n) => openNode(n)} onEdit={(n) => openNode(n)} onAddFacility={(n) => setAdding({ parent: n, kind: 'facility' })} />}
       {tab === 'groups' && groupsOn && <GroupsTab nodes={nodes} />}
+      {tab === 'company' && <CompanyDetails />}
       {tab === 'tree' && <div className="card" style={{ padding: 14, display: 'grid', gap: 12 }}>
         <div className="row" style={{ gap: 10 }}>
           <div className="grow"><h2 style={{ fontSize: 16 }}>Organisation hierarchy</h2><div className="sub">Click a facility to open its profile; click a group to fold or unfold it.</div></div>
@@ -209,7 +211,7 @@ function NodeForm({ f, setF, kind, managers, disabled }: { f: F; setF: (f: F) =>
         <>
           <div className="row">
             <label className="field grow"><span>Facility type</span><select className="input" value={f.facilityType} onChange={set('facilityType')}><option value="">—</option>{TYPES.map((t) => <option key={t}>{t}</option>)}</select></label>
-            <label className="field grow"><span>Location (emirate / city)</span><input className="input" value={f.location} onChange={set('location')} /></label>
+            <label className="field grow"><span>Location (city / region)</span><input className="input" value={f.location} onChange={set('location')} /></label>
             <label className="field" style={{ width: 80 }}><span>Country</span><input className="input" maxLength={2} value={f.country} onChange={set('country')} /></label>
           </div>
           <div className="row">

@@ -50,7 +50,8 @@ The page has four tabs:
 | Tree | the hierarchy as a **List** or an **Org chart** (the choice is remembered); colours show the level: **teal** main entity, **olive** sub-group, **blue** facility |
 | Facilities | one table of every facility: type, sub-group, location, manager (red when missing), meters, vehicles, landfill sites, the share of the year's entries approved and the tCO₂e — click a row to open the facility |
 | Sub-groups | the main entity and each sub-group: where it sits, its admins, its facilities and tCO₂e; **Edit** and **+ Facility here** |
-| Dashboard groups | any mix of facilities to view together (for example “Sharjah sites” or the SBTi boundary); **Open dashboard** shows it in Dashboards, where it is also in the “part of the group” list. Groups never change the structure. A person sees a group only if they can see every facility in it; the creator or a Super admin deletes it. Professional and Enterprise plans. |
+| Dashboard groups | any mix of facilities to view together (for example “European sites” or the SBTi boundary); **Open dashboard** shows it in Dashboards, where it is also in the “part of the group” list. Groups never change the structure. A person sees a group only if they can see every facility in it; the creator or a Super admin deletes it. Professional and Enterprise plans. |
+| Company details & logo | the reporting entity printed on every report — legal name, registration no., LEI, region, sector and its code (NACE / ISIC / NAICS), regulator or registry ID, contact, website, net revenue (for intensity per revenue) and financial year end — and the **company logo** (PNG or JPEG) for the report cover |
 
 **+ Facility** and **+ Sub-group** at the top add under the main entity (Super admin); inside the tree, the buttons under each sub-group add there. The number of facilities is limited by the company's plan.
 
@@ -65,7 +66,7 @@ Everything that **describes** a facility — set up once, changed rarely — is 
 
 | Tab | What it holds |
 |---|---|
-| Profile | type, location, manager, floor area, employees, ownership and control, **grid region** (the emirate or grid it buys electricity from) |
+| Profile | type, location, manager, floor area, employees, ownership and control, **grid region** (the country, state, province or grid sub-region it buys electricity from) |
 | Meters | the facility's meters: what each measures, how often readings come, the utility account number; open one to see its months and readings |
 | Energy | the energy set-up at a glance: grid region and its factors, utility accounts that bills are matched to, certificates and contracts usable here |
 | Vehicle fleet | the vehicles based here, with in-service and retired dates |

@@ -51,9 +51,11 @@ export async function reportsRoutes(app: FastifyInstance) {
                 (a.co2e_scope3 / 1000)::float8 AS s3, ((a.co2e_wtt + coalesce(a.co2e_td, 0)) / 1000)::float8 AS s33, (${W})::float8 AS w,
                 CASE WHEN a.meter_id IS NOT NULL THEN 'meter' WHEN a.purchase_batch_id IS NOT NULL THEN 'batch' WHEN a.commute_record_id IS NOT NULL THEN 'commute'
                      WHEN a.vehicle_id IS NOT NULL THEN 'fleet' ELSE 'form' END AS captured,
-                a.meter_id IS NOT NULL OR a.purchase_batch_id IS NOT NULL AS evidence, a.factors->0->>'source' AS source, a.status, coalesce(mt.name, v.name, ws.name) AS asset, un.dimension AS dim
+                a.meter_id IS NOT NULL OR a.purchase_batch_id IS NOT NULL AS evidence, a.factors->0->>'source' AS source, a.status, coalesce(mt.name, v.name, ws.name) AS asset, un.dimension AS dim, f.country, pn.name AS division, (a.co2_biogenic / 1000)::float8 AS bio,
+                (SELECT json_object_agg(x.fam, x.t) FROM (SELECT CASE WHEN g.family IN ('CO2', 'CH4', 'N2O', 'HFC', 'PFC', 'SF6', 'NF3') THEN g.family WHEN g.family IS NULL THEN 'CO2e (not split)' ELSE 'Other (non-Kyoto)' END AS fam,
+                        sum(r.kg_co2e) / 1000 AS t FROM activity_result r LEFT JOIN gas g ON g.code = r.gas WHERE r.activity_id = a.id AND r.basis = 'direct' GROUP BY 1) x) AS gases
            FROM activity a JOIN org_node f ON f.id = a.facility_id JOIN category cat ON cat.id = a.category_id JOIN item i ON i.id = a.item_id
-           LEFT JOIN meter mt ON mt.id = a.meter_id LEFT JOIN vehicle v ON v.id = a.vehicle_id LEFT JOIN waste_site ws ON ws.id = a.waste_site_id LEFT JOIN unit un ON un.code = a.unit
+           LEFT JOIN meter mt ON mt.id = a.meter_id LEFT JOIN vehicle v ON v.id = a.vehicle_id LEFT JOIN waste_site ws ON ws.id = a.waste_site_id LEFT JOIN unit un ON un.code = a.unit LEFT JOIN org_node pn ON pn.id = f.parent_id
           WHERE a.facility_id = ANY($1) AND extract(year FROM a.period_start) = $2 AND ${q.pend === '1' ? `a.status <> 'rejected'` : `a.status = 'approved'`}
           ORDER BY a.period_start, f.name LIMIT 50000`, [facs, q.year])).rows;
       return { lines: rows.map(({ dim, ...r }) => ({ ...r, code: r.scope === 3 ? `3.${r.g3}` : r.cat === 'purchased_electricity' && (dim === 'cooling' || dim === 'heat') ? '2.2' : CODE[r.cat] ?? `${r.scope}.1` })) };
@@ -130,13 +132,13 @@ export async function reportsRoutes(app: FastifyInstance) {
   app.get('/api/reports/settings', async (req) => {
     const tenant = requireTenant(req);
     return tenantTx(tenant, async (c) => {
-      const t = (await c.query(`SELECT name, country, consolidation, gwp_set, base_year, report FROM tenant WHERE id = $1`, [tenant])).rows[0];
+      const t = (await c.query(`SELECT name, country, consolidation, gwp_set, base_year, currency, logo_id, report FROM tenant WHERE id = $1`, [tenant])).rows[0];
       const templates = (await c.query(`SELECT id, base, name, audience, note, sections FROM report_template ORDER BY updated_at`)).rows;
       const versions = (await c.query(`SELECT v.id, v.name, v.label, v.period, v.scope2, v.s1::float8 AS s1, v.s2::float8 AS s2, v.s3::float8 AS s3, v.by_code AS "byCode", u.name AS by, v.created_at AS at
                                          FROM report_version v LEFT JOIN app_user u ON u.id::text = v.created_by ORDER BY v.created_at DESC`)).rows;
       return {
-        company: { name: t.name, country: t.country, consolidation: t.consolidation, gwp: t.gwp_set, baseYear: t.base_year },
-        entity: t.report?.entity ?? {}, excl: t.report?.excl ?? {}, templates, versions,
+        company: { name: t.name, country: t.country, consolidation: t.consolidation, gwp: t.gwp_set, baseYear: t.base_year, currency: t.currency, hasLogo: !!t.logo_id },
+        entity: (({ emirate, ...e }) => ({ ...e, region: e.region ?? emirate }))(t.report?.entity ?? {}), excl: t.report?.excl ?? {}, templates, versions,
         canEntity: ['super_admin', 'platform_admin'].includes(req.user.role), canEdit: ['super_admin', 'admin', 'platform_admin'].includes(req.user.role),
       };
     });
@@ -147,7 +149,8 @@ export async function reportsRoutes(app: FastifyInstance) {
     requireRole(req, 'super_admin');
     const str = z.string().trim().max(300);
     const b = z.object({
-      entity: z.object({ legal: str, licence: str, emirate: str, sector: str, mrvId: str, contact: str }).partial().optional(),
+      entity: z.object({ legal: str, licence: str, lei: str, region: str, emirate: str, sector: str, sectorCode: str, mrvId: str, contact: str, website: str,
+        revenue: z.number().min(0).max(1e15).nullable(), revenueCurrency: z.string().regex(/^[A-Z]{3}$/), fyEnd: z.string().regex(/^\d{2}-\d{2}$/) }).partial().optional(),
       excl: z.record(z.string().regex(/^[13]\.\d{1,2}$/), z.string().trim().max(500)).optional(),
     }).parse(req.body);
     return tenantTx(tenant, async (c) => {
@@ -159,7 +162,7 @@ export async function reportsRoutes(app: FastifyInstance) {
     });
   });
 
-  const tpl = z.object({ base: z.enum(['board', 'ghgp', 'moccae']).nullable().optional(), name: z.string().trim().min(1).max(120), audience: z.string().trim().max(120).optional(), note: z.string().trim().max(1000).optional(),
+  const tpl = z.object({ base: z.string().regex(/^[a-z0-9_]{2,20}$/).nullable().optional(), name: z.string().trim().min(1).max(120), audience: z.string().trim().max(120).optional(), note: z.string().trim().max(1000).optional(),
     sections: z.array(z.string().max(20)).min(1).max(30) });
   app.post('/api/reports/templates', async (req) => {
     const tenant = requireTenant(req);

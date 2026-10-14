@@ -5,6 +5,7 @@
 import type { Data, Row } from '../components/ViewBar';
 import type { RAction, RepCheck, RepLine, RepSettings, RepTemplate, TargetsData } from './api';
 import { cbOf } from './targets';
+import { FW_SECS, ISO_CSS, fwSection } from './frameworks';
 
 export const GHG_CATS: [string, number, string, string][] = [
   ['1.1', 1, 'Stationary combustion', 'Fuels burned on site: generators, boilers, kitchens'], ['1.2', 1, 'Mobile combustion', 'Fuel used by owned or controlled vehicles'],
@@ -54,14 +55,24 @@ export const lineT = (l: RepLine, mb: boolean) => (l.s1 + (mb ? l.s2m : l.s2) + 
 export const RSECS: [string, string][] = [['cover', 'Cover & reporting entity'], ['boundary', 'Organisational boundary & consolidation'], ['summary', 'Emissions summary by scope'], ['ghgcat', 'Emissions by GHG Protocol category'],
   ['byfac', 'Emissions by facility'], ['byasset', 'Emissions by asset (meters, vehicles, sites)'], ['bymonth', 'Emissions by month'], ['activity', 'Activity data and emission factors by source'], ['intensity', 'Intensity metrics'],
   ['dtype', 'Data type: actual, estimated, proxy'], ['method', 'Methodology statement'], ['excl', 'Exclusions and justifications'], ['base', 'Base year and restatements'], ['dq', 'Data quality controls'],
-  ['targets', 'Targets and progress'], ['actions', 'Decarbonisation actions and cost-benefit'], ['verif', 'Declaration, verification and sign-off']];
+  ['targets', 'Targets and progress'], ['actions', 'Decarbonisation actions and cost-benefit'], ['verif', 'Declaration, verification and sign-off'], ...FW_SECS];
 export const RTPL_DEF: RepTemplate[] = [
   { id: 'board', base: 'board', name: 'Board summary', audience: 'Internal management', note: null, sections: ['cover', 'summary', 'ghgcat', 'byfac', 'intensity', 'targets', 'actions'] },
   { id: 'ghgp', base: 'ghgp', name: 'GHG Protocol inventory report', audience: 'Verifier / public disclosure', note: null, sections: ['cover', 'boundary', 'summary', 'ghgcat', 'byfac', 'activity', 'dtype', 'method', 'excl', 'base', 'dq', 'verif'] },
-  { id: 'moccae', base: 'moccae', name: 'MOCCAE submission (provisional layout)', audience: 'Regulator — MOCCAE MRV', note: 'Provisional structure built from the GHG Protocol inventory. Replace with the official MOCCAE template: sections can be changed here without code changes.',
+  { id: 'iso', base: 'iso', name: 'ISO 14064-1:2018 GHG report', audience: 'Global standard · public report, verifier (ISO 14064-3)', note: null, sections: ['iso_report'] },
+  { id: 'esrs', base: 'esrs', name: 'ESRS E1 climate disclosure (CSRD, EU)', audience: 'EU · CSRD sustainability statement', note: null, sections: ['cover', 'boundary', 'esrs_e1', 'ghgcat', 'bygas', 'method', 'excl', 'base', 'targets', 'verif'] },
+  { id: 'ifrs', base: 'ifrs', name: 'IFRS S2 GHG metrics (ISSB)', audience: 'Global · ISSB and adopting jurisdictions (AU, SG, JP, UK…)', note: null, sections: ['cover', 'boundary', 'ifrs_s2', 'ghgcat', 'method', 'excl', 'verif'] },
+  { id: 'cdp', base: 'cdp', name: 'CDP climate questionnaire — emissions', audience: 'Global · CDP disclosure', note: null, sections: ['cover', 'cdp', 'bygas', 'bycountry', 'method', 'verif'] },
+  { id: 'gri', base: 'gri', name: 'GRI 305 Emissions', audience: 'Global · sustainability report', note: null, sections: ['cover', 'boundary', 'gri305', 'ghgcat', 'bygas', 'intensity', 'method', 'base'] },
+  { id: 'secr', base: 'secr', name: 'UK SECR energy and carbon report', audience: 'UK · directors’ report', note: null, sections: ['cover', 'secr', 'method'] },
+  { id: 'sb253', base: 'sb253', name: 'California SB 253 GHG report', audience: 'US · California', note: null, sections: ['cover', 'boundary', 'sb253', 'ghgcat', 'method', 'verif'] },
+  { id: 'moccae', base: 'moccae', name: 'UAE MOCCAE submission (provisional layout)', audience: 'Regional · UAE regulator (MOCCAE MRV)', note: 'Provisional structure built from the GHG Protocol inventory. Replace with the official MOCCAE template: sections can be changed here without code changes.',
     sections: ['cover', 'boundary', 'summary', 'activity', 'ghgcat', 'byfac', 'byasset', 'dtype', 'method', 'excl', 'base', 'dq', 'verif'] },
 ];
 /** Built-in templates, unless the company saved its own version of one, plus its own templates. */
+/** How the template list is grouped. */
+export const TPL_GROUP: Record<string, string> = { iso: 'Global standards', ifrs: 'Global standards', ghgp: 'Global standards', cdp: 'Global standards', gri: 'Global standards',
+  esrs: 'European Union', secr: 'Country & regional', sb253: 'Country & regional', moccae: 'Country & regional', board: 'Internal' };
 export const templateList = (saved: RepTemplate[]) => [...RTPL_DEF.filter((t) => !saved.some((s) => s.base === t.base)), ...saved].map((t) => ({ ...t, builtin: !saved.some((s) => s.id === t.id) }));
 
 export const esc = (s: unknown) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
@@ -71,7 +82,7 @@ const MN = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct'
 
 export interface RepCtx {
   d: Data; rows: Row[]; prev: Row[]; months: number[]; inv: Inv; lines: RepLine[]; mb: boolean; label: string; period: string; settings: RepSettings;
-  checks: RepCheck[] | null; targets: TargetsData | null; preparedBy: string; consolidation: string;
+  checks: RepCheck[] | null; targets: TargetsData | null; preparedBy: string; consolidation: string; logo?: string;
 }
 const T = (rows: (string | number)[][], head: string[]) => `<table><thead><tr>${head.map((h, i) => `<th${i ? ' class="n"' : ''}>${h}</th>`).join('')}</tr></thead><tbody>${rows.map((r) => `<tr>${r.map((c, i) => `<td${i ? ' class="n"' : ''}>${c}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
 
@@ -79,8 +90,8 @@ export function section(k: string, x: RepCtx): string {
   const { inv, d } = x, pc = (v: number) => (inv.tot ? `${f1((v / inv.tot) * 100)}%` : '—');
   const ex = { ...EXCL_DEFAULT, ...x.settings.excl }, e = x.settings.entity, co = x.settings.company;
   switch (k) {
-    case 'cover': return `<div class="cover"><div class="eyb">Greenhouse-gas emissions report · ${esc(x.period)}</div><h1>${esc(e.legal || co.name)}</h1><table class="kv"><tbody>${[
-      ['Reporting entity', e.legal || co.name], ['Trade licence', e.licence || 'to be completed'], ['Emirate', e.emirate || 'to be completed'], ['Sector', e.sector || 'to be completed'], ['MOCCAE / MRV ID', e.mrvId || 'to be completed'],
+    case 'cover': return `<div class="cover">${x.logo ? `<img src="${x.logo}" alt="" style="float:right;max-height:52px;max-width:170px">` : ''}<div class="eyb">Greenhouse-gas emissions report · ${esc(x.period)}</div><h1>${esc(e.legal || co.name)}</h1><table class="kv"><tbody>${[
+      ['Reporting entity', e.legal || co.name], ['Registration no.', e.licence || 'to be completed'], ['LEI', e.lei || '—'], ['Country / region', [co.country, e.region ?? e.emirate].filter(Boolean).join(' · ')], ['Sector', [e.sector, e.sectorCode].filter(Boolean).join(' · ') || 'to be completed'], ['Regulator / registry ID', e.mrvId || '—'],
       ['Reporting contact', e.contact || 'to be completed'], ['Scope of report', x.label], ['Standard', 'GHG Protocol Corporate Standard'], ['Consolidation', x.consolidation], ['GWP', co.gwp], ['Scope 2 shown', x.mb ? 'Market-based' : 'Location-based'],
       ['Prepared', `${new Date().toLocaleDateString('en-GB')} by ${x.preparedBy}`]].map(([a, b]) => `<tr><td>${a}</td><td>${esc(b)}</td></tr>`).join('')}</tbody></table></div>`;
     case 'boundary': return `<h2>Organisational boundary</h2><p>Consolidation approach: <b>${esc(x.consolidation)}</b>. Operational boundary: Scope 1, Scope 2 and the Scope 3 categories listed below. GWPs: IPCC ${esc(co.gwp)}.</p>`
@@ -123,9 +134,9 @@ export function section(k: string, x: RepCtx): string {
         ['Action', 'Status', 't/yr', 'CapEx', 'OpEx/yr', 'Saving/yr', 'Payback', 'ROI']) : '<p>No actions in the current plan.</p>'); }
     case 'verif': return `<h2>Declaration and verification</h2><p>We declare that this report has been prepared from data approved in Ekotrace under maker-checker controls, and that it is complete and accurate to the best of our knowledge.</p><table class="kv"><tbody><tr><td>Prepared by</td><td>${esc(x.preparedBy)}</td></tr><tr><td>Approved by (name, title, date)</td><td>&nbsp;</td></tr><tr><td>Verification body and statement</td><td>&nbsp;</td></tr><tr><td>Level of assurance</td><td>Limited / Reasonable</td></tr></tbody></table>`;
   }
-  return '';
+  return fwSection(k, x, x.logo);
 }
-export const RT_CSS = 'body{font-family:system-ui,sans-serif;max-width:920px;margin:36px auto;padding:0 18px;color:#0B2A25;line-height:1.5}h1{font-size:28px;margin:6px 0 14px}h2{font-size:18px;margin:28px 0 8px;border-top:1px solid #dfe6e3;padding-top:16px}table{border-collapse:collapse;width:100%;font-size:13px;margin:6px 0}th,td{padding:6px 8px;border-bottom:1px solid #e4ebe8;text-align:left;vertical-align:top}th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:#5b6b66}.n{text-align:right}.small{font-size:12px;color:#5b6b66}.eyb{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#1F8A5B}.kv td:first-child{color:#5b6b66;width:38%}.kv td.n,.kv td:last-child{text-align:left}.cover{border:1px solid #dfe6e3;border-radius:12px;padding:18px}.note{background:#FFF6E0;border-radius:8px;padding:10px 12px;font-size:12.5px}@media print{body{margin:0}h2{break-after:avoid}table{break-inside:auto}}';
+export const RT_CSS = 'body{font-family:system-ui,sans-serif;max-width:920px;margin:36px auto;padding:0 18px;color:#0B2A25;line-height:1.5}h1{font-size:28px;margin:6px 0 14px}h2{font-size:18px;margin:28px 0 8px;border-top:1px solid #dfe6e3;padding-top:16px}table{border-collapse:collapse;width:100%;font-size:13px;margin:6px 0}th,td{padding:6px 8px;border-bottom:1px solid #e4ebe8;text-align:left;vertical-align:top}th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:#5b6b66}.n{text-align:right}.small{font-size:12px;color:#5b6b66}.eyb{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#1F8A5B}.kv td:first-child{color:#5b6b66;width:38%}.kv td.n,.kv td:last-child{text-align:left}.cover{border:1px solid #dfe6e3;border-radius:12px;padding:18px}.note{background:#FFF6E0;border-radius:8px;padding:10px 12px;font-size:12.5px}@media print{body{margin:0}h2{break-after:avoid}table{break-inside:auto}}' + ISO_CSS;
 export const reportBody = (tpl: RepTemplate, x: RepCtx) => (tpl.note ? `<p class="note">${esc(tpl.note)}</p>` : '') + tpl.sections.map((k) => section(k, x)).join('');
 export const reportHtml = (tpl: RepTemplate, x: RepCtx) => `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${esc(tpl.name)} · ${esc(x.label)} · ${esc(x.period)}</title><style>${RT_CSS}</style></head><body>${reportBody(tpl, x)}<p class="small" style="margin-top:30px">Generated by Ekotrace on ${new Date().toLocaleString('en-GB')}.</p></body></html>`;
 

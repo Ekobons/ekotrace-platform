@@ -132,7 +132,7 @@ function EditCompany({ c, plans, onClose, onSaved }: { c: Company; plans: PlanLi
 function NewCompany({ plans, onClose, onDone }: { plans: PlanLimits[]; onClose: () => void; onDone: (s: { email: string; pw: string }) => void }) {
   const ref = useRef<HTMLDialogElement>(null);
   useEffect(() => { ref.current?.showModal(); }, []);
-  const [f, setF] = useState({ name: '', country: 'AE', gwpSet: 'AR5', plan: 'enterprise', accessExpiry: new Date(Date.now() + 365 * 864e5).toISOString().slice(0, 10), saName: '', saEmail: '' });
+  const [f, setF] = useState({ name: '', country: '', gwpSet: 'AR5', plan: 'enterprise', accessExpiry: new Date(Date.now() + 365 * 864e5).toISOString().slice(0, 10), saName: '', saEmail: '' });
   const [err, setErr] = useState<string | null>(null);
   const set = (k: keyof typeof f) => (e: { target: { value: string } }) => setF({ ...f, [k]: e.target.value });
   return (
@@ -141,7 +141,7 @@ function NewCompany({ plans, onClose, onDone }: { plans: PlanLimits[]; onClose: 
         <h2>New company</h2>
         <label className="field"><span>Company name</span><input className="input" value={f.name} onChange={set('name')} /></label>
         <div className="row">
-          <label className="field" style={{ width: 80 }}><span>Country</span><input className="input" maxLength={2} value={f.country} onChange={set('country')} /></label>
+          <label className="field" style={{ width: 110 }}><span>Country (ISO)</span><input className="input" maxLength={2} placeholder="GB, US, DE…" value={f.country} onChange={set('country')} /></label>
           <label className="field grow"><span>Plan</span><select className="input" value={f.plan} onChange={set('plan')}>{plans.map((p) => <option key={p.code} value={p.code}>{p.name}</option>)}</select></label>
           <label className="field grow"><span>Access until</span><input className="input" type="date" value={f.accessExpiry} onChange={set('accessExpiry')} /></label>
           <label className="field"><span>GWP</span><select className="input" value={f.gwpSet} onChange={set('gwpSet')}><option>AR4</option><option>AR5</option><option>AR6</option></select></label>

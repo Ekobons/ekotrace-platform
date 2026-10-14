@@ -16,6 +16,7 @@ import {
 } from '../lib/api';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const FRI_SAT = new Set(['SA', 'KW', 'QA', 'BH', 'OM', 'JO', 'EG', 'IQ', 'LY', 'DZ', 'SD', 'YE', 'SY', 'IL', 'BD']);
 const WEEKENDS: [Weekend, string][] = [['sat_sun', 'Saturday–Sunday'], ['fri_sat', 'Friday–Saturday'], ['sun', 'Sunday only (6-day week)']];
 const FIELDS: [string, string][] = [['mode', 'Main way to work *'], ['km', 'One-way distance'], ['days', 'Days at the workplace per week'], ['occupants', 'People in the car'],
   ['fuel', 'Car fuel'], ['mode2', 'Second way'], ['km2', 'Second distance'], ['site', 'Site']];
@@ -31,7 +32,8 @@ export function CommutingEntry({ facilityId, year, onSaved }: { facilityId: stri
   const [facName, setFacName] = useState('');
   const [method, setMethod] = useState<'typed' | 'survey'>('typed');
   const [headcount, setHeadcount] = useState('');
-  const [weekend, setWeekend] = useState<Weekend>('sat_sun');
+  // the usual weekend of the company's country (Friday–Saturday in much of the Middle East and North Africa)
+  const [weekend, setWeekend] = useState<Weekend>(FRI_SAT.has(useApp().tenant?.country ?? '') ? 'fri_sat' : 'sat_sun');
   const [holidays, setHolidays] = useState('12');
   const [leave, setLeave] = useState('22');
   const [wdOverride, setWdOverride] = useState('');

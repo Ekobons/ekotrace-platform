@@ -5,6 +5,7 @@
  */
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
+import { localeOf } from '../lib/locale.js';
 import { platformTx } from '../db/pool.js';
 import { requirePlatformAdmin } from '../lib/auth.js';
 import { AppError, notFound } from '../lib/errors.js';
@@ -33,7 +34,7 @@ export async function platformRoutes(app: FastifyInstance) {
   app.post('/api/platform/companies', async (req) => {
     requirePlatformAdmin(req);
     const b = z.object({
-      name: z.string().trim().min(2).max(160), country: z.string().length(2).default('AE'), gwpSet: z.enum(['AR4', 'AR5', 'AR6']).default('AR5'),
+      name: z.string().trim().min(2).max(160), country: z.string().regex(/^[A-Za-z]{2}$/, 'Country as a 2-letter ISO code, e.g. GB, US, DE, IN'), gwpSet: z.enum(['AR4', 'AR5', 'AR6']).default('AR5'),
       plan: plan.default('enterprise'), accessExpiry: date.optional(),
       superAdmin: z.object({ name: z.string().trim().min(2).max(120), email: z.string().email().max(190) }),
     }).parse(req.body);
@@ -44,8 +45,8 @@ export async function platformRoutes(app: FastifyInstance) {
         throw new AppError('Someone with this email already has an account', 409, 'DUPLICATE');
       }
       const t = (await c.query(
-        `INSERT INTO tenant (name, country, gwp_set, plan, access_expiry) VALUES ($1,$2,$3,$4,COALESCE($5::date, (current_date + interval '1 year')::date)) RETURNING *`,
-        [b.name, b.country.toUpperCase(), b.gwpSet, b.plan, b.accessExpiry ?? null])).rows[0];
+        `INSERT INTO tenant (name, country, gwp_set, plan, access_expiry, currency, timezone) VALUES ($1,$2,$3,$4,COALESCE($5::date, (current_date + interval '1 year')::date),$6,$7) RETURNING *`,
+        [b.name, b.country.toUpperCase(), b.gwpSet, b.plan, b.accessExpiry ?? null, localeOf(b.country).currency, localeOf(b.country).timezone])).rows[0];
       await c.query(`INSERT INTO org_node (tenant_id, kind, name, country) VALUES ($1,'group',$2,$3)`, [t.id, b.name, t.country]);
       const u = (await c.query(`INSERT INTO app_user (tenant_id, email, name, role, password_hash, created_by) VALUES ($1,$2,$3,'super_admin',$4,$5) RETURNING id, email`,
         [t.id, b.superAdmin.email.toLowerCase(), b.superAdmin.name, hash, req.user.id])).rows[0];

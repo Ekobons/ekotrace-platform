@@ -4,7 +4,7 @@ Value chain → Suppliers lists everyone the company buys from. Suppliers are re
 
 ## One supplier, however it is written
 
-The same company often appears as “Gulf Stationery LLC”, “GULF STATIONERY L.L.C.”, “Gulf Stationary LLC” or under a second vendor number. Each name in a purchase file is linked in this order:
+The same company often appears as “Acme Office Supplies Ltd”, “ACME OFFICE SUPPLIES LIMITED”, “Acme Office Suplies Ltd” or under a second vendor number. Each name in a purchase file is linked in this order:
 
 ```flow
 > 1. Seen before | a spelling already linked (or decided by a person) keeps its supplier

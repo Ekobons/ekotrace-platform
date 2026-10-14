@@ -49,9 +49,10 @@ export function PurchaseEntry(props: { cat: Category; facilityId: string; period
 
 /** Purchases typed by hand. `target`: the Scope 3 category new rows go to (e.g. business travel paid by card). */
 export function ManualGrid({ facilityId, period, onSaved, target = 'purchased_goods', title = 'Purchases typed by hand' }: { cat?: Category; facilityId: string; period: { periodStart: string; periodEnd: string }; onSaved: () => void; target?: string; title?: string }) {
-  const { toast } = useApp();
-  const [currency, setCurrency] = useState('AED');
-  const [rows, setRows] = useState<Row[]>(() => [blank(period.periodStart, 'AED', target)]);
+  const { toast, tenant } = useApp();
+  const cur0 = tenant?.currency ?? 'USD';
+  const [currency, setCurrency] = useState(cur0);
+  const [rows, setRows] = useState<Row[]>(() => [blank(period.periodStart, cur0, target)]);
   const [res, setRes] = useState<ManualResult | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);

@@ -2,6 +2,44 @@
 
 Newest first.
 
+## 2026-10-14 · Audit & assurance; global report formats (ISO 14064-1 designed report, ESRS E1, IFRS S2, CDP, GRI 305, SECR, SB 253); company logo; global defaults
+
+- **Audit & assurance** (menu → Disclose), for ISO 14064-3, ISAE 3410 / 3000, ISSA 5000 or AA1000AS, at limited or reasonable assurance:
+  - **Engagement:** standard, level, provider, subject matter, materiality, status, conclusion and the signed statement PDF.
+  - **Period locks:** a month with every entry approved can be locked.
+    - The database then refuses any change in it — entries, edits, deletions, reviews, meters, imports, recalculation.
+    - Unlocking needs a reason.
+  - **Samples:**
+    - Value-weighted or random, seeded so they can be reproduced.
+    - Key items above a share of the total are always included.
+    - Each entry is tested (agreed / exception with a note), and an exception can raise a finding.
+  - **Findings:** severity, kind, impact in tCO₂e. The company responds; the verifier (or super admin) closes or reopens.
+  - **Verifier pack:**
+    - One HTML file: engagement, GHG statement with both Scope 2 methods and biogenic CO₂, factor sources, locks, samples and results, findings, conclusion.
+    - Plus the change trail as CSV.
+- **Reports — formats used worldwide**, grouped as Global standards, European Union, Country & regional, Internal and Your templates:
+  - **ISO 14064-1:2018 GHG report** — a designed report with the company logo, key figures, key findings written from the data, charts and recommendations.
+    - Charts: ISO categories 1–6, months, largest sources, facilities, direct emissions by gas, data quality and uncertainty.
+    - Then boundaries, factors, exclusions and statement.
+  - **ESRS E1 (CSRD):** E1-6 §48–53 (Scope 1, 2 location / market, Scope 3 by category, totals, intensity per net revenue, biogenic) and E1-5 energy.
+  - **IFRS S2 (ISSB) §29(a)** — the basis of AASB S2, Singapore, SSBJ and UK SRS.
+  - **CDP emissions module:** 7.6–7.8, by gas, country and division.
+  - **GRI 305-1 to 305-4.**
+  - **UK SECR.**
+  - **California SB 253.**
+  - Existing: GHG Protocol and Board summary. The UAE MOCCAE layout is kept as a regional option.
+  - **Datapoints (CSV)** per format; the "MRV dataset" is now the entry-level dataset.
+  - Report lines now carry the gas split, country, division and biogenic CO₂.
+- **Organisation → Company details & logo:** legal name, registration no., LEI, region, sector and NACE / ISIC / NAICS code, regulator / registry ID, contact, website, net revenue and currency, financial year end; logo (PNG / JPEG) on every report cover.
+- **Global defaults:**
+  - A new company takes its currency and time zone from its country (about 70 countries). The country is now required — no UAE default.
+  - Spend, prices and vehicle uploads default to the company currency.
+  - Every time zone is available.
+  - The commuting weekend follows the country.
+  - Neutral examples for flights, groups, integrations, report equivalents and the manual (bills from any utility; biofuel blends).
+- **Tests:** 62 API and 52 engine tests pass.
+- **Manual:** new Audit & assurance chapter; report formats table; company details; glossary.
+
 ## 2026-10-14 · Waste contractor portal
 
 - **Contractor portal at /contractor:** collection and treatment companies sign in with their work email and an access code.

@@ -36,7 +36,7 @@ export const vehicleSchema = z.object({
   charging: z.enum(['site', 'elsewhere']).optional(),
   spend: z.object({
     amount: amount,
-    currency: z.string().regex(/^[A-Z]{3}$/, 'Currency as a 3-letter code, e.g. AED'),
+    currency: z.string().regex(/^[A-Z]{3}$/, 'Currency as a 3-letter code, e.g. USD'),
     /** price per unit (the entry's unit); when omitted, the price list is used */
     price: z.number().finite().positive().optional(),
   }).optional(),

@@ -21,6 +21,7 @@ export function errorHandler(err: FastifyError | Error, req: FastifyRequest, rep
     return reply.status(400).send({ error: 'VALIDATION', message: 'Some fields are missing or invalid', details: err.issues.map((i) => ({ field: i.path.join('.'), message: i.message })) });
   }
   const pgCode = (err as { code?: string }).code;
+  if (pgCode === 'EKLCK') return reply.status(409).send({ error: 'PERIOD_LOCKED', message: err.message });
   if (pgCode === '23505') return reply.status(409).send({ error: 'DUPLICATE', message: 'This already exists' });
   if (pgCode === '23503') return reply.status(409).send({ error: 'IN_USE', message: 'This is referenced by other records' });
   if ((err as FastifyError).statusCode && (err as FastifyError).statusCode! < 500) {

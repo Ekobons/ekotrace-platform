@@ -84,3 +84,10 @@
 | Exclusion justification | Why a category has no data (e.g. no products sold); every excluded category needs one in the inventory |
 | MRV dataset | One row per approved entry (facility, scope, category, activity, unit, factor, source, data type, evidence) for a regulator's MRV platform or a verifier |
 | Report version | The inventory frozen at a point in time, to compare with today |
+| Limited / reasonable assurance | limited: "nothing has come to our attention…", fewer tests; reasonable: "presents fairly, in all material respects", more evidence and larger samples |
+| Materiality | the size of misstatement that would change a reader’s view, usually 5% of the total |
+| Key item | an entry large enough (above the key-item threshold) to be tested every time |
+| Period lock | a month closed for assurance: nothing in it can be added, changed or removed |
+| ISO 14064-1 categories | 1 direct; 2 imported energy; 3 transportation; 4 products used by the organization; 5 use of the organization’s products; 6 other indirect |
+| ESRS E1 | the climate standard of the EU Corporate Sustainability Reporting Directive (CSRD) |
+| IFRS S2 | the ISSB climate-related disclosure standard |

@@ -299,7 +299,7 @@ export const route = (r: Row) => { if (r.wgri && GRI_NAME[r.wgri]) return GRI_NA
   return /re-?use/.test(t) ? 'Re-use' : /recycl/.test(t) ? 'Recycling' : /compost|anaerobic|digest/.test(t) ? 'Composting / digestion'
     : /incinerat|energy recovery|waste-to-energy|combust/.test(t) ? 'Waste-to-energy' : /landfill/.test(t) ? 'Landfill' : 'Other'; };
 const ROUTE_C: Record<string, string> = { Landfill: '#C2523C', Recycling: '#2BA38A', 'Re-use': '#1F6F5C', 'Composting / digestion': '#86CDB4', 'Waste-to-energy': '#E9B44C', Incineration: '#B07A2A', Other: '#9AA7A2' };
-/** diverted from landfill (common UAE measure: waste-to-energy counts) */
+/** diverted from landfill (a common municipal measure: waste-to-energy counts; GRI 306 treats it as disposal) */
 export const DIVERT = new Set(['Re-use', 'Recycling', 'Composting / digestion', 'Waste-to-energy']);
 /** GRI 306-4 / 306-5: recovery is diverted from disposal; incineration with energy recovery is disposal */
 const GRI306: [string, string, string[]][] = [['Diverted from disposal', 'Preparation for re-use', ['Re-use']], ['Diverted from disposal', 'Recycling', ['Recycling']], ['Diverted from disposal', 'Other recovery (composting, digestion)', ['Composting / digestion']],

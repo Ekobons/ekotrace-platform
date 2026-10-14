@@ -280,7 +280,7 @@ export async function vehicleRoutes(app: FastifyInstance) {
 
 // ------------------------------------------------------- vehicle data upload --
 const ENTRY_COLS = ['Facility *', 'Month * (yyyy-mm)', 'Vehicle (fleet name or registration)', 'Vehicle type (if not in the fleet)', 'Number of vehicles (default 1)',
-  'Quantity per vehicle *', 'Unit (km, mile, litre, kg, m3, kWh, AED…)', 'Method (distance/fuel/electricity/spend — optional, read from the unit)', 'Price per unit (spend, optional)',
+  'Quantity per vehicle *', 'Unit (km, mile, litre, kg, m3, kWh, or a currency such as USD, EUR…)', 'Method (distance/fuel/electricity/spend — optional, read from the unit)', 'Price per unit (spend, optional)',
   'Fuel (optional)', 'Charging (site/elsewhere)', 'Data type (actual/estimated/proxy)', 'Note'];
 const key = (s: string) => s.replace(/\s*\*/g, '').trim();
 
@@ -380,14 +380,14 @@ export async function processRows(c: Tx, req: FastifyRequest, t: { id: string; g
     const currencyGiven = /^[A-Za-z]{3}$/.test(unitText) && (!unitBy.has(unitText.toLowerCase()) || !!unitBy.get(unitText.toLowerCase())?.dimension.startsWith('money_'));
     const u = unitText && !currencyGiven ? unitBy.get(unitText.toLowerCase()) : undefined;
     if (unitText && !u && !currencyGiven) errors.push(`Unknown unit "${unitText}"`);
-    // Method: given, else from the unit (km → distance, litres → fuel, kWh → electricity, AED → spend).
+    // Method: given, else from the unit (km → distance, litres → fuel, kWh → electricity, a currency → spend).
     let method = (r.method ?? '').trim().toLowerCase();
     if (method && !(METHODS as readonly string[]).includes(method)) { errors.push(`Method "${r.method}" — use distance, fuel, electricity or spend`); method = ''; }
     if (!method) method = currencyGiven ? 'spend' : !u ? (ty?.attrs.distance === false ? 'fuel' : 'distance') : u.dimension === 'distance' ? 'distance' : u.dimension === 'electricity' ? 'electricity' : 'fuel';
     read.method = method;
     let unit = u?.code ?? (method === 'distance' ? 'km' : method === 'electricity' ? 'kWh_e' : 'L');
     if (method === 'spend' && ty?.attrs.electric) unit = 'kWh_e';
-    if (method === 'spend' && !currencyGiven && !u) errors.push('Spend needs the currency in the unit column (e.g. AED)');
+    if (method === 'spend' && !currencyGiven && !u) errors.push('Spend needs the currency in the unit column (e.g. USD, EUR)');
     read.unit = method === 'spend' ? (currencyGiven ? unitText.toUpperCase() : unitText) : unit;
     if (read.quantity != null) read.total = read.quantity * read.count;
     const fuelName = (r.fuel ?? '').trim();
@@ -407,7 +407,7 @@ export async function processRows(c: Tx, req: FastifyRequest, t: { id: string; g
       facilityId: fac!.id, itemId: itemId!, unit, quantity: method === 'spend' ? undefined : q.qty!,
       periodStart: `${month![1]}-${month![2]}-01`, periodEnd: new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10), dataType, note: r.note || undefined,
       vehicle: { method: method as 'distance', count: count > 1 ? count : undefined, vehicleId: veh?.id, fuelItemId, charging: (charging || undefined) as 'site' | undefined,
-        spend: method === 'spend' ? { amount: q.qty!, currency: currencyGiven ? unitText.toUpperCase() : 'AED', price } : undefined },
+        spend: method === 'spend' ? { amount: q.qty!, currency: currencyGiven ? unitText.toUpperCase() : ((t as { currency?: string }).currency ?? 'USD'), price } : undefined },
     } as SaveInput });
   });
   const batch = entries.length ? await runBatch(c, req, t, entries.map((x) => x.e), !opts.commit) : { results: [], saved: 0, failed: 0 };
@@ -430,17 +430,18 @@ export async function vehicleUploadRoutes(app: FastifyInstance) {
     for (let d = new Date(`${q.from}-01T00:00:00Z`); d <= new Date(`${q.to}-01T00:00:00Z`) && months.length < 24; d.setUTCMonth(d.getUTCMonth() + 1)) months.push(d.toISOString().slice(0, 7));
     if (!months.length) throw new AppError('The period is empty');
     const types = await vehicleTypes();
-    const { facilities, fleet } = await tenantTx(tenant, async (c) => {
+    const { facilities, fleet, currency } = await tenantTx(tenant, async (c) => {
       const scope = await scopeOf(c, req.user);
+      const currency = (await c.query('SELECT currency FROM tenant WHERE id = $1', [tenant])).rows[0]?.currency as string ?? 'USD';
       const facs = (await c.query(`SELECT id, name FROM org_node WHERE kind = 'facility' AND active ORDER BY name`)).rows.filter((f) => scope.enter.has(f.id) && (!q.facilityId || f.id === q.facilityId));
       const fl = (await c.query(`${SELECT_VEHICLE} WHERE v.facility_id = ANY($1) ORDER BY v.name`, [facs.map((f) => f.id)])).rows;
-      return { facilities: facs as { id: string; name: string }[], fleet: fl };
+      return { facilities: facs as { id: string; name: string }[], fleet: fl, currency };
     });
     if (!facilities.length) throw new AppError('No facility you can enter data for');
     const wb = new ExcelJS.Workbook();
     const ws = wb.addWorksheet('Vehicle data');
     ws.addRow(ENTRY_COLS);
-    const unitFor = (m: string, v: { attrs: { electric?: boolean } }) => (m === 'distance' ? 'km' : m === 'electricity' ? 'kWh' : m === 'spend' ? 'AED' : 'litre');
+    const unitFor = (m: string, v: { attrs: { electric?: boolean } }) => (m === 'distance' ? 'km' : m === 'electricity' ? 'kWh' : m === 'spend' ? currency : 'litre');
     for (const m of months) {
       for (const f of facilities) {
         for (const v of fleet.filter((x) => x.facility_id === f.id && x.in_service_from.slice(0, 7) <= m && (!x.retired_on || x.retired_on.slice(0, 7) >= m))) {

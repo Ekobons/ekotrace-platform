@@ -93,6 +93,7 @@ export async function reviewRoutes(app: FastifyInstance) {
       const s = await scopeOf(c, req.user);
       const me = String(req.user.id);
       const rows = (await c.query(`SELECT a.id, a.facility_id, a.status, a.created_by, a.submitted_by, a.approval_stage, a.l1_by, cat.code AS cat, (a.co2e_direct + a.co2e_scope2 + a.co2e_scope3)::float8 AS kg,
+                                          EXISTS (SELECT 1 FROM period_lock pl WHERE pl.month BETWEEN date_trunc('month', a.period_start)::date AND date_trunc('month', a.period_end)::date) AS locked,
                                           coalesce((a.inputs->'wasteInfo'->>'hazardous')::boolean, false) AS haz, nullif(trim(a.inputs->'wasteInfo'->>'ref'), '') AS manifest
                                      FROM activity a JOIN category cat ON cat.id = a.category_id WHERE a.id = ANY($1) FOR UPDATE OF a`, [b.ids])).rows;
       const done: string[] = [], skipped: { id: string; reason: string }[] = [], toL2: string[] = [];
@@ -103,10 +104,11 @@ export async function reviewRoutes(app: FastifyInstance) {
         const mine = a.created_by === me || a.submitted_by === me;
         let why: string | null = null, sql = '';
         if (!s.see.has(a.facility_id)) why = 'no access to this facility';
+        else if (a.locked) why = 'the month is locked for assurance';
         else if (b.action === 'submit') {
           if (!s.enter.has(a.facility_id)) why = 'you cannot enter data for this facility';
           else if (a.status !== 'draft' && a.status !== 'rejected') why = `already ${a.status === 'approved' ? 'approved' : 'waiting for approval'}`;
-          // hazardous waste always travels with a manifest (UAE): no manifest number, no submission
+          // hazardous waste travels with a manifest / consignment note in most jurisdictions (EU, UK, US, UAE…): no number, no submission
           else if (a.cat === 'waste_generated' && a.haz && !a.manifest) why = 'hazardous waste needs its manifest number';
           else sql = `UPDATE activity SET status = 'submitted', submitted_at = now(), submitted_by = $2, approval_stage = NULL, l1_by = NULL, l1_at = NULL, updated_at = now() WHERE id = $1`;
         } else if (b.action === 'withdraw') {
