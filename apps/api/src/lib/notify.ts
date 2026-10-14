@@ -4,6 +4,7 @@
  */
 import type { Tx } from '../db/pool.js';
 import { appLink, queueEmail } from './mail.js';
+import { PRODUCT } from './brand.js';
 
 export interface Note { kind: string; title: string; body?: string; link?: string }
 
@@ -16,7 +17,7 @@ export async function notify(c: Tx, tenantId: string, userIds: (string | null | 
     await c.query(`INSERT INTO notification (tenant_id, user_id, kind, title, body, link) VALUES ($1,$2,$3,$4,$5,$6)`, [tenantId, u.id, n.kind, n.title, n.body ?? null, n.link ?? null]);
     if (opts.email !== false && u.email_notify) {
       const link = n.link ? appLink(n.link) : null;
-      await queueEmail(c, tenantId, u.email, n.title, `${n.title}\n\n${n.body ?? ''}${link ? `\n\nOpen in Ekotrace: ${link}` : ''}\n\n—\nYou receive this because you take part in your company's data collection in Ekotrace. You can switch these e-mails off in Inbox & to-dos.`);
+      await queueEmail(c, tenantId, u.email, n.title, `${n.title}\n\n${n.body ?? ''}${link ? `\n\nOpen in ${PRODUCT}: ${link}` : ''}\n\n—\nYou receive this because you take part in your company's data collection in ${PRODUCT}. You can switch these e-mails off in Inbox & to-dos.`);
     }
   }
   return users.filter((u) => !u.disabled).length;

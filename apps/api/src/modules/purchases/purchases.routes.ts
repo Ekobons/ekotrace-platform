@@ -23,6 +23,7 @@ import {
   buildLine, calcLines, explainLine, groupKey, insertLines, loadFacilities, mapGroups, markMaterial, MAX_LINES, prepareBatch, publishBatch, readFileLines, reopenBatch, spendIndex,
   type BatchSettings, type RawLine,
 } from './pipeline.js';
+import { PRODUCT } from '../../lib/brand.js';
 
 const ENTER = ['super_admin', 'admin', 'manager', 'preparer'] as const;
 const uuid = z.string().uuid();
@@ -670,7 +671,7 @@ export async function purchaseRoutes(app: FastifyInstance) {
      ['Supplier EF: the supplier\'s own emission factor in kg CO2e per "Supplier EF unit" (kg, t, L, m3, kWh, pcs… or a currency such as AED).'],
      ['Capital goods: Yes for purchases capitalised as assets (reported in Scope 3.2).']].forEach((r) => help.addRow(r));
     help.getColumn(1).width = 140;
-    return sendWorkbook(reply, wb, 'Ekotrace purchases template.xlsx');
+    return sendWorkbook(reply, wb, `${PRODUCT} purchases template.xlsx`);
   });
 
   /**

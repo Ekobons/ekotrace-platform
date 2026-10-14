@@ -2,6 +2,13 @@
 
 Newest first.
 
+## 2026-10-14 · Carbontek name and a new sign-in page
+
+- **Product name:** the platform now shows **Carbontek** (brand pack `brands/carbontek`, now the default; `BRAND=ekotrace` brings the Ekotrace name back). The name comes from the brand pack everywhere: menu, sign-in, contractor and scan pages, manual text, MFA app label and recovery-codes file, e-mails and notices, exports and downloaded file names, report declarations, the destruction certificate, demo texts. Internal identifiers (token audience, syslog app name, SCIM schema, package names) are unchanged.
+- **Brand mark:** a new mark (an open carbon-cycle ring around a node) replaces the "e" tile.
+- **Sign-in page redesigned:** split screen. The brand side shows the product, one line on what it does, and monthly bars stepping down from the base year to net zero along a dashed target path (illustrative; they grow in once, still with reduced motion). The form side has the email and password, company sign-in (SSO), and links for survey answers and waste contractors. It works on phones, with the brand side as a short band on top. The code, recovery and company sign-in steps keep the same flow.
+- Colours stay the platform's green (Carbontek brand pack updated to match).
+
 ## 2026-10-14 · Base-year recalculation and restatement
 
 - **Methodology & boundaries → Base year & restatements (RFP 3.2.9; GHG Protocol ch. 5; ISO 14064-1 §6.4.1):**

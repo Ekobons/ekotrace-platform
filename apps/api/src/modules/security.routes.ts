@@ -25,6 +25,7 @@ import { applyRoles } from './scim.routes.js';
 import { newToken, sha256 } from '../lib/password.js';
 import { apiClient } from './meters.routes.js';
 import { ssoRedirectUri } from './auth.routes.js';
+import { PRODUCT, PRODUCT_SLUG } from '../lib/brand.js';
 
 const SECRET_COL = /(hash|secret|token|password|verifier|nonce|^mfa_|recovery|^data$)/i;
 const sha = (b: Buffer | string) => createHash('sha256').update(b).digest('hex');
@@ -68,7 +69,7 @@ export async function exportCompany(c: Tx, tenantId: string, by: string) {
     note: 'Password hashes, session tokens, MFA and SSO secrets are not exported.', tables, dataFiles, files };
   const mj = JSON.stringify(manifest, null, 2);
   zip.add('manifest.json', mj);
-  zip.add('README.txt', `Export of ${t.name} from Ekotrace, ${manifest.exportedAt}.\r\n\r\ndata/   one CSV per table (all of the company's records; audit_log.csv is the company's audit trail)\r\nfiles/  every stored file (bills, invoices, permits, statements…), by kind\r\nmanifest.json  row counts and the SHA-256 checksum of every file, to check the export is complete and unchanged\r\n\r\nPassword hashes, session tokens and MFA / SSO secrets are left out on purpose.\r\n`);
+  zip.add('README.txt', `Export of ${t.name} from ${PRODUCT}, ${manifest.exportedAt}.\r\n\r\ndata/   one CSV per table (all of the company's records; audit_log.csv is the company's audit trail)\r\nfiles/  every stored file (bills, invoices, permits, statements…), by kind\r\nmanifest.json  row counts and the SHA-256 checksum of every file, to check the export is complete and unchanged\r\n\r\nPassword hashes, session tokens and MFA / SSO secrets are left out on purpose.\r\n`);
   return { zip: zip.finish(), manifestSha: sha(mj), tables, files: files.length };
 }
 
@@ -175,7 +176,7 @@ export async function securityRoutes(app: FastifyInstance) {
       await audit(c, req, 'company.export', 'tenant', tenant, { manifestSha256: out.manifestSha, files: out.files, tables: Object.keys(out.tables).length });
       return out;
     });
-    const name = `ekotrace-export-${new Date().toISOString().slice(0, 10)}.zip`;
+    const name = `${PRODUCT_SLUG}-export-${new Date().toISOString().slice(0, 10)}.zip`;
     return reply.header('Content-Type', 'application/zip').header('Content-Disposition', `attachment; filename="${name}"`).header('X-Manifest-SHA256', r.manifestSha).header('Cache-Control', 'no-store').send(r.zip);
   });
 

@@ -7,6 +7,7 @@ import { Link } from 'react-router-dom';
 import { useApp } from '../App';
 import { api, ROLE_LABEL, type Announcement, type Company, type Msg, type MsgThread } from '../lib/api';
 import { FilePreview, FileTag, sizeOf } from '../components/FilePreview';
+import { BRAND, productSlug } from '../lib/brand';
 
 /** The parts of Ekotrace a question can be about (the page it was asked from is chosen by default). */
 const PAGES: [string, string][] = [['', 'General'], ['/data', 'Add data'], ['/entries', 'Entries & results'], ['/approvals', 'Approvals'], ['/progress', 'Data progress'], ['/vault', 'Document vault'],
@@ -41,7 +42,7 @@ function CompanyMessages() {
     <div className="page">
       <div className="row tahead">
         <div><span className="lbl">Help</span><h1>Message centre</h1>
-          <div className="muted">Ask the Ekotrace team anything — how to enter something, a problem, an idea — and read the team's announcements. {d?.companyWide ? 'As super admin you see every conversation from your company.' : 'You see your own conversations.'}</div></div>
+          <div className="muted">Ask the {BRAND.name} team anything — how to enter something, a problem, an idea — and read the team's announcements. {d?.companyWide ? 'As super admin you see every conversation from your company.' : 'You see your own conversations.'}</div></div>
         <span className="grow" />
         <Link to="/help" className="btn">User manual</Link>
         <button className="btn p" onClick={() => { setTab('conv'); setCompose(true); setSel(null); }}>+ New message</button>
@@ -91,7 +92,7 @@ function Bubbles({ messages, mineIsTeam, attachPath }: { messages: Msg[]; mineIs
         const mine = m.from_team === mineIsTeam;
         return (
           <div key={m.id} className={`bub${mine ? ' mine' : ''}${m.from_team ? ' team' : ''}`}>
-            <div className="row" style={{ gap: 6, fontSize: 11.5 }}><b>{m.author_name}</b>{m.from_team && <span className="chip teamchip">Ekotrace team</span>}<span className="muted">{stamp(m.created_at)}</span></div>
+            <div className="row" style={{ gap: 6, fontSize: 11.5 }}><b>{m.author_name}</b>{m.from_team && <span className="chip teamchip">{BRAND.name} team</span>}<span className="muted">{stamp(m.created_at)}</span></div>
             <div className="mbody">{m.body}</div>
             {m.document_id && m.filename && <>
               <button type="button" className="mattach" onClick={() => setOpen(open === m.id ? null : m.id)}><FileTag name={m.filename} /><span><b>{m.filename}</b><span className="muted small">{m.size ? sizeOf(m.size) : ''} · {open === m.id ? 'hide' : 'show'}</span></span></button>
@@ -118,15 +119,15 @@ function Compose({ topics, onCancel, onSent }: { topics: Record<string, string>;
     try {
       const doc = file ? (await api.msgAttach(file)).documentId : undefined;
       const r = await api.newMessage({ ...f, page: f.page || undefined, documentId: doc });
-      toast('Sent to the Ekotrace team'); onSent(r.id);
+      toast(`Sent to the ${BRAND.name} team`); onSent(r.id);
     } catch (e) { toast((e as Error).message); } finally { setBusy(false); }
   };
   return (
     <div className="mcompose">
-      <h2>New message to the Ekotrace team</h2>
+      <h2>New message to the {BRAND.name} team</h2>
       <div className="vform">
         <label className="field"><span>Topic</span><select className="input" value={f.topic} onChange={(e) => setF({ ...f, topic: e.target.value })}>{Object.entries(topics).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></label>
-        <label className="field"><span>Which part of Ekotrace</span><select className="input" value={f.page} onChange={(e) => setF({ ...f, page: e.target.value })}>{PAGES.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></label>
+        <label className="field"><span>Which part of {BRAND.name}</span><select className="input" value={f.page} onChange={(e) => setF({ ...f, page: e.target.value })}>{PAGES.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></label>
         <label className="field span2"><span>Subject</span><input className="input" value={f.subject} maxLength={160} placeholder="e.g. How do I enter district cooling billed in TRh?" onChange={(e) => setF({ ...f, subject: e.target.value })} /></label>
         <label className="field span2"><span>Message</span><textarea className="input" rows={7} value={f.body} maxLength={5000} placeholder="What were you trying to do, and what happened? Facility, month and a screenshot help." onChange={(e) => setF({ ...f, body: e.target.value })} /></label>
       </div>
@@ -170,7 +171,7 @@ function News({ items, onRead }: { items: Announcement[]; onRead: () => void }) 
   const read = async (fn: () => Promise<unknown>) => { try { await fn(); onRead(); window.dispatchEvent(new Event('eko-msg')); } catch (e) { toast((e as Error).message); } };
   return (
     <section className="card" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-      <div className="row"><h2 className="grow">From the Ekotrace team</h2>{unread > 0 && <button className="btn sm" onClick={() => read(() => api.readAllAnnouncements())}>Mark all read</button>}</div>
+      <div className="row"><h2 className="grow">From the {BRAND.name} team</h2>{unread > 0 && <button className="btn sm" onClick={() => read(() => api.readAllAnnouncements())}>Mark all read</button>}</div>
       {!items.length && <div className="empty">No announcements.</div>}
       {items.map((a) => (
         <article key={a.id} className={`ann${a.read ? '' : ' new'}`}>
@@ -226,7 +227,7 @@ function TeamThread({ id, onChange, topics }: { id: string; onChange: () => void
         <div className="row" style={{ gap: 6, marginTop: 4 }}><span className={`chip ${c}`}>{s}</span><span className="muted small">{t.by_name} · {ROLE_LABEL[t.by_role]} · {t.by_email}{t.plan ? ` · ${t.plan} plan` : ''}</span></div></div>
       <Bubbles messages={d.messages} mineIsTeam attachPath={(x) => `/api/team/messages/attachments/${x}`} />
       <div className="mreply">
-        <textarea className="input" rows={4} value={reply} maxLength={5000} placeholder="Reply as the Ekotrace team…" onChange={(e) => setReply(e.target.value)} />
+        <textarea className="input" rows={4} value={reply} maxLength={5000} placeholder={`Reply as the ${BRAND.name} team…`} onChange={(e) => setReply(e.target.value)} />
         <div className="row" style={{ gap: 8 }}>
           <button className="btn p" disabled={busy || reply.trim().length < 2} onClick={() => send(false)}>Send reply</button>
           <button className="btn" disabled={busy || reply.trim().length < 2} onClick={() => send(true)}>Send & close</button><span className="grow" />

@@ -23,6 +23,7 @@ import { useApp } from '../App';
 import { api, ROLE_LABEL, type HomeData, type Role, type TargetsData } from '../lib/api';
 import { Fit, MN, fmt, fmt0 } from '../components/DashCharts';
 import { CONS, S, ViewBar, sum, useView, type Ctx, type Data, type Row } from '../components/ViewBar';
+import { BRAND, productSlug } from '../lib/brand';
 
 const ROLE_C: Record<string, string> = { super_admin: 'r-sa', admin: 'r-ad', manager: 'r-mg', preparer: 'r-dp', verifier: 'r-vf', platform_admin: 'r-op' };
 export const RoleChip = ({ role }: { role: Role }) => <span className={`chip ${ROLE_C[role] ?? 'c-n'}`}><i className="rdot" />{ROLE_LABEL[role]}</span>;
@@ -376,7 +377,7 @@ function HomePreparer({ x, h }: { x: H; h: HomeData }) {
       <section className="card hcard2"><div className="row"><h2>To fix</h2><span className={`chip ${fix.length ? 'c-warn' : 'c-ok'}`}>{fix.length}</span></div>
         {fix.length ? fix.slice(0, 7).map(([k, cls, t, dd, to, cta], i) => <div key={i} className="hitem"><span className={`chip ${cls}`}>{k}</span><span style={{ flex: 1, minWidth: 0 }}><b>{t}</b><small>{dd}</small></span><Link className="btn sm" to={to}>{cta}</Link></div>)
           : <div className="muted" style={{ fontSize: 13, padding: '8px 0' }}>Nothing sent back, no drafts, no earlier gaps.</div>}
-        <div className="tipbox" style={{ fontSize: 12.5, marginTop: 'auto' }}><b>Faster entry</b><div>Upload the bill and Ekotrace reads the numbers; meter readings can arrive by themselves.</div><Link className="btn sm ghost" style={{ paddingLeft: 0 }} to="/help">How to enter data →</Link></div>
+        <div className="tipbox" style={{ fontSize: 12.5, marginTop: 'auto' }}><b>Faster entry</b><div>Upload the bill and {BRAND.name} reads the numbers; meter readings can arrive by themselves.</div><Link className="btn sm ghost" style={{ paddingLeft: 0 }} to="/help">How to enter data →</Link></div>
       </section>
     </div>
   </>;

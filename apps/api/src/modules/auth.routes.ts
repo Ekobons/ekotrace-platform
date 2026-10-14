@@ -25,16 +25,14 @@ import { checkCode, newSecret, otpauthUri, recoveryCodes } from '../lib/totp.js'
 import { decrypt, encrypt } from '../lib/secrets.js';
 import { authorizeUrl, discover, emailOf, exchange, newFlow, usedMfa, verifyIdToken } from '../lib/oidc.js';
 import { config } from '../config.js';
+import { PRODUCT } from '../lib/brand.js';
 
 const LOCK_AFTER = 5;
 const LOCK_MINUTES = 15;
 const CHALLENGE_MINUTES = 5;
 let dummyHash: Promise<string> | null = null; // compared when the email is unknown, so timing gives nothing away
 
-const BRAND = (() => {
-  const f = join(dirname(fileURLToPath(import.meta.url)), '../../../../brands', config.brand, 'brand.json');
-  try { return existsSync(f) ? (JSON.parse(readFileSync(f, 'utf8')).productName as string) ?? 'Ekotrace' : 'Ekotrace'; } catch { return 'Ekotrace'; }
-})();
+const BRAND = PRODUCT;
 const normCode = (s: string) => s.toUpperCase().replace(/[^A-Z0-9]/g, '');
 
 /** What this person's company and role require. */

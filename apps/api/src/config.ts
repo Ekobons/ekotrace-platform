@@ -27,7 +27,7 @@ function required(name: string): string {
 export const config = {
   databaseUrl: required('DATABASE_URL'),
   port: Number(process.env.PORT ?? 4000),
-  brand: process.env.BRAND ?? 'ekotrace',
+  brand: process.env.BRAND ?? 'carbontek',
   /** 127.0.0.1 = only this computer can connect (laptop). Servers set HOST=0.0.0.0 behind HTTPS. */
   host: process.env.HOST ?? '127.0.0.1',
   dbPoolSize: Number(process.env.DB_POOL_SIZE ?? 20),
@@ -88,7 +88,7 @@ export const config = {
    *   MAIL_FROM  "Ekotrace <no-reply@example.com>"
    */
   smtpUrl: process.env.SMTP_URL ?? null,
-  mailFrom: process.env.MAIL_FROM ?? 'Ekotrace <no-reply@ekotrace.local>',
+  mailFrom: process.env.MAIL_FROM ?? null as string | null,
   /** the address people open Ekotrace at (SSO sends people back here), e.g. https://ekotrace.example.com */
   publicUrl: (process.env.PUBLIC_URL ?? '').replace(/\/$/, '') || null,
 };

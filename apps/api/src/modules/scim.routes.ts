@@ -21,6 +21,7 @@ import { platformTx, tenantTx, type Tx } from '../db/pool.js';
 import { checkUserLimit } from '../lib/plans.js';
 import { hashPassword, newToken, sha256 } from '../lib/password.js';
 import { config } from '../config.js';
+import { PRODUCT } from '../lib/brand.js';
 
 const U = 'urn:ietf:params:scim:schemas:core:2.0:User';
 const G = 'urn:ietf:params:scim:schemas:core:2.0:Group';
@@ -118,7 +119,7 @@ export async function scimRoutes(app: FastifyInstance) {
   app.get('/scim/v2/ServiceProviderConfig', async (_req, reply) => send(reply, 200, {
     schemas: ['urn:ietf:params:scim:schemas:core:2.0:ServiceProviderConfig'], patch: { supported: true }, bulk: { supported: false, maxOperations: 0, maxPayloadSize: 0 },
     filter: { supported: true, maxResults: 200 }, changePassword: { supported: false }, sort: { supported: false }, etag: { supported: false },
-    authenticationSchemes: [{ type: 'oauthbearertoken', name: 'Bearer token', description: 'Company SCIM token from Ekotrace (Security & audit log)' }] }));
+    authenticationSchemes: [{ type: 'oauthbearertoken', name: 'Bearer token', description: `Company SCIM token from ${PRODUCT} (Security & audit log)` }] }));
   app.get('/scim/v2/ResourceTypes', async (_req, reply) => send(reply, 200, { schemas: [LIST], totalResults: 2, Resources: [
     { schemas: ['urn:ietf:params:scim:schemas:core:2.0:ResourceType'], id: 'User', name: 'User', endpoint: '/Users', schema: U },
     { schemas: ['urn:ietf:params:scim:schemas:core:2.0:ResourceType'], id: 'Group', name: 'Group', endpoint: '/Groups', schema: G }] }));

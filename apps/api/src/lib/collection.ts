@@ -85,7 +85,7 @@ export const metricSnapshot = (m: Partial<MetricRow>) => ({
 });
 
 /** A company without a registry gets the standard one (one metric per category it can report). */
-export async function ensureMetrics(c: Tx, tenant: string, by = 'Ekotrace'): Promise<void> {
+export async function ensureMetrics(c: Tx, tenant: string, by = 'standard set'): Promise<void> {
   if (Number((await c.query(`SELECT count(*)::int AS n FROM metric`)).rows[0].n)) return;
   const cats = new Set((await c.query(`SELECT code FROM category WHERE active`)).rows.map((r) => r.code as string));
   let n = 0;

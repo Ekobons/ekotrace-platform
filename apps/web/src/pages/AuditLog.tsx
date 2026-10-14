@@ -6,6 +6,7 @@
 import { useEffect, useState } from 'react';
 import { useApp } from '../App';
 import { api, download, ROLE_LABEL, type SecuritySettings } from '../lib/api';
+import { BRAND, productSlug } from '../lib/brand';
 
 const LABEL: Record<string, string> = {
   login: 'Logged in', 'login.sso': 'Logged in (company account)', 'login.failed': 'Wrong password', 'login.locked': 'Sign-in while locked', 'login.mfa_failed': 'Wrong MFA code', 'login.sso_failed': 'Company sign-in refused',
@@ -174,7 +175,7 @@ function DataTab() {
         <h2>Export everything</h2>
         <p className="sub">One ZIP with every record the company holds — each table as a CSV file (entries, results, organisation, people, meters, suppliers, targets, surveys, the audit trail…) — every stored file (bills, invoices, permits, statements), and a manifest with the SHA-256 checksum of each file to prove the copy is complete and unchanged. Password hashes, session keys and MFA / SSO secrets are left out.</p>
         <p className="sub">Use it to keep your own copy, to move to another system, or at the end of the contract before the data is deleted.</p>
-        {can ? <div><button className="btn p" disabled={busy} onClick={async () => { setBusy(true); try { await download('/api/security/export', `ekotrace-export-${new Date().toISOString().slice(0, 10)}.zip`); toast('Export downloaded — the download is in the audit log'); } catch (e) { toast((e as Error).message); } finally { setBusy(false); } }}>{busy ? 'Preparing…' : 'Download the export (ZIP)'}</button></div>
+        {can ? <div><button className="btn p" disabled={busy} onClick={async () => { setBusy(true); try { await download('/api/security/export', `${productSlug()}-export-${new Date().toISOString().slice(0, 10)}.zip`); toast('Export downloaded — the download is in the audit log'); } catch (e) { toast((e as Error).message); } finally { setBusy(false); } }}>{busy ? 'Preparing…' : 'Download the export (ZIP)'}</button></div>
           : <div className="muted small">The super admin can download it.</div>}
       </section>
       <section className="card secbox">

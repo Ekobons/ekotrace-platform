@@ -26,6 +26,7 @@ import { csvRows } from '../lib/csv.js';
 import { calculate } from './calc.service.js';
 import { contextFor, tenantSettings } from './activity.routes.js';
 import { saveCommute, type Body as CommuteBody } from './commute.routes.js';
+import { PRODUCT } from '../lib/brand.js';
 
 /** What people choose in the form → the commuting engine's modes. */
 export const SURVEY_MODES: [key: string, label: string, mode: CommuteMode][] = [
@@ -394,7 +395,7 @@ export async function surveyRoutes(app: FastifyInstance) {
         const body: CommuteBody = {
           facilityId: x.id, year: sv.year, method: 'survey', headcount: x.N, workingDays: st.workingDays, weekend: 'sat_sun', homeworking: sv.wfh,
           rows: [], answers: use.map((r, i) => ({ row: i + 1, ...toEngine(r.answers, sv.wfh) })) as CommuteBody['answers'],
-          survey: { file: `Ekotrace survey: ${sv.name}`, site: null }, note: `${src.length} of ${x.N} employees answered${src.length ? '' : ' (no answers here: company average used)'}`,
+          survey: { file: `${PRODUCT} survey: ${sv.name}`, site: null }, note: `${src.length} of ${x.N} employees answered${src.length ? '' : ' (no answers here: company average used)'}`,
         };
         await c.query('SAVEPOINT pub');
         try {

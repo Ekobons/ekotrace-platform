@@ -1,6 +1,8 @@
 /** Login and change-password screens. */
 import { useEffect, useState, type FormEvent } from 'react';
 import { api } from '../lib/api';
+import { BRAND } from '../lib/brand';
+import { BrandMark } from '../components/BrandMark';
 
 export function Login({ onDone }: { onDone: () => void }) {
   // a bin's QR label opened before signing in: a contractor goes to the portal with that bin chosen
@@ -36,40 +38,84 @@ export function Login({ onDone }: { onDone: () => void }) {
     } finally { setBusy(false); }
   }
   return (
-    <div className="loginwrap">
-      <form className="card loginbox" onSubmit={submit}>
-        <div className="brand" style={{ padding: 0 }}><div className="mark">e</div><div><b style={{ color: 'var(--fg)' }}>ekotrace</b><small style={{ color: 'var(--muted)' }}>Carbon operating system</small></div></div>
-        {mode === 'code' ? <>
-          <h1>Enter your code</h1>
-          <p className="sub">{recovery ? 'Type one of the recovery codes you saved when you set up multi-factor authentication. Each works once.' : 'Open your authenticator app and type the 6-digit code shown for Ekotrace.'}</p>
-          <label className="field"><span>{recovery ? 'Recovery code' : '6-digit code'}</span>
-            <input className="input mfacode" autoFocus inputMode={recovery ? 'text' : 'numeric'} autoComplete="one-time-code" required maxLength={recovery ? 20 : 7} value={code} onChange={(e) => setCode(e.target.value)} placeholder={recovery ? 'XXXX-XXXX-XXXX' : '123 456'} /></label>
-          {err && <div className="note bad">{err}</div>}
-          <button className="btn p" disabled={busy} style={{ height: 42 }}>{busy ? 'Checking…' : 'Continue'}</button>
-          <button type="button" className="btn ghost" onClick={() => { setRecovery(!recovery); setCode(''); setErr(null); }}>{recovery ? 'Use the code from the app instead' : 'Lost your phone? Use a recovery code'}</button>
-          <button type="button" className="btn ghost" onClick={() => { setMode('password'); setChallenge(''); setErr(null); }}>← Start again</button>
-        </> : mode === 'sso' ? <>
-          <h1>Company sign-in</h1>
-          <p className="sub">Sign in with your company's Microsoft, Google or other work account. Your email tells us which company.</p>
-          <label className="field"><span>Work email</span><input className="input" type="email" autoComplete="username" autoFocus required value={email} onChange={(e) => setEmail(e.target.value)} /></label>
-          {err && <div className="note bad">{err}</div>}
-          <button className="btn p" disabled={busy} style={{ height: 42 }}>{busy ? 'Opening…' : 'Continue to your company sign-in'}</button>
-          <button type="button" className="btn ghost" onClick={() => { setMode('password'); setErr(null); }}>← Sign in with a password instead</button>
-        </> : <>
-          <h1>Log in</h1>
-          <label className="field"><span>Work email</span><input className="input" type="email" autoComplete="username" required value={email} onChange={(e) => setEmail(e.target.value)} /></label>
-          <label className="field"><span>Password</span><input className="input" type="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} /></label>
-          {err && <div className="note bad">{err}</div>}
-          <button className="btn p" disabled={busy} style={{ height: 42 }}>{busy ? 'Checking…' : 'Log in'}</button>
-          <div className="ordiv"><span>or</span></div>
-          <button type="button" className="btn" style={{ height: 42 }} onClick={() => { setMode('sso'); setErr(null); }}>Sign in with your company account (SSO)</button>
-          <p className="sub">Forgot your password? Ask your company's Super admin or Admin to reset it.</p>
-          <a className="btn ghost" href="/survey" style={{ justifySelf: 'start' }}>Answering a survey? Enter your code →</a>
-          <a className="btn ghost" href={`/contractor${binCode ? `?bin=${binCode}` : ''}`} style={{ justifySelf: 'start' }}>Waste contractor? Sign in with your access code →</a>
-        </>}
-      </form>
+    <div className="signin">
+      <BrandSide />
+      <main className="signin-form">
+        <form className="sf" onSubmit={submit}>
+          {mode === 'code' ? <>
+            <h1>Enter your code</h1>
+            <p className="sf-sub">{recovery ? 'Type one of the recovery codes you saved when you set up multi-factor authentication. Each works once.' : `Open your authenticator app and type the 6-digit code shown for ${BRAND.name}.`}</p>
+            <label className="field"><span>{recovery ? 'Recovery code' : '6-digit code'}</span>
+              <input className="input mfacode" autoFocus inputMode={recovery ? 'text' : 'numeric'} autoComplete="one-time-code" required maxLength={recovery ? 20 : 7} value={code} onChange={(e) => setCode(e.target.value)} placeholder={recovery ? 'XXXX-XXXX-XXXX' : '123 456'} /></label>
+            {err && <div className="note bad" role="alert">{err}</div>}
+            <button className="btn p sf-go" disabled={busy}>{busy ? 'Checking…' : 'Continue'}</button>
+            <div className="sf-alt">
+              <button type="button" className="linkbtn" onClick={() => { setRecovery(!recovery); setCode(''); setErr(null); }}>{recovery ? 'Use the code from the app instead' : 'Lost your phone? Use a recovery code'}</button>
+              <button type="button" className="linkbtn" onClick={() => { setMode('password'); setChallenge(''); setErr(null); }}>Start again</button>
+            </div>
+          </> : mode === 'sso' ? <>
+            <h1>Company sign-in</h1>
+            <p className="sf-sub">Sign in with your company's Microsoft, Google or other work account. Your email tells us which company you belong to.</p>
+            <label className="field"><span>Work email</span><input className="input" type="email" autoComplete="username" autoFocus required value={email} onChange={(e) => setEmail(e.target.value)} /></label>
+            {err && <div className="note bad" role="alert">{err}</div>}
+            <button className="btn p sf-go" disabled={busy}>{busy ? 'Opening…' : 'Continue to your company sign-in'}</button>
+            <div className="sf-alt"><button type="button" className="linkbtn" onClick={() => { setMode('password'); setErr(null); }}>Sign in with a password instead</button></div>
+          </> : <>
+            <h1>Sign in</h1>
+            <p className="sf-sub">Use your work email and password, or your company account.</p>
+            <label className="field"><span>Work email</span><input className="input" type="email" autoComplete="username" required value={email} onChange={(e) => setEmail(e.target.value)} /></label>
+            <label className="field"><span>Password</span><input className="input" type="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} /></label>
+            {err && <div className="note bad" role="alert">{err}</div>}
+            <button className="btn p sf-go" disabled={busy}>{busy ? 'Checking…' : 'Sign in'}</button>
+            <button type="button" className="btn sf-sso" onClick={() => { setMode('sso'); setErr(null); }}>Sign in with your company account</button>
+            <p className="sf-note">Forgot your password? Your company's super admin or admin can reset it.</p>
+            <div className="sf-other">
+              <span>Not a {BRAND.name} user?</span>
+              <a href="/survey">Answer a commuting survey with your code</a>
+              <a href={`/contractor${binCode ? `?bin=${binCode}` : ''}`}>Waste contractors: sign in with your access code</a>
+            </div>
+          </>}
+        </form>
+      </main>
     </div>
   );
+}
+
+/**
+ * The brand side: the product, one line on what it does, and a field of monthly bars stepping down from the
+ * base year to net zero along the target path (illustrative, not data). The bars grow in once on load.
+ */
+const BARS = (() => {
+  const n = 84, out: { h: number; future: boolean }[] = [];
+  for (let i = 0; i < n; i++) {
+    const t = i / (n - 1), trend = 1 - 0.86 * t ** 1.15;                 // base year → near zero
+    const season = 0.07 * Math.sin(i * 0.52) + 0.035 * Math.sin(i * 1.9 + 1);
+    out.push({ h: Math.max(0.05, trend + season * (1 - t * 0.6)), future: i >= 30 });
+  }
+  return out;
+})();
+function BrandSide() {
+  const W = 1000, H = 300, bw = W / BARS.length;
+  return (
+    <aside className="signin-brand">
+      <div className="sb-top"><BrandMark size={36} /><b>{BRAND.name}</b></div>
+      <div className="sb-copy">
+        <h2>Every tonne, traced back to where it came from.</h2>
+        <p>Activity data from every site, emission factors you can check, and approvals your auditor can follow — from the base year to net zero.</p>
+      </div>
+      <figure className="sb-chart" aria-hidden="true">
+        <svg viewBox={`0 0 ${W} ${H + 30}`} preserveAspectRatio="none">
+          {BARS.map((b, i) => {
+            const h = b.h * H, last = i >= BARS.length - 6;
+            return <rect key={i} className={`sb-bar${b.future ? ' f' : ''}${last ? ' l' : ''}`} x={i * bw + bw * 0.22} y={H - h} width={bw * 0.56} height={h} rx={1.5}
+              style={{ ['--d' as string]: `${i * 14}ms` }} />;
+          })}
+          <path className="sb-path" d={`M0 ${H * 0.02} C ${W * 0.35} ${H * 0.18}, ${W * 0.62} ${H * 0.62}, ${W} ${H * 0.9}`} />
+          <line className="sb-base" x1="0" x2={W} y1={H + 0.5} y2={H + 0.5} />
+        </svg>
+        <figcaption><span>Base year</span><span>Net zero</span></figcaption>
+      </figure>
+    </aside>);
 }
 
 export function ChangePassword({ forced, onDone }: { forced?: boolean; onDone: () => void }) {

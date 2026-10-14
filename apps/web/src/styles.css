@@ -1190,3 +1190,44 @@ ul.plain { list-style: none; margin: 0; padding: 0; }
 .rsbox b { font-size: 22px; } .rsbox.strong { border-color: var(--primary); background: var(--primary-soft); }
 .rstable td { vertical-align: top; }
 .rscheck { padding: 10px 12px; border-radius: 10px; background: var(--bg); font-size: 13px; }
+
+/* ------------------------------------------------------------------ sign-in */
+.signin { min-height: 100vh; display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(380px, 1fr); background: #FFFFFF; }
+.signin-brand { position: relative; overflow: hidden; display: flex; flex-direction: column; gap: 28px; padding: 44px 56px 0; color: #E9F2EE;
+  background: radial-gradient(120% 90% at 100% 0%, #13604F 0%, transparent 55%), radial-gradient(90% 70% at 0% 100%, #0E4D41 0%, transparent 60%), #0B2A25; }
+.sb-top { display: flex; align-items: center; gap: 12px; }
+.sb-top b { font-size: 21px; font-weight: 700; letter-spacing: -.01em; color: #FFFFFF; }
+.sb-copy { margin-top: auto; max-width: 600px; }
+.sb-copy h2 { max-width: 12.5em; font-size: clamp(30px, 3.4vw, 50px); line-height: 1.04; letter-spacing: -.025em; font-weight: 600; margin: 0 0 18px; color: #FFFFFF; }
+.sb-copy p { font-size: 16px; line-height: 1.55; color: #B9D3CA; margin: 0; max-width: 46ch; }
+.sb-chart { margin: 8px -56px 0; height: min(34vh, 300px); display: flex; flex-direction: column; }
+.sb-chart svg { width: 100%; flex: 1; display: block; }
+.sb-chart figcaption { display: flex; justify-content: space-between; padding: 10px 56px 26px; font-size: 12.5px; color: #8FB3A7; }
+.sb-bar { fill: #3F8F78; transform-box: fill-box; transform-origin: bottom; animation: sb-grow .9s cubic-bezier(.2, .8, .2, 1) both; animation-delay: var(--d); }
+.sb-bar.f { fill: none; stroke: #4E9C84; stroke-width: 1.4; vector-effect: non-scaling-stroke; }
+.sb-bar.l { fill: #C6F06B; stroke: none; }
+.sb-path { fill: none; stroke: #C6F06B; stroke-width: 1.6; stroke-dasharray: 5 6; vector-effect: non-scaling-stroke; opacity: .85; }
+.sb-base { stroke: #2D6A5A; stroke-width: 1; vector-effect: non-scaling-stroke; }
+@keyframes sb-grow { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+@media (prefers-reduced-motion: reduce) { .sb-bar { animation: none; } }
+.signin-form { display: grid; place-items: center; padding: 40px 24px; background: #FFFFFF; }
+.sf { width: min(400px, 100%); display: grid; gap: 16px; }
+.sf h1 { font-size: 30px; letter-spacing: -.02em; margin: 0; }
+.sf-sub { margin: -6px 0 6px; color: var(--muted); font-size: 14.5px; line-height: 1.5; }
+.sf .input { height: 46px; font-size: 15px; }
+.sf-go { height: 48px; justify-content: center; font-size: 15px; margin-top: 4px; }
+.sf-sso { height: 46px; justify-content: center; font-size: 14px; }
+.sf-note { margin: 0; font-size: 13px; color: var(--muted); }
+.sf-alt { display: grid; gap: 8px; justify-items: start; }
+.sf-other { display: grid; gap: 6px; margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--line); font-size: 13.5px; }
+.sf-other span { color: var(--muted); }
+.sf-other a { color: var(--primary); text-decoration: none; font-weight: 600; } .sf-other a:hover { text-decoration: underline; }
+.sf .linkbtn { color: var(--primary); font-weight: 600; font-size: 13.5px; }
+@media (max-width: 900px) {
+  .signin { grid-template-columns: minmax(0, 1fr); }
+  .signin-brand { padding: 24px 20px 0; gap: 18px; }
+  .sb-copy { margin-top: 8px; } .sb-copy h2 { font-size: 28px; margin-bottom: 10px; } .sb-copy p { font-size: 14.5px; }
+  .sb-chart { margin: 0 -20px; height: 120px; } .sb-chart figcaption { padding: 6px 20px 14px; }
+  .signin-form { place-items: start center; padding: 28px 20px 40px; }
+}
+.sf .field > span { text-transform: none; letter-spacing: 0; font-size: 13.5px; font-weight: 600; color: var(--fg); }

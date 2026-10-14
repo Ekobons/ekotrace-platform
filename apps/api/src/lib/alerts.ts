@@ -11,6 +11,7 @@
  *   low      a new API client
  */
 import { platformTx, type Tx } from '../db/pool.js';
+import { PRODUCT } from './brand.js';
 
 export type Severity = 'low' | 'medium' | 'high';
 interface Ev { seal_seq: string; id: string; tenant_id: string | null; user_id: string | null; user_name: string | null; action: string; entity_id: string | null; detail: Record<string, unknown> | null; ip: string | null; at: string }
@@ -65,8 +66,8 @@ export async function runAlerts(): Promise<number> {
         if (dup) continue;
         await c.query(`INSERT INTO security_alert (tenant_id, rule, severity, title, detail, dedup, seq) VALUES ($1,$2,$3,$4,$5,$6,$7)`,
           [h.tenant, h.rule, h.severity, h.title, JSON.stringify({ ...h.detail, by: e.user_name, ip: e.ip, record: Number(e.seal_seq) }), h.dedup, e.seal_seq]);
-        await c.query(`INSERT INTO audit_log (tenant_id, user_name, action, detail, ip) VALUES ($1,'Ekotrace alerts',$2,$3,$4)`,
-          [h.tenant, `alert.${h.rule}`, JSON.stringify({ severity: h.severity, title: h.title, record: Number(e.seal_seq) }), e.ip]);
+        await c.query(`INSERT INTO audit_log (tenant_id, user_name, action, detail, ip) VALUES ($1,$5,$2,$3,$4)`,
+          [h.tenant, `alert.${h.rule}`, JSON.stringify({ severity: h.severity, title: h.title, record: Number(e.seal_seq) }), e.ip, `${PRODUCT} alerts`]);
         n++;
       }
     }

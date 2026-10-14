@@ -28,6 +28,7 @@ import { cellText, detectKind, findHeaderRow, sheetRows, type Cell } from '../li
 import { sendWorkbook, styleHeader } from '../lib/xlsx.js';
 import { calculate } from './calc.service.js';
 import { contextFor, saveEntry, tenantSettings } from './activity.routes.js';
+import { PRODUCT } from '../lib/brand.js';
 
 const MODE_KEYS = COMMUTE_MODES.map((m) => m.key) as [CommuteMode, ...CommuteMode[]];
 const FUEL_KEYS = CAR_FUELS.map((f) => f.key) as [string, ...string[]];
@@ -368,6 +369,6 @@ export async function commuteRoutes(app: FastifyInstance) {
       ['Form tools', 'The same questions can be asked in Microsoft Forms or Google Forms; export the answers as .xlsx or .csv and upload them.'],
     ];
     for (const [a, b] of lines) { const r = how.addRow([a, b]); r.getCell(1).font = { bold: true }; r.getCell(2).alignment = { wrapText: true, vertical: 'top' }; }
-    return sendWorkbook(reply, wb, 'Ekotrace commuting survey.xlsx');
+    return sendWorkbook(reply, wb, `${PRODUCT} commuting survey.xlsx`);
   });
 }

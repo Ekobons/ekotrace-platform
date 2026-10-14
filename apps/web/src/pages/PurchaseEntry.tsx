@@ -14,6 +14,7 @@ import { ItemPicker } from '../components/ItemPicker';
 import { Icon } from '../components/Icon';
 import { PublishedLinesView } from './PublishedPurchases';
 import { BatchList, ColumnSetup, FactorBanner, TARGETS, UploadBox } from './Purchases';
+import { BRAND, productSlug } from '../lib/brand';
 
 interface Row extends ManualLine { itemName: string | null; cands: { itemId: number; name: string }[] }
 const blank = (date: string, currency: string, target = 'purchased_goods'): Row => ({ date, description: '', itemId: null, itemName: null, cands: [], target, amount: null, currency, supplier: '', supplierEf: null, supplierEfUnit: null, quantity: null, unit: null });
@@ -34,7 +35,7 @@ export function PurchaseEntry(props: { cat: Category; facilityId: string; period
           <button className={mode === 'published' ? 'on' : ''} onClick={() => setMode('published')}>Published lines</button>
           <button className={mode === 'capital' ? 'on' : ''} onClick={() => setMode('capital')}>Capital goods list</button>
         </div>
-        <span className="sub grow">{mode === 'upload' ? <>An export from the ERP or finance system, any layout, up to 200,000 lines; <button className="link" onClick={() => download('/api/purchases/template', 'Ekotrace purchases template.xlsx')}>template</button>.</> : mode === 'hand' ? 'For a few purchases; saved straight as entries.' : mode === 'published' ? 'Every published line, all batches: filter, open, download.' : 'Products counted as capital goods (Scope 3.2) when a purchase is matched to them.'}</span>
+        <span className="sub grow">{mode === 'upload' ? <>An export from the ERP or finance system, any layout, up to 200,000 lines; <button className="link" onClick={() => download('/api/purchases/template', `${BRAND.name} purchases template.xlsx`)}>template</button>.</> : mode === 'hand' ? 'For a few purchases; saved straight as entries.' : mode === 'published' ? 'Every published line, all batches: filter, open, download.' : 'Products counted as capital goods (Scope 3.2) when a purchase is matched to them.'}</span>
       </div>
       {mode === 'upload' && !up && <UploadBox onUploaded={setUp} />}
       {mode === 'upload' && up && meta && <ColumnSetup meta={meta} up={up} defaultFacility={props.facilityId}

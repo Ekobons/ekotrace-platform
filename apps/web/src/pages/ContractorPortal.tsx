@@ -6,6 +6,8 @@
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { methodName } from '../lib/waste';
+import { BrandMark } from '../components/BrandMark';
+import { BRAND } from '../lib/brand';
 
 const MN = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const TKEY = 'eko_contractor';
@@ -43,7 +45,7 @@ export function ContractorPortal() {
 
   return (
     <div className="cportal">
-      <header><div className="mark">e</div><div><b>ekotrace</b><small>Waste contractor portal</small></div><span className="grow" />
+      <header><BrandMark /><div><b>{BRAND.name}</b><small>Waste contractor portal</small></div><span className="grow" />
         {me && <><span className="small">{me.contractor} · for {me.company}</span><button className="btn sm ghost" onClick={() => void out()}>Sign out</button></>}</header>
       {!me ? <SignIn onDone={() => { setErr(null); void load(); }} err={err} /> : <Portal me={me} reload={load} toast={toast} />}
       {msg && <div className="toast" role="status">{msg}</div>}

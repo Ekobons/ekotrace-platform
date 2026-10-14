@@ -7,6 +7,7 @@
 import nodemailer, { type Transporter } from 'nodemailer';
 import { config } from '../config.js';
 import { platformTx, type Tx } from '../db/pool.js';
+import { PRODUCT, PRODUCT_SLUG } from './brand.js';
 
 export const mailOn = () => !!config.smtpUrl;
 
@@ -36,7 +37,7 @@ export async function deliverEmails(max = 50): Promise<number> {
     let n = 0;
     for (const r of rows) {
       try {
-        await smtp().sendMail({ from: config.mailFrom, to: r.to_email, subject: r.subject, text: r.body });
+        await smtp().sendMail({ from: config.mailFrom ?? `${PRODUCT} <no-reply@${PRODUCT_SLUG}.local>`, to: r.to_email, subject: r.subject, text: r.body });
         await c.query(`UPDATE email_outbox SET status = 'sent', sent_at = now(), attempts = attempts + 1, error = NULL WHERE id = $1`, [r.id]); n++;
       } catch (e) {
         await c.query(`UPDATE email_outbox SET status = CASE WHEN attempts + 1 >= 5 THEN 'failed' ELSE 'queued' END, attempts = attempts + 1, error = $2 WHERE id = $1`, [r.id, (e as Error).message.slice(0, 500)]);

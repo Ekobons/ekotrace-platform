@@ -88,7 +88,7 @@ export async function buildApp(opts: { logger?: boolean; rateLimit?: Limits | nu
   /** Brand pack of this deployment (name, colours, logo): Ekotrace, Carbontek… */
   app.get('/api/brand', async () => {
     const f = join(BRANDS, config.brand, 'brand.json');
-    if (!existsSync(f)) return { name: 'Ekotrace' };
+    if (!existsSync(f)) return { name: 'Carbontek' };
     return JSON.parse(readFileSync(f, 'utf8'));
   });
 

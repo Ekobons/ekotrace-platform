@@ -14,6 +14,7 @@ import {
   api, download, num, tco2e, type CommuteAnswer, type CommuteBody, type CommuteMode, type CommuteOptions, type CommuteRecord, type CommuteResult,
   type CommuteTypedRow, type Survey, type SurveyRead, type Weekend,
 } from '../lib/api';
+import { BRAND, productSlug } from '../lib/brand';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const FRI_SAT = new Set(['SA', 'KW', 'QA', 'BH', 'OM', 'JO', 'EG', 'IQ', 'LY', 'DZ', 'SD', 'YE', 'SY', 'IL', 'BD']);
@@ -119,7 +120,7 @@ export function CommutingEntry({ facilityId, year, onSaved }: { facilityId: stri
       <div className="card" style={{ display: 'grid', gap: 10 }}>
         <div className="row" style={{ gap: 10, flexWrap: 'wrap' }}>
           <b>{facName} · {year}</b>
-          {rec ? <span className="chip">{rec.survey_id ? `From survey “${rec.survey_name ?? 'Ekotrace survey'}” · ${rec.answers} answers` : rec.method === 'survey' ? `Survey file · ${rec.answers} answers` : 'Typed in'} · {tco2e(rec.result.kg)} tCO₂e · saved {rec.updated_at.slice(0, 10)}{rec.updated_by_name ? ` by ${rec.updated_by_name}` : ''}</span>
+          {rec ? <span className="chip">{rec.survey_id ? `From survey “${rec.survey_name ?? `${BRAND.name} survey`}” · ${rec.answers} answers` : rec.method === 'survey' ? `Survey file · ${rec.answers} answers` : 'Typed in'} · {tco2e(rec.result.kg)} tCO₂e · saved {rec.updated_at.slice(0, 10)}{rec.updated_by_name ? ` by ${rec.updated_by_name}` : ''}</span>
             : <span className="chip grey">Not entered for {year} yet</span>}
           {locked && <span className="chip warn">{rec!.approved} of {rec!.entries} monthly entries approved: locked</span>}
           <span className="grow" />
@@ -171,9 +172,9 @@ export function CommutingEntry({ facilityId, year, onSaved }: { facilityId: stri
       ) : (
         <>
         <div className="card" style={{ display: 'grid', gap: 10 }}>
-          <div className="row" style={{ gap: 10 }}><b>Ekotrace surveys</b><span className="muted small">Employees answer with a personal code; results are scaled up to the headcount and published here.</span><span className="grow" />
+          <div className="row" style={{ gap: 10 }}><b>{BRAND.name} surveys</b><span className="muted small">Employees answer with a personal code; results are scaled up to the headcount and published here.</span><span className="grow" />
             {surveys?.canCreate && <Link className="btn sm" to="/surveys?new=1">+ New survey</Link>}</div>
-          {rec?.survey_id && <div className="note info" style={{ margin: 0 }}>{year} for {facName} was published from the survey <Link to={`/surveys/${rec.survey_id}?tab=results`}>{rec.survey_name ?? 'Ekotrace survey'}</Link>. To change it, reopen that survey and publish again — or save other data here, which replaces it.</div>}
+          {rec?.survey_id && <div className="note info" style={{ margin: 0 }}>{year} for {facName} was published from the survey <Link to={`/surveys/${rec.survey_id}?tab=results`}>{rec.survey_name ?? `${BRAND.name} survey`}</Link>. To change it, reopen that survey and publish again — or save other data here, which replaces it.</div>}
           {mine.length ? mine.map((x) => { const inv = x.invited ?? 0, ans = x.answered ?? 0; return (
             <div key={x.id} className="row" style={{ gap: 10, flexWrap: 'wrap', borderTop: '1px solid var(--line)', paddingTop: 10 }}>
               <span className="gic">🚌</span><b>{x.name}</b>
@@ -183,12 +184,12 @@ export function CommutingEntry({ facilityId, year, onSaved }: { facilityId: stri
               <Link className="btn sm" to={`/surveys/${x.id}`}>Open</Link>
               {x.status !== 'published' && x.status !== 'draft' && <Link className="btn p sm" to={`/surveys/${x.id}?tab=results`}>Results & publish</Link>}
             </div>); })
-            : <span className="muted small">{surveys ? `No Ekotrace survey covers ${facName} in ${year}.` : 'Surveys are run by admins and managers.'}</span>}
+            : <span className="muted small">{surveys ? `No ${BRAND.name} survey covers ${facName} in ${year}.` : 'Surveys are run by admins and managers.'}</span>}
         </div>
         <div className="card" style={{ display: 'grid', gap: 10 }}>
           <div className="row" style={{ gap: 10 }}><b>Or use answers collected elsewhere</b></div>
           <div className="row" style={{ gap: 10, flexWrap: 'wrap' }}>
-            <button className="btn sm" onClick={() => download('/api/commuting/survey-template', 'Ekotrace commuting survey.xlsx')}>Download the survey file</button>
+            <button className="btn sm" onClick={() => download('/api/commuting/survey-template', `${BRAND.name} commuting survey.xlsx`)}>Download the survey file</button>
             <input ref={fileRef} type="file" accept=".xlsx,.csv,.txt" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) { setFile(f); void read(f); } e.target.value = ''; }} />
             <button className="btn p sm" disabled={locked || busy} onClick={() => fileRef.current?.click()}>{answers.length ? 'Upload other answers' : 'Upload survey answers'}</button>
             <span className="muted small">Excel or CSV, one row per employee (also an export of Microsoft Forms or Google Forms).</span>

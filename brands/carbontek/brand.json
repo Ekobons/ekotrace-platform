@@ -1,8 +1,8 @@
 {
   "name": "Carbontek",
   "productName": "Carbontek",
-  "colors": { "primary": "#1F6F8B", "primaryDark": "#14495c", "background": "#F3F7F9" },
-  "logo": "logo.svg",
+  "tagline": "Carbon accounting",
+  "colors": { "primary": "#0E7C66", "primaryDark": "#0B4F43", "background": "#EEF2EF" },
   "supportEmail": "TO BE CONFIRMED BY CARBONTEK",
   "legal": { "company": "Carbontek" },
   "features": { "fugitive": true, "stationaryCombustion": true },

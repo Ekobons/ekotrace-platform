@@ -5,6 +5,7 @@
 import { useEffect, useState } from 'react';
 import { useApp } from '../../App';
 import { api } from '../../lib/api';
+import { BRAND, productSlug } from '../../lib/brand';
 
 export function SourcesTab() {
   const { toast } = useApp();
@@ -99,7 +100,7 @@ function SpendImports({ onDone }: { onDone: () => void }) {
           {[['factors', 'purchase_goods_categories_ef *'], ['categories', 'dbo.purchase_category'], ['subcategories', 'dbo.purchase_subcategory'], ['types', 'dbo.typesofpurchase']].map(([k, l]) => (
             <label key={k} className="field"><span>{l}</span><input type="file" accept=".csv" onChange={(e) => { const f = e.target.files?.[0]; setOld((o) => { const n = { ...o }; if (f) n[k!] = f; else delete n[k!]; return n; }); setOldPrev(null); }} /></label>))}
         </div>
-        <p className="sub">Each product (e.g. “Cereal - Barley grain”, “LPG”) becomes a spend category with the EPA factor of its NAICS code; the old category › subcategory and the capital goods type are kept. The old per-currency and per-kg values are not used (Ekotrace converts each purchase itself). Load the EPA file first.</p>
+        <p className="sub">Each product (e.g. “Cereal - Barley grain”, “LPG”) becomes a spend category with the EPA factor of its NAICS code; the old category › subcategory and the capital goods type are kept. The old per-currency and per-kg values are not used ({BRAND.name} converts each purchase itself). Load the EPA file first.</p>
         <div className="row"><button className="btn" disabled={!old.factors} onClick={async () => { setErr(null); try { setOldPrev(await api.importOldPurchases(await oldBody(true))); } catch (x) { setErr((x as Error).message); } }}>Check</button>
           {oldPrev?.preview && <><span className="sub">{oldPrev.rows} rows → {oldPrev.products} products.</span><button className="btn p" onClick={async () => { try { const r = await api.importOldPurchases(await oldBody(false)); toast(`${r.created} products added, ${r.updated} updated${r.notFound?.length ? `, ${r.notFound.length} without an EPA code` : ''}`); setOldPrev(null); onDone(); } catch (x) { setErr((x as Error).message); } }}>Import</button></>}</div>
       </details>

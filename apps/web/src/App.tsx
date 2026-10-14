@@ -42,6 +42,8 @@ import { Surveys } from './pages/Surveys';
 import { MetricRegistry } from './pages/MetricRegistry';
 import { CollectionCalendar } from './pages/CollectionCalendar';
 import { Inbox } from './pages/Inbox';
+import { BrandMark } from './components/BrandMark';
+import { BRAND } from './lib/brand';
 
 interface Ctx {
   me: Me;
@@ -167,7 +169,7 @@ function Shell() {
   return (
     <div className={`app${mini ? ' mini' : ''}`}>
       <aside className="side">
-        <div className="brand"><div className="mark">e</div><div className="bt"><b>ekotrace</b><small>Carbon operating system</small></div>
+        <div className="brand"><BrandMark /><div className="bt"><b>{BRAND.name}</b><small>{BRAND.tagline}</small></div>
           <button type="button" className="minibtn" onClick={toggleMini} aria-label={mini ? 'Expand the menu' : 'Collapse the menu'} title={mini ? 'Expand the menu' : 'Collapse the menu'}>{mini ? '»' : '«'}</button></div>
         <div className="org">
           {role === 'platform_admin' ? (

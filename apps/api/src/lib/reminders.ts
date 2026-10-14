@@ -14,6 +14,7 @@ import { platformTx, tenantTx, type Tx } from '../db/pool.js';
 import { cycleSettings, ensureMetrics, obligations, todayIn, type Obligation, type Person } from './collection.js';
 import { notify } from './notify.js';
 import { deliverEmails } from './mail.js';
+import { PRODUCT } from './brand.js';
 
 const fmt = (d: string) => new Date(d + 'T00:00:00Z').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
 export const obLine = (o: Obligation) => `${o.facility} · ${o.metric} (${o.metricCode}) · ${o.label} · due ${fmt(o.due)}${o.daysLate ? ` · ${o.daysLate} day${o.daysLate > 1 ? 's' : ''} late` : ''}`;
@@ -60,11 +61,11 @@ export async function remindTenant(c: Tx, tenant: string, now = new Date()): Pro
   const soon = obs.filter((o) => o.timing === 'due_soon' && !has(o, 'due_soon') && o.responsible.length);
   const late = obs.filter((o) => (o.timing === 'overdue' || o.timing === 'escalated') && !has(o, 'overdue') && o.responsible.length);
   const esc = obs.filter((o) => o.timing === 'escalated' && !has(o, 'escalated') && o.escalateTo.length);
-  out.people += await send(c, tenant, 'due_soon', soon.map((o) => ({ o, to: o.responsible })), 'Ekotrace reminders'); out.due_soon = soon.length;
-  out.people += await send(c, tenant, 'overdue', late.map((o) => ({ o, to: o.responsible })), 'Ekotrace reminders'); out.overdue = late.length;
-  out.people += await send(c, tenant, 'escalated', esc.map((o) => ({ o, to: o.escalateTo })), 'Ekotrace reminders'); out.escalated = esc.length;
+  out.people += await send(c, tenant, 'due_soon', soon.map((o) => ({ o, to: o.responsible })), `${PRODUCT} reminders`); out.due_soon = soon.length;
+  out.people += await send(c, tenant, 'overdue', late.map((o) => ({ o, to: o.responsible })), `${PRODUCT} reminders`); out.overdue = late.length;
+  out.people += await send(c, tenant, 'escalated', esc.map((o) => ({ o, to: o.escalateTo })), `${PRODUCT} reminders`); out.escalated = esc.length;
   if (out.due_soon + out.overdue + out.escalated) {
-    await c.query(`INSERT INTO audit_log (tenant_id, user_name, action, detail) VALUES ($1,'Ekotrace reminders','collection.reminders',$2)`, [tenant, JSON.stringify(out)]);
+    await c.query(`INSERT INTO audit_log (tenant_id, user_name, action, detail) VALUES ($1,$3,'collection.reminders',$2)`, [tenant, JSON.stringify(out), `${PRODUCT} reminders`]);
   }
   return out;
 }

@@ -25,6 +25,7 @@ import { config } from '../config.js';
 import { calcInputSchema, calculate, loadItem, type CalcInput } from './calc.service.js';
 import { contextFor, tenantSettings } from './activity.routes.js';
 import { refdata } from './refdata.js';
+import { PRODUCT } from '../lib/brand.js';
 
 const FREQ = ['hour', 'day', 'week', 'month', 'irregular'] as const;
 export const FREQ_LABEL: Record<(typeof FREQ)[number], string> = { hour: 'hourly', day: 'daily', week: 'weekly', month: 'monthly', irregular: 'irregular' };
@@ -710,7 +711,7 @@ export async function meterIngestRoutes(app: FastifyInstance) {
           'INSERT INTO audit_log (tenant_id, user_id, user_name, action, entity, entity_id, detail, ip) VALUES ($1,NULL,$2,$3,$4,$5,$6,$7)',
           [k.tenant_id, `API key: ${k.name}`, 'meter.readings_api', 'reading_batch', batch, JSON.stringify({ received: b.readings.length, staged, rejected: rejected.length }), req.ip]);
         return { received: b.readings.length, batchId: batch, status: 'review', new: st.new ?? 0, corrections: st.changed ?? 0, duplicates: st.same ?? 0, conflicts: st.conflict ?? 0,
-          rejected: rejected.sort((a, z2) => a.index - z2.index).slice(0, 1000), note: 'Readings wait for review in Ekotrace (Add data → the category → Meter readings) before they are published.' };
+          rejected: rejected.sort((a, z2) => a.index - z2.index).slice(0, 1000), note: `Readings wait for review in ${PRODUCT} (Add data → the category → Meter readings) before they are published.` };
       }
       let inserted = 0, updated = 0, unchanged = 0;
       const out: { meterId: string; inserted: number; updated: number; entries?: unknown }[] = [];

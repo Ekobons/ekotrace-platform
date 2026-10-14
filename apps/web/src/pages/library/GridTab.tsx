@@ -10,6 +10,7 @@ import { api, num, type GridRegion } from '../../lib/api';
 import { Prices } from '../../components/Prices';
 import { Suppliers } from '../EnergyRegister';
 import { Icon } from '../../components/Icon';
+import { BRAND, productSlug } from '../../lib/brand';
 
 const KIND = { location: 'Grid factor (location-based)', residual: 'Residual mix (market-based)', td_loss: 'T&D losses (Scope 3.3)', wtt: 'Upstream of generation (Scope 3.3)' } as const;
 type Kind = keyof typeof KIND;
@@ -42,7 +43,7 @@ export function GridTab() {
     <div style={{ display: 'grid', gap: 16 }}>
       <div className="card" style={{ display: 'grid', gap: 12 }}>
         <div><h2>Grid regions & electricity factors</h2>
-          <p className="sub">Location-based Scope 2 uses the factor of the facility's grid region: a sub-region (emirate, state, grid) when it has a factor, else the country average. Market-based uses certificates and supplier factors first, then the region's residual mix, then the grid average. Factors for the UK (DESNZ), United States (EPA eGRID), the EU (EEA), Australia (NGA), India, Singapore, China and Japan come with Ekotrace. Enter others with their source (e.g. the utility's sustainability report, the national inventory).</p></div>
+          <p className="sub">Location-based Scope 2 uses the factor of the facility's grid region: a sub-region (emirate, state, grid) when it has a factor, else the country average. Market-based uses certificates and supplier factors first, then the region's residual mix, then the grid average. Factors for the UK (DESNZ), United States (EPA eGRID), the EU (EEA), Australia (NGA), India, Singapore, China and Japan come with {BRAND.name}. Enter others with their source (e.g. the utility's sustainability report, the national inventory).</p></div>
         <div className="row" style={{ gap: 8 }}>
           <label className="field" style={{ width: 280 }}><span>Country</span>
             <select className="input" value={country} onChange={(e) => { setCountry(e.target.value); setF({ ...f, region: e.target.value }); }}>{countries.map((c) => <option key={c} value={c}>{c} · {regions.find((r) => r.country === c && r.kind === 'country')?.name.replace(/ \(.*\)$/, '') ?? c}</option>)}</select></label>

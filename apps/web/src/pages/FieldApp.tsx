@@ -11,6 +11,7 @@ import { api, num, type Bin, type Category, type Contractor, type Facility, type
 import { OPS, firstOp, griOf, materialsOf, methodName, opsOf } from '../lib/waste';
 import { Icon } from '../components/Icon';
 import { MN } from '../components/DashCharts';
+import { BRAND, productSlug } from '../lib/brand';
 
 /** A QR code as SVG markup (only the label's URL is in it). */
 export function qrSvg(text: string, cell = 4) {
@@ -56,7 +57,7 @@ export function FieldApp() {
       <p class="np">${list.length} label${list.length === 1 ? '' : 's'} · the print dialog opens by itself (or press Ctrl+P) · cut out and stick on each bin.</p><div class="grid">
       ${list.map((b) => `<div class="lbl">${qrSvg(scanUrl(b.code), 4)}<div class="n">${esc(b.name)}</div><div class="s">${esc(b.facility)}${b.location ? ` · ${esc(b.location)}` : ''}</div>
         <div class="s">${esc(b.material ?? b.item)} · ${esc(methodName(b.route, b.gri))}</div>${b.hazardous ? '<div class="h">HAZARDOUS</div>' : ''}<div class="c">${b.code}</div>
-        <div class="t">Scan with the phone camera · sign in to Ekotrace</div></div>`).join('')}</div></body></html>`);
+        <div class="t">Scan with the phone camera · sign in to ${BRAND.name}</div></div>`).join('')}</div></body></html>`);
     if (!ok) toast('Allow pop-ups to print the labels');
   };
 
@@ -255,13 +256,13 @@ function Contractors({ ym, canManage }: { ym: { y: number; m: number }; canManag
               {!c.revoked && <> <button className="btn xs ghost" onClick={() => void run(() => api.revokeContractor(c.id))}>Remove access</button></>}</>}</td></tr>)}</tbody></table></div>)}
     </section>
     <section className="card tacard">
-      <div className="row"><h2>Monthly statements · {MN[ym.m - 1]} {ym.y}</h2><span className="grow" /><span className="muted small">The contractor's tonnes against Ekotrace's (weighbridge weights of collections, else the scans) · gaps over ±{st?.tolerancePct ?? 10}% flagged</span></div>
+      <div className="row"><h2>Monthly statements · {MN[ym.m - 1]} {ym.y}</h2><span className="grow" /><span className="muted small">The contractor's tonnes against {BRAND.name}'s (weighbridge weights of collections, else the scans) · gaps over ±{st?.tolerancePct ?? 10}% flagged</span></div>
       {!st ? <div className="muted">Loading…</div> : !st.contractors.length ? <div className="muted">No contractor has bins or a statement for this month.</div> : st.contractors.map((r) => (
         <div key={r.contractorId} className="stmt">
           <div className="row" style={{ gap: 10 }}><b>{r.contractor}</b>
             {r.statement ? <span className={`chip ${r.statement.status === 'accepted' ? '' : r.statement.status === 'queried' ? 'bad' : 'info'}`}>{r.statement.status === 'accepted' ? `Accepted · ${r.statement.reviewedBy ?? ''}` : r.statement.status === 'queried' ? 'Queried' : 'Submitted'}</span> : <span className="chip grey">No statement yet</span>}
             {r.flagged && <span className="chip warn">Gap over ±{st.tolerancePct}%</span>}
-            <span className="muted small">Ekotrace {num(Math.round(r.ours * 100) / 100)} t{r.theirs != null ? ` · contractor ${num(Math.round(r.theirs * 100) / 100)} t` : ''}{r.gapPct != null ? ` · ${r.gapPct >= 0 ? '+' : ''}${r.gapPct.toFixed(1)}%` : ''}</span>
+            <span className="muted small">{BRAND.name} {num(Math.round(r.ours * 100) / 100)} t{r.theirs != null ? ` · contractor ${num(Math.round(r.theirs * 100) / 100)} t` : ''}{r.gapPct != null ? ` · ${r.gapPct >= 0 ? '+' : ''}${r.gapPct.toFixed(1)}%` : ''}</span>
             <span className="grow" />
             {r.statement?.documentId && <a className="btn xs ghost" href={api.docUrl(r.statement.documentId)} target="_blank" rel="noreferrer">Statement file</a>}
             {canManage && r.statement && r.statement.status !== 'accepted' && <><button className="btn xs p" onClick={() => void run(() => api.reviewStatement(r.statement!.id, { status: 'accepted' }))}>Accept</button>
@@ -271,7 +272,7 @@ function Contractors({ ym, canManage }: { ym: { y: number; m: number }; canManag
             <button className="btn sm danger" disabled={!q.note.trim()} onClick={() => void run(async () => { await api.reviewStatement(q.id, { status: 'queried', note: q.note.trim() }); setQ(null); })}>Send query</button><button className="btn sm ghost" onClick={() => setQ(null)}>Cancel</button></div>}
           {r.statement?.note && <div className="muted small">Contractor's note: {r.statement.note}</div>}
           {r.statement?.reviewNote && <div className="small" style={{ color: 'var(--bad)' }}>Query: {r.statement.reviewNote}</div>}
-          <table className="t dt" style={{ marginTop: 6 }}><thead><tr><th>Site</th><th>Material · method</th><th className="num">Ekotrace t</th><th className="num">Contractor t</th><th className="num">Gap</th></tr></thead>
+          <table className="t dt" style={{ marginTop: 6 }}><thead><tr><th>Site</th><th>Material · method</th><th className="num">{BRAND.name} t</th><th className="num">Contractor t</th><th className="num">Gap</th></tr></thead>
             <tbody>{r.lines.map((l, i) => <tr key={i}><td className="small">{l.facility}</td><td className="small">{l.item}</td><td className="num">{num(Math.round(l.ours * 1000) / 1000)}</td>
               <td className="num">{l.theirs == null ? '—' : num(l.theirs)}</td><td className="num" style={{ color: l.gapPct != null && Math.abs(l.gapPct) > st.tolerancePct ? 'var(--warn)' : undefined }}>{l.gapPct == null ? '' : `${l.gapPct >= 0 ? '+' : ''}${l.gapPct.toFixed(1)}%`}</td></tr>)}</tbody></table>
         </div>))}

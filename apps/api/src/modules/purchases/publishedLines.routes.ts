@@ -14,6 +14,7 @@ import { tenantTx, type Tx } from '../../db/pool.js';
 import { requireTenant } from '../../lib/auth.js';
 import { scopeOf } from '../../lib/access.js';
 import { requireFeature } from '../../lib/plans.js';
+import { PRODUCT } from '../../lib/brand.js';
 
 const filters = z.object({
   batch: z.string().uuid().optional(), activity: z.string().uuid().optional(), facility: z.string().uuid().optional(), supplier: z.string().uuid().optional(),
@@ -95,7 +96,7 @@ export async function publishedLineRoutes(app: FastifyInstance) {
       ['kg CO2e', 'co2e', 12], ['Currency per USD', 'fx', 10], ['Price index ratio', 'cpi', 10], ['File', 'file', 24], ['Row in file', 'row_no', 8], ['Entry id', 'activity_id', 36],
     ];
     const val = (r: Record<string, unknown>, k: string) => (k === 'estimate' ? (r[k] ? 'yes' : '') : r[k] ?? '');
-    const name = `Ekotrace published purchases ${new Date().toISOString().slice(0, 10)}`;
+    const name = `${PRODUCT} published purchases ${new Date().toISOString().slice(0, 10)}`;
     if (q.format === 'csv') {
       const esc = (v: unknown) => { const s = String(v ?? ''); return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
       const body = '﻿' + [head.map((h) => esc(h[0])).join(','), ...rows.map((r) => head.map((h) => esc(val(r, h[1]))).join(','))].join('\r\n');

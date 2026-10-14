@@ -28,6 +28,7 @@ import { WaterEntry } from './WaterEntry';
 import { TripEntry, type TripKind } from './TripEntry';
 import { MonthGrid } from '../components/MonthGrid';
 import { EntryContext } from '../components/EntryContext';
+import { BRAND, productSlug } from '../lib/brand';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const lastDay = (y: number, m: number) => new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
@@ -85,7 +86,7 @@ const WAYS: Record<Way, [string, string, string]> = {
   fleet: ['Whole fleet', 'grid', 'Every vehicle of the facility as a row: type the distance or fuel of each.'],
   paste: ['Paste a table', 'paste', 'Paste rows from a spreadsheet in everyday words, e.g. “car petrol | 2 | 34 km”.'],
   upload: ['Excel / CSV', 'download', 'Download a template for this facility and these months, fill it in, then upload it here.'],
-  auto: ['Automatic feed', 'feed', 'Connected systems post data straight into Ekotrace.'],
+  auto: ['Automatic feed', 'feed', `Connected systems post data straight into ${BRAND.name}.`],
   flights: ['Flights', 'plane', 'One row per trip: airports or flight type, class, return and how many trips.'],
   hotels: ['Hotel stays', 'building', 'Room stays (rooms × nights) or meetings and events (m² × hours), one row each.'],
   ground: ['Other transport', 'bus', 'Trains, buses, taxis, hire cars and ferries: one-way km, return, trips.'],

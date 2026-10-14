@@ -8,6 +8,8 @@ import { Link, useParams } from 'react-router-dom';
 import { useApp } from '../App';
 import { api, ApiError, num, type Bin, type Scan } from '../lib/api';
 import { methodName } from '../lib/waste';
+import { BrandMark } from '../components/BrandMark';
+import { BRAND } from '../lib/brand';
 
 type Kind = Scan['kind'];
 type Queued = { binId: string; body: Parameters<typeof api.addScan>[1] & { at: string } };
@@ -60,7 +62,7 @@ export function ScanPage() {
 
   return (
     <div className="scanpage">
-      <header><div className="mark">e</div><b>ekotrace</b><span className="grow" /><span className="muted small">{me.user.name}</span></header>
+      <header><BrandMark /><b>{BRAND.name}</b><span className="grow" /><span className="muted small">{me.user.name}</span></header>
       {queued > 0 && <div className="note warn">{queued} scan{queued === 1 ? '' : 's'} waiting for a connection — sent automatically when online.</div>}
       {err && !d ? <div className="card"><h2>Cannot open this label</h2><p className="muted">{err}</p><Link className="btn" to="/qr">QR & field app</Link></div>
         : !d || !b ? <div className="card empty">Loading…</div> : <>

@@ -6,12 +6,13 @@ import { useEffect, useState } from 'react';
 import { api } from '../lib/api';
 import { useApp } from '../App';
 import { qrSvg } from '../pages/FieldApp';
+import { BRAND, productSlug } from '../lib/brand';
 
 function Codes({ codes, onDone, label = 'Done' }: { codes: string[]; onDone: () => void; label?: string }) {
   const [saved, setSaved] = useState(false);
   const save = () => {
-    const blob = new Blob([`Ekotrace recovery codes — each works once\r\n\r\n${codes.join('\r\n')}\r\n`], { type: 'text/plain' });
-    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'ekotrace-recovery-codes.txt'; a.click(); setSaved(true);
+    const blob = new Blob([`${BRAND.name} recovery codes — each works once\r\n\r\n${codes.join('\r\n')}\r\n`], { type: 'text/plain' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `${productSlug()}-recovery-codes.txt`; a.click(); setSaved(true);
   };
   return (
     <div className="mfastep">
@@ -38,7 +39,7 @@ export function MfaSetup({ forced, onDone }: { forced?: boolean; onDone: () => v
     <div className={`card ${forced ? 'loginbox mfabox' : 'mfabox'}`}>
       <h1 style={forced ? undefined : { fontSize: 20 }}>Set up multi-factor authentication</h1>
       {forced && <p className="sub">Your company requires a second step when you sign in: a code from an app on your phone. It takes a minute.</p>}
-      {codes ? <Codes codes={codes} onDone={onDone} label={forced ? 'Continue to Ekotrace' : 'Done'} /> : <>
+      {codes ? <Codes codes={codes} onDone={onDone} label={forced ? `Continue to ${BRAND.name}` : 'Done'} /> : <>
         <ol className="mfasteps">
           <li><b>Install an authenticator app</b> on your phone if you have none: Microsoft Authenticator, Google Authenticator, or your password manager.</li>
           <li><b>Scan this QR code</b> with the app (Add account → scan a QR code).
@@ -46,7 +47,7 @@ export function MfaSetup({ forced, onDone }: { forced?: boolean; onDone: () => v
               <div className="sub small">Can't scan? <button type="button" className="linkbtn" onClick={() => setShow(!show)}><u>Type the key instead</u></button>
                 {show && <div className="mono mfakey">{s.secret.replace(/(.{4})/g, '$1 ').trim()}</div>}</div></div>}
           </li>
-          <li><b>Type the 6-digit code</b> the app shows for Ekotrace:
+          <li><b>Type the 6-digit code</b> the app shows for {BRAND.name}:
             <div className="row" style={{ gap: 8, marginTop: 6 }}>
               <input className="input mfacode" inputMode="numeric" autoComplete="one-time-code" maxLength={7} placeholder="123 456" value={code} onChange={(e) => setCode(e.target.value)} aria-label="6-digit code" />
               <button type="button" className="btn p" disabled={code.replace(/\s/g, '').length !== 6} onClick={async () => { setErr(null); try { setCodes((await api.mfaEnable(code.replace(/\s/g, ''))).recoveryCodes); } catch (e) { setErr((e as Error).message); } }}>Confirm</button>

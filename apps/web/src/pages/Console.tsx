@@ -9,6 +9,7 @@ import { useApp } from '../App';
 import { api, setTenant, type Company, type DestructionCertificate, type PlanLimits } from '../lib/api';
 import { AlertList, PlatformAudit } from './AuditLog';
 import { Icon } from '../components/Icon';
+import { BRAND, productSlug } from '../lib/brand';
 
 const lim = (n: number | null) => (n == null ? 'unlimited' : String(n));
 export const planLine = (p: PlanLimits) => `${lim(p.facilities)} facilities · ${lim(p.users)} people · Eko AI ${p.ai ? 'on' : 'off'} · export ${p.export ? 'on' : 'off'} · dashboard groups ${p.groups ? 'on' : 'off'}`;
@@ -220,11 +221,11 @@ function certificateHtml(c: DestructionCertificate) {
   const rows = Object.entries(c.rows_deleted).sort((a, b) => b[1] - a[1]);
   const total = rows.reduce((a, [, n]) => a + n, 0);
   return `<!doctype html><html><head><meta charset="utf-8"><title>Certificate of destruction — ${esc(c.company)}</title><style>body{font:14px/1.5 system-ui,sans-serif;max-width:760px;margin:40px auto;color:#10201C}h1{font-size:24px;margin:0 0 4px}table{border-collapse:collapse;width:100%;margin:10px 0}td,th{border-bottom:1px solid #DDE5E0;padding:5px 8px;text-align:left}td.n{text-align:right}.k td:first-child{color:#5B6B66;width:34%}.box{border:1px solid #C9D9D2;border-radius:10px;padding:16px 18px;margin:16px 0}small{color:#5B6B66}</style></head><body>
-<small>Ekotrace · Ekobon</small><h1>Certificate of secure data destruction</h1><small>Certificate ${esc(c.id)}</small>
+<small>${BRAND.name}</small><h1>Certificate of secure data destruction</h1><small>Certificate ${esc(c.id)}</small>
 <div class="box"><table class="k"><tr><td>Company</td><td><b>${esc(c.company)}</b> (${esc(c.country)})</td></tr><tr><td>Company id</td><td>${esc(c.tenant_id)}</td></tr>
 <tr><td>Deleted on</td><td>${esc(new Date(c.performed_at).toUTCString())}</td></tr><tr><td>Performed by</td><td>${esc(c.requested_by)}</td></tr><tr><td>Reason</td><td>${esc(c.reason)}</td></tr>
 <tr><td>Export handed over</td><td>${c.export_sha256 ? `manifest SHA-256 <code>${esc(c.export_sha256)}</code>` : 'not recorded'}</td></tr></table></div>
-<p>All records and files held for the company in the Ekotrace production database were permanently deleted in one transaction: <b>${total.toLocaleString('en')} records</b> in ${rows.length} tables and <b>${c.files_deleted.toLocaleString('en')} stored files</b>. The deletion was verified: no record of the company remains in those tables.</p>
+<p>All records and files held for the company in the ${BRAND.name} production database were permanently deleted in one transaction: <b>${total.toLocaleString('en')} records</b> in ${rows.length} tables and <b>${c.files_deleted.toLocaleString('en')} stored files</b>. The deletion was verified: no record of the company remains in those tables.</p>
 <p><b>Backups:</b> encrypted backups taken before this date still hold copies; they expire and are destroyed by <b>${esc(c.backups_until)}</b> under the backup retention schedule, and are not restored except for disaster recovery of the whole service.</p>
 <p><b>Audit trail:</b> the company's security audit records (who signed in or changed what, when, from where) are append-only and are kept until <b>${esc(c.audit_until)}</b>, then removed automatically.</p>
 <table><thead><tr><th>Table</th><th class="n">Records deleted</th></tr></thead><tbody>${rows.map(([t, n]) => `<tr><td>${esc(t)}</td><td class="n">${n.toLocaleString('en')}</td></tr>`).join('')}</tbody></table>
