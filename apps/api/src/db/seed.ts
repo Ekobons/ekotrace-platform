@@ -13,6 +13,8 @@
  *  4. IPCC 2006 defaults for coal types DESNZ does not cover.
  *  5. US EPA supply chain factors in data/epa/ (purchased goods & services), when the file is there,
  *     then the products of the previous Ekotrace list (data/ekotrace-old/products.csv) on top.
+ *  6. Grid electricity factors of other countries from data/grid/grid-factors.csv (US EPA eGRID,
+ *     EU EEA, Australia NGA, India CEA, Singapore EMA, China MEE, Japan): regions and factors per year.
  */
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
@@ -138,6 +140,68 @@ export async function seedIpccCoals(c: Tx) {
   return IPCC_COALS.length;
 }
 
+const GRID_PUBLISHER: Record<string, string> = {
+  'EPA-eGRID2023': 'US Environmental Protection Agency', 'EEA-GHGI-ELEC-2022': 'European Environment Agency',
+  'AU-NGA-2025': 'Australian Government DCCEEW', 'IN-CEA-V20': 'Central Electricity Authority (India)',
+  'SG-EMA-GEF': 'Energy Market Authority (Singapore)', 'CN-MEE-2023': 'Ministry of Ecology and Environment (China)',
+  'JP-MOE-METI-2024': 'Ministry of the Environment / METI (Japan)',
+};
+const GRID_BASIS: Record<string, string> = { location: 'scope2', residual: 'scope2_market', td_loss: 'td_loss', wtt: 'wtt' };
+export const GRID_FILE = join(DATA, 'grid', 'grid-factors.csv');
+
+/** Source codes in the grid file (to see whether the database has them). */
+export function gridSourceCodes(): string[] {
+  if (!existsSync(GRID_FILE)) return [];
+  return [...new Set(csvObjects(readFileSync(GRID_FILE, 'utf8')).map((r) => r.source_code!))];
+}
+
+/**
+ * Grid factors of other countries. Safe to run again: a factor with the same value is kept,
+ * a changed one is superseded (kept as history), regions are added or renamed.
+ */
+export async function seedGrid(c: Tx) {
+  if (!existsSync(GRID_FILE)) return { regions: 0, added: 0, superseded: 0, kept: 0 };
+  const rows = csvObjects(readFileSync(GRID_FILE, 'utf8'));
+  const item = (await c.query(`SELECT id FROM item WHERE code = 'grid:electricity'`)).rows[0]?.id;
+  if (!item) throw new Error('item grid:electricity missing — run the migrations first');
+  const regions = new Map<string, Record<string, string>>();
+  for (const r of rows) if (!regions.has(r.region!)) regions.set(r.region!, r);
+  for (const [code, r] of regions) {
+    await c.query(
+      `INSERT INTO grid_region (code, country, name, kind, note) VALUES ($1,$2,$3,$4,$5)
+       ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name, kind = EXCLUDED.kind, note = COALESCE(grid_region.note, EXCLUDED.note)`,
+      [code, r.country, r.name, r.kind, `Factors from ${r.source_code!.replace(/-/g, ' ')}`]);
+  }
+  const sources = new Map<string, number>();
+  for (const r of rows) {
+    if (sources.has(r.source_code!)) continue;
+    const id = (await c.query(
+      `INSERT INTO factor_source (code, publisher, title, year, url) VALUES ($1,$2,$3,$4,$5)
+       ON CONFLICT (code) DO UPDATE SET publisher = EXCLUDED.publisher, title = EXCLUDED.title, url = EXCLUDED.url RETURNING id`,
+      [r.source_code, GRID_PUBLISHER[r.source_code!] ?? r.source_code!.split('-')[0], r.source_title, Number(r.year), r.url])).rows[0].id;
+    sources.set(r.source_code!, id);
+  }
+  let added = 0, superseded = 0, kept = 0;
+  for (const r of rows) {
+    const basis = GRID_BASIS[r.basis!];
+    if (!basis) throw new Error(`grid-factors.csv: unknown basis ${r.basis}`);
+    const co2e = Number(r.kg_co2e_per_kwh);
+    if (!Number.isFinite(co2e) || co2e < 0) throw new Error(`grid-factors.csv: bad factor for ${r.region} ${r.year}`);
+    const vf = `${r.year}-01-01`;
+    const old = (await c.query(`SELECT id, co2e, version FROM factor WHERE item_id=$1 AND region=$2 AND basis=$3 AND unit='kWh_e' AND valid_from=$4 AND status='active'`,
+      [item, r.region, basis, vf])).rows[0];
+    if (old && Math.abs(Number(old.co2e) - co2e) < 1e-9) { kept++; continue; }
+    if (old) { await c.query(`UPDATE factor SET status = 'superseded' WHERE id = $1`, [old.id]); superseded++; }
+    await c.query(
+      `INSERT INTO factor (item_id, source_id, region, basis, unit, co2e, valid_from, valid_to, version, supersedes_id, note, created_by)
+       VALUES ($1,$2,$3,$4,'kWh_e',$5,$6,$7,$8,$9,$10,'seed')`,
+      [item, sources.get(r.source_code!), r.region, basis, co2e, vf, `${r.year}-12-31`, old ? old.version + 1 : 1, old?.id ?? null, r.note || null]);
+    added++;
+  }
+  if (added) await c.query(`SELECT pg_notify('refdata_changed', 'grid')`);
+  return { regions: regions.size, added, superseded, kept };
+}
+
 export async function seed(log = console.log) {
   await platformTx(async (c) => {
     log(`[seed] gases: ${await seedGases(c)}`);
@@ -166,6 +230,8 @@ export async function seed(log = console.log) {
     const r = await platformTx((c) => importOldProducts(c, products, { createdBy: 'seed' }));
     log(`[seed] previous Ekotrace products: ${r.created} new, ${r.updated} updated${r.notFound.length ? `, ${r.notFound.length} without an EPA code` : ''}`);
   }
+  const g = await platformTx((c) => seedGrid(c));
+  log(`[seed] grid factors: ${g.regions} regions, ${g.added} added${g.superseded ? ` (${g.superseded} replaced)` : ''}, ${g.kept} unchanged`);
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {

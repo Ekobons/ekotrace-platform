@@ -3,15 +3,16 @@
  * `npm run app` is enough:
  *   1. runs the migrations that have not run yet;
  *   2. loads the factor files (DESNZ 2022–2026, EPA, IPCC) when the database does not have them
- *      yet, or has them from an older version of the importer (e.g. before business travel was added).
+ *      yet, or has them from an older version of the importer (e.g. before business travel was added);
+ *   3. loads the grid factors of other countries (data/grid) when a source in that file is missing.
  * Quick when nothing is missing (one query). Switch off with AUTO_SETUP=false.
  */
 import { readdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { pool } from './pool.js';
+import { pool, platformTx } from './pool.js';
 import { migrate } from './migrate.js';
-import { seed } from './seed.js';
+import { seed, seedGrid, gridSourceCodes } from './seed.js';
 import { IMPORTER_VERSION } from '../import/desnzWrite.js';
 
 const DEFRA = join(dirname(fileURLToPath(import.meta.url)), '../../../../data/defra');
@@ -44,5 +45,11 @@ export async function autoSetup(log: (m: string) => void) {
     log(`[setup] loading factors (${behind.join(', ')} missing or from an older importer) — about a minute the first time`);
     await seed(log);
     log('[setup] factors loaded');
+  }
+  const codes = gridSourceCodes();
+  const have = new Set((await pool.query<{ code: string }>(`SELECT code FROM factor_source WHERE code = ANY($1)`, [codes])).rows.map((r) => r.code));
+  if (codes.some((c) => !have.has(c))) {
+    const g = await platformTx((c) => seedGrid(c));
+    log(`[setup] grid factors of other countries loaded: ${g.regions} regions, ${g.added} factors`);
   }
 }

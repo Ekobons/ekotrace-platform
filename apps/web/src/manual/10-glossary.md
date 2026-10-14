@@ -12,6 +12,9 @@
 | I-REC, REC, GO | energy attribute certificates: proof of 1 MWh from a named source |
 | Well-to-tank (WTT) | upstream emissions of producing and delivering a fuel or energy (Scope 3.3) |
 | T&D losses | electricity or heat lost in the grid on the way (Scope 3.3) |
+| Grid region | the grid a facility draws from: a country average, a state or province, or a grid sub-region (e.g. eGRID CAMX in California); its factor gives location-based Scope 2 |
+| eGRID | US EPA database of emission rates for the US grid and its 27 sub-regions |
+| NGA Factors | Australian Government National Greenhouse Accounts Factors, published each year |
 | Biogenic CO₂ | CO₂ from burning biomass or organic waste; reported outside the scopes |
 | Calorific value (net / gross) | energy content of a fuel, without / with the heat of the water vapour |
 | Coverage | share of a month covered by meter readings or bills |

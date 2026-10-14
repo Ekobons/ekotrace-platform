@@ -6,9 +6,23 @@
 |---|---|---|
 | Fuels, vehicles, refrigerants, UK electricity and heat, waste sent to others | UK DESNZ greenhouse gas conversion factors (2022 onwards) | each June, by Ekobon (preview before loading) |
 | Waste treated at own sites | IPCC 2006 Guidelines Vol. 5 and 2019 Refinement | defaults in the tool; replaceable per site |
-| National and sub-national grids outside the UK, residual mixes, T&D losses | entered by the platform admin with their source (utility, national inventory) | as published |
+| Grid electricity — United States (national + 27 eGRID sub-regions, with T&D losses) | US EPA eGRID2023 | when EPA publishes a new eGRID |
+| Grid electricity — 27 EU countries | European Environment Agency, CO₂-equivalent intensity of electricity generation (2022) | when EEA publishes a new year |
+| Grid electricity — Australia (national, states and WA grids, with upstream Scope 3) | National Greenhouse Accounts Factors 2025 (DCCEEW) | each August |
+| Grid electricity — India, Singapore, China (incl. residual mix), Japan | CEA CO₂ Baseline Database v20; EMA grid emission factor; MEE national average 2023; Japan national average (MOE / METI) | as published |
+| Other grids (e.g. Gulf countries, Canadian provinces), residual mixes, T&D losses | entered by the platform admin with their source (utility, national inventory) | as published |
 | Supplier factors, certificates | the company or the platform admin, with their source | per contract / period |
 | GWP values | IPCC AR4, AR5, AR6 | fixed per set |
+
+### Grid factors of other countries
+
+These come with Ekotrace in one file (`data/grid/grid-factors.csv`) and load by themselves when the server starts. Each factor keeps its source, year and a note (for example the eGRID value in lb/MWh it was converted from). Open **Factor library → Grid regions** to see them.
+
+- **Pick the right region for a facility.** In the United States choose the eGRID sub-region (e.g. *WECC California*), not the state; in Australia the state or WA grid. Without a region the country average is used.
+- **Years.** eGRID 2023 and EEA 2022 are the latest published. An entry for a later year uses the latest factor and shows a warning; when a newer year is loaded, recalculate.
+- **EEA values are generation intensities** (electricity produced in the country, imports not included). That is the common choice for EU location-based reporting; a national inventory value may replace it.
+- **To check before a client report:** Australia's values were taken from secondary summaries of the NGA 2025 workbook, and India's from the CEA figure as reported; compare them with the official publication.
+- **Market-based** uses the residual mix where one is loaded (China) and otherwise the grid average, which the report discloses.
 
 ## Which factor is used
 

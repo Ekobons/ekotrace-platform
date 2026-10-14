@@ -2,6 +2,23 @@
 
 Newest first.
 
+## 2026-10-14 · Grid electricity factors for other countries (US eGRID, EU EEA, Australia NGA, India, Singapore, China, Japan)
+
+- **106 factors in 68 grid regions** now come with Ekotrace in `data/grid/grid-factors.csv`. They load by themselves when the server starts, and loading again changes nothing.
+  - **United States:** EPA eGRID2023, for the national average and the 27 eGRID sub-regions, with T&D losses (Scope 3.3) from each region's loss %. Converted from lb CO₂e/MWh.
+  - **European Union:** EEA, the CO₂e intensity of electricity generation in 2022, for 27 countries.
+  - **Australia:** NGA Factors 2025, for the national figure, 6 states, NT and the two WA grids, with upstream Scope 3. To check against the DCCEEW workbook.
+  - **India:** CEA CO₂ Baseline Database v20, 0.727 (FY 2023-24). To check against the CEA publication.
+  - **Singapore:** EMA grid emission factor for 2023 and 2024.
+  - **China:** MEE 2023 national average, plus the residual mix for market-based reporting.
+  - **Japan:** the national average.
+- Each factor keeps its source, publisher, link and a note. They show in **Factor library → Grid regions**.
+- A facility picks its region (e.g. eGRID CAMX, Queensland) or falls back to its country.
+- For a later year, the latest factor is used, with a warning.
+- **Not included yet:** Canada, and the Gulf countries (no public official factor). The platform admin enters these.
+- Manual: Factors & methodology (sources table, a new section on grid factors) and the glossary (grid region, eGRID, NGA).
+- Test added; 63 API tests pass.
+
 ## 2026-10-14 · Audit & assurance; global report formats (ISO 14064-1 designed report, ESRS E1, IFRS S2, CDP, GRI 305, SECR, SB 253); company logo; global defaults
 
 - **Audit & assurance** (menu → Disclose), for ISO 14064-3, ISAE 3410 / 3000, ISSA 5000 or AA1000AS, at limited or reasonable assurance:

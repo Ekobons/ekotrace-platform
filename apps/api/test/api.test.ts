@@ -1934,3 +1934,32 @@ test('audit & assurance: engagement, period lock enforced by the database (no en
   assert.equal(de.currency, 'EUR'); assert.equal(de.timezone, 'Europe/Berlin');
   void id;
 });
+
+// ------------------------------------------------------- global grid factors --
+test('grid factors of other countries: eGRID sub-region, EU country with year fallback, Australian state with upstream; loading again changes nothing', async () => {
+  const grid = await itemId('grid:electricity');
+  const groupA = (await api('GET', '/api/org', undefined, tenantA)).body.nodes.find((n: { kind: string }) => n.kind === 'group').id;
+  const fac = async (name: string, country: string, gridRegion?: string) =>
+    (await api('POST', '/api/org/nodes', { parentId: groupA, kind: 'facility', name, country, gridRegion }, tenantA)).body.id;
+  const calc = (facilityId: string, ps: string, pe: string) =>
+    api('POST', '/api/calculate', { facilityId, itemId: grid, unit: 'MWh_e', quantity: 10, periodStart: ps, periodEnd: pe }, tenantA);
+  // California (eGRID CAMX 2023): location 0.195045, T&D 0.007997 kg/kWh
+  const ca = await calc(await fac('San Jose lab', 'US', 'US-CAMX'), '2023-06-01', '2023-06-30');
+  assert.equal(ca.status, 200, JSON.stringify(ca.body));
+  assert.ok(Math.abs(ca.body.totals.scope2 - 1950.45) < 1e-6, JSON.stringify(ca.body.totals));
+  assert.ok(Math.abs(ca.body.totals.td_loss - 79.97) < 1e-6);
+  // Germany: EEA 2022 is the latest; a 2025 entry uses it and says so
+  const de = await calc(await fac('Munich office', 'DE'), '2025-03-01', '2025-03-31');
+  assert.ok(Math.abs(de.body.totals.scope2 - 3660) < 1e-6, JSON.stringify(de.body.totals));
+  assert.ok(de.body.warnings.some((w: string) => /2022/.test(w)), JSON.stringify(de.body.warnings));
+  // Queensland (NGA 2025): Scope 2 0.67, Scope 3 upstream 0.09
+  const qld = await calc(await fac('Brisbane depot', 'AU', 'AU-QLD'), '2025-08-01', '2025-08-31');
+  assert.ok(Math.abs(qld.body.totals.scope2 - 6700) < 1e-6 && Math.abs(qld.body.totals.wtt - 900) < 1e-6, JSON.stringify(qld.body.totals));
+  // the library lists the regions with their source
+  const regions = (await api('GET', '/api/grid-regions', undefined, tenantA)).body.regions;
+  assert.ok(regions.find((r: { code: string }) => r.code === 'US-CAMX').factors.some((f: { source: string }) => f.source === 'EPA eGRID2023'));
+  const { seedGrid } = await import('../src/db/seed.js');
+  const c = await pool.connect();
+  try { await c.query('BEGIN'); const again = await seedGrid(c as never); await c.query('ROLLBACK'); assert.equal(again.added, 0); }
+  finally { c.release(); }
+});

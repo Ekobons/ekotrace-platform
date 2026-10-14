@@ -42,14 +42,14 @@ export function GridTab() {
     <div style={{ display: 'grid', gap: 16 }}>
       <div className="card" style={{ display: 'grid', gap: 12 }}>
         <div><h2>Grid regions & electricity factors</h2>
-          <p className="sub">Location-based Scope 2 uses the factor of the facility's grid region: a sub-region (emirate, state, grid) when it has a factor, else the country average. Market-based uses certificates and supplier factors first, then the region's residual mix, then the grid average. UK factors come from DESNZ; enter others with their source (e.g. the utility's sustainability report, the national inventory).</p></div>
+          <p className="sub">Location-based Scope 2 uses the factor of the facility's grid region: a sub-region (emirate, state, grid) when it has a factor, else the country average. Market-based uses certificates and supplier factors first, then the region's residual mix, then the grid average. Factors for the UK (DESNZ), United States (EPA eGRID), the EU (EEA), Australia (NGA), India, Singapore, China and Japan come with Ekotrace. Enter others with their source (e.g. the utility's sustainability report, the national inventory).</p></div>
         <div className="row" style={{ gap: 8 }}>
-          <label className="field" style={{ width: 120 }}><span>Country</span>
-            <select className="input" value={country} onChange={(e) => { setCountry(e.target.value); setF({ ...f, region: e.target.value }); }}>{countries.map((c) => <option key={c}>{c}</option>)}</select></label>
+          <label className="field" style={{ width: 280 }}><span>Country</span>
+            <select className="input" value={country} onChange={(e) => { setCountry(e.target.value); setF({ ...f, region: e.target.value }); }}>{countries.map((c) => <option key={c} value={c}>{c} · {regions.find((r) => r.country === c && r.kind === 'country')?.name.replace(/ \(.*\)$/, '') ?? c}</option>)}</select></label>
         </div>
         <div className="scroll" style={{ border: '1px solid var(--line)', borderRadius: 12 }}>
           <table className="t">
-            <thead><tr><th>Region</th><th>Code</th><th>Kind</th>{years.length ? years.map((y) => <th key={y} className="num">{y}</th>) : <th>Factors</th>}</tr></thead>
+            <thead><tr><th>Region</th><th>Code</th><th>Kind</th>{years.length ? years.map((y) => <th key={y} className="num">{y}</th>) : <th>Factors</th>}<th>Source</th></tr></thead>
             <tbody>{shown.map((r) => (
               <tr key={r.code}>
                 <td>{r.name}</td><td className="mono">{r.code}</td><td>{r.kind}</td>
@@ -57,6 +57,7 @@ export function GridTab() {
                   const fs = (r.factors ?? []).filter((x) => x.year === y);
                   return <td key={y} className="num" style={{ fontSize: 12 }}>{fs.map((x) => <div key={x.id} title={`${x.source}${x.note ? ` — ${x.note}` : ''}`}><span className="sub">{({ scope2: 'grid', scope2_market: 'residual', td_loss: 'T&D', wtt: 'upstream' } as Record<string, string>)[x.basis]}</span> {num(Number(x.co2e))}</div>)}</td>;
                 }) : <td className="sub">none yet</td>}
+                <td className="sub" style={{ fontSize: 12 }}>{[...new Set((r.factors ?? []).map((x) => x.source))].join(', ') || '—'}</td>
               </tr>))}</tbody>
           </table>
         </div>
