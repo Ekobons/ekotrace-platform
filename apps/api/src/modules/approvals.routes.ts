@@ -15,6 +15,7 @@ import { z } from 'zod';
 import { tenantTx, type Tx } from '../db/pool.js';
 import { audit, requireRole, requireTenant } from '../lib/auth.js';
 import { scopeOf } from '../lib/access.js';
+import { METRIC_JOIN } from '../lib/collection.js';
 
 export interface ApprovalSettings { l2: boolean; minT: number; cats: string[]; checkPct: number }
 export const APPROVAL_DEFAULT: ApprovalSettings = { l2: false, minT: 100, cats: [], checkPct: 35 };
@@ -47,9 +48,9 @@ export async function approvalsRoutes(app: FastifyInstance) {
                 a.quantity::float8 AS qty, a.unit, (a.co2e_direct + a.co2e_scope2 + a.co2e_scope3)::float8 AS kg, a.created_by, a.submitted_by, a.submitted_at AS at,
                 ue.name AS by, a.approval_stage AS stage, a.l1_by, a.l1_at, u1.name AS l1_name, coalesce(CASE WHEN fo.manager_user_id::text NOT IN (coalesce(a.created_by, ''), coalesce(a.submitted_by, '')) THEN um.name END,
                   (SELECT u.name FROM user_facility uf JOIN app_user u ON u.id = uf.user_id WHERE uf.node_id = a.facility_id AND u.role = 'manager' AND NOT u.disabled
-                      AND u.id::text NOT IN (coalesce(a.created_by, ''), coalesce(a.submitted_by, '')) ORDER BY u.name LIMIT 1)) AS manager, ${USUAL_SQL} AS usual
+                      AND u.id::text NOT IN (coalesce(a.created_by, ''), coalesce(a.submitted_by, '')) ORDER BY u.name LIMIT 1)) AS manager, ${USUAL_SQL} AS usual, mt.check_pct, mt.metric_code
            FROM activity a JOIN category cat ON cat.id = a.category_id JOIN item i ON i.id = a.item_id JOIN org_node fo ON fo.id = a.facility_id
-           LEFT JOIN app_user ue ON ue.id::text = coalesce(a.submitted_by, a.created_by) LEFT JOIN app_user u1 ON u1.id::text = a.l1_by LEFT JOIN app_user um ON um.id = fo.manager_user_id
+           LEFT JOIN app_user ue ON ue.id::text = coalesce(a.submitted_by, a.created_by) LEFT JOIN app_user u1 ON u1.id::text = a.l1_by LEFT JOIN app_user um ON um.id = fo.manager_user_id ${METRIC_JOIN}
           WHERE a.facility_id = ANY($1) AND a.status = 'submitted' ORDER BY a.submitted_at NULLS LAST, fo.name LIMIT 2000`, [[...s.see]])).rows;
       const out = rows.map((r) => {
         const mine = r.created_by === me || r.submitted_by === me;
@@ -58,7 +59,7 @@ export async function approvalsRoutes(app: FastifyInstance) {
         const waitingFor = l2 ? 'an admin or the super admin (level 2)' : r.manager ?? 'an admin or the super admin';
         return {
           id: r.id, f: r.f, facility: r.facility, month: r.month, cat: r.cat, category: r.category, item: r.item, note: r.note, dataType: r.data_type, qty: r.qty, unit: r.unit, kg: r.kg,
-          by: r.by, at: r.at, stage: r.stage, l1: r.l1_name, mine, canApprove: can, waitingFor, check: checkOf(r.qty, r.usual, set.checkPct),
+          by: r.by, at: r.at, stage: r.stage, l1: r.l1_name, mine, canApprove: can, waitingFor, check: checkOf(r.qty, r.usual, r.check_pct ?? set.checkPct), metric: r.metric_code,
           willNeedL2: !l2 && needsL2(set, r.kg, r.cat),
         };
       });

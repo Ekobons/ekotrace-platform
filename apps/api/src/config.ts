@@ -80,6 +80,15 @@ export const config = {
     only: process.env.PLATFORM_SSO_ONLY === 'true',
     breakGlass: (process.env.PLATFORM_BREAKGLASS ?? '').split(',').map((d) => d.trim().toLowerCase()).filter(Boolean),
   } as { issuer: string; clientId: string; clientSecret: string | null; domains: string[]; only: boolean; breakGlass: string[] } | null : null,
+  /**
+   * E-mail (reminders, escalations, sent-back entries). Without SMTP_URL nothing is sent: messages are
+   * kept as "held" and people still see them in Inbox & to-dos.
+   *   SMTP_URL   smtps://user:password@mail.example.com:465 or smtp://user:password@host:587 (STARTTLS is required
+   *              except on this computer); keep it in the secret store
+   *   MAIL_FROM  "Ekotrace <no-reply@example.com>"
+   */
+  smtpUrl: process.env.SMTP_URL ?? null,
+  mailFrom: process.env.MAIL_FROM ?? 'Ekotrace <no-reply@ekotrace.local>',
   /** the address people open Ekotrace at (SSO sends people back here), e.g. https://ekotrace.example.com */
   publicUrl: (process.env.PUBLIC_URL ?? '').replace(/\/$/, '') || null,
 };

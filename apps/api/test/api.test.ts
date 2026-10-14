@@ -1720,7 +1720,7 @@ test('reports: entries behind the report with their GHG Protocol category, quali
   assert.ok(l.body.lines.some((x: { cat: string; code: string }) => x.cat === 'stationary_combustion' && x.code === '1.1'));
   const qd = await call(sa, 'GET', '/api/reports/quality?year=2024');
   assert.equal(qd.status, 200, JSON.stringify(qd.body));
-  assert.deepEqual(qd.body.checks.map((c: { id: string }) => c.id), ['missing', 'odd', 'noev', 'spend', 'dup', 'est', 'old']);
+  assert.deepEqual(qd.body.checks.map((c: { id: string }) => c.id), ['missing', 'odd', 'noev', 'reqev', 'spend', 'dup', 'est', 'old']);
   assert.equal((await call(mgr, 'PUT', '/api/reports/quality/odd', { year: 2024, text: 'x' })).status, 403);
   assert.equal((await call(sa, 'PUT', '/api/reports/quality/odd', { year: 2024, text: 'Plant shutdown in April' })).status, 200);
   assert.equal((await call(sa, 'GET', '/api/reports/quality?year=2024')).body.checks.find((c: { id: string }) => c.id === 'odd').justified.text, 'Plant shutdown in April');
@@ -2463,4 +2463,127 @@ test('platform admins sign in with Ekobon\'s identity provider; password refused
     assert.equal((await app.inject({ method: 'POST', url: '/api/auth/login', payload: { email: 'glass@ekobon.test', password: 'correct horse battery' } })).json().mfa, true);
     void g;
   } finally { (config as { platformSso: unknown }).platformSso = saved; await idp.close(); }
+});
+
+test('metric registry (standard metrics, admin proposes → super admin approves, versions), collection calendar (required, applicability, evidence rule, exceptions), reminders and escalation (once each), inbox, sent-back notice; companies kept apart', async () => {
+  const co = await api('POST', '/api/platform/companies', { name: 'Cycle Co', country: 'AE', superAdmin: { name: 'Cy Super', email: 'super@cycle.test' } });
+  const T = co.body.company.id as string;
+  const sa = await login('super@cycle.test', co.body.superAdmin.temporaryPassword);
+  await call(sa, 'POST', '/api/auth/password', { current: co.body.superAdmin.temporaryPassword, next: 'a long enough pass' });
+  const group = (await call(sa, 'GET', '/api/org')).body.nodes.find((n: { kind: string }) => n.kind === 'group').id;
+  const plant = (await call(sa, 'POST', '/api/org/nodes', { parentId: group, kind: 'facility', name: 'Cycle plant', facilityType: 'Plant' })).body.id as string;
+  const office = (await call(sa, 'POST', '/api/org/nodes', { parentId: group, kind: 'facility', name: 'Cycle office', facilityType: 'Office' })).body.id as string;
+  const mk = async (email: string, role: string, extra: object = {}) => {
+    const r = await call(sa, 'POST', '/api/users', { name: email, email, role, ...extra });
+    assert.equal(r.status, 200, JSON.stringify(r.body));
+    const ck = await login(email, r.body.temporaryPassword);
+    await call(ck, 'POST', '/api/auth/password', { current: r.body.temporaryPassword, next: 'a long enough pass' });
+    return { ck, id: r.body.user?.id ?? r.body.id };
+  };
+  const adm = await mk('cadm@cycle.test', 'admin', { scopeNodeId: group });
+  const mgr = await mk('cmgr@cycle.test', 'manager', { facilityIds: [plant] });
+  const prep = await mk('cprep@cycle.test', 'preparer', { facilityIds: [plant] });
+
+  // the standard registry, one metric per category; everyone reads it, only admins change it
+  const reg = (await call(prep.ck, 'GET', '/api/metrics')).body;
+  assert.ok(reg.metrics.length >= 10, JSON.stringify(reg).slice(0, 300));
+  const fuel = reg.metrics.find((m: { category_code: string }) => m.category_code === 'stationary_combustion');
+  assert.equal(fuel.code, 'EKO-001'); assert.equal(fuel.unit, 'L'); assert.equal(fuel.version, 1);
+  assert.equal(reg.canEdit, false);
+  const body = (o: object) => ({ name: fuel.name, definition: fuel.definition, category_code: fuel.category_code, item_ids: [], unit: 'L', owner_user_id: null, facility_types: ['Plant'],
+    facility_ids: [], required: true, source_system: 'Fuel delivery notes', methods: ['form', 'upload'], frequency: 'monthly', due_day: 5, due_months: 1, check_pct: 20, evidence: 'required', active: true, ...o });
+  assert.equal((await call(prep.ck, 'POST', '/api/metrics', { ...body({}), id: fuel.id, reason: 'try' })).status, 403);
+  // an admin proposes; the super admin approves (never their own); the version history keeps both
+  const prop = await call(adm.ck, 'POST', '/api/metrics', { ...body({}), id: fuel.id, reason: 'Plants must report fuel every month, with delivery notes' });
+  assert.equal(prop.status, 200, JSON.stringify(prop.body)); assert.equal(prop.body.pending, true);
+  assert.equal((await call(adm.ck, 'POST', '/api/metrics', { ...body({ name: 'x2' }), id: fuel.id, reason: 'again' })).status, 409);
+  assert.equal((await call(adm.ck, 'POST', `/api/metrics/changes/${prop.body.changeId}`, { decision: 'approve' })).status, 403);
+  const ch = (await call(sa, 'GET', '/api/metrics')).body.changes.find((x: { id: string }) => x.id === prop.body.changeId);
+  assert.deepEqual(ch.changes.required, [false, true]); assert.deepEqual(ch.changes.evidence, ['optional', 'required']);
+  assert.ok((await call(sa, 'GET', '/api/inbox')).body.notifications.some((n: { kind: string }) => n.kind === 'metric_change'));
+  const ok = await call(sa, 'POST', `/api/metrics/changes/${prop.body.changeId}`, { decision: 'approve' });
+  assert.equal(ok.status, 200, JSON.stringify(ok.body)); assert.equal(ok.body.version, 2);
+  const hist = (await call(prep.ck, 'GET', `/api/metrics/${fuel.id}/history`)).body.versions;
+  assert.equal(hist.length, 2); assert.equal(hist[0].approved_by, 'Cy Super'); assert.equal(hist[0].changed_by, 'cadm@cycle.test'); assert.match(hist[0].reason, /every month/);
+  assert.ok((await call(adm.ck, 'GET', '/api/inbox')).body.notifications.some((n: { kind: string; title: string }) => n.kind === 'metric_decision' && /approved/.test(n.title)));
+  // a new metric gets the next code; unknown items are refused
+  const elec = (await call(sa, 'GET', '/api/metrics')).body.categories.find((c: { code: string }) => c.code === 'purchased_electricity');
+  assert.equal((await call(sa, 'POST', '/api/metrics', { ...body({ name: 'Grid power', category_code: 'purchased_electricity', item_ids: [999999], unit: 'kWh_e' }), reason: 'split' })).status, 400);
+  const nw = await call(sa, 'POST', '/api/metrics', { ...body({ name: 'Grid power', category_code: 'purchased_electricity', item_ids: [elec.items[0].id], unit: 'MWh_e', required: false, evidence: 'optional' }), reason: 'Grid electricity on its own' });
+  assert.equal(nw.status, 200, JSON.stringify(nw.body)); assert.match(nw.body.code, /^EKO-0\d\d$/); assert.equal(nw.body.pending, false);
+
+  // calendar 2025: the plant owes fuel every month (required, Plant only); the office does not
+  const id = await diesel();
+  const e = (m: string, q = 100) => ({ facilityId: plant, itemId: id, quantity: q, unit: 'L', periodStart: `2025-${m}-01`, periodEnd: `2025-${m}-28` });
+  const jan = (await call(prep.ck, 'POST', '/api/activities', e('01', 1000))).body.id, feb = (await call(prep.ck, 'POST', '/api/activities', e('02', 2))).body.id;
+  // evidence required by the registry: no submission without it
+  const sub = (await call(prep.ck, 'POST', '/api/activities/review', { ids: [jan], action: 'submit' })).body;
+  assert.equal(sub.done, 0); assert.match(sub.skipped[0].reason, /EKO-001 needs evidence/);
+  assert.equal((await call(sa, 'POST', '/api/metrics', { ...body({ evidence: 'optional' }), id: fuel.id, reason: 'Evidence checked at year end instead' })).body.version, 3);
+  assert.equal((await call(prep.ck, 'POST', '/api/activities/review', { ids: [jan, feb], action: 'submit' })).body.done, 2);
+  // the metric's own check limit (±20%) is used on Approvals
+  assert.equal((await call(mgr.ck, 'POST', '/api/activities/review', { ids: [jan], action: 'approve' })).body.done, 1);
+  const ap = (await call(mgr.ck, 'GET', '/api/approvals')).body.mine.find((x: { id: string }) => x.id === feb);
+  assert.match(ap.check.txt, /limit ±20%/); assert.equal(ap.metric, 'EKO-001');
+  // sent back: the preparer hears about it
+  await call(mgr.ck, 'POST', '/api/activities/review', { ids: [feb], action: 'return', note: '2 litres is a typo?' });
+  const pin = (await call(prep.ck, 'GET', '/api/inbox')).body;
+  assert.ok(pin.notifications.some((n: { kind: string; body: string }) => n.kind === 'returned' && /typo/.test(n.body)));
+  assert.equal(pin.returned.length, 1);
+  // a month not owed: excused with a reason (manager of the facility; not the preparer)
+  assert.equal((await call(prep.ck, 'POST', '/api/calendar/exception', { facilityId: plant, metricId: fuel.id, period: '2025-03-01', reason: 'shut' })).status, 403);
+  assert.equal((await call(mgr.ck, 'POST', '/api/calendar/exception', { facilityId: plant, metricId: fuel.id, period: '2025-03-01', reason: 'Plant shut for maintenance' })).status, 200);
+  const cal = (await call(sa, 'GET', '/api/calendar?year=2025')).body;
+  const ob = (p: string, f = plant, m = fuel.id) => cal.obligations.find((o: { facilityId: string; metricId: string; period: string }) => o.facilityId === f && o.metricId === m && o.period === p);
+  assert.equal(ob('2025-01-01').status, 'approved'); assert.equal(ob('2025-01-01').due, '2025-02-05'); assert.equal(ob('2025-01-01').quantity, 1000); assert.equal(ob('2025-01-01').unit, 'L');
+  assert.equal(ob('2025-02-01').status, 'in_progress');
+  assert.equal(ob('2025-03-01').status, 'excused'); assert.match(ob('2025-03-01').exception.reason, /maintenance/);
+  assert.equal(ob('2025-04-01').status, 'missing'); assert.equal(ob('2025-04-01').timing, 'escalated');
+  assert.deepEqual(ob('2025-04-01').responsible.map((p: { name: string }) => p.name), ['cprep@cycle.test']);
+  assert.deepEqual(ob('2025-04-01').escalateTo.map((p: { name: string }) => p.name).sort(), ['cadm@cycle.test', 'cmgr@cycle.test']);
+  assert.equal(ob('2025-04-01', office), undefined, 'fuel applies to plants only');
+  assert.equal(cal.obligations.filter((o: { facilityId: string; metricId: string }) => o.facilityId === plant && o.metricId === fuel.id).length, 12);
+  // the preparer sees only their facility; the office has nothing owed
+  assert.ok((await call(prep.ck, 'GET', '/api/calendar?year=2025')).body.obligations.every((o: { facilityId: string }) => o.facilityId === plant));
+
+  // reminders on 3 March 2026: Feb is due soon, Jan and late 2025 months are overdue and escalated — once each
+  const { tenantTx } = await import('../src/db/pool.js');
+  const rem = await import('../src/lib/reminders.js');
+  const now = new Date('2026-03-03T08:00:00Z');
+  const r1 = await tenantTx(T, (c) => rem.remindTenant(c, T, now));
+  assert.ok(r1.due_soon >= 1 && r1.overdue >= 1 && r1.escalated >= 1, JSON.stringify(r1));
+  const r2 = await tenantTx(T, (c) => rem.remindTenant(c, T, now));
+  assert.deepEqual([r2.due_soon, r2.overdue, r2.escalated], [0, 0, 0]);
+  const kinds = async (ck: string) => (await call(ck, 'GET', '/api/inbox')).body.notifications.map((n: { kind: string }) => n.kind);
+  assert.ok((await kinds(prep.ck)).includes('reminder') && (await kinds(prep.ck)).includes('overdue'));
+  assert.ok((await kinds(mgr.ck)).includes('escalated') && (await kinds(adm.ck)).includes('escalated'));
+  assert.ok(!(await kinds(mgr.ck)).includes('overdue'), 'the manager is told by escalation, not as the person responsible');
+  // e-mail: no mail server here, so messages are held (nothing leaves); one per person and kind
+  const mail = await tenantTx(T, async (c) => (await c.query(`SELECT to_email, status, subject FROM email_outbox WHERE tenant_id = $1`, [T])).rows);
+  assert.ok(mail.length >= 4 && mail.every((m) => m.status === 'held'), JSON.stringify(mail));
+  assert.equal(mail.filter((m) => m.to_email === 'cprep@cycle.test' && /overdue/.test(m.subject)).length, 1);
+  // by hand from the calendar: once a day
+  const key = `${plant}:${fuel.id}:2025-04-01`;
+  assert.equal((await call(prep.ck, 'POST', '/api/calendar/remind', { keys: [key] })).status, 403);
+  assert.equal((await call(mgr.ck, 'POST', '/api/calendar/remind', { keys: [key] })).body.sent, 1);
+  assert.equal((await call(mgr.ck, 'POST', '/api/calendar/remind', { keys: [key] })).body.skipped, 1);
+  // switched off: nothing sent
+  assert.equal((await call(adm.ck, 'PUT', '/api/calendar/settings', { reminders: false })).status, 403);
+  await call(sa, 'PUT', '/api/calendar/settings', { reminders: false });
+  assert.equal((await tenantTx(T, (c) => rem.remindTenant(c, T, new Date('2026-06-20T08:00:00Z')))).skipped, 'reminders are switched off');
+  // inbox: read, e-mails off
+  const ib = (await call(prep.ck, 'GET', '/api/inbox')).body;
+  assert.ok(ib.unread > 0);
+  assert.equal((await call(prep.ck, 'GET', '/api/inbox/count')).body.unread, ib.unread);
+  await call(prep.ck, 'POST', '/api/inbox/read', { all: true });
+  assert.equal((await call(prep.ck, 'GET', '/api/inbox')).body.unread, 0);
+  assert.equal((await call(prep.ck, 'PUT', '/api/inbox/settings', { emailNotify: false })).body.emailNotify, false);
+  // data quality: the metric's check limit
+  const qc = (await call(sa, 'GET', '/api/reports/quality?year=2025')).body.checks;
+  assert.ok(qc.some((x: { id: string }) => x.id === 'reqev'));
+  // companies kept apart
+  const other = (await api('GET', '/api/metrics', undefined, tenantB)).body;
+  assert.ok(!other.metrics.some((m: { id: string }) => m.id === fuel.id));
+  assert.equal((await api('GET', `/api/metrics/${fuel.id}/history`, undefined, tenantB)).status, 404);
+  assert.ok(!(await api('GET', '/api/calendar?year=2025', undefined, tenantB)).body.obligations.some((o: { facilityId: string }) => o.facilityId === plant));
 });

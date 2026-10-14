@@ -2,6 +2,24 @@
 
 Newest first.
 
+## 2026-10-14 · Metric registry, collection calendar, reminders and escalation, Inbox & to-dos
+
+- **Metric registry (Setup) — the data dictionary, separate from the factors (RFP 3.2.1):**
+  - One standard metric per category to start (EKO-001…), each with an approved definition, scope and category, items, reporting unit with conversion rules, owner, facilities it applies to (types or a list), required or not, source system, collection methods, frequency and due day, check limit and evidence rule.
+  - Metrics are collected per facility, or once for the whole company (purchases, travel, commuting).
+  - Every change is a new version with its reason, who changed and who approved it, and what changed. An admin's change waits for a super admin's approval (never their own). Metrics are retired, never deleted.
+  - The registry drives the rest: the calendar, reminders, the check limit on Approvals and in data quality, and the evidence rule (required evidence blocks submission and approval; a new data-quality check lists entries without it).
+- **Collection calendar (Capture) (3.4.1 b, e, i):**
+  - Every obligation (facility × metric × month, quarter or year) with its due date, the people responsible, the data in (converted to the metric's unit), evidence missing, and its status: approved, in review, open, due soon, overdue, escalated, excused.
+  - Views by month and as a list; filters by status, facility and "only mine"; share of periods complete on time.
+  - Remind people now (once a day each); excuse a period with a reason (kept, shown to verifiers, can be undone).
+  - The super admin sets the due day, "due soon" days, escalation days, and whether reminders go out automatically.
+- **Reminders and escalation (3.4.1 c, 3.4.10):** hourly, once per kind and period: due soon and overdue to the people responsible, escalation to the facility manager and the admins above (else the super admins). Gathered into one message per person. People are also told at once when an entry is sent back to them, and when a registry change needs their decision or was decided.
+- **Inbox & to-dos (Capture):** late and due-soon data, escalations, sent-back entries with the approver's note, approvals, registry changes and audit findings waiting, drafts; notifications (read / unread); a count on the menu.
+- **E-mail:** notices also go by e-mail (SMTP_URL, MAIL_FROM; TLS required), queued in the same transaction and sent by the worker with retries. Each person can switch e-mails off. Without a mail server, messages are held and nothing leaves the platform.
+- Demo: owners, rules and versions in the registry, one change waiting for approval, recent months left open, one month excused, reminders sent.
+- Database: migration 039 (metric, metric_version, metric_change, collection_exception, reminder_log, notification, email_outbox; row-level security on all). Dependency: nodemailer 10.0.12 (pinned).
+
 ## 2026-10-14 · Security round 2: account sync (SCIM), security alerts, platform SSO, files encrypted at rest, stricter CSP, DAST
 
 - **Account sync from the identity provider (SCIM 2.0) (4.2 joiners and leavers, PAM/PIM):**

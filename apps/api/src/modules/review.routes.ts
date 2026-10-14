@@ -21,6 +21,8 @@ import { audit, requireTenant } from '../lib/auth.js';
 import { assertCan, scopeOf } from '../lib/access.js';
 import { AppError, notFound } from '../lib/errors.js';
 import { approvalSettings, needsL2 } from './approvals.routes.js';
+import { EVIDENCE_SQL, METRIC_JOIN } from '../lib/collection.js';
+import { notify } from '../lib/notify.js';
 
 const ymd = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 
@@ -94,8 +96,10 @@ export async function reviewRoutes(app: FastifyInstance) {
       const me = String(req.user.id);
       const rows = (await c.query(`SELECT a.id, a.facility_id, a.status, a.created_by, a.submitted_by, a.approval_stage, a.l1_by, cat.code AS cat, (a.co2e_direct + a.co2e_scope2 + a.co2e_scope3)::float8 AS kg,
                                           EXISTS (SELECT 1 FROM period_lock pl WHERE pl.month BETWEEN date_trunc('month', a.period_start)::date AND date_trunc('month', a.period_end)::date) AS locked,
-                                          coalesce((a.inputs->'wasteInfo'->>'hazardous')::boolean, false) AS haz, nullif(trim(a.inputs->'wasteInfo'->>'ref'), '') AS manifest
-                                     FROM activity a JOIN category cat ON cat.id = a.category_id WHERE a.id = ANY($1) FOR UPDATE OF a`, [b.ids])).rows;
+                                          coalesce((a.inputs->'wasteInfo'->>'hazardous')::boolean, false) AS haz, nullif(trim(a.inputs->'wasteInfo'->>'ref'), '') AS manifest,
+                                          mt.metric_code, mt.evidence = 'required' AND NOT ${EVIDENCE_SQL} AS needs_evidence, fo.name AS facility, i.name AS item, a.period_start::text AS month
+                                     FROM activity a JOIN category cat ON cat.id = a.category_id JOIN org_node fo ON fo.id = a.facility_id JOIN item i ON i.id = a.item_id ${METRIC_JOIN}
+                                    WHERE a.id = ANY($1) FOR UPDATE OF a`, [b.ids])).rows;
       const done: string[] = [], skipped: { id: string; reason: string }[] = [], toL2: string[] = [];
       const set = await approvalSettings(c, tenant), canL2 = ['super_admin', 'admin', 'platform_admin'].includes(req.user.role);
       // A company whose only user (verifiers aside) is its super admin approves its own entries: marked self-reviewed.
@@ -110,6 +114,8 @@ export async function reviewRoutes(app: FastifyInstance) {
           else if (a.status !== 'draft' && a.status !== 'rejected') why = `already ${a.status === 'approved' ? 'approved' : 'waiting for approval'}`;
           // hazardous waste travels with a manifest / consignment note in most jurisdictions (EU, UK, US, UAE…): no number, no submission
           else if (a.cat === 'waste_generated' && a.haz && !a.manifest) why = 'hazardous waste needs its manifest number';
+          // the metric registry asks for evidence (a bill, meter, file or linked document)
+          else if (a.needs_evidence) why = `metric ${a.metric_code} needs evidence: link a bill or document in the Document vault first`;
           else sql = `UPDATE activity SET status = 'submitted', submitted_at = now(), submitted_by = $2, approval_stage = NULL, l1_by = NULL, l1_at = NULL, updated_at = now() WHERE id = $1`;
         } else if (b.action === 'withdraw') {
           if (a.status !== 'submitted') why = 'not waiting for approval';
@@ -119,6 +125,7 @@ export async function reviewRoutes(app: FastifyInstance) {
           if (!s.approve.has(a.facility_id)) why = 'you cannot approve data for this facility';
           else if (mine && !solo) why = 'nobody approves their own entry';
           else if (b.action === 'approve' && a.status !== 'submitted') why = a.status === 'approved' ? 'already approved' : 'not submitted yet';
+          else if (b.action === 'approve' && a.needs_evidence) why = `metric ${a.metric_code} needs evidence before approval`;
           else if (b.action === 'return' && a.status !== 'submitted' && a.status !== 'approved') why = 'not submitted';
           else if (a.approval_stage === 'L2' && b.action === 'approve' && !canL2) why = 'level 2 is approved by an admin or the super admin';
           else if (a.approval_stage === 'L2' && b.action === 'approve' && a.l1_by === me) why = 'level 2 is approved by someone other than level 1';
@@ -134,6 +141,16 @@ export async function reviewRoutes(app: FastifyInstance) {
         done.push(a.id);
       }
       for (const id of b.ids) if (!rows.some((r) => r.id === id)) skipped.push({ id, reason: 'not found' });
+      // sent back: the people who entered or submitted it hear about it (in their Inbox, and by e-mail)
+      if (b.action === 'return') {
+        const back = rows.filter((r) => done.includes(r.id));
+        const per = new Map<string, typeof back>();
+        for (const r of back) for (const u of new Set([r.created_by, r.submitted_by].filter((x): x is string => !!x && x !== me && /^[0-9a-f-]{36}$/.test(x)))) per.set(u, [...(per.get(u) ?? []), r]);
+        for (const [u, rs] of per) await notify(c, tenant, [u], {
+          kind: 'returned', title: rs.length === 1 ? `Sent back: ${rs[0]!.facility} · ${rs[0]!.item} · ${rs[0]!.month.slice(0, 7)}` : `${rs.length} entries sent back to you`,
+          body: `${req.user.name}: ${b.note}\n\n${rs.slice(0, 20).map((r) => `• ${r.facility} · ${r.item} · ${r.month.slice(0, 7)}`).join('\n')}`, link: '/inbox',
+        });
+      }
       const final = done.filter((id) => !toL2.includes(id));
       if (final.length) await audit(c, req, `activity.${b.action}`, 'activity', final.length === 1 ? final[0] : null, { ids: final, note: b.note ?? undefined });
       if (toL2.length) await audit(c, req, 'activity.approve_l1', 'activity', toL2.length === 1 ? toL2[0] : null, { ids: toL2 });

@@ -148,6 +148,38 @@ export interface Certificate {
   vintage_from: string; vintage_to: string; reference: string | null; supplier: string | null; retired_on: string | null; note: string | null; claimed_mwh: number; claims: number;
 }
 
+// ------------------------------------------------- metric registry, calendar, inbox --
+export type Freq = 'monthly' | 'quarterly' | 'annual';
+export interface MetricData {
+  name: string; definition: string; category_code: string; item_ids: number[]; unit: string | null; owner_user_id: string | null; facility_types: string[]; facility_ids: string[];
+  required: boolean; level: 'facility' | 'company'; source_system: string | null; methods: string[]; frequency: Freq; due_day: number | null; due_months: number; check_pct: number | null; evidence: 'required' | 'optional'; active: boolean;
+}
+export interface Metric extends MetricData { id: string; code: string; version: number; category: string; scope: number; owner_name: string | null; unit_name: string | null; unit_dim: string | null; pending: number; updated_at: string; updated_by: string | null }
+export interface MetricChange { id: string; metric_id: string | null; code: string | null; name: string; proposal: MetricData; reason: string; status: 'pending' | 'approved' | 'rejected' | 'withdrawn'; proposed_name: string | null; proposed_at: string; decided_name: string | null; decided_at: string | null; decision_note: string | null; mine: boolean; changes: Record<string, [unknown, unknown]> }
+export interface MetricList {
+  metrics: Metric[]; changes: MetricChange[]; categories: { code: string; name: string; scope: number; items: { id: number; name: string; sub: string }[] }[];
+  units: { code: string; name: string; dimension: string; to_base: number }[]; users: { id: string; name: string; role: Role }[]; facilities: { id: string; name: string; type: string | null }[];
+  facilityTypes: string[]; methods: string[]; settings: { dueDay: number; checkPct: number }; canEdit: boolean; canApprove: boolean;
+}
+export interface MetricVersion { version: number; changes: Record<string, [unknown, unknown]> | null; reason: string; changed_by: string | null; approved_by: string | null; at: string }
+export interface PersonRef { id: string; name: string }
+export type ObStatus = 'approved' | 'submitted' | 'in_progress' | 'missing' | 'excused';
+export type ObTiming = 'done' | 'upcoming' | 'due_soon' | 'overdue' | 'escalated';
+export interface Obligation {
+  key: string; level: 'facility' | 'company'; facilityId: string; facility: string; facilityType: string | null; metricId: string; metricCode: string; metric: string; category: string; scope: number; frequency: Freq;
+  period: string; periodEnd: string; label: string; due: string; status: ObStatus; timing: ObTiming; daysLate: number; completedAt: string | null; late: boolean;
+  owner: PersonRef | null; responsible: PersonRef[]; escalateTo: PersonRef[]; evidence: 'required' | 'optional'; withoutEvidence: number; entries: number; quantity: number | null; unit: string | null; otherUnits: number;
+  exception: { reason: string; by: string | null; at: string } | null; reminders: { kind: string; at: string }[]; canChase?: boolean; canEnter?: boolean;
+}
+export interface CycleSettings { dueDay: number; remindDays: number; escalateDays: number; timezone: string; reminders: boolean }
+export interface CalendarData { year: number; today: string; settings: CycleSettings; mailOn: boolean; me: string; obligations: Obligation[]; canSettings: boolean }
+export interface Notice { id: number; kind: string; title: string; body: string | null; link: string | null; at: string; read_at: string | null }
+export interface InboxData {
+  today: string; mine: Obligation[]; escalations: Obligation[]; upcoming: Obligation[]; approvals: number; drafts: number; metricChanges: number; findings: number;
+  returned: { id: string; f: string; facility: string; cat: string; category: string; item: string; month: string; note: string | null; by: string | null; at: string | null }[];
+  notifications: Notice[]; unread: number; emailNotify: boolean; mailOn: boolean;
+}
+
 // ------------------------------------------------------------ document vault --
 export interface VaultDoc {
   id: string; kind: string; source: string; filename: string; contentType: string; size: number; uploadedAt: string; uploadedBy: string | null;
@@ -620,6 +652,22 @@ export const api = {
   vaultRestore: (id: string) => call<{ ok: true }>('POST', `/api/vault/${id}/restore`),
   vaultDelete: (id: string) => call<{ ok: true }>('DELETE', `/api/vault/${id}`),
   vaultSettings: (retentionYears: number) => call<{ ok: true }>('PUT', '/api/vault/settings', { retentionYears }),
+  // metric registry, collection calendar, inbox
+  metrics: () => call<MetricList>('GET', '/api/metrics'),
+  metricHistory: (id: string) => call<{ metric: { id: string; code: string; name: string }; versions: MetricVersion[]; labels: Record<string, string> }>('GET', `/api/metrics/${id}/history`),
+  metricSave: (b: MetricData & { id?: string; reason: string }) => call<{ pending: boolean; changeId?: string; id?: string; code?: string; version?: number }>('POST', '/api/metrics', b),
+  metricDecide: (id: string, decision: 'approve' | 'reject', note?: string) => call<{ ok: true; version?: number }>('POST', `/api/metrics/changes/${id}`, { decision, note }),
+  metricWithdraw: (id: string) => call<{ ok: true }>('DELETE', `/api/metrics/changes/${id}`),
+  calendar: (q: { year?: number; node?: string; group?: string }) => call<CalendarData>('GET', `/api/calendar?${new URLSearchParams(Object.entries(q).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)]))}`),
+  calendarRemind: (keys: string[]) => call<{ sent: number; people: number; skipped: number }>('POST', '/api/calendar/remind', { keys }),
+  calendarExcuse: (b: { facilityId: string; metricId: string; period: string; reason: string }) => call<{ ok: true }>('POST', '/api/calendar/exception', b),
+  calendarUnexcuse: (b: { facilityId: string; metricId: string; period: string }) => call<{ ok: true }>('DELETE', `/api/calendar/exception?${new URLSearchParams(b)}`),
+  calendarSettings: (b: Partial<Omit<CycleSettings, 'timezone'>>) => call<CycleSettings>('PUT', '/api/calendar/settings', b),
+  calendarRun: () => call<{ due_soon: number; overdue: number; escalated: number; people: number; skipped?: string }>('POST', '/api/calendar/run'),
+  inbox: () => call<InboxData>('GET', '/api/inbox'),
+  inboxCount: () => call<{ unread: number; todo: number; approvals: number }>('GET', '/api/inbox/count'),
+  inboxRead: (b: { ids?: number[]; all?: boolean }) => call<{ read: number }>('POST', '/api/inbox/read', b),
+  inboxSettings: (emailNotify: boolean) => call<{ emailNotify: boolean }>('PUT', '/api/inbox/settings', { emailNotify }),
   evidence: (activityId: string) => call<{ files: EvidenceFile[]; canAdd: boolean; locked: boolean; facilityId: string; periodStart: string; periodEnd: string }>('GET', `/api/activities/${activityId}/evidence`),
   // message centre
   msgCounts: () => call<{ unread: number; announcements: number; team: boolean }>('GET', '/api/messages/counts'),

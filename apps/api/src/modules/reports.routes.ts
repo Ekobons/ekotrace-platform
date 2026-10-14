@@ -18,11 +18,12 @@ import { audit, requireRole, requireTenant } from '../lib/auth.js';
 import { scopeOf, subtreeFacilities } from '../lib/access.js';
 import { AppError } from '../lib/errors.js';
 import { USUAL_SQL, approvalSettings } from './approvals.routes.js';
+import { EVIDENCE_SQL, METRIC_JOIN } from '../lib/collection.js';
 
 const sel = z.object({ year: z.coerce.number().int().min(2000).max(2100), node: z.string().uuid().optional(), group: z.string().uuid().optional(), pend: z.enum(['0', '1']).optional() });
 
 /** Facilities in the view (as on the dashboards): the subtree or group, within what the user may see. */
-async function viewFacs(c: Tx, req: FastifyRequest, q: z.infer<typeof sel>) {
+export async function viewFacs(c: Tx, req: FastifyRequest, q: z.infer<typeof sel>) {
   const see = (await scopeOf(c, req.user)).see;
   let within: Set<string> | null = q.node ? await subtreeFacilities(c, q.node) : null;
   if (q.group) {
@@ -71,10 +72,14 @@ export async function reportsRoutes(app: FastifyInstance) {
       const base = `FROM activity a JOIN org_node f ON f.id = a.facility_id JOIN item i ON i.id = a.item_id JOIN category cat ON cat.id = a.category_id
                     WHERE a.facility_id = ANY($1) AND extract(year FROM a.period_start) = $2`;
       const q2 = async (sql: string) => (await c.query(sql, [facs, q.year])).rows;
-      const odd = (await q2(`SELECT f.name AS facility, i.name AS item, a.period_start::text AS month, a.quantity::float8 AS qty, ${USUAL_SQL} AS usual ${base}
+      // metric registry: its own check limit, and whether it needs evidence
+      const baseM = base.replace('WHERE a.facility_id', `${METRIC_JOIN} WHERE a.facility_id`);
+      const odd = (await q2(`SELECT f.name AS facility, i.name AS item, a.period_start::text AS month, a.quantity::float8 AS qty, ${USUAL_SQL} AS usual, mt.check_pct ${baseM}
                                AND a.status IN ('approved', 'submitted') AND coalesce(trim(a.note), '') = '' AND a.period_end - a.period_start < 40`))
-        .filter((r) => r.usual && Math.abs(r.qty / r.usual - 1) >= pct)
-        .map((r) => `${nm(r)} — ${r.qty > r.usual ? '+' : '−'}${Math.round(Math.abs(r.qty / r.usual - 1) * 100)}% vs 6-month average, no explanation`);
+        .filter((r) => r.usual && Math.abs(r.qty / r.usual - 1) >= (r.check_pct != null ? r.check_pct / 100 : pct))
+        .map((r) => `${nm(r)} — ${r.qty > r.usual ? '+' : '−'}${Math.round(Math.abs(r.qty / r.usual - 1) * 100)}% vs 6-month average (limit ±${r.check_pct ?? set.checkPct}%), no explanation`);
+      const reqev = (await q2(`SELECT f.name AS facility, i.name AS item, a.period_start::text AS month, mt.metric_code ${baseM}
+                                 AND a.status IN ('approved', 'submitted') AND mt.evidence = 'required' AND NOT ${EVIDENCE_SQL} ORDER BY 3 LIMIT 500`)).map((r) => `${nm(r)} · ${r.metric_code}`);
       const noev = (await q2(`SELECT f.name AS facility, i.name AS item, a.period_start::text AS month ${base}
                                AND a.status = 'approved' AND cat.code IN ('purchased_electricity', 'stationary_combustion', 'water_supply') AND a.meter_id IS NULL ORDER BY 3 LIMIT 500`)).map(nm);
       const spend = (await q2(`SELECT f.name AS facility, i.name AS item, a.period_start::text AS month ${base}
@@ -106,6 +111,7 @@ export async function reportsRoutes(app: FastifyInstance) {
         ['missing', 'Data missing in months so far (categories the facility reports)', 'Completeness', miss],
         ['odd', `Values more than ${set.checkPct}% off the 6-month average without a note`, 'Outliers', odd],
         ['noev', 'Electricity, fuel and water entries approved without a bill or meter', 'Evidence', noev],
+        ['reqev', 'Entries of metrics that require evidence (metric registry), without it', 'Evidence', reqev],
         ['spend', 'Purchases calculated with spend averages (not supplier-specific)', 'Emission factors', spend],
         ['dup', 'Possible double counting (same facility, month, item and quantity)', 'Double counting', dup],
         ['est', 'Estimated data without a note on how it was estimated', 'Data type', est],
@@ -118,7 +124,7 @@ export async function reportsRoutes(app: FastifyInstance) {
   app.put('/api/reports/quality/:check', async (req) => {
     const tenant = requireTenant(req);
     requireRole(req, ...ADMIN);
-    const { check } = z.object({ check: z.enum(['missing', 'odd', 'noev', 'spend', 'dup', 'est', 'old']) }).parse(req.params);
+    const { check } = z.object({ check: z.enum(['missing', 'odd', 'noev', 'reqev', 'spend', 'dup', 'est', 'old']) }).parse(req.params);
     const b = z.object({ year: z.number().int().min(2000).max(2100), text: z.string().trim().max(1000) }).parse(req.body);
     return tenantTx(tenant, async (c) => {
       if (!b.text) await c.query(`DELETE FROM report_justification WHERE year = $1 AND check_id = $2`, [b.year, check]);

@@ -8,7 +8,10 @@
  * All demo people share one password, printed once. Demo only — never run this
  * on a server with real clients.
  */
-import { platformTx, pool, type Tx } from '../db/pool.js';
+import { platformTx, pool, tenantTx, type Tx } from '../db/pool.js';
+import { ensureMetrics, metricSnapshot } from '../lib/collection.js';
+import { remindTenant } from '../lib/reminders.js';
+import { applyMetric, metricBody } from '../modules/collection.routes.js';
 import { hashPassword, temporaryPassword } from '../lib/password.js';
 import { calculate } from '../modules/calc.service.js';
 import { contextFor } from '../modules/activity.routes.js';
@@ -475,6 +478,9 @@ async function main() {
   // purchases run after the company exists (the pipeline commits in chunks, like a real upload)
   const sa = (await platformTx((c: Tx) => c.query(`SELECT id, name, email, role, tenant_id, scope_node_id FROM app_user WHERE tenant_id = $1 AND role = 'super_admin' LIMIT 1`, [tenantId]))).rows[0];
   await demoPurchases(tenantId, { id: sa.id, name: sa.name, email: sa.email, role: 'super_admin', tenantId, scopeNodeId: null, mustChangePassword: false });
+  // entries typed in during the year came in a few days after each month, most before the due date (before 2025 is locked below)
+  await platformTx((c: Tx) => c.query(`UPDATE activity SET submitted_at = least(period_end + (2 + floor(random() * 11))::int, now() - interval '1 day')
+                                         WHERE tenant_id = $1 AND status = 'approved' AND submitted_at IS NULL AND period_end < now()`, [tenantId]));
   // Audit & assurance (DEMO, not real): 2025 assured and locked month by month; 2026 engagement in planning.
   await platformTx(async (c: Tx) => {
     const t = tenantId;
@@ -563,6 +569,57 @@ async function main() {
       ('maintenance', 'DEMO — Planned maintenance, Saturday 06:00-07:00 UTC', 'DEMO announcement. Ekotrace will be unavailable for up to one hour. Nothing you have saved is affected.', ARRAY[$1]::uuid[], 'Ekotrace team (DEMO)', now() - interval '6 days')`, [t]);
     const nd = (await c.query(`SELECT count(*)::int AS n, (SELECT count(*)::int FROM document_link WHERE tenant_id = $1) AS l FROM document WHERE tenant_id = $1 AND kind = 'vault'`, [t])).rows[0];
     console.log(`Document vault: ${nd.n} DEMO files, ${nd.l} links to entries (one permit expiring, one calibration expired, one invoice not linked). Message centre: 3 DEMO conversations, 2 announcements.`);
+  });
+  // Metric registry and collection calendar (DEMO): owners and rules as versions, one change waiting for approval;
+  // a few recent months left open so the calendar, reminders and escalations have something to show.
+  await tenantTx(tenantId, async (c: Tx) => {
+    const t = tenantId;
+    await ensureMetrics(c, t, 'demo');
+    const U = new Map((await c.query(`SELECT role, id, name FROM app_user WHERE tenant_id = $1`, [t])).rows.map((r) => [r.role as string, r as { id: string; name: string }]));
+    const M = new Map((await c.query(`SELECT * FROM metric`)).rows.map((r) => [r.category_code as string, r]));
+    const change = async (cat: string, set: Record<string, unknown>, reason: string, by: string) => {
+      const m = M.get(cat); if (!m) return;
+      await applyMetric(c, t, m.id, metricBody.parse({ ...metricSnapshot(m), ...set }), reason, U.get(by)!.name, U.get('super_admin')!.name);
+    };
+    await change('stationary_combustion', { required: true, facility_types: ['Plant'], source_system: 'Fuel delivery notes and tank dips (DEMO)', due_day: 10 },
+      'DEMO — every plant reports fuel every month, even when nothing was delivered', 'super_admin');
+    await change('purchased_electricity', { owner_user_id: U.get('admin')!.id, check_pct: 20, source_system: 'DEWA / SEWA bills and smart meters (DEMO)' },
+      'DEMO — the energy team owns electricity; bills are exact, so a tighter check', 'admin');
+    await change('fugitive', { evidence: 'required', source_system: 'HVAC contractor service reports (DEMO)' }, 'DEMO — refrigerant top-ups need the service report (assurance finding)', 'super_admin');
+    const w = M.get('waste_generated');
+    if (w) await c.query(`INSERT INTO metric_change (tenant_id, metric_id, proposal, reason, proposed_by, proposed_name) VALUES ($1,$2,$3,$4,$5,$6)`,
+      [t, w.id, JSON.stringify({ ...metricSnapshot(w), evidence: 'required', source_system: 'Contractor manifests (DEMO)' }), 'DEMO — a manifest for every collection, as the contractor portal now provides them', U.get('admin')!.id, U.get('admin')!.name]);
+    // open work: Sep 2026 fuel at the recycling complex not entered (overdue); WtE Sep electricity waiting for approval;
+    // water at the busiest water site: July excused, August not entered (escalated), September not entered (overdue)
+    const fac = async (name: string) => (await c.query(`SELECT id FROM org_node WHERE name = $1`, [name])).rows[0]?.id as string | undefined;
+    const del = async (f: string | undefined, cat: string, months: string[]) => {
+      if (!f) return;
+      await c.query(`DELETE FROM document_link WHERE activity_id IN (SELECT a.id FROM activity a JOIN category k ON k.id = a.category_id WHERE a.facility_id = $1 AND k.code = $2 AND to_char(a.period_start, 'YYYY-MM') = ANY($3))`, [f, cat, months]);
+      await c.query(`DELETE FROM activity_result WHERE activity_id IN (SELECT a.id FROM activity a JOIN category k ON k.id = a.category_id WHERE a.facility_id = $1 AND k.code = $2 AND to_char(a.period_start, 'YYYY-MM') = ANY($3))`, [f, cat, months]);
+      await c.query(`DELETE FROM activity a USING category k WHERE k.id = a.category_id AND a.facility_id = $1 AND k.code = $2 AND to_char(a.period_start, 'YYYY-MM') = ANY($3) AND a.purchase_batch_id IS NULL AND a.meter_id IS NULL`, [f, cat, months]);
+    };
+    await del(await fac("Al Saja'a Recycling Complex"), 'stationary_combustion', ['2026-09']);
+    const wte = await fac('Sharjah Waste-to-Energy');
+    await c.query(`UPDATE activity a SET status = 'submitted', submitted_at = now() - interval '2 days', submitted_by = created_by FROM category k
+                    WHERE k.id = a.category_id AND a.facility_id = $1 AND k.code = 'purchased_electricity' AND to_char(a.period_start, 'YYYY-MM') = '2026-09'`, [wte]);
+    const ws = (await c.query(`SELECT a.facility_id AS f FROM activity a JOIN category k ON k.id = a.category_id WHERE k.code = 'water_supply' AND to_char(a.period_start, 'YYYY-MM') = '2026-08' AND a.meter_id IS NULL
+                                GROUP BY 1 ORDER BY count(*) DESC LIMIT 1`)).rows[0]?.f as string | undefined;
+    await del(ws, 'water_supply', ['2026-07', '2026-08', '2026-09']);
+    if (ws && M.get('water_supply')) await c.query(`INSERT INTO collection_exception (tenant_id, facility_id, metric_id, period, reason, by_user, by_name) VALUES ($1,$2,$3,'2026-07-01',$4,$5,$6)`,
+      [t, ws, M.get('water_supply').id, 'DEMO — site closed for the summer shutdown; no water drawn', U.get('manager')?.id ?? null, U.get('manager')?.name ?? 'demo']);
+    // waste at the data centre and the fleet depot is collected every few months: the empty months are excused
+    if (M.get('waste_generated')) await c.query(
+      `INSERT INTO collection_exception (tenant_id, facility_id, metric_id, period, reason, by_name)
+       SELECT $1, f.id, $2, mo.d::date, 'DEMO — collected every few months; nothing collected this month', $3
+         FROM org_node f CROSS JOIN generate_series('2026-01-01'::date, '2026-09-01'::date, interval '1 month') mo(d)
+        WHERE f.name IN ('Data Centre Dubai', 'Fleet Depot Sharjah')
+          AND NOT EXISTS (SELECT 1 FROM activity a JOIN category k ON k.id = a.category_id WHERE a.facility_id = f.id AND k.code = 'waste_generated' AND date_trunc('month', a.period_start) = mo.d)`,
+      [t, M.get('waste_generated').id, U.get('manager')?.name ?? 'demo']);
+    // meter months up to June were submitted and approved by the manager; July and August meter drafts are still waiting to be sent
+    await c.query(`UPDATE activity SET status = 'approved', submitted_at = period_end + interval '6 days', submitted_by = created_by, reviewed_at = period_end + interval '8 days', reviewed_by = $1
+                    WHERE status = 'draft' AND meter_id IS NOT NULL AND period_start < '2026-07-01'`, [U.get('manager')?.id ?? null]);
+    const r = await remindTenant(c, t);
+    console.log(`Metric registry: ${M.size} metrics, 3 changed (versions), 1 change waiting for approval. Calendar: reminders ${r.due_soon} due soon, ${r.overdue} overdue, ${r.escalated} escalated → ${r.people} DEMO notices (e-mail held: no mail server).`);
   });
   console.log('\nDemo logins (all with the same password, shown once):');
   for (const [name, email] of PEOPLE) console.log(`  ${email.padEnd(24)} ${name}`);

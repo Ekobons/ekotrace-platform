@@ -44,6 +44,7 @@ import { scimRoutes } from './modules/scim.routes.js';
 import { assuranceRoutes } from './modules/assurance.routes.js';
 import { contractorPublicRoutes, contractorRoutes } from './modules/contractor.routes.js';
 import { reportsRoutes } from './modules/reports.routes.js';
+import { collectionRoutes } from './modules/collection.routes.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const BRANDS = join(HERE, '../../../brands');
@@ -108,6 +109,7 @@ export async function buildApp(opts: { logger?: boolean; rateLimit?: Limits | nu
     await secured.register(targetsRoutes);
     await secured.register(approvalsRoutes);
     await secured.register(reportsRoutes);
+    await secured.register(collectionRoutes);
     await secured.register(qrRoutes);
     await secured.register(contractorRoutes);
     await secured.register(assuranceRoutes);

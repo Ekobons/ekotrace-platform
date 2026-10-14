@@ -39,6 +39,9 @@ import { MfaCard, MfaSetup } from './components/MfaSetup';
 import { Messages } from './pages/Messages';
 import { SurveyAnswerPage } from './pages/SurveyAnswer';
 import { Surveys } from './pages/Surveys';
+import { MetricRegistry } from './pages/MetricRegistry';
+import { CollectionCalendar } from './pages/CollectionCalendar';
+import { Inbox } from './pages/Inbox';
 
 interface Ctx {
   me: Me;
@@ -62,8 +65,8 @@ const NAV: { group?: string; items: NavItem[] }[] = [
     { to: '/data/stationary_combustion', label: 'Add data', icon: 'plus', roles: ['super_admin', 'admin', 'manager', 'preparer'] },
     { to: '/entries', label: 'Entries & results', icon: 'list' },
     { to: '/surveys', label: 'Surveys', icon: 'users', roles: ['super_admin', 'admin', 'manager', 'verifier'] },
-    { to: '/approvals', label: 'Approvals', icon: 'check', roles: ['super_admin', 'admin', 'manager', 'preparer'] }, { to: '/progress', label: 'Data progress', icon: 'grid' }, { label: 'Collection calendar', icon: 'calendar', stage: 2 },
-    { label: 'Inbox & to-dos', icon: 'inbox', stage: 2 }, { to: '/vault', label: 'Document vault', icon: 'folder' }, { label: 'Batch runs', icon: 'upload', stage: 4 },
+    { to: '/approvals', label: 'Approvals', icon: 'check', roles: ['super_admin', 'admin', 'manager', 'preparer'] }, { to: '/progress', label: 'Data progress', icon: 'grid' }, { to: '/calendar', label: 'Collection calendar', icon: 'calendar' },
+    { to: '/inbox', label: 'Inbox & to-dos', icon: 'inbox' }, { to: '/vault', label: 'Document vault', icon: 'folder' }, { label: 'Batch runs', icon: 'upload', stage: 4 },
     { to: '/qr', label: 'QR & field app', icon: 'qr', roles: ['super_admin', 'admin', 'manager', 'preparer', 'verifier'] },
   ] },
   { group: 'Value chain', items: [{ to: '/suppliers', label: 'Suppliers', icon: 'users', roles: ['super_admin', 'admin', 'manager', 'preparer', 'verifier'] }, { label: 'Product LCA', icon: 'leaf', stage: 4 }] },
@@ -76,7 +79,7 @@ const NAV: { group?: string; items: NavItem[] }[] = [
     { to: '/currency', label: 'Currencies & price index', icon: 'scale', roles: ['super_admin', 'admin', 'manager', 'verifier'] },
     { to: '/people', label: 'People & access', icon: 'users', roles: ['super_admin', 'admin', 'manager'] },
     { to: '/library', label: 'Factors & dictionary', icon: 'book', roles: [] },
-    { label: 'Metric registry', icon: 'list', stage: 4 }, { to: '/integrations', label: 'Integrations & API', icon: 'plug', roles: ['super_admin', 'admin'] }, { label: 'AI models', icon: 'spark', stage: 4 },
+    { to: '/metrics', label: 'Metric registry', icon: 'list' }, { to: '/integrations', label: 'Integrations & API', icon: 'plug', roles: ['super_admin', 'admin'] }, { label: 'AI models', icon: 'spark', stage: 4 },
     { to: '/audit', label: 'Security & audit log', icon: 'lock', roles: ['super_admin', 'admin', 'verifier'] },
   ] },
   { group: 'Help', items: [{ to: '/help', label: 'User manual', icon: 'book' }, { to: '/messages', label: 'Message centre', icon: 'chat' }] },
@@ -143,6 +146,13 @@ function Shell() {
     get(); window.addEventListener('eko-msg', get); const t = window.setInterval(get, 120000);
     return () => { window.removeEventListener('eko-msg', get); window.clearInterval(t); };
   }, [path, tenant?.id, role]); // eslint-disable-line react-hooks/exhaustive-deps
+  // inbox: unread notifications and open to-dos
+  const [inboxN, setInboxN] = useState(0);
+  useEffect(() => {
+    const get = () => { if (!tenant) { setInboxN(0); return; } api.inboxCount().then((c) => setInboxN(c.unread + c.todo - c.approvals)).catch(() => {}); };
+    get(); window.addEventListener('eko-inbox', get); const t = window.setInterval(get, 180000);
+    return () => { window.removeEventListener('eko-inbox', get); window.clearInterval(t); };
+  }, [path, tenant?.id, role]); // eslint-disable-line react-hooks/exhaustive-deps
   // security alerts to review (super admin, admin; platform admin: platform alerts)
   const [alertN, setAlertN] = useState(0);
   useEffect(() => {
@@ -187,7 +197,7 @@ function Shell() {
                 {g.group && <button type="button" className={`sech${open ? ' open' : ''}${on ? ' has' : ''}`} aria-expanded={open} title={g.group} onClick={() => !mini && fold(g.group!)}>
                   <i className="sdot" /><span>{g.group.toUpperCase()}</span><span className="chev">{open ? '▾' : '▸'}</span></button>}
                 {open && <div className="secitems">{items.map((i) => i.to
-                  ? <NavLink key={i.label} to={i.to} title={mini ? i.label : undefined} className={({ isActive }) => (isActive || (i.to?.startsWith('/data/') && path.startsWith('/data/')) ? 'active' : '')}><Icon name={i.icon} /><span className="nl">{i.label}</span>{i.to === '/approvals' && apprN > 0 && <span className="navb amber">{apprN}</span>}{i.to === '/messages' && msgN > 0 && role !== 'platform_admin' && <span className="navb">{msgN}</span>}{i.to === '/audit' && alertN > 0 && <span className="navb red" title="Security alerts to review">{alertN}</span>}</NavLink>
+                  ? <NavLink key={i.label} to={i.to} title={mini ? i.label : undefined} className={({ isActive }) => (isActive || (i.to?.startsWith('/data/') && path.startsWith('/data/')) ? 'active' : '')}><Icon name={i.icon} /><span className="nl">{i.label}</span>{i.to === '/approvals' && apprN > 0 && <span className="navb amber">{apprN}</span>}{i.to === '/inbox' && inboxN > 0 && <span className="navb amber" title="Unread notices and things to do">{inboxN}</span>}{i.to === '/messages' && msgN > 0 && role !== 'platform_admin' && <span className="navb">{msgN}</span>}{i.to === '/audit' && alertN > 0 && <span className="navb red" title="Security alerts to review">{alertN}</span>}</NavLink>
                   : <a key={i.label} className="soon" aria-disabled="true" title={`${i.label} · coming in stage ${i.stage}`}><Icon name={i.icon} /><span className="nl">{i.label}</span><span className="soonchip">S{i.stage}</span></a>)}</div>}
               </div>
             );
@@ -207,6 +217,9 @@ function Shell() {
           <Route path="/console" element={<Gate ok={role === 'platform_admin'}><Console /></Gate>} />
           <Route path="/messages" element={role === 'platform_admin' ? <Messages /> : <NeedCo><Messages /></NeedCo>} />
           <Route path="/vault" element={<NeedCo><Vault /></NeedCo>} />
+          <Route path="/metrics" element={<NeedCo><MetricRegistry /></NeedCo>} />
+          <Route path="/calendar" element={<NeedCo><CollectionCalendar /></NeedCo>} />
+          <Route path="/inbox" element={<NeedCo><Inbox onSeen={() => window.dispatchEvent(new Event('eko-inbox'))} /></NeedCo>} />
           <Route path="/account" element={<div className="page"><div className="acctgrid"><ChangePassword onDone={() => nav('/')} /><MfaCard /></div></div>} />
           <Route path="/library/*" element={<Gate ok={role === 'platform_admin'}><Library /></Gate>} />
           <Route path="/data/:category" element={<NeedCo><AddData /></NeedCo>} />
