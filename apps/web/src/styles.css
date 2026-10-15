@@ -1246,3 +1246,22 @@ ul.plain { list-style: none; margin: 0; padding: 0; }
 .ccuse i { display: block; height: 100%; }
 .ccdot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; vertical-align: 1px; }
 .cctable td { vertical-align: top; }
+
+/* batch runs */
+.brsrc { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+.brcard { display: grid; gap: 6px; align-content: start; }
+.brcard.bad { border-color: color-mix(in srgb, var(--bad) 45%, transparent); }
+.brcard.warn { border-color: color-mix(in srgb, var(--warn) 45%, transparent); }
+.brnums { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12.5px; color: var(--muted); }
+.brnums b { color: var(--fg); font-size: 15px; }
+.brbar { display: flex; height: 6px; background: #EEF2EF; border-radius: 4px; overflow: hidden; margin: 3px 0 4px; }
+.brbar i { display: block; height: 100%; }
+.brtable td { vertical-align: top; }
+.brsub { display: grid; gap: 8px; padding: 12px 14px !important; }
+.brflow td, .brflow th { font-size: 12.5px; }
+.brchecks { display: grid; gap: 6px; }
+.brchecks > div { display: flex; gap: 10px; align-items: flex-start; padding: 8px 10px; border-radius: 10px; background: #F4F7F5; font-size: 13px; }
+.brchecks > div.bad { background: color-mix(in srgb, var(--bad) 10%, transparent); }
+.brchecks .ic { width: 20px; height: 20px; border-radius: 50%; display: inline-grid; place-items: center; font-size: 12px; font-weight: 700; flex: none; background: #DDE5E1; color: var(--muted); }
+.brchecks .ok .ic { background: var(--primary); color: #fff; }
+.brchecks .bad .ic { background: var(--bad); color: #fff; }

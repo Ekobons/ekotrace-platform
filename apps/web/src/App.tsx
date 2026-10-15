@@ -41,6 +41,7 @@ import { SurveyAnswerPage } from './pages/SurveyAnswer';
 import { Surveys } from './pages/Surveys';
 import { MetricRegistry } from './pages/MetricRegistry';
 import { CarbonCredits } from './pages/CarbonCredits';
+import { BatchRuns } from './pages/BatchRuns';
 import { CollectionCalendar } from './pages/CollectionCalendar';
 import { Inbox } from './pages/Inbox';
 import { BrandMark } from './components/BrandMark';
@@ -69,7 +70,7 @@ const NAV: { group?: string; items: NavItem[] }[] = [
     { to: '/entries', label: 'Entries & results', icon: 'list' },
     { to: '/surveys', label: 'Surveys', icon: 'users', roles: ['super_admin', 'admin', 'manager', 'verifier'] },
     { to: '/approvals', label: 'Approvals', icon: 'check', roles: ['super_admin', 'admin', 'manager', 'preparer'] }, { to: '/progress', label: 'Data progress', icon: 'grid' }, { to: '/calendar', label: 'Collection calendar', icon: 'calendar' },
-    { to: '/inbox', label: 'Inbox & to-dos', icon: 'inbox' }, { to: '/vault', label: 'Document vault', icon: 'folder' }, { label: 'Batch runs', icon: 'upload', stage: 4 },
+    { to: '/inbox', label: 'Inbox & to-dos', icon: 'inbox' }, { to: '/vault', label: 'Document vault', icon: 'folder' }, { to: '/batches', label: 'Batch runs', icon: 'upload', roles: ['super_admin', 'admin', 'manager', 'verifier'] },
     { to: '/qr', label: 'QR & field app', icon: 'qr', roles: ['super_admin', 'admin', 'manager', 'preparer', 'verifier'] },
   ] },
   { group: 'Value chain', items: [{ to: '/suppliers', label: 'Suppliers', icon: 'users', roles: ['super_admin', 'admin', 'manager', 'preparer', 'verifier'] }, { label: 'Product LCA', icon: 'leaf', stage: 4 }] },
@@ -222,6 +223,7 @@ function Shell() {
           <Route path="/vault" element={<NeedCo><Vault /></NeedCo>} />
           <Route path="/metrics" element={<NeedCo><MetricRegistry /></NeedCo>} />
           <Route path="/credits" element={<NeedCo><CarbonCredits /></NeedCo>} />
+          <Route path="/batches" element={<NeedCo><BatchRuns /></NeedCo>} />
           <Route path="/calendar" element={<NeedCo><CollectionCalendar /></NeedCo>} />
           <Route path="/inbox" element={<NeedCo><Inbox onSeen={() => window.dispatchEvent(new Event('eko-inbox'))} /></NeedCo>} />
           <Route path="/account" element={<div className="page"><div className="acctgrid"><ChangePassword onDone={() => nav('/')} /><MfaCard /></div></div>} />

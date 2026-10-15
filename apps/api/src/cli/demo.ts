@@ -22,7 +22,7 @@ import { bookBill, createBill } from '../modules/bills.routes.js';
 import { PDFDocument, StandardFonts } from 'pdf-lib';
 import { demoPurchases } from './demoPurchases.js';
 import { purgeTenant } from '../db/purge.js';
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { linkBins } from '../modules/contractor.routes.js';
 import { sealFile } from '../lib/secrets.js';
 
@@ -480,6 +480,48 @@ async function main() {
   // purchases run after the company exists (the pipeline commits in chunks, like a real upload)
   const sa = (await platformTx((c: Tx) => c.query(`SELECT id, name, email, role, tenant_id, scope_node_id FROM app_user WHERE tenant_id = $1 AND role = 'super_admin' LIMIT 1`, [tenantId]))).rows[0];
   await demoPurchases(tenantId, { id: sa.id, name: sa.name, email: sa.email, role: 'super_admin', tenantId, scopeNodeId: null, mustChangePassword: false });
+  // Batch runs (DEMO, not real): source totals on the purchase files, three connected systems with 30 days of transfers, one failed batch
+  await platformTx(async (c: Tx) => {
+    const t = tenantId;
+    const bs = (await c.query(`SELECT b.id, b.name, count(l.*)::int AS n, coalesce(jsonb_object_agg(z.cur, z.amt) FILTER (WHERE z.cur IS NOT NULL), '{}') AS amounts
+                                 FROM purchase_batch b LEFT JOIN purchase_line l ON l.batch_id = b.id
+                                 LEFT JOIN LATERAL (SELECT coalesce(currency, 'AED') AS cur, sum(amount)::float8 AS amt FROM purchase_line WHERE batch_id = b.id GROUP BY 1) z ON true
+                                WHERE b.tenant_id = $1 GROUP BY b.id ORDER BY b.created_at`, [t])).rows;
+    for (const [i, b] of bs.entries()) {
+      const n = Number(b.n) / Math.max(1, Object.keys(b.amounts).length);   // the join repeats lines per currency
+      const amounts = Object.fromEntries(Object.entries(b.amounts as Record<string, number>).map(([k, v]) => [k, Math.round(v * 100) / 100]));
+      // the second file: the ERP footer says 3 more lines than the file holds (DEMO difference to investigate)
+      await c.query(`UPDATE purchase_batch SET control = $2 WHERE id = $1`, [b.id, JSON.stringify({ lines: Math.round(n) + (i === 1 ? 3 : 0), amounts, by: 'DEMO ERP extract footer (not real)', at: new Date().toISOString() })]);
+    }
+    const key = async (name: string, scopes: string[], expect: number) => (await c.query(
+      `INSERT INTO api_key (tenant_id, name, prefix, key_hash, scopes, created_by, created_at, last_used_at, expect_hours) VALUES ($1,$2,'ek_demo',$3,$4,'demo',now() - interval '60 days',now(),$5) RETURNING id`,
+      [t, name, `demo-${randomUUID()}`, scopes, expect])).rows[0].id as string;
+    const sap = await key('DEMO SAP S/4HANA purchases (not real)', ['purchases'], 24), bms = await key('DEMO BMS meter gateway (not real)', ['meter_readings'], 6), ora = await key('DEMO Oracle fleet fuel (not real)', ['meter_readings'], 24);
+    const run = (k: string, name: string, source: string, hoursAgo: number, st: string, http: number, rec: number, rej: number, err: string | null, problems: unknown[] = [], reference: string | null = null) => c.query(
+      `INSERT INTO integration_run (tenant_id, api_key_id, client, source, endpoint, status, http_status, received, accepted, rejected, error, problems, reference, duration_ms, at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14, now() - make_interval(hours => $15))`,
+      [t, k, name, source, source === 'purchases' ? 'POST /api/v1/purchases' : 'POST /api/v1/meter-readings', st, http, rec, st === 'failed' ? 0 : rec - rej, rej, err, JSON.stringify(problems), reference, 120 + Math.round(Math.random() * 900), hoursAgo]);
+    for (let d = 30; d >= 1; d--) {
+      if (d === 12) await run(sap, 'DEMO SAP S/4HANA purchases (not real)', 'purchases', d * 24 + 2, 'failed', 401, 0, 0, 'Access token not valid or expired');
+      const bad = d % 9 === 0 ? 2 : 0;
+      await run(sap, 'DEMO SAP S/4HANA purchases (not real)', 'purchases', d * 24, bad ? 'partial' : 'ok', 200, 180 + (d * 37) % 90, bad, null,
+        bad ? [{ index: 14, reason: 'Missing amount' }, { index: 61, reason: 'Facility "PLANT-99" not found' }] : [], `DEMO-SAP-${String(30 - d + 1).padStart(3, '0')}`);
+      if (d <= 3) await run(ora, 'DEMO Oracle fleet fuel (not real)', 'meter_readings', d * 24 - 4, 'failed', 400, 412, 412, 'Some fields are missing or invalid — readings.12.timestamp: Invalid datetime');
+      else await run(ora, 'DEMO Oracle fleet fuel (not real)', 'meter_readings', d * 24 - 4, 'ok', 200, 380 + (d * 13) % 60, 0, null);
+      for (let h = 0; h < 24; h += 6) {
+        const rej = (d + h) % 23 === 0 ? 1 : 0;
+        await run(bms, 'DEMO BMS meter gateway (not real)', 'meter_readings', d * 24 - h - 1, rej ? 'partial' : 'ok', 200, 96, rej, null, rej ? [{ index: 40, reason: 'meter "BMS-CH-07" is inactive' }] : []);
+      }
+    }
+    await c.query(`UPDATE api_key SET fail_alert_at = now() - interval '20 hours' WHERE id = $1`, [ora]);
+    // an API batch whose mapping failed (DEMO): Retry runs it again
+    const fb = (await c.query(`INSERT INTO purchase_batch (tenant_id, source, name, external_ref, settings, status, error, created_by, created_at)
+                                VALUES ($1, 'api', 'DEMO SAP S/4HANA purchases (not real): DEMO-SAP-REJECTED', 'DEMO-SAP-REJECTED', '{"currency":"AED","columns":{},"headerRow":0,"dateFormat":"ymd"}', 'failed',
+                                        'DEMO — the mapping job stopped: the server restarted while it ran', 'api:DEMO SAP S/4HANA purchases (not real)', now() - interval '2 days') RETURNING id`, [t])).rows[0].id;
+    await c.query(`INSERT INTO job (tenant_id, kind, ref, status, attempts, error, created_by, created_at, started_at, finished_at)
+                   VALUES ($1, 'purchase_map', $2, 'failed', 1, 'DEMO — the mapping job stopped: the server restarted while it ran', 'api:DEMO SAP', now() - interval '2 days', now() - interval '2 days', now() - interval '2 days')`, [t, fb]);
+    console.log(`Batch runs: source totals on ${bs.length} purchase files (one with a DEMO difference), 3 DEMO connected systems with 30 days of transfers (Oracle failing), 1 failed batch to retry.`);
+  });
   // entries typed in during the year came in a few days after each month, most before the due date (before 2025 is locked below)
   await platformTx((c: Tx) => c.query(`UPDATE activity SET submitted_at = least(period_end + (2 + floor(random() * 11))::int, now() - interval '1 day')
                                          WHERE tenant_id = $1 AND status = 'approved' AND submitted_at IS NULL AND period_end < now()`, [tenantId]));

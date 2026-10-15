@@ -2,6 +2,17 @@
 
 Newest first.
 
+## 2026-10-15 · Batch runs: transfer log, integration health, reconciliation, retry
+
+- **Batch runs** (Menu → Capture, was a stage-4 placeholder): `/batches`, for super admin, admin, verifier (all) and manager (batches of their facilities).
+  - **Transfer log:** every POST by a known client to `/api/v1/meter-readings`, `/api/v1/purchases` and `/complete` is logged (`integration_run`, new): records received, accepted, refused with reasons (sample of 200), HTTP status, error returned, batch reference and link, duration. Failed calls included (the client is identified before validation; content-type checks moved after it). Kept 400 days.
+  - **Integration health** per API client: healthy / failures in the last 24 h / failing / gone quiet / never / revoked; transfers, failures, records accepted; last success and failure; expected interval (`api_key.expect_hours`). Alerts to super admins and admins: a failed call (at most once an hour per client) and a quiet client (once per gap, hourly check in the collection worker). Purchase-file and utility-bill channels shown beside.
+  - **Reconciliation** per purchase batch: source control totals (`purchase_batch.control`: lines, amount per currency) sent by the system (`control` on `/api/v1/purchases` or `/complete`) or entered for a file; flow sent → received → published / excluded / duplicates / problems / in review → entries by status (lines, amounts per currency, tCO₂e); checks (lines, totals per currency, every line has an outcome, published lines in entries, entry emissions = line emissions, entries approved); state reconciled / differences / in review / no source totals / not processed; problem lines, published lines missing from entries, transfer and job history.
+  - **Retry** of failed processing (re-queues the failed job; super admin, admin, manager; audited `batch.retry`).
+  - Meter-reading review batches listed with received, refused, new / corrections / duplicates / conflicts.
+- DEMO: source totals on both purchase files (the second 3 lines short of its footer), three DEMO connected systems with 30 days of transfers (Oracle failing, SAP gone quiet), one failed API batch to retry.
+- Migration 043. Manual chapter "Batch runs"; Integrations chapter: control totals and the transfer log. Test added (76 API tests pass).
+
 ## 2026-10-15 · Carbon credits register (Net zero)
 
 - **Carbon credits** (Menu → Net zero, was a stage-4 placeholder): `/credits`.

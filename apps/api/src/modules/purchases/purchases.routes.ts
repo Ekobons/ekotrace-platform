@@ -729,20 +729,23 @@ export async function purchaseRoutes(app: FastifyInstance) {
 // ------------------------------------------------------------- machine API --
 /**
  * For ERP systems (SAP, Oracle, Dynamics…) sending purchase lines:
- *   POST /api/v1/purchases                 { reference, name?, currency?, facility?, complete?, lines: [...] }  (≤ 10,000 lines per call)
- *   POST /api/v1/purchases/{reference}/complete    all lines sent: map and calculate
+ *   POST /api/v1/purchases                 { reference, name?, currency?, facility?, complete?, control?, lines: [...] }  (≤ 10,000 lines per call)
+ *   POST /api/v1/purchases/{reference}/complete    { control? } all lines sent: map and calculate; control = the source totals { lines, amounts: { AED: 12345.67 } } for reconciliation
  *   GET  /api/v1/purchases/{reference}     status and counts
  * A batch collects every call with the same reference until it is completed; it is then
  * reviewed and published on the screen, like an upload.
  */
+/** The source system's control totals for a batch (reconciliation): line count and total amount per currency. */
+export const controlSchema = z.object({ lines: z.number().int().min(0).max(10_000_000).optional(), amounts: z.record(z.string().regex(/^[A-Z]{3}$/), z.number().finite()).optional() })
+  .refine((x) => x.lines !== undefined || (x.amounts && Object.keys(x.amounts).length), 'Give the line count or the totals');
 export async function purchaseIngestRoutes(app: FastifyInstance) {
   const ref = z.string().trim().min(1).max(120).regex(/^[\w.:\-/ ]+$/, 'Letters, digits and . : - / _ only');
   app.post('/api/v1/purchases', { bodyLimit: 30 * 1024 * 1024 }, async (req) => {
-    if (!/^application\/json/.test(String(req.headers['content-type'] ?? ''))) throw new AppError('Send JSON (Content-Type: application/json)', 415, 'UNSUPPORTED');
     const k = await apiClient(req, 'purchases');
+    if (!/^application\/json/.test(String(req.headers['content-type'] ?? ''))) throw new AppError('Send JSON (Content-Type: application/json)', 415, 'UNSUPPORTED');
     const b = z.object({
       reference: ref, name: z.string().trim().max(120).optional(), currency: z.string().regex(/^[A-Z]{3}$/).optional(), facility: z.string().max(200).optional(),
-      dateFormat: z.enum(['dmy', 'mdy', 'ymd']).default('ymd'), complete: z.boolean().default(false), lines: z.array(lineSchema).max(10000),
+      dateFormat: z.enum(['dmy', 'mdy', 'ymd']).default('ymd'), complete: z.boolean().default(false), lines: z.array(lineSchema).max(10000), control: controlSchema.optional(),
     }).parse(req.body);
     return tenantTx(k.tenant_id, async (c) => {
       const t = (await c.query('SELECT currency FROM tenant WHERE id = $1', [k.tenant_id])).rows[0];
@@ -761,6 +764,7 @@ export async function purchaseIngestRoutes(app: FastifyInstance) {
       const lines = b.lines.map((l, i) => buildLine(toRaw(l), start + i + 1, batch.settings as BatchSettings, fac));
       for (let i = 0; i < lines.length; i += 2000) await insertLines(c, k.tenant_id, batch.id, lines.slice(i, i + 2000));
       const problems = lines.map((l, i) => ({ index: i, problems: l.problems })).filter((x) => x.problems.length);
+      if (b.control) await c.query(`UPDATE purchase_batch SET control = $2 WHERE id = $1`, [batch.id, JSON.stringify({ ...b.control, by: `API client: ${k.name}`, at: new Date().toISOString() })]);
       if (b.complete) {
         await c.query(`UPDATE purchase_batch SET status = 'queued' WHERE id = $1`, [batch.id]);
         await enqueue(c, k.tenant_id, 'purchase_map', batch.id, {}, `api:${k.name}`);
@@ -774,10 +778,12 @@ export async function purchaseIngestRoutes(app: FastifyInstance) {
   app.post('/api/v1/purchases/:reference/complete', async (req) => {
     const k = await apiClient(req, 'purchases');
     const r = ref.parse((req.params as { reference: string }).reference);
+    const control = z.object({ control: controlSchema.optional() }).parse(req.body ?? {}).control;
     return tenantTx(k.tenant_id, async (c) => {
       const batch = (await c.query(`SELECT id, status FROM purchase_batch WHERE external_ref = $1`, [r])).rows[0];
       if (!batch) throw notFound(`Batch "${r}"`);
       if (batch.status !== 'receiving') throw new AppError(`Batch "${r}" is already complete (${batch.status})`, 409, 'BATCH_CLOSED');
+      if (control) await c.query(`UPDATE purchase_batch SET control = $2 WHERE id = $1`, [batch.id, JSON.stringify({ ...control, by: `API client: ${k.name}`, at: new Date().toISOString() })]);
       await c.query(`UPDATE purchase_batch SET status = 'queued' WHERE id = $1`, [batch.id]);
       await enqueue(c, k.tenant_id, 'purchase_map', batch.id, {}, `api:${k.name}`);
       return { reference: r, status: 'queued' };

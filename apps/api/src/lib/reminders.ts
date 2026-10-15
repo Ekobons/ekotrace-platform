@@ -15,6 +15,7 @@ import { cycleSettings, ensureMetrics, obligations, todayIn, type Obligation, ty
 import { notify } from './notify.js';
 import { deliverEmails } from './mail.js';
 import { PRODUCT } from './brand.js';
+import { checkIntegrations } from './integrations.js';
 
 const fmt = (d: string) => new Date(d + 'T00:00:00Z').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
 export const obLine = (o: Obligation) => `${o.facility} · ${o.metric} (${o.metricCode}) · ${o.label} · due ${fmt(o.due)}${o.daysLate ? ` · ${o.daysLate} day${o.daysLate > 1 ? 's' : ''} late` : ''}`;
@@ -102,7 +103,7 @@ export function startCollectionWorker(log: (m: string) => void = console.log) {
     try { const n = await deliverEmails(); if (n) log(`[mail] ${n} e-mail(s) sent`); } catch (e) { log(`[mail] ${(e as Error).message}`); } finally { busy = false; }
   }, 30_000);
   mailTimer.unref();
-  const rem = () => runReminders(new Date(), log).catch((e) => log(`[reminders] ${(e as Error).message}`));
+  const rem = () => runReminders(new Date(), log).then(() => checkIntegrations(log)).catch((e) => log(`[reminders] ${(e as Error).message}`));
   setTimeout(rem, 60_000).unref();
   remTimer = setInterval(rem, 3600_000);
   remTimer.unref();

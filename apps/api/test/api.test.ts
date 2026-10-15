@@ -2778,3 +2778,75 @@ test('carbon credits: lots, retirements from delivered credits only, second-pers
   assert.equal((await api('GET', '/api/credits?year=2025', undefined, tenantB)).body.lots.length, 0);
   assert.equal((await api('POST', `/api/credits/retirements/${r1}/decide`, { decision: 'reject', note: 'x' }, tenantB)).status, 404);
 });
+
+test('batch runs: every machine-API transfer logged (accepted, refused with reasons, failed calls), failure and quiet-system alerts, purchase-batch reconciliation against source control totals, retry of failed processing; companies kept apart', async () => {
+  const { checkIntegrations } = await import('../src/lib/integrations.js');
+  const sap = (await api('POST', '/api/api-keys', { name: 'Batch SAP', scopes: ['purchases'] }, tenantA)).body;
+  const bms = (await api('POST', '/api/api-keys', { name: 'Batch BMS' }, tenantA)).body;
+  const send = (k: string, path: string, body: unknown) => app.inject({ method: 'POST', url: path, payload: body as object, headers: { authorization: `Bearer ${k}`, 'content-type': 'application/json' } });
+  const notes = async (re: RegExp) => (await pq(`SELECT n.title FROM notification n JOIN app_user u ON u.id = n.user_id WHERE n.tenant_id = $1 AND n.kind = 'integration' AND u.email = 'super@a.test'`, [tenantA])).rows.filter((r) => re.test(r.title)).length;
+  // a failed call (no reference) is logged with its reason and tells the admins once an hour
+  assert.equal((await send(sap.key, '/api/v1/purchases', { lines: [] })).statusCode, 400);
+  assert.equal((await send(sap.key, '/api/v1/purchases', { lines: [] })).statusCode, 400);
+  assert.equal(await notes(/Transfer failed: Batch SAP/), 1, 'one failure notice an hour');
+  // lines with source control totals: 4 lines arrive, the source says 5
+  const lines = Array.from({ length: 4 }, (_, i) => ({ date: '2024-05-10', description: 'Security guards monthly', amount: 1000, currency: 'AED', supplier: `Guard Co ${i}`, facility: 'Sharjah plant' }));
+  const r = await send(sap.key, '/api/v1/purchases', { reference: 'BR-2024-05', lines, complete: true, control: { lines: 5, amounts: { AED: 4000 } } });
+  assert.equal(r.statusCode, 200, r.body);
+  // meter readings with one unknown meter: partial, the reason kept
+  const m = await send(bms.key, '/api/v1/meter-readings', { readings: [{ meterId: 'NO-SUCH-METER', timestamp: '2024-05-01T00:00:00Z', value: 1 }] });
+  assert.equal(m.statusCode, 200, m.body);
+  await drain();
+  const d = (await api('GET', '/api/batches?days=7', undefined, tenantA)).body;
+  const runs = d.transfers.filter((t: { client: string }) => /^Batch (SAP|BMS)$/.test(t.client));
+  assert.equal(runs.filter((t: { status: string }) => t.status === 'failed').length, 2);
+  assert.ok(runs.find((t: { status: string; error: string }) => t.status === 'failed').error.length > 5);
+  const part = runs.find((t: { client: string }) => t.client === 'Batch BMS');
+  assert.equal(part.status, 'partial'); assert.equal(part.rejected, 1);
+  const one = (await api('GET', `/api/batches/transfers/${part.id}`, undefined, tenantA)).body;
+  assert.match(one.problems[0].reason, /unknown meterId/);
+  const s = d.sources.find((x: { name: string }) => x.name === 'Batch SAP');
+  assert.equal(s.failed, 2); assert.equal(s.health, 'warning', 'recovered, with failures in the last 24 hours');
+  // reconciliation: the line count differs from the source; totals agree; fixed when the source corrects its count
+  const b = d.batches.find((x: { external_ref: string }) => x.external_ref === 'BR-2024-05');
+  assert.equal(b.recon, 'differences'); assert.equal(b.lines, 4);
+  const rec = (await api('GET', `/api/batches/purchase/${b.id}`, undefined, tenantA)).body;
+  assert.equal(rec.checks.find((c: { id: string }) => c.id === 'lines').ok, false);
+  assert.equal(rec.checks.find((c: { id: string }) => c.id === 'amount:AED').ok, true);
+  assert.equal(rec.runs.length, 1);
+  assert.equal((await api('PUT', `/api/batches/purchase/${b.id}/control`, { control: { lines: 4 } }, tenantA)).status, 403, 'platform staff do not enter company figures');
+  const nu = await api('POST', '/api/users', { name: 'Bea Admin', email: 'bea.admin@a.test', role: 'admin', scopeNodeId: (await api('GET', '/api/org', undefined, tenantA)).body.nodes.find((n: { kind: string }) => n.kind === 'group').id }, tenantA);
+  let adm = await login('bea.admin@a.test', nu.body.temporaryPassword);
+  await call(adm, 'POST', '/api/auth/password', { current: nu.body.temporaryPassword, next: 'a long enough pass' });
+  adm = await login('bea.admin@a.test', 'a long enough pass');
+  assert.equal((await call(adm, 'PUT', `/api/batches/purchase/${b.id}/control`, { control: { lines: 4, amounts: { AED: 4000 } } })).status, 200);
+  assert.notEqual((await api('GET', `/api/batches/purchase/${b.id}`, undefined, tenantA)).body.state, 'differences');
+  // publish: every published line is in an entry with the same emissions
+  await pq(`UPDATE purchase_line SET status = 'ready' WHERE batch_id = $1 AND status IN ('check', 'flagged')`, [b.id]);   // as if the reviewer confirmed them
+  assert.equal((await call(adm, 'POST', `/api/purchases/batches/${b.id}/publish`, {})).status, 200);
+  await drain();
+  const after = (await api('GET', `/api/batches/purchase/${b.id}`, undefined, tenantA)).body;
+  assert.equal(after.batch.status, 'published', JSON.stringify(after.outcomes));
+  {
+    assert.equal(after.checks.find((c: { id: string }) => c.id === 'entries').ok, true, JSON.stringify(after.checks));
+    assert.equal(after.checks.find((c: { id: string }) => c.id === 'co2e').ok, true, JSON.stringify(after.checks));
+  }
+  // a system expected every hour that has gone quiet: one notice per gap
+  assert.equal((await api('PUT', `/api/batches/sources/${bms.id}`, { expectHours: 1 }, tenantA)).status, 200);
+  await pq(`UPDATE integration_run SET at = now() - interval '3 hours' WHERE api_key_id = $1`, [bms.id]);
+  await checkIntegrations(); await checkIntegrations();
+  assert.equal(await notes(/No data from Batch BMS/), 1);
+  assert.equal((await api('GET', '/api/batches', undefined, tenantA)).body.sources.find((x: { name: string }) => x.name === 'Batch BMS').health, 'quiet');
+  // failed processing runs again; a batch that did not fail does not
+  const fb = (await pq(`INSERT INTO purchase_batch (tenant_id, source, name, settings, status, error) VALUES ($1, 'api', 'Broken', '{}', 'failed', 'boom') RETURNING id`, [tenantA])).rows[0].id;
+  await pq(`INSERT INTO job (tenant_id, kind, ref, status, error) VALUES ($1, 'purchase_map', $2, 'failed', 'boom')`, [tenantA, fb]);
+  assert.equal((await api('POST', `/api/batches/purchase/${b.id}/retry`, {}, tenantA)).status, 409);
+  assert.equal((await api('POST', `/api/batches/purchase/${fb}/retry`, {}, tenantA)).status, 200);
+  assert.equal((await pq(`SELECT count(*)::int AS n FROM job WHERE ref = $1 AND status = 'queued'`, [fb])).rows[0].n, 1);
+  await drain();
+  // companies kept apart
+  const other = (await api('GET', '/api/batches', undefined, tenantB)).body;
+  assert.ok(!other.transfers.some((t: { client: string }) => /^Batch /.test(t.client)));
+  assert.equal((await api('GET', `/api/batches/transfers/${part.id}`, undefined, tenantB)).status, 404);
+  assert.equal((await api('GET', `/api/batches/purchase/${b.id}`, undefined, tenantB)).status, 404);
+});

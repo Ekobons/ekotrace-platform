@@ -644,6 +644,7 @@ export async function apiClient(req: FastifyRequest, scope: 'meter_readings' | '
   if (!tok.startsWith('ek_') && !claims) throw new AppError('Access token not valid or expired', 401, 'UNAUTHENTICATED');
   const k = await platformTx(async (c) => (await c.query(claims ? `${KEY_SQL} k.id = $1` : `${KEY_SQL} k.key_hash = $1`, [claims ? claims.sub : sha256(tok)])).rows[0]);
   if (!k || (claims && claims.tid !== k.tenant_id)) throw new AppError('API client not valid or revoked', 401, 'UNAUTHENTICATED');
+  req.ingestClient = { id: k.id, name: k.name, tenant_id: k.tenant_id };
   if (!k.scopes.includes(scope)) throw new AppError(`This client cannot ${SCOPE_TEXT[scope]}`, 403, 'FORBIDDEN');
   rateLimit(k.id);
   await platformTx((c) => c.query('UPDATE api_key SET last_used_at = now() WHERE id = $1', [k.id]));
@@ -678,9 +679,8 @@ export async function meterIngestRoutes(app: FastifyInstance) {
   });
 
   app.post('/api/v1/meter-readings', { bodyLimit: 20 * 1024 * 1024 }, async (req) => {
-    const ct = String(req.headers['content-type'] ?? '');
-    if (!/^application\/json/.test(ct)) throw new AppError('Send JSON (Content-Type: application/json)', 415, 'UNSUPPORTED');
     const k = await keyOf(req);
+    if (!/^application\/json/.test(String(req.headers['content-type'] ?? ''))) throw new AppError('Send JSON (Content-Type: application/json)', 415, 'UNSUPPORTED');
     const b = z.object({ readings: z.array(z.object({ meterId: z.string().min(1).max(120) }).and(readingSchema)).min(1).max(100000) }).parse(req.body);
     const t = await tenantSettings(k.tenant_id);
     return tenantTx(k.tenant_id, async (c) => {

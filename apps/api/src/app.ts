@@ -47,6 +47,8 @@ import { reportsRoutes } from './modules/reports.routes.js';
 import { collectionRoutes } from './modules/collection.routes.js';
 import { restatementRoutes } from './modules/restatement.routes.js';
 import { creditRoutes } from './modules/credits.routes.js';
+import { batchRoutes } from './modules/batches.routes.js';
+import { logTransfers } from './lib/integrations.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const BRANDS = join(HERE, '../../../brands');
@@ -93,6 +95,9 @@ export async function buildApp(opts: { logger?: boolean; rateLimit?: Limits | nu
     return JSON.parse(readFileSync(f, 'utf8'));
   });
 
+  // Every transfer by a connected system is logged as a run (Batch runs: health, reconciliation).
+  logTransfers(app);
+
   // Login / logout (open), then everything else behind a valid session.
   await app.register(authRoutes);
   // Machine API for systems that send meter readings: API key, no session.
@@ -114,6 +119,7 @@ export async function buildApp(opts: { logger?: boolean; rateLimit?: Limits | nu
     await secured.register(collectionRoutes);
     await secured.register(restatementRoutes);
     await secured.register(creditRoutes);
+    await secured.register(batchRoutes);
     await secured.register(qrRoutes);
     await secured.register(contractorRoutes);
     await secured.register(assuranceRoutes);

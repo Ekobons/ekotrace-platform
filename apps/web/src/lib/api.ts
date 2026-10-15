@@ -192,6 +192,38 @@ export interface RestatementData {
   canPropose: boolean; canDecide: boolean; canSettings: boolean;
 }
 
+// ------------------------------------------------------------ batch runs --
+export interface BatchCheck { id: string; name: string; ok: boolean | null; detail: string }
+export type Recon = 'balanced' | 'differences' | 'open' | 'no_control' | 'failed';
+export interface BatchRow {
+  id: string; name: string; source: 'upload' | 'manual' | 'api'; external_ref: string | null; status: string; error: string | null; created_at: string; published_at: string | null; created_by_name: string | null;
+  control: { lines?: number; amounts?: Record<string, number>; by?: string; at?: string } | null; lines: number; problem: number; excluded: number; dup: number; pending: number; published: number;
+  pub_kg: number; no_entry: number; amounts: Record<string, number>; entries: number; approved: number; entry_kg: number; job_kind: string | null; job_status: string | null; job_error: string | null; job_attempts: number | null;
+  recon: Recon; failedChecks: string[]; retry: boolean;
+}
+export interface ReadingBatchRow { id: string; client: string | null; status: 'review' | 'published' | 'discarded'; received: number; rejected: number; created_at: string; decided_at: string | null; decided_by: string | null; staged: Record<string, number>; result: Record<string, unknown> | null }
+export interface IntegrationSource {
+  id: string; name: string; prefix: string; scopes: string[]; created_at: string; last_used_at: string | null; revoked_at: string | null; expect_hours: number | null;
+  runs: number; ok: number; partial: number; failed: number; received: number; accepted: number; rejected: number; last_run: string | null; last_ok: string | null; last_fail: string | null; last_error: string | null;
+  health: 'healthy' | 'warning' | 'failing' | 'quiet' | 'never' | 'revoked'; quietHours: number;
+}
+export interface Transfer {
+  id: string; client: string | null; api_key_id: string | null; source: string; endpoint: string; status: 'ok' | 'partial' | 'failed'; http_status: number; received: number; accepted: number; rejected: number;
+  error: string | null; reference: string | null; ref_kind: string | null; ref_id: string | null; duration_ms: number | null; at: string; problems?: { index: number; reason: string }[];
+}
+export interface BatchesData {
+  days: number; batches: BatchRow[]; readings: ReadingBatchRow[]; sources: IntegrationSource[]; transfers: Transfer[]; sourceText: Record<string, string>;
+  channels: { uploads: { n: number; failed: number; review: number; last: string | null }; bills: { n: number; review: number; rejected: number; last: string | null } };
+  canManage: boolean; seesSources: boolean;
+}
+export interface BatchRecon {
+  batch: { id: string; name: string; source: string; reference: string | null; status: string; error: string | null; created_at: string; published_at: string | null; created_by: string | null; control: BatchRow['control'] };
+  received: { lines: number; amounts: Record<string, number> }; outcomes: { outcome: string; lines: number; amounts: Record<string, number>; kg: number }[];
+  entries: { status: string; n: number; kg: number }[]; checks: BatchCheck[]; state: Recon; problems: { row_no: number; description: string | null; problems: string[]; calc_error: string | null }[];
+  missing: { row_no: number; description: string | null; kg: number }[]; runs: Transfer[]; jobs: { id: number; kind: string; status: string; attempts: number; error: string | null; created_at: string; finished_at: string | null }[];
+  canControl: boolean; canRetry: boolean;
+}
+
 // ------------------------------------------------------------ carbon credits --
 export interface CreditLot {
   id: string; project: string; project_id: string | null; registry: string; methodology: string | null; category: 'avoidance' | 'removal_nature' | 'removal_technical'; project_type: string | null; country: string | null;
@@ -701,6 +733,14 @@ export const api = {
   restatementDecide: (id: string, decision: 'approve' | 'reject', note?: string) => call<{ status: string; applied: boolean; before: number; after: number; pct: number; cumulativePct: number; alsoApplied: number }>('POST', `/api/restatements/${id}/decide`, { decision, note }),
   restatementWithdraw: (id: string) => call<{ ok: true }>('DELETE', `/api/restatements/${id}`),
   restatementSettings: (threshold: number) => call<{ threshold: number }>('PUT', '/api/restatements/settings', { threshold }),
+  // batch runs
+  batches: (days: number) => call<BatchesData>('GET', `/api/batches?days=${days}`),
+  batchRecon: (id: string) => call<BatchRecon>('GET', `/api/batches/purchase/${id}`),
+  batchControl: (id: string, control: { lines?: number; amounts?: Record<string, number> } | null) => call<{ ok: true }>('PUT', `/api/batches/purchase/${id}/control`, { control }),
+  batchRetry: (id: string) => call<{ ok: true; jobId: number }>('POST', `/api/batches/purchase/${id}/retry`),
+  batchReadings: (id: string) => call<Omit<ReadingBatchRow, 'rejected'> & { rejected: { index: number; reason: string }[]; staged: Record<string, number>; meters: { name: string; external_id: string; facility: string; n: number }[] }>('GET', `/api/batches/readings/${id}`),
+  transfer: (id: string) => call<Transfer>('GET', `/api/batches/transfers/${id}`),
+  sourceExpect: (id: string, expectHours: number | null) => call<{ ok: true }>('PUT', `/api/batches/sources/${id}`, { expectHours }),
   // carbon credits
   credits: (year?: number) => call<CreditData>('GET', `/api/credits${year ? `?year=${year}` : ''}`),
   creditLotSave: (b: CreditLotBody, id?: string) => call<{ id?: string; ok?: true }>(id ? 'PUT' : 'POST', id ? `/api/credits/lots/${id}` : '/api/credits/lots', b),

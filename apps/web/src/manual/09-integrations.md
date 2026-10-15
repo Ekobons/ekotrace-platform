@@ -68,3 +68,11 @@ The client needs the **Purchase lines** permission (tick it when creating the cl
 | capital | no | true for capitalised purchases (Scope 3.2) |
 
 At most 10,000 lines per call and 200,000 per reference. A completed reference is closed; corrections go under a new one. The batch is then reviewed and published under Add data → Purchases (Batches).
+
+**Control totals (reconciliation).** Send the source's own count and totals with the batch, on any call or on `complete`:
+
+    "control": { "lines": 1250, "amounts": { "AED": 4778973.97, "USD": 21673.23 } }
+
+Batch runs then compares them with what arrived and flags any difference.
+
+**Every call is logged.** Each call to the API by a client, successful or not, appears under Capture → **Batch runs → Transfers** with the records received, accepted and refused (and why). A failed call tells the super admins and admins at most once an hour per client. Set how often each system is expected to send; when it goes quiet for longer, they are told once.
