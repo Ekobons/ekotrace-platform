@@ -10,8 +10,33 @@ import { AppError, notFound } from '../../lib/errors.js';
 import { enqueue } from '../../lib/jobs.js';
 import { normSupplier } from './fields.js';
 import { calcLines } from './pipeline.js';
+import { countryCode } from './supplierMatch.js';
+import { STAGE_SQL, supplierScore } from '../../lib/supplierScore.js';
+import { completeness } from '../supplierPortal.routes.js';
+
+/** The supplier's latest data request (any year) and its line in the SBTi list. */
+export const ENGAGE_JOIN = `LEFT JOIN LATERAL (SELECT r.id, r.year, r.status, r.revoked, r.last_used_at, r.answers FROM supplier_request r WHERE r.supplier_id = s.id AND NOT r.revoked ORDER BY r.year DESC, r.created_at DESC LIMIT 1) rq ON true
+  LEFT JOIN LATERAL (SELECT z.name AS sbti_name, z.near_status, z.near_class, z.near_year, z.net_zero_status, z.net_zero_year FROM sbti_company z WHERE z.norm = s.norm OR z.norm = ANY(s.aliases) ORDER BY (z.norm = s.norm) DESC LIMIT 1) sb ON true`;
+/** Score, stage and completion of a supplier row that has the ENGAGE_JOIN columns. */
+export function engagement(r: Record<string, any>) {
+  const sc = supplierScore({ reports_emissions: r.reports_emissions, climate_target: r.climate_target, cdp_score: r.cdp_score, target: r.target, sbti: r.near_status ? { near_status: r.near_status, net_zero_year: r.net_zero_year } : null, request: r.rq_status ? { status: r.rq_status, answers: r.rq_answers } : null });
+  const pr = r.rq_status ? completeness(r.rq_answers ?? {}) : null;
+  return { score: sc.score, letter: sc.letter, ghgReport: sc.ghgReport, sbti: sc.sbtiValidated, completion: pr ? Math.round((pr.n / pr.of) * 100) : null, sbtiList: r.near_status ? { name: r.sbti_name, status: r.near_status, classification: r.near_class, netZero: r.net_zero_status, netZeroYear: r.net_zero_year } : null };
+}
 
 const uuid = z.string().uuid();
+export const CDP_SCORES = ['A', 'A-', 'B', 'B-', 'C', 'C-', 'D', 'D-', 'F'] as const;
+export const targetSchema = z.object({ reductionPct: z.number().min(0).max(100).nullable().optional(), baseYear: z.number().int().min(1990).max(2100).nullable().optional(),
+  targetYear: z.number().int().min(2000).max(2100).nullable().optional(), netZeroYear: z.number().int().min(2020).max(2100).nullable().optional(), scopes: z.string().max(120).nullable().optional(), source: z.string().max(200).nullable().optional() });
+const optS = (n: number) => z.string().trim().max(n).optional().transform((v) => v || undefined);
+/** A supplier entered by hand or from a list. */
+export const supplierBody = z.object({
+  name: z.string().trim().min(1).max(300), country: z.string().trim().optional().transform((v, ctx) => { if (!v) return undefined; const cc = countryCode(v); if (!cc) { ctx.addIssue({ code: 'custom', message: `Country "${v}" not recognised` }); return z.NEVER; } return cc; }),
+  reference: optS(120), contactEmail: z.string().trim().email().max(200).optional().or(z.literal('').transform(() => undefined)), contactName: optS(120), industry: optS(120),
+  size: z.enum(['micro', 'small', 'medium', 'large']).optional(), website: optS(200), kind: z.enum(['current', 'prospect']).default('current'), department: optS(120), trn: optS(40),
+  cdpScore: z.enum(CDP_SCORES).optional(), cdpYear: z.number().int().min(2000).max(2100).optional(), reportsEmissions: z.enum(['yes', 'no', 'unknown']).optional(),
+  climateTarget: z.enum(['sbti_validated', 'sbti_committed', 'own', 'none', 'unknown']).optional(), target: targetSchema.optional(), note: optS(2000),
+});
 const MANAGE = ['super_admin', 'admin', 'manager'] as const;
 
 /** Recalculate unpublished lines of these suppliers in every open batch. */
@@ -34,6 +59,8 @@ export async function supplierRoutes(app: FastifyInstance) {
     const tenant = requireTenant(req);
     const q = z.object({ q: z.string().max(200).optional(), offset: z.coerce.number().int().min(0).default(0), limit: z.coerce.number().int().min(1).max(200).default(50),
       filter: z.enum(['all', 'with_factor', 'without_factor', 'review', 'incomplete']).default('all'), country: z.string().max(10).optional(),
+      stage: z.enum(['not_engaged', 'invited', 'signed_in', 'started', 'submitted', 'finished']).optional(), kind: z.enum(['current', 'prospect']).optional(),
+      department: z.string().max(120).optional(), code: z.string().max(120).optional(),
       sort: z.enum(['co2e', 'spend', 'name', 'lines']).default('co2e') }).parse(req.query);
     return tenantTx(tenant, async (c) => {
       const params: unknown[] = [q.limit, q.offset];
@@ -43,21 +70,32 @@ export async function supplierRoutes(app: FastifyInstance) {
       if (q.filter === 'without_factor') conds.push('NOT EXISTS (SELECT 1 FROM supplier_ef e WHERE e.supplier_id = s.id)');
       if (q.filter === 'review') conds.push(`s.review = 'possible_duplicate'`);
       if (q.filter === 'incomplete') conds.push(`${COMPLETE} < 1`);
+      if (q.stage) { params.push(q.stage); conds.push(`${STAGE_SQL} = $${params.length}`); }
+      if (q.kind) { params.push(q.kind); conds.push(`s.kind = $${params.length}`); }
+      if (q.department) { params.push(q.department); conds.push(`s.department = $${params.length}`); }
+      if (q.code) { params.push(`%${q.code.toLowerCase()}%`); conds.push(`lower(coalesce(s.reference, '')) LIKE $${params.length}`); }
       if (q.country) { params.push(q.country === 'none' ? null : q.country); conds.push(q.country === 'none' ? `s.country IS NULL AND $${params.length}::text IS NULL` : `s.country = $${params.length}`); }
       const order = { co2e: 'coalesce(x.co2e, 0) DESC', spend: 'coalesce(x.usd, 0) DESC', name: 's.name', lines: 'coalesce(x.lines, 0) DESC' }[q.sort];
       const rows = (await c.query(
         `SELECT s.id, s.name, s.aliases, s.country, s.reference, s.contact_email, s.industry, s.origin, s.active, s.review, s.duplicate_score, s.created_at,
+                s.kind, s.department, s.cdp_score, s.climate_target, s.reports_emissions, s.target, ${STAGE_SQL} AS stage, rq.status AS rq_status, rq.answers AS rq_answers, rq.year AS rq_year,
+                sb.sbti_name, sb.near_status, sb.near_class, sb.net_zero_status, sb.net_zero_year,
                 d.name AS duplicate_of_name, d.id AS duplicate_of, round(${COMPLETE}, 2)::float8 AS completeness,
                 coalesce(x.lines, 0) AS lines, coalesce(x.usd, 0)::float8 AS usd, coalesce(x.co2e, 0)::float8 AS co2e, coalesce(x.supplier_lines, 0) AS supplier_lines,
                 (SELECT count(*)::int FROM supplier_ef e WHERE e.supplier_id = s.id) AS factors, count(*) OVER () AS total
            FROM supplier s LEFT JOIN supplier d ON d.id = s.duplicate_of
+           ${ENGAGE_JOIN}
            LEFT JOIN LATERAL (SELECT count(*)::int AS lines, sum(usd) AS usd, sum(co2e) FILTER (WHERE status IN ('ready','check','published')) AS co2e,
                                      count(*) FILTER (WHERE method = 'supplier')::int AS supplier_lines FROM purchase_line l WHERE l.supplier_id = s.id) x ON true
           WHERE ${conds.join(' AND ')}
           ORDER BY ${order}, s.name LIMIT $1 OFFSET $2`, params)).rows;
       const counts = (await c.query(`SELECT count(*)::int AS all, count(*) FILTER (WHERE review = 'possible_duplicate')::int AS review, count(*) FILTER (WHERE ${COMPLETE} < 1)::int AS incomplete FROM supplier s`)).rows[0];
       const autoLinked = Number((await c.query(`SELECT count(*) FROM supplier_match WHERE method = 'similar' AND NOT confirmed`)).rows[0].count);
-      return { total: Number(rows[0]?.total ?? 0), counts: { ...counts, autoLinked }, suppliers: rows.map(({ total: _t, ...r }) => r) };
+      const stages = Object.fromEntries((await c.query(`SELECT ${STAGE_SQL} AS stage, count(*)::int AS n FROM supplier s ${ENGAGE_JOIN} WHERE s.active GROUP BY 1`)).rows.map((r) => [r.stage, r.n]));
+      const departments = (await c.query(`SELECT DISTINCT department FROM supplier WHERE department IS NOT NULL ORDER BY 1`)).rows.map((r) => r.department as string);
+      const prospects = Number((await c.query(`SELECT count(*)::int AS n FROM supplier WHERE kind = 'prospect'`)).rows[0].n);
+      return { total: Number(rows[0]?.total ?? 0), counts: { ...counts, autoLinked, prospects }, stages, departments,
+        suppliers: rows.map(({ total: _t, rq_answers: _a, sbti_name: _n, near_status: _s, near_class: _c, net_zero_status: _z, net_zero_year: _y, ...r }) => ({ ...r, ...engagement({ ...r, rq_answers: _a, sbti_name: _n, near_status: _s, near_class: _c, net_zero_status: _z, net_zero_year: _y }) })) };
     });
   });
 
@@ -80,8 +118,15 @@ export async function supplierRoutes(app: FastifyInstance) {
     const tenant = requireTenant(req);
     const id = uuid.parse((req.params as { id: string }).id);
     return tenantTx(tenant, async (c) => {
-      const s = (await c.query(`SELECT s.*, round(${COMPLETE}, 2)::float8 AS completeness FROM supplier s WHERE id = $1`, [id])).rows[0];
+      const s = (await c.query(`SELECT s.*, round(${COMPLETE}, 2)::float8 AS completeness, ${STAGE_SQL} AS stage, rq.status AS rq_status, rq.answers AS rq_answers, rq.year AS rq_year, rq.id AS rq_id,
+                                       sb.sbti_name, sb.near_status, sb.near_class, sb.near_year, sb.net_zero_status, sb.net_zero_year
+                                  FROM supplier s ${ENGAGE_JOIN} WHERE s.id = $1`, [id])).rows[0];
       if (!s) throw notFound('Supplier');
+      const sc = supplierScore({ reports_emissions: s.reports_emissions, climate_target: s.climate_target, cdp_score: s.cdp_score, target: s.target,
+        sbti: s.near_status ? { near_status: s.near_status, net_zero_year: s.net_zero_year } : null, request: s.rq_status ? { status: s.rq_status, answers: s.rq_answers } : null });
+      const eng = { stage: s.stage, request: s.rq_id ? { id: s.rq_id, year: s.rq_year, status: s.rq_status } : null, ...engagement(s), parts: sc.parts, actions: sc.actions,
+        sbtiList: s.near_status ? { name: s.sbti_name, status: s.near_status, classification: s.near_class, nearYear: s.near_year, netZero: s.net_zero_status, netZeroYear: s.net_zero_year } : null };
+      for (const k of ['rq_status', 'rq_answers', 'rq_year', 'rq_id', 'sbti_name', 'near_status', 'near_class', 'near_year', 'net_zero_status', 'net_zero_year', 'stage']) delete s[k];
       const factors = (await c.query(
         `SELECT e.id, e.item_id, i.name AS item, e.co2e::float8 AS co2e, e.unit, e.price_year, to_char(e.valid_from,'YYYY-MM-DD') AS valid_from, to_char(e.valid_to,'YYYY-MM-DD') AS valid_to,
                 e.source, e.boundary, e.created_at FROM supplier_ef e LEFT JOIN item i ON i.id = e.item_id WHERE e.supplier_id = $1 ORDER BY e.created_at DESC`, [id])).rows;
@@ -101,22 +146,24 @@ export async function supplierRoutes(app: FastifyInstance) {
         `SELECT l.item_id AS id, i.name, sum(abs(l.usd)) / nullif(sum(sum(abs(l.usd))) OVER (), 0) AS share, count(*) AS n
            FROM purchase_line l JOIN item i ON i.id = l.item_id WHERE l.supplier_id = $1 AND i.code NOT LIKE 'purchase:%' GROUP BY 1, 2 ORDER BY 3 DESC NULLS LAST LIMIT 1`, [id])).rows[0];
       const suggestedDefault = top && Number(top.share) >= 0.8 && Number(top.n) >= 3 && top.id !== def?.id ? { id: top.id, name: top.name, share: Number(top.share) } : null;
-      return { supplier: s, factors, categories, names, months, duplicateOf, defaultItem: def, suggestedDefault };
+      return { supplier: s, factors, categories, names, months, duplicateOf, defaultItem: def, suggestedDefault, engagement: eng };
     });
   });
 
   app.post('/api/suppliers', async (req) => {
     const tenant = requireTenant(req);
     requireRole(req, ...MANAGE);
-    const b = z.object({ name: z.string().trim().min(1).max(300), country: z.string().regex(/^[A-Z]{2}$/).optional(), reference: z.string().max(120).optional(), contactEmail: z.string().email().max(200).optional() }).parse(req.body);
+    const b = supplierBody.parse(req.body);
     return tenantTx(tenant, async (c) => {
       const norm = normSupplier(b.name);
       if (!norm) throw new AppError('Name needed');
-      const same = (await c.query(`SELECT name FROM supplier WHERE norm = $1 OR $1 = ANY(aliases) OR ($2::text IS NOT NULL AND lower(reference) = lower($2))`, [norm, b.reference ?? null])).rows[0];
-      if (same) throw new AppError(`This supplier already exists: ${same.name}`, 409);
+      const same = (await c.query(`SELECT id, name FROM supplier WHERE norm = $1 OR $1 = ANY(aliases) OR ($2::text IS NOT NULL AND lower(reference) = lower($2))`, [norm, b.reference ?? null])).rows[0];
+      if (same) throw new AppError(`This supplier already exists: ${same.name}`, 409, 'EXISTS', { id: same.id });
       const r = (await c.query(
-        `INSERT INTO supplier (tenant_id, name, norm, country, reference, contact_email) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id`,
-        [tenant, b.name, norm, b.country ?? null, b.reference ?? null, b.contactEmail ?? null])).rows[0];
+        `INSERT INTO supplier (tenant_id, name, norm, country, reference, contact_email, contact_name, industry, size, website, kind, department, cdp_score, cdp_year, reports_emissions, climate_target, target, note, trn)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19) RETURNING id`,
+        [tenant, b.name, norm, b.country ?? null, b.reference ?? null, b.contactEmail ?? null, b.contactName ?? null, b.industry ?? null, b.size ?? null, b.website ?? null, b.kind, b.department ?? null,
+         b.cdpScore ?? null, b.cdpYear ?? null, b.reportsEmissions ?? null, b.climateTarget ?? null, b.target ? JSON.stringify(b.target) : null, b.note ?? null, b.trn ?? null])).rows[0];
       await c.query(`INSERT INTO supplier_match (tenant_id, supplier_id, name_seen, norm, method, confirmed) VALUES ($1,$2,$3,$4,'manual',true) ON CONFLICT (tenant_id, norm) DO NOTHING`, [tenant, r.id, b.name, norm]);
       await audit(c, req, 'supplier.create', 'supplier', r.id, b);
       return r;
@@ -134,9 +181,11 @@ export async function supplierRoutes(app: FastifyInstance) {
       website: opt(z.string().max(200)), industry: opt(z.string().max(120)), size: opt(z.enum(['micro', 'small', 'medium', 'large'])), contactName: opt(z.string().max(120)),
       contactEmail: opt(z.string().email().max(200)), reportsEmissions: opt(z.enum(['yes', 'no', 'unknown'])), climateTarget: opt(z.enum(['sbti_validated', 'sbti_committed', 'own', 'none', 'unknown'])),
       note: opt(z.string().max(2000)), active: z.boolean().optional(), defaultItemId: z.number().int().positive().nullable().optional(),
+      kind: z.enum(['current', 'prospect']).optional(), department: opt(z.string().trim().max(120)), cdpScore: opt(z.enum(CDP_SCORES)), cdpYear: opt(z.number().int().min(2000).max(2100)), target: opt(targetSchema),
     }).parse(req.body);
+    if (b.target) (b as Record<string, unknown>).target = JSON.stringify(b.target);
     const cols: Record<string, string> = { name: 'name', country: 'country', reference: 'reference', trn: 'trn', website: 'website', industry: 'industry', size: 'size', contactName: 'contact_name',
-      contactEmail: 'contact_email', reportsEmissions: 'reports_emissions', climateTarget: 'climate_target', note: 'note', active: 'active' };
+      contactEmail: 'contact_email', reportsEmissions: 'reports_emissions', climateTarget: 'climate_target', note: 'note', active: 'active', kind: 'kind', department: 'department', cdpScore: 'cdp_score', cdpYear: 'cdp_year', target: 'target' };
     return tenantTx(tenant, async (c) => {
       if (!(await c.query('SELECT 1 FROM supplier WHERE id = $1', [id])).rowCount) throw notFound('Supplier');
       const sets: string[] = [], vals: unknown[] = [id];

@@ -29,6 +29,7 @@ async function call<T>(method: string, path: string, body?: unknown, file?: File
 interface Me {
   id: string; year: number; contact_name: string | null; email: string; message: string; due_date: string | null; expires_at: string; status: SPStatus; answers: SPAnswers; documents: SPDoc[];
   submitted_at: string | null; submitted_by: string | null; review_note: string | null; supplier: string; company: string; company_currency: string; progress: SPProgress; derived: SPDerived; editable: boolean;
+  score: { score: number; letter: string; parts: { key: string; label: string; points: number; max: number; note: string }[]; actions: string[] }; contribution: number | null;
 }
 type Step = 'profile' | 'inventory' | 'allocation' | 'targets' | 'products' | 'evidence' | 'submit';
 const STEPS: [Step, string, string][] = [
@@ -116,6 +117,7 @@ function Portal({ me, reload, toast }: { me: Me; reload: () => Promise<void>; to
     {me.status === 'queried' && me.review_note && <div className="note bad"><b>{me.company} asks you to check:</b> {me.review_note}<div className="small">Update the sections concerned and submit again.</div></div>}
     {me.status === 'submitted' && <div className="note info">Submitted on {d8(me.submitted_at)} by {me.submitted_by}. {me.company} is reviewing your answers; you will hear from them by e-mail.</div>}
     {me.status === 'accepted' && <div className="note ok">Thank you — {me.company} has reviewed and accepted your answers.</div>}
+    <ScoreBox me={me} />
     <div className="sp-body">
       <nav className="sp-steps" aria-label="Sections">
         {STEPS.map(([k, l, sub], i) => {
@@ -135,6 +137,28 @@ function Portal({ me, reload, toast }: { me: Me; reload: () => Promise<void>; to
       </div>
     </div>
   </>;
+}
+
+const GRADE_C: Record<string, string> = { 'A+': '#0E7C66', A: '#2BA38A', B: '#7CC4A6', C: '#E9B44C', D: '#E39A5A', E: '#C2523C' };
+function ScoreBox({ me }: { me: Me }) {
+  const sc = me.score;
+  const [open, setOpen] = useState(false);
+  return (
+    <section className="card sp-score">
+      <div className="sp-sc-head">
+        <span className="grade" style={{ width: 54, height: 54, fontSize: 22, background: GRADE_C[sc.letter] ?? '#9AA7A2' }}>{sc.letter}</span>
+        <div><b className="sp-sc-n">{sc.score}<small>/100</small></b><div className="small muted">Your climate score{me.status === 'accepted' ? '' : ' with the answers so far'}</div></div>
+        <div className="sp-scale" aria-hidden="true">{['A+', 'A', 'B', 'C', 'D', 'E'].map((l) => <span key={l} className={l === sc.letter ? 'on' : ''} style={{ background: GRADE_C[l] }}>{l}</span>)}</div>
+        {me.contribution != null && <div className="sp-contrib"><b>{nf(me.contribution, 1)} tCO₂e</b><span className="small muted">{me.company}'s estimate of your emissions in its {me.year} report, from what it bought from you. Your own figures replace it.</span></div>}
+        <button className="btn sm ghost" onClick={() => setOpen(!open)}>{open ? 'Hide details' : 'Score details and how to improve'}</button>
+      </div>
+      {open && <div className="sp-sc-body">
+        <div className="sc-parts">{sc.parts.map((p) => <div key={p.key}><span className="small"><b>{p.label}</b> <span className="muted">{p.note}</span></span>
+          <span className="sc-bar"><i style={{ width: `${(p.points / p.max) * 100}%` }} /></span><span className="small num">{p.points}/{p.max}</span></div>)}</div>
+        {sc.actions.length > 0 && <div><b className="small">Recommended actions</b><ul className="small">{sc.actions.map((a) => <li key={a}>{a}</li>)}</ul></div>}
+        <p className="muted small" style={{ margin: 0 }}>The score is the same for every customer: measuring emissions (25), a reduction target (30), public disclosure such as CDP (15), sharing data with customers (20) and product footprints (10). A+ from 85, A 70, B 55, C 40, D 20.</p>
+      </div>}
+    </section>);
 }
 
 type SaveFn = (section: string, data: unknown, go?: boolean) => Promise<void>;

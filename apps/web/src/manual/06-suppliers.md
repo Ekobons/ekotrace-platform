@@ -57,6 +57,44 @@ For a year, from calculated purchase lines (ready or published), shown as emissi
 
 Lines that cannot be calculated yet (no exchange rate, facility not recognised, no spend category) are not in Analytics until fixed.
 
+## Adding suppliers by hand or from a list
+
+Suppliers are created automatically from purchases, and you can also add them yourself — for example a new supplier before its first invoice, or a **prospect** you are comparing before choosing.
+
+- **Add supplier**: name, type (current supplier or prospect), internal code / vendor number, country (code or name), procurement department, industry, size, website, sustainability contact and e-mail, whether it reports its emissions, CDP score, climate target and, if known, its reduction target (%, target year, net-zero year). Tick **Invite the contact to the supplier portal now** to send the invitation in the same step. The name and code are checked against existing suppliers and every spelling seen in purchases.
+- **Import a list**: an Excel or CSV export of your vendor master. Columns are recognised by their names (supplier name required; internal code, type, country, procurement department, industry, contact name and e-mail, website, CDP score). You first see what will happen to each row — **New**, **Completes** (an existing supplier gets its empty fields filled; nothing typed by a person is overwritten), **Already there**, or **Error** (with the reason) — then add them. **Template** downloads an example.
+- **Download list**: every supplier with its engagement, score, SBTi status and the year's purchase emissions (CSV).
+
+## The supplier list
+
+Tabs follow each supplier through engagement: **Not engaged · Invited · Signed in · Survey started · Submitted · Finished** (from its latest request on the supplier portal). Filter by name, internal code or procurement department, sort by CO₂ emitted, spend or name, and **hide prospects**.
+
+| Column | Meaning |
+|---|---|
+| Score | the supplier's climate score as a grade (A+ to E) |
+| GHG report | it measures and reports its emissions |
+| SBTi | it has a validated science-based target (from its answers, its profile or the SBTi list) |
+| Completion | how much of the questionnaire it has answered |
+| Type · Department | current supplier or prospect; the procurement department responsible |
+
+**Climate score** (0–100), the same for every supplier: measures its emissions (25: inventory 15, partial 8; Scope 3 +5; verification up to +5), reduction target (30: SBTi validated 25, committed 15, own target 10 — 6 without a figure; net-zero year +5), public disclosure (15: CDP A 15, B 11, C 7, D 3), shares data with you (20: answers accepted 15 or submitted 8; share of its emissions for you +5), product footprints (10: given 6, verified +4). Grades: A+ from 85, A 70, B 55, C 40, D 20, E below. The supplier's panel shows the breakdown and the actions that would raise it; the supplier sees the same on the portal.
+
+## Engagement
+
+Suppliers → **Engagement** shows how committed your supply chain is, **weighted by the emissions** of the year's purchases from each supplier:
+
+- the share of emissions with a validated science-based target (and including commitments — the SBTi asks companies with a supplier-engagement target to reach 67%), whose supplier answered, with a CDP score, and the average climate score;
+- SBTi objectives, CDP scores, grades and the engagement funnel;
+- where non-SBTi and C-or-lower suppliers sit, by country and Scope 3 category — where to engage next.
+
+**Supplier emission trajectories** project each supplier's emissions from your purchases to 2030–2050:
+
+- a declared target (from its answers or profile) is followed as a straight line from its base year to its target year, then to about 90% below by its net-zero year; a validated or committed SBTi target without figures follows the SBTi pathway (1.5 °C: 4.2% a year; well-below 2 °C: 2.5%) to 2030; suppliers with no target stay flat;
+- **credibility**: high (SBTi validated), average (committed, or own target with figures), weak (none);
+- scenarios: **Optimistic** (every declared target met), **Prudent** (only validated targets met), **No action**; show by supplier or by credibility; filter by category, country and credibility. Your purchases from each supplier are assumed constant.
+
+**SBTi list**: the Science Based Targets initiative publishes the companies with targets or commitments (its "Target dashboard" download). The platform administrator loads that file; suppliers are matched to it by name (legal forms such as LLC, Ltd, FZE ignored), so a supplier's SBTi status, classification and net-zero year are known without asking it. It is shared by every company on the platform and replaced at each upload.
+
 ## Supplier portal
 
 Suppliers → **Supplier portal** asks suppliers for their own data, so their purchases are counted with their real figures instead of spend-based averages. The supplier's contact signs in at **/supplier** with their work e-mail and an access code — no user account, no password.

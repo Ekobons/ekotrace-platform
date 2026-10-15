@@ -77,9 +77,27 @@ export interface PurchaseLine {
   problems: string[]; warnings: string[]; calc_error: string | null; dup_of: string | null; activity_id: string | null;
 }
 export interface SpendItem { id: number; name: string; naics: string | null; group: string; co2e: number | null; unit: string | null; price_year: number | null; source: string | null }
+export type SupplierStage = 'not_engaged' | 'invited' | 'signed_in' | 'started' | 'submitted' | 'finished';
+export interface SbtiMatch { name: string; status: string; classification: string | null; nearYear?: number | null; netZero: string | null; netZeroYear: number | null }
 export interface Supplier { id: string; name: string; aliases: string[]; country: string | null; reference: string | null; contact_email: string | null; industry?: string | null; origin: string; active: boolean; lines: number; usd: number; co2e: number; supplier_lines: number; factors: number;
+  kind?: 'current' | 'prospect'; department?: string | null; cdp_score?: string | null; climate_target?: string | null; stage?: SupplierStage; rq_year?: number | null;
+  score?: number; letter?: string; ghgReport?: boolean; sbti?: boolean; completion?: number | null; sbtiList?: SbtiMatch | null;
   review?: 'ok' | 'possible_duplicate'; duplicate_of?: string | null; duplicate_of_name?: string | null; duplicate_score?: number | null; completeness?: number }
-export interface SupplierProfile extends Supplier { note: string | null; norm: string; trn: string | null; website: string | null; size: string | null; contact_name: string | null; reports_emissions: string | null; climate_target: string | null; created_at: string }
+export interface SupplierProfile extends Supplier { note: string | null; norm: string; trn: string | null; website: string | null; size: string | null; contact_name: string | null; reports_emissions: string | null; climate_target: string | null; created_at: string;
+  cdp_year: number | null; target: { reductionPct?: number | null; baseYear?: number | null; targetYear?: number | null; netZeroYear?: number | null; scopes?: string | null; source?: string | null } | null }
+export interface SupplierEngagement {
+  stage: SupplierStage; request: { id: string; year: number; status: string } | null; score: number; letter: string; ghgReport: boolean; sbti: boolean; completion: number | null; sbtiList: SbtiMatch | null;
+  parts: { key: string; label: string; points: number; max: number; note: string }[]; actions: string[];
+}
+export interface EngagementData {
+  year: number; years: number[]; total: number; suppliers: number;
+  sbti: { key: string; kg: number; n: number; share: number }[]; cdp: { key: string; kg: number; n: number; share: number }[]; letters: { key: string; kg: number; n: number; share: number }[]; stages: { key: string; kg: number; n: number; share: number }[];
+  notSbtiByCountry: { key: string; kg: number }[]; notSbtiByCategory: { key: string; kg: number }[]; lowByCategory: { key: string; kg: number }[]; lowByCountry: { key: string; kg: number }[];
+  trajectory: { years: number[]; rows: { id: string; name: string; country: string; category: string; kg: number; stage: string; letter: string; score: number; sbti: string; cdp: string; cred: 'high' | 'average' | 'weak'; path: number[];
+    target: { pct?: number; base?: number; ty?: number | null; nz?: number | null; rate?: number } | null }[] };
+  sbtiList: { rows: number; imported_at: string | null; filename: string | null; demo: boolean | null; matched: number }; canImportSbti: boolean;
+}
+export interface SupplierImportResult { committed: boolean; columns: Record<string, string>; totals: { new: number; update: number; same: number; error: number }; created: number; updated: number; rows: { row: number; name: string; action: 'new' | 'update' | 'same' | 'error'; detail: string }[] }
 export interface SupplierName { id: number; name_seen: string; method: string; score: number | null; confirmed: boolean; lines: number }
 export interface SupplierReview {
   duplicates: { id: string; name: string; country: string | null; reference: string | null; score: number | null; other_id: string; other_name: string; other_country: string | null; other_reference: string | null; lines: number; other_lines: number }[];
@@ -653,8 +671,8 @@ export const api = {
   purchaseRules: () => call<{ rules: { id: string; field: string; pattern: string; item: string | null; decision: string | null; target: string | null; capital: boolean | null; hits: number; created_at: string; created_by: string | null }[] }>('GET', '/api/purchases/rules'),
   deleteRule: (id: string) => call<{ ok: true }>('DELETE', `/api/purchases/rules/${id}`),
   manualPurchases: (b: { facilityId: string; dryRun?: boolean; name?: string; lines: ManualLine[] }) => call<ManualResult>('POST', '/api/purchases/manual', b),
-  suppliers: (q: Record<string, string | number | undefined>) => call<{ total: number; suppliers: Supplier[] }>('GET', `/api/suppliers?${new URLSearchParams(Object.entries(q).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)]))}`),
-  supplier: (id: string) => call<{ supplier: SupplierProfile; factors: SupplierFactor2[]; categories: { item: string | null; lines: number; usd: number; co2e: number }[]; names: SupplierName[]; months: { month: string; usd: number; co2e: number | null }[]; duplicateOf: { id: string; name: string } | null; defaultItem: { id: number; name: string } | null; suggestedDefault: { id: number; name: string; share: number } | null }>('GET', `/api/suppliers/${id}`),
+  suppliers: (q: Record<string, string | number | undefined>) => call<{ total: number; suppliers: Supplier[]; counts?: { all: number; review: number; incomplete: number; autoLinked: number; prospects: number }; stages?: Partial<Record<SupplierStage, number>>; departments?: string[] }>('GET', `/api/suppliers?${new URLSearchParams(Object.entries(q).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)]))}`),
+  supplier: (id: string) => call<{ supplier: SupplierProfile; factors: SupplierFactor2[]; categories: { item: string | null; lines: number; usd: number; co2e: number }[]; names: SupplierName[]; months: { month: string; usd: number; co2e: number | null }[]; duplicateOf: { id: string; name: string } | null; defaultItem: { id: number; name: string } | null; suggestedDefault: { id: number; name: string; share: number } | null; engagement: SupplierEngagement }>('GET', `/api/suppliers/${id}`),
   supplierCounts: () => call<{ total: number; counts: { all: number; review: number; incomplete: number; autoLinked: number } }>('GET', '/api/suppliers?limit=1'),
   supplierReview: () => call<SupplierReview>('GET', '/api/suppliers/review'),
   supplierAnalytics: (year?: number) => call<SupplierAnalytics>('GET', `/api/suppliers/analytics${year ? `?year=${year}` : ''}`),
@@ -662,6 +680,9 @@ export const api = {
   supplierMatch: (id: number, action: 'confirm' | 'split') => call<{ ok?: true; supplierId?: string; lines?: number }>('POST', `/api/suppliers/matches/${id}/${action}`),
   dashboard: (q: { year?: number; node?: string; group?: string; scope2?: 'location' | 'market'; cmp?: number; pend?: string }) => call<Dashboard>('GET', `/api/dashboard?${new URLSearchParams(Object.entries(q).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)]))}`),
   addSupplier: (b: unknown) => call<{ id: string }>('POST', '/api/suppliers', b),
+  importSuppliers: (f: File, commit: boolean) => call<SupplierImportResult>('POST', `/api/suppliers/import?commit=${commit ? 1 : 0}`, undefined, f, { 'x-filename': encodeURIComponent(f.name) }),
+  supplierEngagement: (year?: number) => call<EngagementData>('GET', `/api/suppliers/engagement${year ? `?year=${year}` : ''}`),
+  sbtiImport: (f: File) => call<{ rows: number; columns: Record<string, string> }>('POST', '/api/sbti/import', undefined, f, { 'x-filename': encodeURIComponent(f.name) }),
   patchSupplier: (id: string, b: unknown) => call<{ ok: true }>('PATCH', `/api/suppliers/${id}`, b),
   mergeSupplier: (id: string, intoId: string) => call<{ lines: number }>('POST', `/api/suppliers/${id}/merge`, { intoId }),
   addSupplierEf: (id: string, b: unknown) => call<{ id: string; linesRecalculated: number }>('POST', `/api/suppliers/${id}/factors`, b),
@@ -752,7 +773,7 @@ export const api = {
   // supplier portal (staff)
   supplierPortal: (year: number) => call<SupplierPortalData>('GET', `/api/supplier-portal?year=${year}`),
   supplierRequest: (id: string) => call<SupplierRequestDetail>('GET', `/api/supplier-portal/requests/${id}`),
-  supplierInvite: (b: { supplierId: string; year: number; email: string; contactName: string; message: string; dueDate: string | null; months: number; sendEmail: boolean }) => call<{ id: string; code: string; expiresAt: string; emailed: boolean }>('POST', '/api/supplier-portal/requests', b),
+  supplierInvite: (b: { supplierId: string; year: number; email: string; contactName: string; message: string; dueDate: string | null; months: number; sendEmail: boolean; shareEstimate?: boolean }) => call<{ id: string; code: string; expiresAt: string; emailed: boolean }>('POST', '/api/supplier-portal/requests', b),
   supplierRequestCode: (id: string, sendEmail: boolean) => call<{ code: string; expiresAt: string; emailed: boolean }>('POST', `/api/supplier-portal/requests/${id}/code`, { sendEmail }),
   supplierRequestRevoke: (id: string) => call<{ ok: true }>('POST', `/api/supplier-portal/requests/${id}/revoke`, {}),
   supplierRequestReview: (id: string, b: { decision: 'accept' | 'query'; note?: string; profile?: boolean; intensity?: { use: boolean; itemId: number | null }; products?: { index: number; itemId: number | null }[] }) =>

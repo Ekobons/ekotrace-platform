@@ -2921,3 +2921,59 @@ test('supplier portal: invite with a one-time code, supplier signs in with e-mai
   assert.equal((await api('GET', `/api/supplier-portal/documents/${up.json().documentId}`, undefined, tenantB)).status, 404);
   assert.equal((await api('GET', '/api/supplier-portal?year=2025', undefined, tenantB)).body.requests.length, 0);
 });
+
+test('supplier engagement: add suppliers by hand (all fields, country names, duplicates refused) and from a list (preview, then add / complete), engagement stages, score and grade, SBTi list import and matching, export, engagement analytics and trajectories; companies kept apart', async () => {
+  const raw = (path: string, buf: Buffer, tenant: string, name: string, cookie?: string) => app.inject({ method: 'POST', url: path, payload: buf, headers: { 'content-type': 'application/octet-stream', 'x-filename': name, ...(cookie ? { cookie } : { cookie: adminCookie, 'x-tenant-id': tenant }) } });
+  // by hand
+  const add = await api('POST', '/api/suppliers', { name: 'Hand Made Trading LLC', kind: 'prospect', reference: 'HM-1', country: 'United Arab Emirates', department: 'Facilities', cdpScore: 'B', climateTarget: 'own', target: { reductionPct: 40, baseYear: 2024, targetYear: 2030, netZeroYear: 2050 } }, tenantA);
+  assert.equal(add.status, 200, JSON.stringify(add.body));
+  assert.equal((await api('POST', '/api/suppliers', { name: 'HAND MADE TRADING L.L.C.' }, tenantA)).status, 409, 'same name, other spelling');
+  assert.equal((await api('POST', '/api/suppliers', { name: 'Other', reference: 'hm-1' }, tenantA)).status, 409, 'same internal code');
+  assert.equal((await api('POST', '/api/suppliers', { name: 'Nowhere Co', country: 'Atlantis' }, tenantA)).status, 400);
+  const prof = (await api('GET', `/api/suppliers/${add.body.id}`, undefined, tenantA)).body;
+  assert.equal(prof.supplier.country, 'AE'); assert.equal(prof.supplier.kind, 'prospect'); assert.equal(prof.supplier.department, 'Facilities');
+  assert.equal(prof.engagement.stage, 'not_engaged');
+  // score: own target with numbers 10 + net zero 5, CDP B 11 = 26 → D
+  assert.equal(prof.engagement.score, 26); assert.equal(prof.engagement.letter, 'D');
+  assert.ok(prof.engagement.actions.some((a: string) => /SBTi|Science Based/i.test(a)));
+  // from a list: preview, then commit; existing suppliers only get blanks filled
+  const csv = Buffer.from('Supplier name,Internal code,Type,Country,Procurement department,Contact email\nList Supplier One,LS-1,current,India,IT,one@list.example\nHand Made Trading LLC,,,,,hm@hand.example\nBad Country Co,BC-1,,Narnia,,\nList Supplier One,LS-1,,,,\n');
+  const pre = await raw('/api/suppliers/import?commit=0', csv, tenantA, 'list.csv');
+  assert.equal(pre.statusCode, 200, pre.body);
+  assert.deepEqual(pre.json().totals, { new: 1, update: 1, same: 1, error: 1 });
+  assert.equal((await api('GET', '/api/suppliers?q=list%20supplier%20one', undefined, tenantA)).body.total, 0, 'preview adds nothing');
+  const done = (await raw('/api/suppliers/import?commit=1', csv, tenantA, 'list.csv')).json();
+  assert.equal(done.created, 1); assert.equal(done.updated, 1);
+  const one = (await api('GET', '/api/suppliers?q=list%20supplier%20one', undefined, tenantA)).body.suppliers[0];
+  assert.equal(one.country, 'IN'); assert.equal(one.department, 'IT'); assert.equal(one.stage, 'not_engaged');
+  assert.equal((await api('GET', `/api/suppliers/${add.body.id}`, undefined, tenantA)).body.supplier.contact_email, 'hm@hand.example');
+  // list filters: department, prospects hidden, engagement stage
+  const it = (await api('GET', '/api/suppliers?department=IT', undefined, tenantA)).body;
+  assert.ok(it.suppliers.every((x: { department: string }) => x.department === 'IT')); assert.ok(it.departments.includes('Facilities'));
+  assert.ok(!(await api('GET', '/api/suppliers?kind=current&limit=200', undefined, tenantA)).body.suppliers.some((x: { id: string }) => x.id === add.body.id));
+  await api('POST', '/api/supplier-portal/requests', { supplierId: one.id, year: 2025, email: 'one@list.example', sendEmail: false }, tenantA);
+  const inv = (await api('GET', '/api/suppliers?stage=invited&limit=200', undefined, tenantA)).body;
+  assert.ok(inv.suppliers.some((x: { id: string }) => x.id === one.id)); assert.ok((inv.stages.invited ?? 0) >= 1);
+  // SBTi list: platform admin only; matched by name whatever the legal form
+  const sb = Buffer.from('Company Name,Location,Sector,Near term - Target Status,Near term - Target Classification,Net-Zero Year\nList Supplier One Pvt Ltd,India,IT,Targets Set,1.5°C,2045\nSomeone Else,France,Food,Committed,,\n');
+  assert.equal((await raw('/api/sbti/import', sb, tenantA, 'sbti.csv', await login('sp.admin@a.test', 'a long enough pass'))).statusCode, 403, 'company admins do not change the shared list');
+  const imp = await raw('/api/sbti/import', sb, tenantA, 'sbti.csv');
+  assert.equal(imp.statusCode, 200, imp.body); assert.equal(imp.json().rows, 2);
+  const m = (await api('GET', `/api/suppliers/${one.id}`, undefined, tenantA)).body.engagement;
+  assert.equal(m.sbtiList.status, 'Targets Set'); assert.equal(m.sbti, true, 'validated through the SBTi list');
+  // export
+  const ex = await app.inject({ method: 'GET', url: '/api/suppliers/export?year=2025', headers: { cookie: adminCookie, 'x-tenant-id': tenantA } });
+  assert.equal(ex.statusCode, 200); assert.match(ex.body, /Internal code/); assert.match(ex.body, /List Supplier One/);
+  // engagement analytics and trajectories (on the purchases of a year with a supplier)
+  const e = (await api('GET', '/api/suppliers/engagement', undefined, tenantA)).body;
+  assert.ok(Array.isArray(e.trajectory.years) && e.trajectory.years.at(-1) === 2050);
+  if (e.suppliers) {
+    const sum = (k: string) => e[k].reduce((a: number, r: { kg: number }) => a + r.kg, 0);
+    assert.ok(Math.abs(sum('sbti') - e.total) < 1e-6 && Math.abs(sum('stages') - e.total) < 1e-6, 'every split adds up to the total');
+    const r = e.trajectory.rows[0]; assert.equal(r.path[0], r.kg);
+    assert.ok(e.trajectory.rows.every((x: { cred: string; path: number[] }) => x.cred !== 'weak' || x.path.every((v) => Math.abs(v - x.path[0]!) < 1e-9)), 'no target: flat');
+  }
+  // companies kept apart
+  assert.equal((await api('GET', '/api/suppliers?q=hand%20made', undefined, tenantB)).body.total, 0);
+  await pool.query(`DELETE FROM sbti_company; DELETE FROM sbti_import`);
+});

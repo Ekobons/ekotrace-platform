@@ -26,6 +26,14 @@ export function SupplierRequests() {
   const setOpen = (id: string | null) => { const n = new URLSearchParams(sp); if (id) n.set('request', id); else n.delete('request'); setSp(n, { replace: true }); };
   useEffect(() => { api.supplierPortal(year).then(setD).catch((e) => toast((e as Error).message)); }, [year, tick]); // eslint-disable-line react-hooks/exhaustive-deps
   const reload = () => setTick((t) => t + 1);
+  // from the supplier list: "Engage suppliers" (?invite=1) or "Invite to the portal" on one supplier (?invite=<id>)
+  const inv = sp.get('invite');
+  useEffect(() => {
+    if (!inv) return;
+    const n = new URLSearchParams(sp); n.delete('invite'); setSp(n, { replace: true });
+    if (inv === '1') setInviting('pick');
+    else api.supplier(inv).then((r) => setInviting({ id: r.supplier.id, name: r.supplier.name, email: r.supplier.contact_email })).catch(() => setInviting('pick'));
+  }, [inv]); // eslint-disable-line react-hooks/exhaustive-deps
   if (!d) return <div className="card empty">Loading…</div>;
   const by = (s: string) => d.requests.filter((r) => r.status === s).length;
   const answered = d.requests.filter((r) => r.status === 'accepted');
@@ -104,12 +112,12 @@ function InviteDrawer({ year, pre, onClose, onDone }: { year: number; pre: { id:
   const [q, setQ] = useState('');
   const [hits, setHits] = useState<Supplier[]>([]);
   useEffect(() => { if (sup || q.trim().length < 2) { setHits([]); return; } const t = setTimeout(() => api.suppliers({ q, limit: 8 }).then((r) => setHits(r.suppliers)).catch(() => {}), 200); return () => clearTimeout(t); }, [q, sup]);
-  const [f, setF] = useState({ email: pre?.email ?? '', contactName: '', message: `Please share your ${year} greenhouse-gas emissions data. It helps us measure our Scope 3 emissions accurately.`, dueDate: '', months: 6, sendEmail: true });
+  const [f, setF] = useState({ email: pre?.email ?? '', contactName: '', message: `Please share your ${year} greenhouse-gas emissions data. It helps us measure our Scope 3 emissions accurately.`, dueDate: '', months: 6, sendEmail: true, shareEstimate: false });
   const [busy, setBusy] = useState(false);
   const go = async () => {
     if (!sup) return;
     setBusy(true);
-    try { const r = await api.supplierInvite({ supplierId: sup.id, year, email: f.email.trim(), contactName: f.contactName.trim(), message: f.message.trim(), dueDate: f.dueDate || null, months: f.months, sendEmail: f.sendEmail }); onDone({ supplier: sup.name, email: f.email.trim().toLowerCase(), ...r }); }
+    try { const r = await api.supplierInvite({ supplierId: sup.id, year, email: f.email.trim(), contactName: f.contactName.trim(), message: f.message.trim(), dueDate: f.dueDate || null, months: f.months, sendEmail: f.sendEmail, shareEstimate: f.shareEstimate }); onDone({ supplier: sup.name, email: f.email.trim().toLowerCase(), ...r }); }
     catch (e) { toast((e as Error).message); } finally { setBusy(false); }
   };
   return (
@@ -126,6 +134,8 @@ function InviteDrawer({ year, pre, onClose, onDone }: { year: number; pre: { id:
           <label className="field"><span>Please answer by</span><input className="input" type="date" value={f.dueDate} onChange={(e) => setF({ ...f, dueDate: e.target.value })} /></label>
           <label className="field"><span>Code valid for</span><select className="input" value={f.months} onChange={(e) => setF({ ...f, months: Number(e.target.value) })}>{[1, 3, 6, 12].map((m) => <option key={m} value={m}>{m} month{m > 1 ? 's' : ''}</option>)}</select></label>
           <label className="span2 row small chkline" style={{ gap: 8 }}><input type="checkbox" checked={f.sendEmail} onChange={(e) => setF({ ...f, sendEmail: e.target.checked })} /><b>E-mail the invitation with the access code</b></label>
+          <label className="span2 row small chkline" style={{ gap: 8 }}><input type="checkbox" checked={f.shareEstimate} onChange={(e) => setF({ ...f, shareEstimate: e.target.checked })} />
+            <span><b>Show the supplier our estimate of its emissions in our report</b> <span className="muted">(tCO₂e from our {year} purchases from it — motivates suppliers, but shares a figure from your inventory)</span></span></label>
         </div>
         <div className="row"><span className="grow" /><button className="btn" onClick={() => dlg.current?.close()}>Cancel</button><button className="btn p" disabled={busy || !sup || !/^\S+@\S+\.\S+$/.test(f.email.trim())} onClick={go}>Invite</button></div>
       </div>

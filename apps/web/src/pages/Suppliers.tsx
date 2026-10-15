@@ -9,9 +9,10 @@
 import { useEffect, useMemo, useRef, useState, type InputHTMLAttributes } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useApp } from '../App';
-import { api, num, tco2e, type Supplier, type SupplierAnalytics, type SupplierFactor2, type SupplierProfile, type SupplierReview } from '../lib/api';
+import { api, num, tco2e, type Supplier, type SupplierAnalytics, type SupplierFactor2, type SupplierEngagement, type SupplierImportResult, type SupplierProfile, type SupplierReview } from '../lib/api';
 import { ItemPicker } from '../components/ItemPicker';
 import { SupplierRequests } from '../components/SupplierRequests';
+import { SupplierEngagementTab } from '../components/SupplierEngagementTab';
 import { Icon } from '../components/Icon';
 import { countryName, t as tonnes, usdShort } from '../components/Charts';
 import { Bars, DCard, Donut, DStat, HBars, Legend, MN, PAL as PAL2, Treemap, fmt0, fmtT, type BarRow } from '../components/DashCharts';
@@ -21,7 +22,7 @@ const UNITS = ['kg', 't', 'L', 'm3', 'kWh', 'pcs', 'AED', 'USD', 'EUR', 'GBP', '
 const usd = (v: number) => `$${Math.round(v).toLocaleString('en')}`;
 const TARGET_LABEL: Record<string, string> = { sbti_validated: 'SBTi target (validated)', sbti_committed: 'SBTi commitment', own: 'Own target', none: 'No target', unknown: 'Not known' };
 const SCOPE3_LABEL: Record<string, string> = { purchased_goods: '3.1 Purchased goods & services', capital_goods: '3.2 Capital goods', upstream_transport: '3.4 Upstream transport', business_travel: '3.6 Business travel', upstream_leased: '3.8 Upstream leased assets' };
-type Tab = 'list' | 'review' | 'analytics' | 'portal';
+type Tab = 'list' | 'review' | 'analytics' | 'portal' | 'engagement';
 
 export function Suppliers() {
   const { role } = useApp();
@@ -38,70 +39,108 @@ export function Suppliers() {
     <div className="page">
       <div className="head">
         <div><div className="eyebrow">Value chain</div><h1>Suppliers</h1>
-          <p className="sub">Every supplier is registered from purchase uploads, the ERP API and manual entries — one record however the name is written (vendor number first, then name and known spellings, then near-identical names). Names that may be the same supplier wait for a person under “Check names”. Complete the profile here; a supplier's own emission factor replaces the spend-based estimate for its purchases.</p></div>
+          <p className="sub">Everyone you buy from — registered from purchases (one record however the name is written) or added here by hand or from a list — and prospects you may buy from. Engage them on the supplier portal: their own figures replace spend-based estimates, and their targets shape your Scope 3 trajectory.</p></div>
       </div>
       <div className="tabs">
         <button className={tab === 'list' ? 'on' : ''} onClick={() => setTab('list')}>Suppliers{counts ? ` (${counts.all.toLocaleString('en')})` : ''}</button>
-        <button className={tab === 'review' ? 'on' : ''} onClick={() => setTab('review')}>Check names{toCheck ? <span className="chip warn" style={{ marginLeft: 6 }}>{toCheck}</span> : ''}</button>
-        <button className={tab === 'analytics' ? 'on' : ''} onClick={() => setTab('analytics')}>Analytics</button>
+        <button className={tab === 'engagement' ? 'on' : ''} onClick={() => setTab('engagement')}>Engagement</button>
         <button className={tab === 'portal' ? 'on' : ''} onClick={() => setTab('portal')}>Supplier portal</button>
+        <button className={tab === 'analytics' ? 'on' : ''} onClick={() => setTab('analytics')}>Spend analytics</button>
+        <button className={tab === 'review' ? 'on' : ''} onClick={() => setTab('review')}>Check names{toCheck ? <span className="chip warn" style={{ marginLeft: 6 }}>{toCheck}</span> : ''}</button>
       </div>
       {tab === 'list' && <SupplierList canManage={canManage} counts={counts} onChanged={loadCounts} />}
       {tab === 'review' && <ReviewTab canManage={canManage} onChanged={loadCounts} />}
       {tab === 'analytics' && <Analytics />}
       {tab === 'portal' && <SupplierRequests />}
+      {tab === 'engagement' && <SupplierEngagementTab />}
     </div>
   );
 }
 
 // ------------------------------------------------------------------ list --
+export const STAGE_LABEL: Record<string, string> = { not_engaged: 'Not engaged', invited: 'Invited', signed_in: 'Signed in', started: 'Survey started', submitted: 'Submitted', finished: 'Finished' };
+const GRADE_C: Record<string, string> = { 'A+': '#0E7C66', A: '#2BA38A', B: '#7CC4A6', C: '#E9B44C', D: '#E39A5A', E: '#C2523C' };
+export function Grade({ l, size = 30 }: { l?: string; size?: number }) {
+  if (!l) return <span className="muted">—</span>;
+  return <span className="grade" style={{ width: size, height: size, background: GRADE_C[l] ?? '#9AA7A2', fontSize: size * 0.42 }} title={`Climate score ${l}`}>{l}</span>;
+}
+const Yes = ({ v, t }: { v?: boolean; t: string }) => v ? <span className="yn y" title={t}>✓</span> : <span className="yn n" title={`No: ${t.toLowerCase()}`}>✕</span>;
+
 function SupplierList({ canManage, counts, onChanged }: { canManage: boolean; counts: { all: number; review: number; incomplete: number } | null; onChanged: () => void }) {
   const [sp, setSp] = useSearchParams();
   const [q, setQ] = useState('');
+  const [code, setCode] = useState('');
   const filter = sp.get('filter') ?? 'all';
   const country = sp.get('country') ?? '';
+  const stage = sp.get('stage') ?? '';
+  const dept = sp.get('dept') ?? '';
+  const [hideProspects, setHideProspects] = useState(false);
   const [sort, setSort] = useState('co2e');
   const [offset, setOffset] = useState(0);
   const [rows, setRows] = useState<Supplier[] | null>(null);
+  const [meta, setMeta] = useState<{ stages: Partial<Record<string, number>>; departments: string[]; prospects: number }>({ stages: {}, departments: [], prospects: 0 });
   const [total, setTotal] = useState(0);
   const open = sp.get('open');
   const [adding, setAdding] = useState(false);
+  const [importing, setImporting] = useState(false);
   const setParam = (k: string, v: string | null) => { const n = new URLSearchParams(sp); if (v) n.set(k, v); else n.delete(k); setSp(n); };
-  const load = () => api.suppliers({ q, filter, offset, limit: 50, sort, country: country || undefined }).then((r) => { setRows(r.suppliers); setTotal(r.total); });
-  useEffect(() => { const t = window.setTimeout(load, q ? 250 : 0); return () => window.clearTimeout(t); }, [q, filter, offset, sort, country]); // eslint-disable-line react-hooks/exhaustive-deps
+  const load = () => api.suppliers({ q, code: code || undefined, filter, offset, limit: 50, sort, country: country || undefined, stage: stage || undefined, department: dept || undefined, kind: hideProspects ? 'current' : undefined })
+    .then((r) => { setRows(r.suppliers); setTotal(r.total); setMeta({ stages: r.stages ?? {}, departments: r.departments ?? [], prospects: r.counts?.prospects ?? 0 }); });
+  useEffect(() => { const t = window.setTimeout(load, q || code ? 250 : 0); return () => window.clearTimeout(t); }, [q, code, filter, offset, sort, country, stage, dept, hideProspects]); // eslint-disable-line react-hooks/exhaustive-deps
   const changed = () => { load(); onChanged(); };
   const FILTERS: [string, string, number | undefined][] = [['all', 'All', counts?.all], ['review', 'Possible duplicates', counts?.review], ['incomplete', 'Profile incomplete', counts?.incomplete], ['with_factor', 'With own factor', undefined], ['without_factor', 'Spend-based only', undefined]];
+  const allStages = Object.values(meta.stages).reduce((a: number, n) => a + (n ?? 0), 0);
 
   return (
     <>
-      {adding && <AddSupplier onDone={(id) => { setAdding(false); changed(); if (id) setParam('open', id); }} />}
+      <div className="row" style={{ gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+        <span className="grow muted small">Suppliers come from purchases (uploads, ERP API, typed in) or are added here — one by one or from a list. Prospects are suppliers you do not buy from yet.</span>
+        <a className="btn sm ghost" href={`/api/suppliers/export?year=${new Date().getFullYear() - 1}`}><Icon name="download" />Download list</a>
+        {canManage && <button className="btn sm" onClick={() => setImporting(true)}><Icon name="upload" />Import a list</button>}
+        {canManage && <button className="btn sm" onClick={() => setAdding(true)}><Icon name="plus" />Add supplier</button>}
+        {canManage && <button className="btn sm p" onClick={() => setSp({ tab: 'portal', invite: '1' })}>Engage suppliers</button>}
+      </div>
+      {adding && <AddSupplierDrawer departments={meta.departments} onClose={() => setAdding(false)} onDone={(id) => { setAdding(false); changed(); if (id) setParam('open', id); }} />}
+      {importing && <ImportDrawer onClose={() => setImporting(false)} onDone={() => { setImporting(false); changed(); }} />}
+      <div className="seg stagebar" role="tablist" aria-label="Engagement">
+        <button className={!stage ? 'on' : ''} onClick={() => { setParam('stage', null); setOffset(0); }}>All<span className="meta">{allStages || ''}</span></button>
+        {Object.entries(STAGE_LABEL).map(([k, l]) => <button key={k} className={stage === k ? 'on' : ''} onClick={() => { setParam('stage', k); setOffset(0); }}>{l}<span className="meta">{meta.stages[k] ?? 0}</span></button>)}
+      </div>
       <div className="card flush">
-        <div className="row" style={{ padding: 12, gap: 6, flexWrap: 'wrap' }}>
+        <div className="sfilters">
+          <label className="field"><span>Supplier name</span><input className="input sm" type="search" placeholder="Search a supplier…" value={q} onChange={(e) => { setQ(e.target.value); setOffset(0); }} /></label>
+          <label className="field"><span>Internal code</span><input className="input sm" type="search" placeholder="Vendor number…" value={code} onChange={(e) => { setCode(e.target.value); setOffset(0); }} /></label>
+          <label className="field"><span>Procurement department</span><select className="input sm" value={dept} onChange={(e) => { setParam('dept', e.target.value || null); setOffset(0); }}><option value="">All</option>{meta.departments.map((d) => <option key={d}>{d}</option>)}</select></label>
+          <label className="field"><span>Sort by</span><select className="input sm" value={sort} onChange={(e) => { setSort(e.target.value); setOffset(0); }} aria-label="Sort by">
+            <option value="co2e">↓ CO₂ emitted</option><option value="spend">↓ Spend</option><option value="lines">↓ Purchase lines</option><option value="name">Name A–Z</option></select></label>
+          <label className="row small chkline sp-hide"><input type="checkbox" checked={hideProspects} onChange={(e) => { setHideProspects(e.target.checked); setOffset(0); }} />Hide prospects{meta.prospects ? ` (${meta.prospects})` : ''}</label>
+        </div>
+        <div className="row" style={{ padding: '0 12px 10px', gap: 6, flexWrap: 'wrap' }}>
           {FILTERS.map(([k, l, n]) => <button key={k} className={`chipbtn ${filter === k ? 'on' : ''}`} onClick={() => { setParam('filter', k === 'all' ? null : k); setOffset(0); }}>{l}{n !== undefined && <span className="meta">{n.toLocaleString('en')}</span>}</button>)}
           {country && <button className="chipbtn on" onClick={() => setParam('country', null)} title="Remove the country filter">{country === 'none' ? 'Country not known' : countryName(country)} <Icon name="x" /></button>}
-          <div className="grow" />
-          <select className="input sm" value={sort} onChange={(e) => { setSort(e.target.value); setOffset(0); }} aria-label="Sort by" style={{ width: 150 }}>
-            <option value="co2e">Most emissions</option><option value="spend">Most spend</option><option value="lines">Most lines</option><option value="name">Name A–Z</option>
-          </select>
-          <input className="input sm" type="search" placeholder="Search name, spelling or vendor number…" value={q} onChange={(e) => { setQ(e.target.value); setOffset(0); }} style={{ width: 260 }} />
-          {canManage && <button className="btn sm p" onClick={() => setAdding(true)}><Icon name="plus" />Add supplier</button>}
         </div>
-        {rows === null ? <div className="empty">Loading…</div> : !rows.length ? <div className="empty">{filter === 'all' && !q && !country ? 'No suppliers yet: they appear with the first purchase upload.' : 'No supplier matches.'}</div> : (
-          <div className="scrollx"><table className="t">
-            <thead><tr><th>Supplier</th><th>Country</th><th className="num">Lines</th><th className="num">Spend (USD)</th><th className="num">tCO₂e</th><th>Factor</th><th>Profile</th></tr></thead>
+        {rows === null ? <div className="empty">Loading…</div> : !rows.length ? <div className="empty">{filter === 'all' && !q && !country && !stage ? 'No suppliers yet: add them here, import a list, or they appear with the first purchase upload.' : 'No supplier matches.'}</div> : (
+          <div className="scrollx"><table className="t suptable">
+            <thead><tr><th>Supplier</th><th>Internal code</th><th className="c">Score</th><th className="c">GHG report</th><th className="c">SBTi</th><th>Completion</th><th>Type</th><th>Department</th><th className="num">tCO₂e</th><th>Factor</th></tr></thead>
             <tbody>{rows.map((s) => (
               <tr key={s.id} className={`click ${open === s.id ? 'sel' : ''}`} onClick={() => setParam('open', open === s.id ? null : s.id)}>
-                <td><b>{s.name}</b>{s.review === 'possible_duplicate' && <span className="chip warn" style={{ marginLeft: 6 }} title={`${Math.round((s.duplicate_score ?? 0) * 100)}% alike`}>same as {s.duplicate_of_name}?</span>}
-                  <div className="muted small">{[s.reference && `vendor ${s.reference}`, s.aliases.length ? `${s.aliases.length} other spelling${s.aliases.length > 1 ? 's' : ''}` : ''].filter(Boolean).join(' · ')}</div></td>
-                <td className="small">{s.country ? countryName(s.country) : <span className="muted">—</span>}</td>
-                <td className="num">{s.lines.toLocaleString('en')}</td><td className="num">{usd(s.usd)}</td><td className="num">{tco2e(s.co2e)}</td>
+                <td style={{ minWidth: 200 }}><b>{s.name}</b>{s.review === 'possible_duplicate' && <span className="chip warn" style={{ marginLeft: 6 }} title={`${Math.round((s.duplicate_score ?? 0) * 100)}% alike`}>same as {s.duplicate_of_name}?</span>}
+                  <div className="muted small">{[s.country && countryName(s.country), STAGE_LABEL[s.stage ?? 'not_engaged'], s.sbtiList ? `SBTi list: ${s.sbtiList.status}` : null].filter(Boolean).join(' · ')}</div></td>
+                <td className="small mono">{s.reference ?? <span className="muted">—</span>}</td>
+                <td className="c"><Grade l={s.letter} /></td>
+                <td className="c"><Yes v={s.ghgReport} t="Measures and reports its emissions" /></td>
+                <td className="c"><Yes v={s.sbti} t="Science-based target validated" /></td>
+                <td>{s.completion != null ? <span className="pctpill" style={{ ['--p' as string]: `${s.completion}%` }}>{s.completion}%</span> : <span className="muted small">—</span>}</td>
+                <td>{s.kind === 'prospect' ? <span className="chip info">Prospect</span> : <span className="chip grey">Current supplier</span>}</td>
+                <td className="small">{s.department ?? <span className="muted">—</span>}</td>
+                <td className="num">{tco2e(s.co2e)}</td>
                 <td>{s.factors ? <span className="chip">own factor</span> : <span className="chip grey">spend-based</span>}</td>
-                <td><Completeness v={s.completeness ?? 0} /></td>
               </tr>))}</tbody>
           </table></div>
         )}
         {total > 50 && <div className="row" style={{ padding: 8, justifyContent: 'flex-end' }}><span className="muted small">{offset + 1}–{Math.min(total, offset + 50)} of {total.toLocaleString('en')}</span>
           <button className="btn sm" disabled={!offset} onClick={() => setOffset(offset - 50)} aria-label="Previous page">‹</button><button className="btn sm" disabled={offset + 50 >= total} onClick={() => setOffset(offset + 50)} aria-label="Next page">›</button></div>}
+        {total > 0 && total <= 50 && <div className="muted small" style={{ padding: '8px 12px' }}>Showing {total} of {total}</div>}
       </div>
       {open && <SupplierPanel key={open} id={open} canManage={canManage} onChanged={changed} onClose={() => setParam('open', null)} onOpen={(id) => setParam('open', id)} />}
     </>
@@ -112,30 +151,121 @@ function Completeness({ v }: { v: number }) {
   return <span className="complete" title={`Profile ${Math.round(v * 100)}% complete (country, vendor number, industry, contact, reports emissions, climate target)`}><span className="cov"><div style={{ width: `${Math.round(v * 100)}%` }} /></span>{Math.round(v * 100)}%</span>;
 }
 
-function AddSupplier({ onDone }: { onDone: (id?: string) => void }) {
-  const [f, setF] = useState({ name: '', country: '', reference: '', contactEmail: '' });
+const CDP_SCORES = ['A', 'A-', 'B', 'B-', 'C', 'C-', 'D', 'D-', 'F'];
+function AddSupplierDrawer({ departments, onClose, onDone }: { departments: string[]; onClose: () => void; onDone: (id?: string) => void }) {
+  const { toast } = useApp();
+  const dlg = useRef<HTMLDialogElement>(null);
+  useEffect(() => { dlg.current?.showModal(); }, []);
+  const [f, setF] = useState({ name: '', kind: 'current', reference: '', country: '', department: '', industry: '', size: '', website: '', contactName: '', contactEmail: '', reportsEmissions: 'unknown', climateTarget: 'unknown',
+    cdpScore: '', reductionPct: '', targetYear: '', netZeroYear: '', note: '', invite: false });
   const [err, setErr] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [code, setCode] = useState<{ code: string; email: string } | null>(null);
+  const up = (x: Partial<typeof f>) => setF((o) => ({ ...o, ...x }));
+  const txt = (k: keyof typeof f, l: string, p = '', cls = 'field') => <label className={cls}><span>{l}</span><input className="input" placeholder={p} value={String(f[k])} onChange={(e) => up({ [k]: e.target.value })} /></label>;
+  const go = async () => {
+    setBusy(true); setErr(null);
+    const o = (v: string) => v.trim() || undefined;
+    const target = f.reductionPct || f.netZeroYear ? { reductionPct: f.reductionPct ? Number(f.reductionPct) : null, targetYear: f.targetYear ? Number(f.targetYear) : null, netZeroYear: f.netZeroYear ? Number(f.netZeroYear) : null, source: 'Entered by hand' } : undefined;
+    try {
+      const r = await api.addSupplier({ name: f.name.trim(), kind: f.kind, reference: o(f.reference), country: o(f.country), department: o(f.department), industry: o(f.industry), size: f.size || undefined, website: o(f.website),
+        contactName: o(f.contactName), contactEmail: o(f.contactEmail), reportsEmissions: f.reportsEmissions, climateTarget: f.climateTarget, cdpScore: f.cdpScore || undefined, target, note: o(f.note) });
+      if (f.invite && f.contactEmail.trim()) {
+        const inv = await api.supplierInvite({ supplierId: r.id, year: new Date().getFullYear() - 1, email: f.contactEmail.trim(), contactName: f.contactName.trim(), message: '', dueDate: null, months: 6, sendEmail: true });
+        setCode({ code: inv.code, email: f.contactEmail.trim() });
+        toast('Supplier added and invited'); return;
+      }
+      toast('Supplier added'); onDone(r.id);
+    } catch (e) { setErr((e as Error).message); } finally { setBusy(false); }
+  };
   return (
-    <div className="card" style={{ display: 'grid', gap: 10 }}>
-      <h3>New supplier</h3>
-      <div className="grid3">
-        <label className="field"><span>Name</span><input className="input" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} /></label>
-        <label className="field"><span>Vendor number (ERP)</span><input className="input" value={f.reference} onChange={(e) => setF({ ...f, reference: e.target.value })} /></label>
-        <label className="field"><span>Country (2 letters)</span><input className="input" maxLength={2} value={f.country} onChange={(e) => setF({ ...f, country: e.target.value.toUpperCase() })} /></label>
-        <label className="field"><span>Sustainability contact e-mail</span><input className="input" value={f.contactEmail} onChange={(e) => setF({ ...f, contactEmail: e.target.value })} /></label>
+    <dialog ref={dlg} className="drawer wide" onClose={() => (code ? onDone() : onClose())}>
+      <div className="in">
+        <div className="row"><div className="grow"><div className="eyebrow">Suppliers</div><h2>Add a supplier</h2></div><button className="btn ghost" onClick={() => dlg.current?.close()} aria-label="Close"><Icon name="x" /></button></div>
+        {code ? <>
+          <div className="note ok">Added and invited to the supplier portal for {new Date().getFullYear() - 1}.</div>
+          <div className="sp-code mono">{code.code.replace(/(.{5})/, '$1 ')}</div>
+          <div className="note warn small">The access code is shown only now. The invitation with it was queued to {code.email} (sent once a mail server is set up). Sign-in page: {location.origin}/supplier</div>
+          <div className="row"><span className="grow" /><button className="btn p" onClick={() => dlg.current?.close()}>Done</button></div>
+        </> : <>
+          <div className="vform">
+            {txt('name', 'Name *', 'Legal or trading name', 'field span2')}
+            <div className="field span2"><span>Type</span><div className="sp-choice">
+              {([['current', 'Current supplier', 'You buy from them'], ['prospect', 'Prospect', 'You may buy from them — compare before choosing']] as const).map(([k, l, sub]) =>
+                <label key={k} className={f.kind === k ? 'on' : ''}><input type="radio" name="kind" checked={f.kind === k} onChange={() => up({ kind: k })} /><span><b>{l}</b><small>{sub}</small></span></label>)}</div></div>
+            {txt('reference', 'Internal code / vendor number', 'as in the ERP — links future purchases')}{txt('country', 'Country', 'AE, India, Germany…')}
+            <label className="field"><span>Procurement department</span><input className="input" list="sup-depts" value={f.department} onChange={(e) => up({ department: e.target.value })} placeholder="e.g. Fleet, Facilities, IT" />
+              <datalist id="sup-depts">{departments.map((d) => <option key={d} value={d} />)}</datalist></label>
+            {txt('industry', 'Industry / what they supply')}
+            <label className="field"><span>Size</span><select className="input" value={f.size} onChange={(e) => up({ size: e.target.value })}><option value="">—</option><option value="micro">Micro</option><option value="small">Small</option><option value="medium">Medium</option><option value="large">Large</option></select></label>
+            {txt('website', 'Website', 'https://')}
+            {txt('contactName', 'Sustainability contact')}{txt('contactEmail', 'Contact e-mail')}
+            <label className="field"><span>Reports its emissions</span><select className="input" value={f.reportsEmissions} onChange={(e) => up({ reportsEmissions: e.target.value })}><option value="unknown">Not known</option><option value="yes">Yes</option><option value="no">No</option></select></label>
+            <label className="field"><span>CDP climate score</span><select className="input" value={f.cdpScore} onChange={(e) => up({ cdpScore: e.target.value })}><option value="">Not known</option>{CDP_SCORES.map((c) => <option key={c}>{c}</option>)}</select></label>
+            <label className="field"><span>Climate target</span><select className="input" value={f.climateTarget} onChange={(e) => up({ climateTarget: e.target.value })}>{Object.entries(TARGET_LABEL).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></label>
+            <div className="field"><span>Target, if known</span><div className="row" style={{ gap: 6 }}>
+              <input className="input num" placeholder="−%" aria-label="Reduction %" value={f.reductionPct} onChange={(e) => up({ reductionPct: e.target.value })} />
+              <input className="input num" placeholder="by year" aria-label="Target year" value={f.targetYear} onChange={(e) => up({ targetYear: e.target.value })} />
+              <input className="input num" placeholder="net zero" aria-label="Net-zero year" value={f.netZeroYear} onChange={(e) => up({ netZeroYear: e.target.value })} /></div></div>
+            {txt('note', 'Note', '', 'field span2')}
+            <label className="span2 row small chkline" style={{ gap: 8 }}><input type="checkbox" checked={f.invite} disabled={!/\S+@\S+\.\S+/.test(f.contactEmail)} onChange={(e) => up({ invite: e.target.checked })} />
+              <b>Invite the contact to the supplier portal now</b> <span className="muted">(for {new Date().getFullYear() - 1}; needs the contact e-mail)</span></label>
+          </div>
+          <div className="sub">The name and internal code are checked against existing suppliers and every spelling seen in purchases, so the same supplier is not added twice. Purchases later uploaded under this name or code link to it.</div>
+          {err && <div className="note bad">{err}</div>}
+          <div className="row"><span className="grow" /><button className="btn" onClick={() => dlg.current?.close()}>Cancel</button><button className="btn p" disabled={busy || !f.name.trim()} onClick={() => void go()}>{f.invite ? 'Add and invite' : 'Add supplier'}</button></div>
+        </>}
       </div>
-      <div className="sub">The name and vendor number are checked against existing suppliers and every spelling seen in purchases.</div>
-      {err && <div className="note bad">{err}</div>}
-      <div className="row" style={{ justifyContent: 'flex-end' }}><button className="btn" onClick={() => onDone()}>Cancel</button>
-        <button className="btn p" disabled={!f.name.trim()} onClick={async () => { try { const r = await api.addSupplier(Object.fromEntries(Object.entries(f).filter(([, v]) => v))); onDone(r.id); } catch (e) { setErr((e as Error).message); } }}>Add</button></div>
-    </div>
-  );
+    </dialog>);
+}
+
+function ImportDrawer({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
+  const { toast } = useApp();
+  const dlg = useRef<HTMLDialogElement>(null);
+  useEffect(() => { dlg.current?.showModal(); }, []);
+  const [file, setFile] = useState<File | null>(null);
+  const [res, setRes] = useState<SupplierImportResult | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const run = async (commit: boolean, f = file) => {
+    if (!f) return;
+    setBusy(true); setErr(null);
+    try { const r = await api.importSuppliers(f, commit); setRes(r); if (commit) { toast(`${r.created} suppliers added, ${r.updated} completed`); onDone(); } } catch (e) { setErr((e as Error).message); } finally { setBusy(false); }
+  };
+  const template = () => {
+    const csv = 'Supplier name,Internal code,Type,Country,Procurement department,Industry,Contact name,Contact email,Website,CDP score\nExample Supplier LLC,V-10001,current,AE,Facilities,Cleaning services,Jane Doe,jane@example.com,https://example.com,\n';
+    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' })); a.download = 'supplier-list-template.csv'; a.click();
+  };
+  const ACT: Record<string, [string, string]> = { new: ['', 'New'], update: ['info', 'Completes'], same: ['grey', 'Already there'], error: ['bad', 'Error'] };
+  return (
+    <dialog ref={dlg} className="drawer wide" onClose={onClose}>
+      <div className="in">
+        <div className="row"><div className="grow"><div className="eyebrow">Suppliers</div><h2>Import a supplier list</h2></div><button className="btn ghost" onClick={() => dlg.current?.close()} aria-label="Close"><Icon name="x" /></button></div>
+        <p className="sub" style={{ margin: 0 }}>An Excel or CSV export of your vendor master or a list you keep. Columns are recognised by their names: supplier name (required), internal code / vendor number, type (current / prospect), country, procurement department, industry, contact name and e-mail, website, CDP score. Existing suppliers are found by name, known spellings or code; only their empty fields are filled.</p>
+        <div className="sp-drop">
+          <label className="btn">{file ? file.name : 'Choose a file…'}<input type="file" hidden accept=".xlsx,.csv,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onChange={(e) => { const f = e.target.files?.[0] ?? null; setFile(f); setRes(null); if (f) void run(false, f); }} /></label>
+          <button className="btn ghost sm" onClick={template}><Icon name="download" />Template</button>
+        </div>
+        {err && <div className="note bad">{err}</div>}
+        {res && <>
+          <div className="small"><b>Columns used:</b> {Object.entries(res.columns).map(([k, v]) => `${k} ← “${v}”`).join(' · ')}</div>
+          <div className="row" style={{ gap: 8 }}>{(['new', 'update', 'same', 'error'] as const).map((k) => <span key={k} className={`chip ${ACT[k]![0]}`}>{ACT[k]![1]}: {res.totals[k]}</span>)}</div>
+          <div className="scroll" style={{ maxHeight: 340 }}><table className="t small"><thead><tr><th className="num">Row</th><th>Supplier</th><th>What happens</th><th>Detail</th></tr></thead>
+            <tbody>{res.rows.map((r) => <tr key={r.row}><td className="num">{r.row}</td><td><b>{r.name}</b></td><td><span className={`chip ${ACT[r.action]![0]}`}>{ACT[r.action]![1]}</span></td><td className={r.action === 'error' ? '' : 'muted'} style={r.action === 'error' ? { color: 'var(--bad)' } : undefined}>{r.detail}</td></tr>)}</tbody></table></div>
+        </>}
+        <div className="row"><span className="grow" /><button className="btn" onClick={() => dlg.current?.close()}>Cancel</button>
+          <button className="btn p" disabled={busy || !res || res.committed || !(res.totals.new + res.totals.update)} onClick={() => void run(true)}>{busy ? 'Working…' : res ? `Add ${res.totals.new} · complete ${res.totals.update}` : 'Import'}</button></div>
+      </div>
+    </dialog>);
 }
 
 const METHOD_LABEL: Record<string, string> = { new: 'first seen', exact: 'same name', alias: 'known spelling', reference: 'same vendor number', similar: 'near-identical name', merged: 'merged', manual: 'added by hand' };
-type ProfileForm = { name: string; country: string; reference: string; trn: string; website: string; industry: string; size: string; contactName: string; contactEmail: string; reportsEmissions: string; climateTarget: string; note: string };
+type ProfileForm = { name: string; country: string; reference: string; trn: string; website: string; industry: string; size: string; contactName: string; contactEmail: string; reportsEmissions: string; climateTarget: string; note: string;
+  kind: string; department: string; cdpScore: string; cdpYear: string; reductionPct: string; baseYear: string; targetYear: string; netZeroYear: string };
 const formOf = (s: SupplierProfile): ProfileForm => ({ name: s.name, country: s.country ?? '', reference: s.reference ?? '', trn: s.trn ?? '', website: s.website ?? '', industry: s.industry ?? '', size: s.size ?? '',
-  contactName: s.contact_name ?? '', contactEmail: s.contact_email ?? '', reportsEmissions: s.reports_emissions ?? 'unknown', climateTarget: s.climate_target ?? 'unknown', note: s.note ?? '' });
+  contactName: s.contact_name ?? '', contactEmail: s.contact_email ?? '', reportsEmissions: s.reports_emissions ?? 'unknown', climateTarget: s.climate_target ?? 'unknown', note: s.note ?? '',
+  kind: s.kind ?? 'current', department: s.department ?? '', cdpScore: s.cdp_score ?? '', cdpYear: s.cdp_year ? String(s.cdp_year) : '',
+  reductionPct: s.target?.reductionPct != null ? String(s.target.reductionPct) : '', baseYear: s.target?.baseYear ? String(s.target.baseYear) : '', targetYear: s.target?.targetYear ? String(s.target.targetYear) : '', netZeroYear: s.target?.netZeroYear ? String(s.target.netZeroYear) : '' });
 
 function SupplierPanel({ id, canManage, onChanged, onClose, onOpen }: { id: string; canManage: boolean; onChanged: () => void; onClose: () => void; onOpen: (id: string) => void }) {
   const { toast } = useApp();
@@ -159,6 +289,9 @@ function SupplierPanel({ id, canManage, onChanged, onClose, onOpen }: { id: stri
   const saveProfile = () => act(() => api.patchSupplier(id, {
     name: form.name.trim(), country: form.country || null, reference: form.reference.trim() || null, trn: form.trn.trim() || null, website: form.website.trim() || null, industry: form.industry.trim() || null,
     size: form.size || null, contactName: form.contactName.trim() || null, contactEmail: form.contactEmail.trim() || null, reportsEmissions: form.reportsEmissions, climateTarget: form.climateTarget, note: form.note.trim() || null,
+    kind: form.kind, department: form.department.trim() || null, cdpScore: form.cdpScore || null, cdpYear: form.cdpYear ? Number(form.cdpYear) : null,
+    target: form.reductionPct || form.netZeroYear || form.targetYear ? { reductionPct: form.reductionPct ? Number(form.reductionPct) : null, baseYear: form.baseYear ? Number(form.baseYear) : null,
+      targetYear: form.targetYear ? Number(form.targetYear) : null, netZeroYear: form.netZeroYear ? Number(form.netZeroYear) : null, source: s.target?.source ?? 'Entered by hand' } : null,
   }), 'Profile saved');
   const saveEf = async () => {
     if (!nf) return;
@@ -179,6 +312,7 @@ function SupplierPanel({ id, canManage, onChanged, onClose, onOpen }: { id: stri
         <Completeness v={s.completeness ?? 0} />
         <button className="btn ghost" onClick={onClose} aria-label="Close"><Icon name="x" /></button></div>
       {err && <div className="note bad">{err}</div>}
+      <ScoreCard e={d.engagement} supplierId={id} canManage={canManage} />
       {s.review === 'possible_duplicate' && d.duplicateOf && (
         <div className="note warn row" style={{ gap: 8 }}>
           <span className="grow">Possibly the same supplier as <a href="#" onClick={(e) => { e.preventDefault(); onOpen(d.duplicateOf!.id); }}>{d.duplicateOf.name}</a> ({Math.round((s.duplicate_score ?? 0) * 100)}% alike).</span>
@@ -197,6 +331,13 @@ function SupplierPanel({ id, canManage, onChanged, onClose, onOpen }: { id: stri
             {F('website', 'Website')}
             <label className="field"><span>Reports its emissions</span><select className="input" value={form.reportsEmissions} disabled={!canManage} onChange={(e) => setForm({ ...form, reportsEmissions: e.target.value })}><option value="unknown">Not known</option><option value="yes">Yes</option><option value="no">No</option></select></label>
             <label className="field"><span>Climate target</span><select className="input" value={form.climateTarget} disabled={!canManage} onChange={(e) => setForm({ ...form, climateTarget: e.target.value })}>{Object.entries(TARGET_LABEL).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></label>
+            <label className="field"><span>Type</span><select className="input" value={form.kind} disabled={!canManage} onChange={(e) => setForm({ ...form, kind: e.target.value })}><option value="current">Current supplier</option><option value="prospect">Prospect</option></select></label>
+            {F('department', 'Procurement department')}
+            <label className="field"><span>CDP climate score</span><select className="input" value={form.cdpScore} disabled={!canManage} onChange={(e) => setForm({ ...form, cdpScore: e.target.value })}><option value="">Not known</option>{CDP_SCORES.map((c) => <option key={c}>{c}</option>)}</select></label>
+            {F('cdpYear', 'CDP year', { inputMode: 'numeric' })}
+            <div className="field" style={{ gridColumn: '1 / -1' }}><span>Declared reduction target{s.target?.source ? ` · ${s.target.source}` : ''}</span><div className="row" style={{ gap: 6 }}>
+              {([['reductionPct', '−%'], ['baseYear', 'from year'], ['targetYear', 'by year'], ['netZeroYear', 'net zero']] as const).map(([k, p]) =>
+                <input key={k} className="input num" placeholder={p} aria-label={p} disabled={!canManage} value={form[k]} onChange={(e) => setForm({ ...form, [k]: e.target.value })} />)}</div></div>
           </div>
           <label className="field" style={{ marginTop: 8 }}><span>Note</span><textarea className="input" rows={2} value={form.note} disabled={!canManage} onChange={(e) => setForm({ ...form, note: e.target.value })} /></label>
           {canManage && <div className="row" style={{ justifyContent: 'flex-end', marginTop: 8 }}><button className="btn sm" disabled={!dirty} onClick={() => setForm(formOf(s))}>Undo</button><button className="btn sm p" disabled={!dirty || !form.name.trim()} onClick={saveProfile}>Save profile</button></div>}
@@ -262,6 +403,24 @@ function SupplierPanel({ id, canManage, onChanged, onClose, onOpen }: { id: stri
       </div>
     </div>
   );
+}
+
+function ScoreCard({ e, supplierId, canManage }: { e: SupplierEngagement; supplierId: string; canManage: boolean }) {
+  const [, setSp] = useSearchParams();
+  return (
+    <div className="scorecard">
+      <div className="sc-grade"><Grade l={e.letter} size={56} /><div><b>{e.score}</b><small>/ 100</small></div><span className="small muted">Climate score</span></div>
+      <div className="sc-parts">{e.parts.map((p) => <div key={p.key}><span className="small"><b>{p.label}</b> <span className="muted">{p.note}</span></span>
+        <span className="sc-bar"><i style={{ width: `${(p.points / p.max) * 100}%` }} /></span><span className="small num">{p.points}/{p.max}</span></div>)}</div>
+      <div className="sc-side">
+        <div className="small"><span className="muted">Engagement</span><br /><b>{STAGE_LABEL[e.stage]}</b>{e.request ? ` · ${e.request.year}` : ''}{e.completion != null ? ` · ${e.completion}% answered` : ''}</div>
+        {e.sbtiList ? <div className="small"><span className="muted">SBTi list</span><br /><b>{e.sbtiList.status}</b>{e.sbtiList.classification ? ` · ${e.sbtiList.classification}` : ''}{e.sbtiList.netZeroYear ? ` · net zero ${e.sbtiList.netZeroYear}` : ''}<div className="muted">as “{e.sbtiList.name}”</div></div>
+          : <div className="small muted">Not found in the SBTi list.</div>}
+        {e.request ? <button className="btn sm" onClick={() => setSp({ tab: 'portal', request: e.request!.id })}>Open the request</button>
+          : canManage && <button className="btn sm p" onClick={() => setSp({ tab: 'portal', invite: supplierId })}>Invite to the portal</button>}
+      </div>
+      {e.actions.length > 0 && <details className="sc-act small"><summary>How this supplier can improve ({e.actions.length})</summary><ul>{e.actions.map((a) => <li key={a}>{a}</li>)}</ul></details>}
+    </div>);
 }
 
 // ---------------------------------------------------------------- review --

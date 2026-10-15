@@ -26,6 +26,7 @@ import { notify } from '../lib/notify.js';
 import { appLink, queueEmail } from '../lib/mail.js';
 import { PRODUCT } from '../lib/brand.js';
 import { recalcSupplier } from './purchases/suppliers.routes.js';
+import { supplierScore } from '../lib/supplierScore.js';
 
 const sha = (s: string) => createHash('sha256').update(s).digest('hex');
 const ABC = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -155,6 +156,7 @@ export async function supplierPortalRoutes(app: FastifyInstance) {
     const b = z.object({
       supplierId: z.string().uuid(), year: z.number().int().min(2000).max(2100), email: z.string().trim().toLowerCase().email().max(200), contactName: z.string().trim().max(120).default(''),
       message: z.string().trim().max(2000).default(''), dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().default(null), months: z.number().int().min(1).max(24).default(6), sendEmail: z.boolean().default(true),
+      shareEstimate: z.boolean().default(false),
     }).parse(req.body);
     const code = newCode();
     return tenantTx(tenant, async (c) => {
@@ -162,9 +164,9 @@ export async function supplierPortalRoutes(app: FastifyInstance) {
       if (!s) throw notFound('Supplier');
       if ((await c.query(`SELECT 1 FROM supplier_request WHERE supplier_id = $1 AND year = $2`, [b.supplierId, b.year])).rowCount) throw new AppError(`${s.name} is already invited for ${b.year}: give a new code instead`, 409, 'EXISTS');
       const r = (await c.query(
-        `INSERT INTO supplier_request (tenant_id, supplier_id, year, contact_name, email, message, due_date, code_hash, expires_at, created_by)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,(current_date + make_interval(months => $9))::date,$10) RETURNING id, email, contact_name, year, message, due_date, expires_at`,
-        [tenant, b.supplierId, b.year, b.contactName || null, b.email, b.message, b.dueDate, sha(code), b.months, req.user.name])).rows[0];
+        `INSERT INTO supplier_request (tenant_id, supplier_id, year, contact_name, email, message, due_date, code_hash, expires_at, created_by, share_estimate)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,(current_date + make_interval(months => $9))::date,$10,$11) RETURNING id, email, contact_name, year, message, due_date, expires_at`,
+        [tenant, b.supplierId, b.year, b.contactName || null, b.email, b.message, b.dueDate, sha(code), b.months, req.user.name, b.shareEstimate])).rows[0];
       if (!s.contact_email) await c.query(`UPDATE supplier SET contact_email = $2, contact_name = coalesce(contact_name, $3), updated_at = now() WHERE id = $1`, [s.id, b.email, b.contactName || null]);
       if (b.sendEmail) await invite(c, tenant, r, s.name, code);
       await audit(c, req, 'supplier_portal.invite', 'supplier_request', r.id, { supplier: s.name, year: b.year, email: b.email, emailed: b.sendEmail });
@@ -249,6 +251,7 @@ export async function supplierPortalRoutes(app: FastifyInstance) {
         if (p.contactName) set.contact_name = p.contactName;
         if (inv.reports) set.reports_emissions = inv.reports === 'no' ? 'no' : 'yes';
         if (t.status) set.climate_target = t.status;
+        if (t.status && t.status !== 'none' && (t.reductionPct != null || t.netZeroYear != null)) set.target = JSON.stringify({ reductionPct: t.reductionPct ?? null, baseYear: t.baseYear ?? null, targetYear: t.targetYear ?? null, netZeroYear: t.netZeroYear ?? null, scopes: t.scopes ?? null, source: `Supplier portal ${r.year}` });
         const keys = Object.keys(set);
         if (keys.length) await c.query(`UPDATE supplier SET ${keys.map((k, i) => `${k} = $${i + 2}`).join(', ')}, updated_at = now() WHERE id = $1`, [r.supplier_id, ...keys.map((k) => set[k])]);
         applied.profile = keys;
@@ -327,9 +330,18 @@ export async function supplierPublicRoutes(app: FastifyInstance) {
     const k = await session(req);
     return tenantTx(k.tenant, async (c) => {
       const r = (await c.query(`SELECT r.id, r.year, r.contact_name, r.email, r.message, r.due_date, r.expires_at, r.status, r.answers, r.documents, r.submitted_at, r.submitted_by, r.review_note, r.reviewed_at,
-                                       s.name AS supplier, t.name AS company, t.currency AS company_currency
-                                  FROM supplier_request r JOIN supplier s ON s.id = r.supplier_id JOIN tenant t ON t.id = r.tenant_id WHERE r.id = $1`, [k.id])).rows[0];
-      return { ...r, progress: completeness(r.answers), derived: derived(r.answers), statusText: STATUS_TEXT, editable: ['invited', 'in_progress', 'queried'].includes(r.status) };
+                                       r.share_estimate, s.name AS supplier, s.cdp_score, s.target, s.reports_emissions, s.climate_target, t.name AS company, t.currency AS company_currency,
+                                       sb.near_status, sb.net_zero_year
+                                  FROM supplier_request r JOIN supplier s ON s.id = r.supplier_id JOIN tenant t ON t.id = r.tenant_id
+                                  LEFT JOIN LATERAL (SELECT z.near_status, z.net_zero_year FROM sbti_company z WHERE z.norm = s.norm OR z.norm = ANY(s.aliases) LIMIT 1) sb ON true WHERE r.id = $1`, [k.id])).rows[0];
+      // the score as it will be once the answers are in (the supplier's own view, with what earns more points)
+      const sc = supplierScore({ reports_emissions: r.reports_emissions, climate_target: r.climate_target, cdp_score: r.cdp_score, target: r.target,
+        sbti: r.near_status ? { near_status: r.near_status, net_zero_year: r.net_zero_year } : null, request: { status: r.status === 'accepted' ? 'accepted' : 'submitted', answers: r.answers } });
+      const contribution = r.share_estimate ? Number((await c.query(`SELECT coalesce(sum(co2e), 0)::float8 / 1000 AS t FROM purchase_line WHERE supplier_id = (SELECT supplier_id FROM supplier_request WHERE id = $1)
+                                                                       AND status IN ('ready','check','published') AND extract(year FROM period_start) = $2`, [k.id, r.year])).rows[0].t) : null;
+      const { cdp_score: _c, target: _t, reports_emissions: _r, climate_target: _ct, near_status: _n, net_zero_year: _z, share_estimate: _s, ...rest } = r;
+      return { ...rest, progress: completeness(r.answers), derived: derived(r.answers), statusText: STATUS_TEXT, editable: ['invited', 'in_progress', 'queried'].includes(r.status),
+        score: { score: sc.score, letter: sc.letter, parts: sc.parts.map((p) => (p.key === 'data' && !['submitted', 'accepted'].includes(r.status) ? { ...p, note: 'counted once you submit' } : p)), actions: sc.actions.filter((x) => !/customer's data request/.test(x)) }, contribution };
     });
   });
 

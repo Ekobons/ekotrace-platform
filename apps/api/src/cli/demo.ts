@@ -21,6 +21,7 @@ import { storeReadings, syncMeter, type MeterRow } from '../modules/meters.route
 import { bookBill, createBill } from '../modules/bills.routes.js';
 import { PDFDocument, StandardFonts } from 'pdf-lib';
 import { demoPurchases } from './demoPurchases.js';
+import { normSupplier } from '../modules/purchases/fields.js';
 import { purgeTenant } from '../db/purge.js';
 import { createHash, randomUUID } from 'node:crypto';
 import { linkBins } from '../modules/contractor.routes.js';
@@ -534,7 +535,7 @@ async function main() {
     // invented supplier records (no real company is shown with made-up figures): the lines of the four largest suppliers move to them
     const FAKE = ['Falcon Steel Works (DEMO, not real)', 'Oasis Cement Co (DEMO, not real)', 'Dunes Heavy Equipment (DEMO, not real)', 'Palm Ready Mix (DEMO, not real)'];
     for (const [i, s] of top.entries()) {
-      const id = (await c.query(`INSERT INTO supplier (tenant_id, name, norm, country, origin) VALUES ($1,$2,$3,'AE','manual') RETURNING id`, [t, FAKE[i], FAKE[i]!.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()])).rows[0].id as string;
+      const id = (await c.query(`INSERT INTO supplier (tenant_id, name, norm, country, origin) VALUES ($1,$2,$3,'AE','manual') RETURNING id`, [t, FAKE[i], normSupplier(FAKE[i]!)])).rows[0].id as string;
       await c.query(`UPDATE purchase_line SET supplier_id = $2 WHERE supplier_id = $1`, [s.id, id]);
       await c.query(`UPDATE supplier_ef SET supplier_id = $2 WHERE supplier_id = $1`, [s.id, id]);
       top[i] = { id, name: FAKE[i]! };
@@ -576,6 +577,23 @@ async function main() {
     // 4: invited, not started
     await req(top[3]!, 'invited', {}, [], null, 3);
     sportal = `esg@${slug(top[2]!.name)}.example`;
+    // engagement (DEMO): departments on the largest suppliers; CDP scores, targets and prospects only on invented suppliers
+    const DEPTS = ['Facilities', 'Fleet & logistics', 'IT', 'Construction', 'Waste operations', 'Corporate services'];
+    const big = (await c.query(`SELECT s.id FROM supplier s JOIN purchase_line l ON l.supplier_id = s.id WHERE s.tenant_id = $1 GROUP BY s.id ORDER BY sum(l.co2e) DESC NULLS LAST LIMIT 40`, [t])).rows;
+    for (const [i, r] of big.entries()) await c.query(`UPDATE supplier SET department = $2 WHERE id = $1`, [r.id, DEPTS[i % DEPTS.length]]);
+    await c.query(`UPDATE supplier SET cdp_score = 'A-', cdp_year = $2, reports_emissions = 'yes', target = $3 WHERE id = $1`, [top[0]!.id, by, JSON.stringify({ reductionPct: 42, baseYear: 2022, targetYear: 2030, netZeroYear: 2050, source: 'Supplier portal (DEMO)' })]);
+    await c.query(`UPDATE supplier SET cdp_score = 'B', cdp_year = $2 WHERE id = $1`, [top[1]!.id, by]);
+    await c.query(`UPDATE supplier SET climate_target = 'own', target = $2 WHERE id = $1`, [top[2]!.id, JSON.stringify({ reductionPct: 30, baseYear: 2023, targetYear: 2030, source: 'DEMO' })]);
+    for (const [n, dep, cdp, tgt] of [['Desert Bloom Biofuels (DEMO, not real)', 'Fleet & logistics', 'B', 'sbti_committed'], ['Gulf Green Concrete (DEMO, not real)', 'Construction', 'A', 'sbti_validated'], ['Solar Shade Facilities (DEMO, not real)', 'Facilities', null, 'own']] as const)
+      await c.query(`INSERT INTO supplier (tenant_id, name, norm, country, kind, department, cdp_score, climate_target, reports_emissions, origin, note) VALUES ($1,$2,$3,'AE','prospect',$4,$5,$6,'yes','manual','DEMO — invented prospect')`,
+        [t, n, normSupplier(n), dep, cdp, tgt]);
+    // a DEMO SBTi list (invented companies) — only when no real list has been loaded on the platform
+    if (!Number((await c.query(`SELECT count(*)::int AS n FROM sbti_company`)).rows[0].n)) {
+      const L = [[top[0]!.name, 'Targets set', '1.5°C', 2050], [top[1]!.name, 'Committed', null, null], ['Gulf Green Concrete (DEMO, not real)', 'Targets set', '1.5°C', 2045], ['Desert Bloom Biofuels (DEMO, not real)', 'Committed', null, null], ['Coral Bay Packaging (DEMO, not real)', 'Targets set', 'Well-below 2°C', null]] as const;
+      for (const [n, st, cl, nz] of L) await c.query(`INSERT INTO sbti_company (name, norm, location, sector, near_status, near_class, net_zero_year, published) VALUES ($1,$2,'United Arab Emirates','DEMO sector',$3,$4,$5,'2025 (DEMO)')`,
+        [n, normSupplier(n), st, cl, nz]);
+      await c.query(`INSERT INTO sbti_import (filename, rows, imported_by, demo) VALUES ('DEMO SBTi list (not real)', $1, 'demo', true)`, [L.length]);
+    }
     console.log(`Supplier portal: 4 DEMO requests for ${by} (accepted with a supplier factor, submitted to review, in progress, invited).`);
   });
   // entries typed in during the year came in a few days after each month, most before the due date (before 2025 is locked below)
