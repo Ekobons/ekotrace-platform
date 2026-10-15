@@ -63,6 +63,7 @@ Suppliers are created automatically from purchases, and you can also add them yo
 
 - **Add supplier**: name, type (current supplier or prospect), internal code / vendor number, country (code or name), procurement department, industry, size, website, sustainability contact and e-mail, whether it reports its emissions, CDP score, climate target and, if known, its reduction target (%, target year, net-zero year). Tick **Invite the contact to the supplier portal now** to send the invitation in the same step. The name and code are checked against existing suppliers and every spelling seen in purchases.
 - **Import a list**: an Excel or CSV export of your vendor master. Columns are recognised by their names (supplier name required; internal code, type, country, procurement department, industry, contact name and e-mail, website, CDP score). You first see what will happen to each row — **New**, **Completes** (an existing supplier gets its empty fields filled; nothing typed by a person is overwritten), **Already there**, or **Error** (with the reason) — then add them. **Template** downloads an example.
+- **Documents on the record**: on each supplier's panel, upload its sustainability report, verification statement, EPDs, CDP response or contract clauses (PDF, image, Excel or Word, up to 20 MB). Files the supplier sent on the portal are listed there too.
 - **Download list**: every supplier with its engagement, score, SBTi status and the year's purchase emissions (CSV).
 
 ## The supplier list
@@ -120,6 +121,10 @@ Suppliers → **Supplier portal** asks suppliers for their own data, so their pu
 | Product footprints | per product: kg CO₂e per unit (kg, t, L, m³, kWh, piece or a currency), standard (EPD, ISO 14067…), boundary, validity, verified, document |
 | Evidence | reports, verification statements, EPDs — PDF, JPEG or PNG up to 15 MB |
 | Review & submit | a summary, the sections still missing, and a declaration with name and title |
+
+**Checks that keep the answers consistent**: the emissions relating to you are part of the supplier's own Scope 1 + 2, so they cannot be larger (for example 40,000 t "for you" against 400 t in total is refused — usually a kg / t mix-up); its sales to you cannot be more than its revenue. The portal shows the problem as they type and does not save or submit it; lowering the totals below a share already saved is refused too. Answers sent before this check that disagree are flagged in your review and cannot be accepted — query them.
+
+**Files**: the supplier can attach its report or verification statement right in the Emissions section, an EPD on each product footprint, and anything else under Evidence.
 
 The page shows the figures that follow as they type: their **intensity** (Scope 1 + 2 in kg CO₂e per unit of revenue) and the **tonnes relating to you**. Once submitted the answers are locked until you query them.
 

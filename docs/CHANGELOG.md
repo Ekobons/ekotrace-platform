@@ -2,6 +2,11 @@
 
 Newest first.
 
+## 2026-10-15 · Supplier answers checked for consistency; document uploads
+
+- **Consistency check** (`conflicts()` in the supplier portal): the share for the customer (own calculation) cannot exceed the supplier's Scope 1 + 2 (higher of location / market), sales to the customer cannot exceed revenue. Shown live on the portal (save disabled), refused on save of either section and on submit (`INCONSISTENT`), flagged in the staff review where accepting is blocked.
+- **Uploads**: on the portal, attach the report / verification statement in the Emissions section and an EPD on each product (sets the product's document); on the supplier record, staff upload documents (report, verification, EPD, CDP response, contract, other — PDF, image, .xlsx, .docx ≤ 20 MB; `POST/DELETE /api/suppliers/:id/documents`, `supplier.documents`, migration 046), listed with the files the supplier sent. Test added (79 API tests pass).
+
 ## 2026-10-15 · Supplier engagement (after Greenly's supplier module): manual entry and list import, engagement funnel, climate score, analytics, trajectories, SBTi list
 
 - **Add suppliers by hand** (drawer replaces the inline form): type current / prospect, internal code, country (code or name, `countryCode`), procurement department, industry, size, website, contact, reports emissions, CDP score, climate target and declared target; optional invitation to the portal in the same step. Duplicates refused by name, known spellings or code. `POST /api/suppliers` takes the new fields (`supplierBody`).

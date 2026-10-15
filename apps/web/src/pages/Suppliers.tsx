@@ -9,7 +9,7 @@
 import { useEffect, useMemo, useRef, useState, type InputHTMLAttributes } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useApp } from '../App';
-import { api, num, tco2e, type Supplier, type SupplierAnalytics, type SupplierFactor2, type SupplierEngagement, type SupplierImportResult, type SupplierProfile, type SupplierReview } from '../lib/api';
+import { api, num, tco2e, type Supplier, type SupplierAnalytics, type SupplierFactor2, type SupplierDoc, type SupplierEngagement, type SupplierImportResult, type SupplierProfile, type SupplierReview } from '../lib/api';
 import { ItemPicker } from '../components/ItemPicker';
 import { SupplierRequests } from '../components/SupplierRequests';
 import { SupplierEngagementTab } from '../components/SupplierEngagementTab';
@@ -374,6 +374,7 @@ function SupplierPanel({ id, canManage, onChanged, onClose, onOpen }: { id: stri
               <button className="btn xs" onClick={() => act(async () => { const r = await api.mergeSupplier(c.id, id); setMerge(''); return r; }, `Merged into ${s.name}`)}>Merge into {s.name}</button></div>)}
           </fieldset>}
         </div>
+        <SupplierDocs id={id} docs={d.documents} canManage={canManage} onChanged={load} />
         <div><h3>Own emission factors</h3>
           {d.factors.length ? <table className="t compact"><thead><tr><th>Applies to</th><th className="num">kg CO₂e</th><th>per</th><th>Valid</th><th>Source</th><th /></tr></thead>
             <tbody>{d.factors.map((f: SupplierFactor2) => (
@@ -420,6 +421,33 @@ function ScoreCard({ e, supplierId, canManage }: { e: SupplierEngagement; suppli
           : canManage && <button className="btn sm p" onClick={() => setSp({ tab: 'portal', invite: supplierId })}>Invite to the portal</button>}
       </div>
       {e.actions.length > 0 && <details className="sc-act small"><summary>How this supplier can improve ({e.actions.length})</summary><ul>{e.actions.map((a) => <li key={a}>{a}</li>)}</ul></details>}
+    </div>);
+}
+
+const DOCKIND: Record<string, string> = { report: 'Sustainability / emissions report', verification: 'Verification statement', epd: 'EPD or product footprint', cdp: 'CDP response', contract: 'Contract or clause', other: 'Other' };
+function SupplierDocs({ id, docs, canManage, onChanged }: { id: string; docs: SupplierDoc[]; canManage: boolean; onChanged: () => void }) {
+  const { toast } = useApp();
+  const [kind, setKind] = useState('report');
+  const [busy, setBusy] = useState(false);
+  const add = async (f?: File) => {
+    if (!f) return;
+    if (f.size > 20 * 1024 * 1024) return toast('The file is over 20 MB');
+    setBusy(true);
+    try { await api.uploadSupplierDoc(id, f, kind); toast(`${f.name} attached`); onChanged(); } catch (e) { toast((e as Error).message); } finally { setBusy(false); }
+  };
+  return (
+    <div style={{ gridColumn: '1 / -1' }}><h3>Documents</h3>
+      <div className="sub">The supplier's sustainability report, verification statement, EPDs, CDP response or contract clauses — kept with its record. Files the supplier sent on the portal are listed too.</div>
+      {docs.length ? <ul className="sp-docs" style={{ marginTop: 6 }}>{docs.map((x) => <li key={`${x.from}${x.id}`}>
+        <span className="grow"><a href={`/api/supplier-portal/documents/${x.id}`} target="_blank" rel="noreferrer"><b>{x.filename}</b></a>
+          <small>{DOCKIND[x.kind] ?? x.kind}{x.size ? ` · ${Math.max(1, Math.round(x.size / 1024))} KB` : ''} · {x.from === 'portal' ? `sent by the supplier on the portal${x.year ? ` (${x.year})` : ''}` : `added by ${x.by ?? '—'}${x.at ? `, ${new Date(x.at).toLocaleDateString('en-GB')}` : ''}`}</small></span>
+        {canManage && x.from === 'staff' && <button className="btn sm ghost" onClick={async () => { try { await api.deleteSupplierDoc(id, x.id); onChanged(); } catch (e) { toast((e as Error).message); } }}>Remove</button>}</li>)}</ul>
+        : <div className="muted small" style={{ marginTop: 6 }}>No documents yet.</div>}
+      {canManage && <div className="sp-drop" style={{ marginTop: 8 }}>
+        <label className="field"><span>What it is</span><select className="input sm" value={kind} onChange={(e) => setKind(e.target.value)}>{Object.entries(DOCKIND).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></label>
+        <label className={`btn sm${busy ? ' dis' : ''}`}><Icon name="upload" />{busy ? 'Uploading…' : 'Upload a document'}<input type="file" hidden disabled={busy} accept=".pdf,.jpg,.jpeg,.png,.xlsx,.docx" onChange={(e) => { void add(e.target.files?.[0]); e.target.value = ''; }} /></label>
+        <span className="muted small">PDF, image, Excel or Word · up to 20 MB</span>
+      </div>}
     </div>);
 }
 

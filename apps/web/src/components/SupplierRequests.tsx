@@ -176,6 +176,7 @@ function ReviewDrawer({ id, onClose, onChanged }: { id: string; onClose: () => v
         {!r ? <div className="muted">Loading…</div> : <>
           <div className="row" style={{ gap: 8 }}><span className={`chip ${SP_STATUS[r.status][0]}`}>{SP_STATUS[r.status][1]}</span><span className="small muted">{r.progress.n} of {r.progress.of} sections</span>
             {r.review_note && <span className="small">· {r.status === 'queried' ? 'Asked' : 'Note'}: “{r.review_note}”</span>}</div>
+          {r.issues.length > 0 && <div className="note bad small">{r.issues.map((x) => <div key={x}>{x}</div>)}<div>Query these answers rather than accepting them.</div></div>}
           {r.status === 'invited' && <div className="note info small">The supplier has not started yet{r.last_used_at ? '' : ' (never signed in)'}.</div>}
           <h3 className="sp-h3">Company</h3>
           <table className="t kv"><tbody>

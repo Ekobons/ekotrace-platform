@@ -82,6 +82,20 @@ export function derived(a: Answers) {
   return { s12, intensity, currency: inv.currency ?? null, allocated, share: inv.revenue && al.customerRevenue != null ? al.customerRevenue / inv.revenue : null };
 }
 
+/** Answers that contradict each other: the share for the customer is part of the supplier's own figures. */
+export function conflicts(a: Answers, customer = 'us'): string[] {
+  const inv = a.inventory ?? {}, al = a.allocation ?? {}, out: string[] = [];
+  const f = (x: number) => x.toLocaleString('en-GB', { maximumFractionDigits: 2 });
+  const s2 = Math.max(inv.scope2Location ?? 0, inv.scope2Market ?? 0);
+  const s12 = inv.scope1 != null && (inv.scope2Location != null || inv.scope2Market != null) ? inv.scope1 + s2 : null;
+  if (al.method === 'direct' && al.directT != null && s12 != null && al.directT > s12 * 1.0001)
+    out.push(`The emissions relating to ${customer} (${f(al.directT)} tCO₂e) are more than your whole company's Scope 1 + 2 (${f(s12)} tCO₂e). The share for ${customer} is part of your own emissions: check both figures and their units (tonnes, not kg).`);
+  if (al.method === 'revenue' && al.customerRevenue != null && inv.revenue && al.customerRevenue > inv.revenue * 1.0001)
+    out.push(`Your sales to ${customer} (${f(al.customerRevenue)} ${inv.currency ?? ''}) are more than your total revenue (${f(inv.revenue)} ${inv.currency ?? ''}). Check both figures and the currency.`);
+  if (inv.scope2Location != null && inv.scope2Market != null && inv.scope2Location === 0 && inv.scope2Market > 0) { /* possible (market-based above zero grid) — not an error */ }
+  return out;
+}
+
 /** Which sections are complete (for the progress bar and to submit). */
 export function completeness(a: Answers) {
   const p = a.profile ?? {}, inv = a.inventory ?? {}, al = a.allocation ?? {}, t = a.targets ?? {}, pr = a.products ?? {};
@@ -183,7 +197,7 @@ export async function supplierPortalRoutes(app: FastifyInstance) {
       const { code_hash: _h, ...rest } = r;
       const factors = (await c.query(`SELECT e.id, e.co2e::float8 AS co2e, e.unit, e.item_id, i.name AS item, e.valid_from, e.valid_to, e.source, e.request_id FROM supplier_ef e LEFT JOIN item i ON i.id = e.item_id
                                        WHERE e.supplier_id = $1 ORDER BY e.created_at DESC`, [r.supplier_id])).rows;
-      return { ...rest, has_code: !!r.code_hash, progress: completeness(r.answers), derived: derived(r.answers), factors, canManage: (MANAGE as readonly string[]).includes(req.user.role) };
+      return { ...rest, has_code: !!r.code_hash, progress: completeness(r.answers), derived: derived(r.answers), issues: conflicts(r.answers, 'you'), factors, canManage: (MANAGE as readonly string[]).includes(req.user.role) };
     });
   });
 
@@ -236,6 +250,7 @@ export async function supplierPortalRoutes(app: FastifyInstance) {
       if (!r) throw notFound('Request');
       if (r.status !== 'submitted') throw new AppError('Only submitted answers can be reviewed', 409, 'NOT_SUBMITTED');
       const a = r.answers as Answers;
+      if (b.decision === 'accept' && conflicts(a).length) throw new AppError(`These answers contradict each other — query them instead: ${conflicts(a, 'you')[0]}`, 400, 'INCONSISTENT');
       if (b.decision === 'query') {
         await c.query(`UPDATE supplier_request SET status = 'queried', review_note = $2, reviewed_by = $3, reviewed_at = now(), updated_at = now() WHERE id = $1`, [id, b.note, req.user.name]);
         await queueEmail(c, tenant, r.email, `Please check your ${r.year} emissions data`, `Dear ${r.contact_name || 'colleague'},\n\nWe reviewed your answers and ask you to check the following:\n\n${b.note}\n\nSign in again to update and resubmit${appLink('/supplier') ? `: ${appLink('/supplier')}` : ''}.\n`);
@@ -358,6 +373,11 @@ export async function supplierPublicRoutes(app: FastifyInstance) {
         for (const p of (data as z.infer<typeof SECTIONS.products>).items ?? []) if (p.documentId && !docs.has(p.documentId)) throw new AppError('Attach the document under Evidence first');
       }
       const answers = { ...r.answers, [b.section]: data };
+      if (b.section === 'allocation' || b.section === 'inventory') {
+        const co = (await c.query(`SELECT t.name FROM tenant t WHERE t.id = $1`, [k.tenant])).rows[0].name as string;
+        const bad = conflicts(answers, co);
+        if (bad.length) throw new AppError(b.section === 'inventory' ? `${bad[0]} If the totals are right, change your share for ${co} first.` : bad[0]!, 400, 'INCONSISTENT');
+      }
       await c.query(`UPDATE supplier_request SET answers = $2, status = CASE WHEN status = 'invited' THEN 'in_progress' ELSE status END, updated_at = now() WHERE id = $1`, [k.id, JSON.stringify(answers)]);
       await log(c, k, 'supplier_portal.save', k.id, { section: b.section }, req.ip);
       return { ok: true, progress: completeness(answers), derived: derived(answers) };
@@ -409,6 +429,8 @@ export async function supplierPublicRoutes(app: FastifyInstance) {
       const r = (await c.query(`SELECT r.status, r.answers, r.year, r.created_by, s.name AS supplier FROM supplier_request r JOIN supplier s ON s.id = r.supplier_id WHERE r.id = $1 FOR UPDATE OF r`, [k.id])).rows[0];
       if (!['invited', 'in_progress', 'queried'].includes(r.status)) throw new AppError('Already submitted', 409, 'SUBMITTED');
       const p = completeness(r.answers);
+      const bad = conflicts(r.answers);
+      if (bad.length) throw new AppError(bad[0]!, 400, 'INCONSISTENT');
       const missing = Object.entries(p.done).filter(([, v]) => !v).map(([s]) => s);
       if (missing.length) throw new AppError(`Complete these sections first: ${missing.join(', ')}`, 400, 'INCOMPLETE', { missing });
       const answers = { ...r.answers, declaration: { name: b.name, title: b.title, at: new Date().toISOString() } };

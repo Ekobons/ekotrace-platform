@@ -128,10 +128,10 @@ function Portal({ me, reload, toast }: { me: Me; reload: () => Promise<void>; to
       </nav>
       <div className="card sp-panel">
         {step === 'profile' && <Profile me={me} ro={ro} save={save} />}
-        {step === 'inventory' && <Inventory me={me} ro={ro} save={save} />}
+        {step === 'inventory' && <Inventory me={me} ro={ro} save={save} reload={reload} toast={toast} />}
         {step === 'allocation' && <Allocation me={me} ro={ro} save={save} />}
         {step === 'targets' && <Targets me={me} ro={ro} save={save} />}
-        {step === 'products' && <Products me={me} ro={ro} save={save} />}
+        {step === 'products' && <Products me={me} ro={ro} save={save} reload={reload} toast={toast} />}
         {step === 'evidence' && <Evidence me={me} ro={ro} reload={reload} toast={toast} next={next} />}
         {step === 'submit' && <Submit me={me} reload={reload} toast={toast} goto={setStep} />}
       </div>
@@ -187,7 +187,29 @@ function Profile({ me, ro, save }: { me: Me; ro: boolean; save: SaveFn }) {
   </>;
 }
 
-function Inventory({ me, ro, save }: { me: Me; ro: boolean; save: SaveFn }) {
+/** Upload a file to the request's evidence; returns its id. */
+async function uploadEvidence(file: File, kind: string): Promise<string> {
+  if (file.size > 15 * 1024 * 1024) throw new Error('The file is over 15 MB');
+  return (await call<{ documentId: string }>('POST', '/evidence', undefined, file, { 'x-kind': kind })).documentId;
+}
+function AttachInline({ me, kinds, reload, toast, label }: { me: Me; kinds: (keyof typeof SP_DOCKIND)[]; reload: () => Promise<void>; toast: (m: string) => void; label: string }) {
+  const [kind, setKind] = useState<string>(kinds[0]!);
+  const [busy, setBusy] = useState(false);
+  const mine = me.documents.filter((d) => kinds.includes(d.kind));
+  return (
+    <div className="sp-attach">
+      <div className="row" style={{ gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+        <b className="small">{label}</b>
+        {kinds.length > 1 && <select className="input sm" style={{ width: 'auto' }} value={kind} onChange={(e) => setKind(e.target.value)} aria-label="What it is">{kinds.map((k) => <option key={k} value={k}>{SP_DOCKIND[k]}</option>)}</select>}
+        <label className={`btn sm${busy ? ' dis' : ''}`}>{busy ? 'Uploading…' : 'Attach a file…'}<input type="file" hidden accept="application/pdf,image/jpeg,image/png" disabled={busy}
+          onChange={async (e) => { const f = e.target.files?.[0]; e.target.value = ''; if (!f) return; setBusy(true); try { await uploadEvidence(f, kind); toast('Attached'); await reload(); } catch (x) { toast((x as Error).message); } finally { setBusy(false); } }} /></label>
+        <span className="muted small">PDF, JPEG or PNG · up to 15 MB</span>
+      </div>
+      {mine.length > 0 && <div className="small muted">{mine.map((d) => `📎 ${d.filename}`).join('  ·  ')}</div>}
+    </div>);
+}
+
+function Inventory({ me, ro, save, reload, toast }: { me: Me; ro: boolean; save: SaveFn; reload: () => Promise<void>; toast: (m: string) => void }) {
   const a = me.answers.inventory ?? {};
   const [f, setF] = useState({ reports: a.reports ?? '', scope1: str(a.scope1), scope2Location: str(a.scope2Location), scope2Market: str(a.scope2Market), scope3: str(a.scope3), scope3Categories: a.scope3Categories ?? '',
     boundary: a.boundary ?? '', standard: a.standard ?? 'GHG Protocol Corporate Standard', verification: a.verification ?? '', verifier: a.verifier ?? '', revenue: str(a.revenue), currency: a.currency ?? me.company_currency, notes: a.notes ?? '' });
@@ -195,7 +217,11 @@ function Inventory({ me, ro, save }: { me: Me; ro: boolean; save: SaveFn }) {
   const s1 = toNum(f.scope1), s2 = toNum(f.scope2Market) ?? toNum(f.scope2Location), rev = toNum(f.revenue);
   const intensity = s1 != null && s2 != null && rev ? ((s1 + s2) * 1000) / rev : null;
   const has = f.reports && f.reports !== 'no';
-  const ok = f.reports === 'no' || (!!f.reports && s1 != null && s2 != null && !!rev && /^[A-Z]{3}$/.test(f.currency));
+  const al = me.answers.allocation ?? {}, s2hi = Math.max(toNum(f.scope2Location) ?? 0, toNum(f.scope2Market) ?? 0);
+  const clash = al.method === 'direct' && al.directT != null && s1 != null && al.directT > (s1 + s2hi) * 1.0001
+    ? `Your share for ${me.company} (${nf(al.directT, 2)} tCO₂e, saved under "Your share for us") is more than these Scope 1 + 2 totals.`
+    : al.method === 'revenue' && al.customerRevenue != null && rev && al.customerRevenue > rev * 1.0001 ? `Your sales to ${me.company} (${nf(al.customerRevenue, 0)}, saved under "Your share for us") are more than this revenue.` : null;
+  const ok = !clash && (f.reports === 'no' || (!!f.reports && s1 != null && s2 != null && !!rev && /^[A-Z]{3}$/.test(f.currency)));
   return <>
     <Head t={`Emissions in ${me.year}`} sub="Your whole company's greenhouse-gas emissions for the year, in tonnes of CO₂ equivalent (tCO₂e), as in your own inventory or sustainability report." />
     <div className="sp-choice">
@@ -215,6 +241,8 @@ function Inventory({ me, ro, save }: { me: Me; ro: boolean; save: SaveFn }) {
       <label className="field"><span>Verifier</span><input className="input" disabled={ro || !f.verification || f.verification === 'none'} value={f.verifier} onChange={(e) => setF({ ...f, verifier: e.target.value })} /></label>
     </div>}
     <label className="field"><span>Notes (method, exclusions, what is estimated)</span><textarea className="input" rows={2} disabled={ro} value={f.notes} onChange={(e) => setF({ ...f, notes: e.target.value })} /></label>
+    {!ro && f.reports && f.reports !== 'no' && <AttachInline me={me} kinds={['report', 'verification']} reload={reload} toast={toast} label="Your report or verification statement" />}
+    {clash && <div className="note bad small" role="alert">{clash} Correct the figures, or change your share first.</div>}
     {intensity != null && <div className="sp-calc"><b>{nf(intensity, 4)} kg CO₂e per {f.currency}</b> of revenue (Scope 1 + 2{toNum(f.scope2Market) != null ? ', market-based' : ''}). Your customer may use this for what it buys from you.</div>}
     <Foot ro={ro} ok={ok} onSave={() => void save('inventory', {
       reports: f.reports || null, scope1: has ? s1 : null, scope2Location: has ? toNum(f.scope2Location) : null, scope2Market: has ? toNum(f.scope2Market) : null, scope3: has ? toNum(f.scope3) : null,
@@ -229,7 +257,12 @@ function Allocation({ me, ro, save }: { me: Me; ro: boolean; save: SaveFn }) {
   const [f, setF] = useState({ method: a.method ?? (noInv ? 'none' : ''), customerRevenue: str(a.customerRevenue), directT: str(a.directT), notes: a.notes ?? '' });
   const s12 = me.derived.s12, rev = inv.revenue ?? null, cr = toNum(f.customerRevenue);
   const alloc = f.method === 'direct' ? toNum(f.directT) : f.method === 'revenue' && s12 != null && rev && cr != null ? (s12 * cr) / rev : null;
-  const ok = f.method === 'none' || (f.method === 'revenue' && cr != null) || (f.method === 'direct' && toNum(f.directT) != null);
+  const s2max = Math.max(inv.scope2Location ?? 0, inv.scope2Market ?? 0), s12all = inv.scope1 != null ? inv.scope1 + s2max : null;
+  const dT = toNum(f.directT);
+  const err = f.method === 'direct' && dT != null && s12all != null && dT > s12all * 1.0001
+    ? `This is more than your whole company's Scope 1 + 2 (${nf(s12all, 2)} tCO₂e, under Emissions). The share for ${me.company} is part of your own emissions — check both figures and that both are in tonnes.`
+    : f.method === 'revenue' && cr != null && rev && cr > rev * 1.0001 ? `This is more than your total revenue (${nf(rev, 0)} ${inv.currency ?? ''}, under Emissions). Check both figures and the currency.` : null;
+  const ok = !err && (f.method === 'none' || (f.method === 'revenue' && cr != null) || (f.method === 'direct' && dT != null));
   return <>
     <Head t={`Your emissions relating to ${me.company}`} sub={`The part of your Scope 1 and 2 emissions that relates to what ${me.company} bought from you in ${me.year}. This is what ends up in their Scope 3.`} />
     <div className="sp-choice col">
@@ -245,7 +278,8 @@ function Allocation({ me, ro, save }: { me: Me; ro: boolean; save: SaveFn }) {
     {f.method === 'direct' && <div className="vform"><label className="field"><span>Emissions relating to {me.company} · tCO₂e *</span>
       <input className="input num" inputMode="decimal" disabled={ro} value={f.directT} onChange={(e) => setF({ ...f, directT: e.target.value })} /></label><div className="field" /></div>}
     {f.method !== 'none' && <label className="field"><span>How it was worked out</span><textarea className="input" rows={2} disabled={ro} value={f.notes} onChange={(e) => setF({ ...f, notes: e.target.value })} /></label>}
-    {alloc != null && <div className="sp-calc"><b>{nf(alloc, 2)} tCO₂e</b> relate to {me.company}{f.method === 'revenue' && rev && cr != null ? ` (${nf((cr / rev) * 100, 2)}% of your revenue)` : ''}.</div>}
+    {err && <div className="note bad small" role="alert">{err}</div>}
+    {!err && alloc != null && <div className="sp-calc"><b>{nf(alloc, 2)} tCO₂e</b> relate to {me.company}{f.method === 'revenue' && rev && cr != null ? ` (${nf((cr / rev) * 100, 2)}% of your revenue)` : ''}.</div>}
     <Foot ro={ro} ok={ok} onSave={() => void save('allocation', { method: f.method || null, customerRevenue: f.method === 'revenue' ? cr : null, directT: f.method === 'direct' ? toNum(f.directT) : null, notes: f.notes.trim() || null })} />
   </>;
 }
@@ -271,7 +305,7 @@ function Targets({ me, ro, save }: { me: Me; ro: boolean; save: SaveFn }) {
 }
 
 type PRow = { name: string; description: string; co2e: string; unit: string; standard: string; boundary: string; validFrom: string; validTo: string; verified: boolean; documentId: string };
-function Products({ me, ro, save }: { me: Me; ro: boolean; save: SaveFn }) {
+function Products({ me, ro, save, reload, toast }: { me: Me; ro: boolean; save: SaveFn; reload: () => Promise<void>; toast: (m: string) => void }) {
   const a = me.answers.products ?? {};
   const toRow = (p: SPProduct): PRow => ({ name: p.name, description: p.description ?? '', co2e: String(p.co2e), unit: p.unit, standard: p.standard ?? '', boundary: p.boundary ?? 'cradle-to-gate', validFrom: p.validFrom ?? '', validTo: p.validTo ?? '', verified: !!p.verified, documentId: p.documentId ?? '' });
   const blank: PRow = { name: '', description: '', co2e: '', unit: 'kg', standard: SP_STANDARDS[0]!, boundary: 'cradle-to-gate', validFrom: '', validTo: '', verified: false, documentId: '' };
@@ -281,7 +315,7 @@ function Products({ me, ro, save }: { me: Me; ro: boolean; save: SaveFn }) {
   const valid = rows.every((r) => r.name.trim() && Number(r.co2e) >= 0 && r.co2e.trim() !== '' && r.unit);
   const units = [...SP_UNITS, ...(me.answers.inventory?.currency ? [me.answers.inventory.currency] : []), me.company_currency, 'USD'].filter((u, i, x) => x.indexOf(u) === i);
   return <>
-    <Head t="Product carbon footprints" sub="If you have footprints for what you sell us (an EPD or a product footprint to ISO 14067), give them per unit. They are more accurate than averages. Attach the documents under Evidence first." />
+    <Head t="Product carbon footprints" sub="If you have footprints for what you sell us (an EPD or a product footprint to ISO 14067), give them per unit. They are more accurate than averages. Upload each product's document with it." />
     <label className="row small chkline" style={{ gap: 8 }}><input type="checkbox" disabled={ro} checked={none} onChange={(e) => setNone(e.target.checked)} /><b>We have no product footprints</b></label>
     {!none && <>
       {rows.map((r, i) => <div key={i} className="sp-prod">
@@ -294,7 +328,10 @@ function Products({ me, ro, save }: { me: Me; ro: boolean; save: SaveFn }) {
           <label className="field"><span>Boundary</span><select className="input" disabled={ro} value={r.boundary} onChange={(e) => up(i, { boundary: e.target.value })}><option value="cradle-to-gate">Cradle to gate</option><option value="cradle-to-grave">Cradle to grave</option><option value="gate-to-gate">Gate to gate</option></select></label>
           <label className="field"><span>Valid from</span><input className="input" type="date" disabled={ro} value={r.validFrom} onChange={(e) => up(i, { validFrom: e.target.value })} /></label>
           <label className="field"><span>Valid to</span><input className="input" type="date" disabled={ro} value={r.validTo} onChange={(e) => up(i, { validTo: e.target.value })} /></label>
-          <label className="field"><span>Document</span><select className="input" disabled={ro} value={r.documentId} onChange={(e) => up(i, { documentId: e.target.value })}><option value="">—</option>{me.documents.map((d) => <option key={d.id} value={d.id}>{d.filename}</option>)}</select></label>
+          <div className="field"><span>Document (EPD or footprint report)</span><div className="row" style={{ gap: 6 }}>
+            <select className="input grow" disabled={ro} value={r.documentId} onChange={(e) => up(i, { documentId: e.target.value })}><option value="">—</option>{me.documents.map((d) => <option key={d.id} value={d.id}>{d.filename}</option>)}</select>
+            {!ro && <label className="btn sm" title="Upload the EPD for this product">Upload…<input type="file" hidden accept="application/pdf,image/jpeg,image/png"
+              onChange={async (e) => { const f = e.target.files?.[0]; e.target.value = ''; if (!f) return; try { const docId = await uploadEvidence(f, 'epd'); await reload(); up(i, { documentId: docId }); toast(`${f.name} attached to ${r.name || `product ${i + 1}`} — save to keep it`); } catch (x) { toast((x as Error).message); } }} /></label>}</div></div>
           <label className="row small chkline" style={{ gap: 8, alignSelf: 'end' }}><input type="checkbox" disabled={ro} checked={r.verified} onChange={(e) => up(i, { verified: e.target.checked })} />Independently verified</label>
         </div>
       </div>)}

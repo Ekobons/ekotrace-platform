@@ -2977,3 +2977,32 @@ test('supplier engagement: add suppliers by hand (all fields, country names, dup
   assert.equal((await api('GET', '/api/suppliers?q=hand%20made', undefined, tenantB)).body.total, 0);
   await pool.query(`DELETE FROM sbti_company; DELETE FROM sbti_import`);
 });
+
+test('supplier answers must agree (share for the customer within Scope 1+2, sales within revenue); staff keep documents on a supplier record', async () => {
+  const sup = (await api('POST', '/api/suppliers', { name: 'Consistency Check Co' }, tenantA)).body.id as string;
+  const inv = (await api('POST', '/api/supplier-portal/requests', { supplierId: sup, year: 2025, email: 'cc@consistency.example', sendEmail: false }, tenantA)).body;
+  const pub = (method: string, path: string, body?: unknown, tok?: string) => app.inject({ method: method as 'GET', url: `/api/public/supplier${path}`, payload: body as object, headers: { ...(tok ? { 'x-supplier-token': tok } : {}), ...(body !== undefined ? { 'content-type': 'application/json' } : {}) } });
+  const tok = (await pub('POST', '/login', { email: 'cc@consistency.example', code: inv.code })).json().token as string;
+  const save = (section: string, data: unknown) => pub('PUT', '/answers', { section, data }, tok);
+  assert.equal((await save('inventory', { reports: 'yes', scope1: 300, scope2Location: 100, revenue: 1_000_000, currency: 'AED' })).statusCode, 200);
+  // the user's case: 40,000 t "for BEEAH" against 400 t in total
+  const big = await save('allocation', { method: 'direct', directT: 40000 });
+  assert.equal(big.statusCode, 400); assert.match(big.json().message, /more than your whole company's Scope 1 \+ 2 \(400 tCO₂e\)/);
+  assert.equal((await save('allocation', { method: 'revenue', customerRevenue: 2_000_000 })).statusCode, 400, 'sales above revenue');
+  assert.equal((await save('allocation', { method: 'direct', directT: 40 })).statusCode, 200);
+  // lowering the totals below a saved share is refused too
+  assert.equal((await save('inventory', { reports: 'yes', scope1: 10, scope2Location: 5, revenue: 1_000_000, currency: 'AED' })).statusCode, 400);
+  // documents on the supplier record (staff)
+  const pdf = Buffer.from('%PDF-1.4\n% supplier report\n' + 'x'.repeat(300));
+  const up = await app.inject({ method: 'POST', url: `/api/suppliers/${sup}/documents`, payload: pdf, headers: { cookie: adminCookie, 'x-tenant-id': tenantA, 'content-type': 'application/octet-stream', 'x-filename': 'cdp-response.pdf', 'x-kind': 'cdp' } });
+  assert.equal(up.statusCode, 200, up.body);
+  const bad = await app.inject({ method: 'POST', url: `/api/suppliers/${sup}/documents`, payload: Buffer.from('MZ not a document at all'), headers: { cookie: adminCookie, 'x-tenant-id': tenantA, 'content-type': 'application/octet-stream', 'x-filename': 'x.exe' } });
+  assert.equal(bad.statusCode, 400);
+  // the supplier's own upload shows on the record too
+  await app.inject({ method: 'POST', url: '/api/public/supplier/evidence', payload: pdf, headers: { 'x-supplier-token': tok, 'content-type': 'application/octet-stream', 'x-filename': 'report.pdf', 'x-kind': 'report' } });
+  const docs = (await api('GET', `/api/suppliers/${sup}`, undefined, tenantA)).body.documents;
+  assert.deepEqual(docs.map((d: { from: string; kind: string }) => `${d.from}:${d.kind}`).sort(), ['portal:report', 'staff:cdp']);
+  assert.equal((await api('DELETE', `/api/suppliers/${sup}/documents/${up.json().id}`, undefined, tenantA)).status, 200);
+  assert.equal((await api('GET', `/api/suppliers/${sup}`, undefined, tenantA)).body.documents.length, 1);
+  assert.equal((await api('GET', `/api/suppliers/${sup}`, undefined, tenantB)).status, 404);
+});

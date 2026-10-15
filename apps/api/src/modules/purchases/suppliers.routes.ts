@@ -9,6 +9,8 @@ import { audit, requirePlatformAdmin, requireRole, requireTenant } from '../../l
 import { AppError, notFound } from '../../lib/errors.js';
 import { enqueue } from '../../lib/jobs.js';
 import { normSupplier } from './fields.js';
+import { createHash } from 'node:crypto';
+import { sealFile } from '../../lib/secrets.js';
 import { calcLines } from './pipeline.js';
 import { countryCode } from './supplierMatch.js';
 import { STAGE_SQL, supplierScore } from '../../lib/supplierScore.js';
@@ -146,7 +148,12 @@ export async function supplierRoutes(app: FastifyInstance) {
         `SELECT l.item_id AS id, i.name, sum(abs(l.usd)) / nullif(sum(sum(abs(l.usd))) OVER (), 0) AS share, count(*) AS n
            FROM purchase_line l JOIN item i ON i.id = l.item_id WHERE l.supplier_id = $1 AND i.code NOT LIKE 'purchase:%' GROUP BY 1, 2 ORDER BY 3 DESC NULLS LAST LIMIT 1`, [id])).rows[0];
       const suggestedDefault = top && Number(top.share) >= 0.8 && Number(top.n) >= 3 && top.id !== def?.id ? { id: top.id, name: top.name, share: Number(top.share) } : null;
-      return { supplier: s, factors, categories, names, months, duplicateOf, defaultItem: def, suggestedDefault, engagement: eng };
+      // files: kept by staff on the record, and sent by the supplier on the portal
+      const portalDocs = (await c.query(`SELECT r.year, x AS doc FROM supplier_request r, jsonb_array_elements(r.documents) x WHERE r.supplier_id = $1 ORDER BY r.year DESC`, [id])).rows
+        .map((r) => ({ ...r.doc, year: r.year, from: 'portal' }));
+      const documents = [...(s.documents ?? []).map((x: Record<string, unknown>) => ({ ...x, from: 'staff' })), ...portalDocs];
+      delete s.documents;
+      return { supplier: s, factors, categories, names, months, duplicateOf, defaultItem: def, suggestedDefault, engagement: eng, documents };
     });
   });
 
@@ -207,6 +214,50 @@ export async function supplierRoutes(app: FastifyInstance) {
       }
       if (sets.length) await c.query(`UPDATE supplier SET ${sets.join(', ')}, updated_at = now() WHERE id = $1`, vals);
       await audit(c, req, 'supplier.update', 'supplier', id, b);
+      return { ok: true };
+    });
+  });
+
+  /** A file kept on the supplier's record: PDF, image, Excel or Word up to 20 MB (body = the file; headers x-filename, x-kind). */
+  app.post('/api/suppliers/:id/documents', { bodyLimit: 20 * 1024 * 1024 }, async (req) => {
+    const tenant = requireTenant(req);
+    requireRole(req, ...MANAGE);
+    const id = uuid.parse((req.params as { id: string }).id);
+    const buf = req.body as Buffer;
+    if (!Buffer.isBuffer(buf) || !buf.length) throw new AppError('Send the file');
+    const filename = decodeURIComponent(String(req.headers['x-filename'] ?? 'document')).replace(/[^\w.\- ()]/g, '_').slice(0, 160);
+    const zip = buf[0] === 0x50 && buf[1] === 0x4b;
+    const type = buf.subarray(0, 5).toString('latin1') === '%PDF-' ? 'application/pdf' : buf[0] === 0xff && buf[1] === 0xd8 ? 'image/jpeg' : buf.subarray(1, 4).toString('latin1') === 'PNG' ? 'image/png'
+      : zip && /\.xlsx$/i.test(filename) ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' : zip && /\.docx$/i.test(filename) ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' : null;
+    if (!type) throw new AppError('Send a PDF, JPEG, PNG, Excel (.xlsx) or Word (.docx) file');
+    const kind = z.enum(['report', 'verification', 'epd', 'cdp', 'contract', 'other']).catch('other').parse(String(req.headers['x-kind'] ?? 'other'));
+    const h = createHash('sha256').update(buf).digest('hex');
+    return tenantTx(tenant, async (c) => {
+      const sup = (await c.query(`SELECT documents FROM supplier WHERE id = $1 FOR UPDATE`, [id])).rows[0];
+      if (!sup) throw notFound('Supplier');
+      if ((sup.documents as unknown[]).length >= 50) throw new AppError('At most 50 files per supplier');
+      const prior = (await c.query(`SELECT id FROM document WHERE sha256 = $1 AND kind = 'supplier_evidence'`, [h])).rows[0];
+      const docId = prior?.id ?? (await c.query(`INSERT INTO document (tenant_id, kind, filename, content_type, size, sha256, data, uploaded_by) VALUES ($1,'supplier_evidence',$2,$3,$4,$5,$6,$7) RETURNING id`,
+        [tenant, filename, type, buf.length, h, sealFile(buf), req.user.id])).rows[0].id;
+      const docs = [...(sup.documents as { id: string }[]).filter((d) => d.id !== docId), { id: docId, filename, kind, size: buf.length, at: new Date().toISOString(), by: req.user.name }];
+      await c.query(`UPDATE supplier SET documents = $2, updated_at = now() WHERE id = $1`, [id, JSON.stringify(docs)]);
+      await audit(c, req, 'supplier.document', 'supplier', id, { filename, kind, size: buf.length });
+      return { id: docId, filename, kind };
+    });
+  });
+
+  app.delete('/api/suppliers/:id/documents/:docId', async (req) => {
+    const tenant = requireTenant(req);
+    requireRole(req, ...MANAGE);
+    const p = z.object({ id: uuid, docId: uuid }).parse(req.params);
+    return tenantTx(tenant, async (c) => {
+      const sup = (await c.query(`SELECT documents FROM supplier WHERE id = $1 FOR UPDATE`, [p.id])).rows[0];
+      if (!sup) throw notFound('Supplier');
+      const docs = (sup.documents as { id: string; filename: string }[]);
+      const d = docs.find((x) => x.id === p.docId);
+      if (!d) throw notFound('Document');
+      await c.query(`UPDATE supplier SET documents = $2, updated_at = now() WHERE id = $1`, [p.id, JSON.stringify(docs.filter((x) => x.id !== p.docId))]);
+      await audit(c, req, 'supplier.document_remove', 'supplier', p.id, { filename: d.filename });
       return { ok: true };
     });
   });

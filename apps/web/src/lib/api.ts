@@ -77,6 +77,7 @@ export interface PurchaseLine {
   problems: string[]; warnings: string[]; calc_error: string | null; dup_of: string | null; activity_id: string | null;
 }
 export interface SpendItem { id: number; name: string; naics: string | null; group: string; co2e: number | null; unit: string | null; price_year: number | null; source: string | null }
+export interface SupplierDoc { id: string; filename: string; kind: string; size?: number; at?: string; by?: string; year?: number; from: 'staff' | 'portal' }
 export type SupplierStage = 'not_engaged' | 'invited' | 'signed_in' | 'started' | 'submitted' | 'finished';
 export interface SbtiMatch { name: string; status: string; classification: string | null; nearYear?: number | null; netZero: string | null; netZeroYear: number | null }
 export interface Supplier { id: string; name: string; aliases: string[]; country: string | null; reference: string | null; contact_email: string | null; industry?: string | null; origin: string; active: boolean; lines: number; usd: number; co2e: number; supplier_lines: number; factors: number;
@@ -223,7 +224,7 @@ export interface SupplierPortalData {
 export interface SupplierRequestDetail extends Omit<SupplierRequestRow, 'documents' | 'kg' | 'usd'> {
   message: string; answers: import('./supplierPortal').SPAnswers; documents: import('./supplierPortal').SPDoc[]; submitted_by: string | null; supplier_country: string | null; climate_target: string | null;
   applied: { profile: string[]; factors: { id: string; kind: string; co2e: number; unit: string }[]; linesRecalculated: number } | null;
-  factors: { id: string; co2e: number; unit: string; item_id: number | null; item: string | null; valid_from: string; valid_to: string; source: string; request_id: string | null }[]; canManage: boolean;
+  factors: { id: string; co2e: number; unit: string; item_id: number | null; item: string | null; valid_from: string; valid_to: string; source: string; request_id: string | null }[]; canManage: boolean; issues: string[];
 }
 
 // ------------------------------------------------------------ batch runs --
@@ -672,7 +673,9 @@ export const api = {
   deleteRule: (id: string) => call<{ ok: true }>('DELETE', `/api/purchases/rules/${id}`),
   manualPurchases: (b: { facilityId: string; dryRun?: boolean; name?: string; lines: ManualLine[] }) => call<ManualResult>('POST', '/api/purchases/manual', b),
   suppliers: (q: Record<string, string | number | undefined>) => call<{ total: number; suppliers: Supplier[]; counts?: { all: number; review: number; incomplete: number; autoLinked: number; prospects: number }; stages?: Partial<Record<SupplierStage, number>>; departments?: string[] }>('GET', `/api/suppliers?${new URLSearchParams(Object.entries(q).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)]))}`),
-  supplier: (id: string) => call<{ supplier: SupplierProfile; factors: SupplierFactor2[]; categories: { item: string | null; lines: number; usd: number; co2e: number }[]; names: SupplierName[]; months: { month: string; usd: number; co2e: number | null }[]; duplicateOf: { id: string; name: string } | null; defaultItem: { id: number; name: string } | null; suggestedDefault: { id: number; name: string; share: number } | null; engagement: SupplierEngagement }>('GET', `/api/suppliers/${id}`),
+  supplier: (id: string) => call<{ supplier: SupplierProfile; factors: SupplierFactor2[]; categories: { item: string | null; lines: number; usd: number; co2e: number }[]; names: SupplierName[]; months: { month: string; usd: number; co2e: number | null }[]; duplicateOf: { id: string; name: string } | null; defaultItem: { id: number; name: string } | null; suggestedDefault: { id: number; name: string; share: number } | null; engagement: SupplierEngagement; documents: SupplierDoc[] }>('GET', `/api/suppliers/${id}`),
+  uploadSupplierDoc: (id: string, f: File, kind: string) => call<{ id: string; filename: string }>('POST', `/api/suppliers/${id}/documents`, undefined, f, { 'x-filename': encodeURIComponent(f.name), 'x-kind': kind }),
+  deleteSupplierDoc: (id: string, docId: string) => call<{ ok: true }>('DELETE', `/api/suppliers/${id}/documents/${docId}`),
   supplierCounts: () => call<{ total: number; counts: { all: number; review: number; incomplete: number; autoLinked: number } }>('GET', '/api/suppliers?limit=1'),
   supplierReview: () => call<SupplierReview>('GET', '/api/suppliers/review'),
   supplierAnalytics: (year?: number) => call<SupplierAnalytics>('GET', `/api/suppliers/analytics${year ? `?year=${year}` : ''}`),
