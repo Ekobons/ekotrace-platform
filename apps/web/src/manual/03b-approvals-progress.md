@@ -2,7 +2,7 @@
 
 ## Approvals
 
-**Approvals** (menu → Capture) lists the entries submitted for the facilities you look after.
+**Approvals** (menu → Capture → Entries & approvals) lists the entries submitted for the facilities you look after.
 
 - **Waiting for you** — entries you can approve. For each: facility and month, category and item (with the note), quantity, tCO₂e (**How calculated** shows the factors and steps), the **check**, and who entered it and when.
 - **Check** — the quantity against the average for the same item at the same facility over the 6 months before. Outside the limit (±35% by default) it is flagged, e.g. “+42% vs 6-month average — add a note”. No history = nothing to compare yet.
@@ -10,7 +10,7 @@
 - **Approve all N without warnings** — approves every entry in its usual range in one go; flagged ones stay for a closer look.
 - **Waiting for someone else** — entries in your facilities waiting for another approver, and who (your own entries, which you never approve yourself).
 
-The number next to **Approvals** in the menu is what waits for you.
+The number next to **Entries & approvals** in the menu (and on its Approvals tab) is what waits for you.
 
 ### Approval levels
 

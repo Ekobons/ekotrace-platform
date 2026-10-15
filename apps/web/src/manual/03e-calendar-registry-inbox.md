@@ -2,9 +2,9 @@
 
 Three screens run the data-collection cycle.
 
-- The **metric registry** says what is collected (Menu → Setup).
-- The **collection calendar** shows what each facility owes and by when (Menu → Capture).
-- **Inbox & to-dos** tells each person what is waiting for them (Menu → Capture).
+- The **metric registry** says what is collected (Menu → Setup → Methodology & metrics → Metric registry).
+- The **collection calendar** shows what each facility owes and by when (Menu → Capture → Data progress → Collection calendar).
+- **Inbox & to-dos** tells each person what is waiting for them (Menu → Capture → Inbox & messages).
 
 Reminders and escalations go out by themselves.
 
@@ -110,7 +110,7 @@ When an approver sends an entry back, the person who entered or submitted it is 
 
 **Notifications** lists the reminders, escalations, sent-back entries and registry decisions sent to you, unread first. Click one to open the page it is about.
 
-The number on **Inbox & to-dos** in the menu counts unread notifications and late or sent-back work. Approvals has its own number.
+The number on **Inbox & messages** in the menu adds unread notifications, late or sent-back work and unread messages; each tab shows its own part. Approvals has its own number, on Entries & approvals.
 
 **E-mail.** Notifications are also sent by e-mail unless you untick "Also send them to me by e-mail". An e-mail carries the title, the list of facilities, metrics and periods, and a link. It never carries figures or files. If the platform has no mail server set up yet, e-mails are held and nothing leaves Ekotrace; the notices still appear here.
 

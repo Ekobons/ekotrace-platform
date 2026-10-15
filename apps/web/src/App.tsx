@@ -60,36 +60,41 @@ interface Ctx {
 const AppCtx = createContext<Ctx>(null as unknown as Ctx);
 export const useApp = () => useContext(AppCtx);
 
-type NavItem = { to?: string; label: string; icon: string; roles?: Role[]; stage?: number };
+type Tab = { to: string; label: string; roles?: Role[] };
+/** A menu entry; with `tabs`, one entry for several pages shown as tabs at the top of each (old links keep working). */
+type NavItem = { to?: string; label: string; icon: string; roles?: Role[]; stage?: number; tabs?: Tab[] };
 /** Section colours of the side menu, as in the prototype. */
-const SEC_C: Record<string, string> = { '': 'var(--lime)', Capture: '#7FD3B9', Analyse: '#8EC5FF', 'Value chain': '#F2C46D', 'Product LCA': '#F59E7A', 'Net zero': '#B6E36B', Disclose: '#C9A7F5', Setup: '#E7ECEA', Help: '#F7A8B8' };
+const SEC_C: Record<string, string> = { '': 'var(--lime)', Capture: '#7FD3B9', Analyse: '#8EC5FF', 'Value chain': '#F2C46D', 'Net zero': '#B6E36B', Disclose: '#C9A7F5', Setup: '#E7ECEA', Help: '#F7A8B8' };
 const NAV: { group?: string; items: NavItem[] }[] = [
   { items: [
-    { to: '/home', label: 'Home', icon: 'home' }, { to: '/dashboards', label: 'Dashboards', icon: 'chart' }, { to: '/kpis', label: 'KPI dashboard', icon: 'gauge' },
+    { to: '/home', label: 'Home', icon: 'home' },
+    { label: 'Dashboards', icon: 'chart', tabs: [{ to: '/dashboards', label: 'Dashboards' }, { to: '/kpis', label: 'KPI dashboard' }] },
   ] },
   { group: 'Capture', items: [
     { to: '/data/stationary_combustion', label: 'Add data', icon: 'plus', roles: ['super_admin', 'admin', 'manager', 'preparer'] },
-    { to: '/entries', label: 'Entries & results', icon: 'list' },
+    { label: 'Entries & approvals', icon: 'check', tabs: [{ to: '/entries', label: 'Entries & results' }, { to: '/approvals', label: 'Approvals', roles: ['super_admin', 'admin', 'manager', 'preparer'] }] },
+    { label: 'Data progress', icon: 'grid', tabs: [{ to: '/progress', label: 'Data progress' }, { to: '/calendar', label: 'Collection calendar' }] },
+    { label: 'Inbox & messages', icon: 'inbox', tabs: [{ to: '/inbox', label: 'Inbox & to-dos' }, { to: '/messages', label: 'Message centre' }] },
     { to: '/surveys', label: 'Surveys', icon: 'users', roles: ['super_admin', 'admin', 'manager', 'verifier'] },
-    { to: '/approvals', label: 'Approvals', icon: 'check', roles: ['super_admin', 'admin', 'manager', 'preparer'] }, { to: '/progress', label: 'Data progress', icon: 'grid' }, { to: '/calendar', label: 'Collection calendar', icon: 'calendar' },
-    { to: '/inbox', label: 'Inbox & to-dos', icon: 'inbox' }, { to: '/vault', label: 'Document vault', icon: 'folder' }, { to: '/batches', label: 'Batch runs', icon: 'upload', roles: ['super_admin', 'admin', 'manager', 'verifier'] },
+    { to: '/vault', label: 'Document vault', icon: 'folder' },
     { to: '/qr', label: 'QR & field app', icon: 'qr', roles: ['super_admin', 'admin', 'manager', 'preparer', 'verifier'] },
   ] },
-  { group: 'Value chain', items: [{ to: '/suppliers', label: 'Suppliers', icon: 'users', roles: ['super_admin', 'admin', 'manager', 'preparer', 'verifier'] }] },
-  { group: 'Product LCA', items: [{ to: '/lca', label: 'Product footprints', icon: 'leaf', roles: ['super_admin', 'admin', 'manager', 'preparer', 'verifier'] }] },
+  { group: 'Value chain', items: [
+    { to: '/suppliers', label: 'Suppliers', icon: 'users', roles: ['super_admin', 'admin', 'manager', 'preparer', 'verifier'] },
+    { to: '/lca', label: 'Product LCA', icon: 'leaf', roles: ['super_admin', 'admin', 'manager', 'preparer', 'verifier'] },
+  ] },
   { group: 'Net zero', items: [{ to: '/targets', label: 'Targets & actions', icon: 'target' }, { to: '/credits', label: 'Carbon credits', icon: 'leaf' }] },
   { group: 'Disclose', items: [{ to: '/reports', label: 'Reports', icon: 'doc' }, { to: '/assurance', label: 'Audit & assurance', icon: 'shield', roles: ['super_admin', 'admin', 'manager', 'verifier'] }] },
   { group: 'Setup', items: [
     { to: '/organisation', label: 'Organisation & groups', icon: 'tree' },
-    { to: '/methodology', label: 'Methodology & boundaries', icon: 'scale', roles: ['super_admin', 'admin', 'verifier'] },
-    { to: '/energy', label: 'Energy certificates & suppliers', icon: 'bolt', roles: ['super_admin', 'admin', 'manager', 'verifier'] },
-    { to: '/currency', label: 'Currencies & price index', icon: 'scale', roles: ['super_admin', 'admin', 'manager', 'verifier'] },
     { to: '/people', label: 'People & access', icon: 'users', roles: ['super_admin', 'admin', 'manager'] },
+    { label: 'Methodology & metrics', icon: 'scale', tabs: [{ to: '/methodology', label: 'Methodology & boundaries', roles: ['super_admin', 'admin', 'verifier'] }, { to: '/metrics', label: 'Metric registry' }] },
+    { label: 'Energy & currency data', icon: 'bolt', tabs: [{ to: '/energy', label: 'Energy certificates & suppliers', roles: ['super_admin', 'admin', 'manager', 'verifier'] }, { to: '/currency', label: 'Currencies & price index', roles: ['super_admin', 'admin', 'manager', 'verifier'] }] },
     { to: '/library', label: 'Factors & dictionary', icon: 'book', roles: [] },
-    { to: '/metrics', label: 'Metric registry', icon: 'list' }, { to: '/integrations', label: 'Integrations & API', icon: 'plug', roles: ['super_admin', 'admin'] }, { label: 'AI models', icon: 'spark', stage: 4 },
+    { label: 'Integrations & batch runs', icon: 'plug', tabs: [{ to: '/integrations', label: 'Integrations & API', roles: ['super_admin', 'admin'] }, { to: '/batches', label: 'Batch runs', roles: ['super_admin', 'admin', 'manager', 'verifier'] }] },
     { to: '/audit', label: 'Security & audit log', icon: 'lock', roles: ['super_admin', 'admin', 'verifier'] },
   ] },
-  { group: 'Help', items: [{ to: '/help', label: 'User manual', icon: 'book' }, { to: '/messages', label: 'Message centre', icon: 'chat' }] },
+  { group: 'Help', items: [{ to: '/help', label: 'User manual', icon: 'book' }] },
 ];
 
 export function App() {
@@ -171,7 +176,15 @@ function Shell() {
     get(); window.addEventListener('eko-alerts', get); const t = window.setInterval(get, 120000);
     return () => { window.removeEventListener('eko-alerts', get); window.clearInterval(t); };
   }, [path, tenant?.id, role]); // eslint-disable-line react-hooks/exhaustive-deps
-  const visible = (i: NavItem) => !i.roles || (i.roles.length === 0 ? role === 'platform_admin' : can(...i.roles));
+  const allowed = (roles?: Role[]) => !roles || (roles.length === 0 ? role === 'platform_admin' : can(...roles));
+  const tabsOf = (i: NavItem) => (i.tabs ?? []).filter((t) => allowed(t.roles));
+  const visible = (i: NavItem) => (i.tabs ? tabsOf(i).length > 0 : allowed(i.roles));
+  const labelOf = (i: NavItem) => (i.tabs && tabsOf(i).length === 1 ? tabsOf(i)[0]!.label : i.label);
+  const hrefOf = (i: NavItem) => (i.tabs ? tabsOf(i)[0]?.to : i.to);
+  const isOn = (i: NavItem) => (i.tabs ? tabsOf(i).some((t) => path === t.to) : !!i.to && (path === i.to || (i.to.startsWith('/data/') && path.startsWith('/data/'))));
+  // the tabs at the top of a page that shares its menu entry with others
+  const section = NAV.flatMap((g) => g.items).find((i) => i.tabs && tabsOf(i).some((t) => path === t.to));
+  const badge = (to: string) => (to === '/approvals' ? apprN : to === '/messages' && role !== 'platform_admin' ? msgN : to === '/inbox' ? inboxN : 0);
   // a bin's QR label opens the scan page full screen (phone), without the menu
   if (path.startsWith('/scan/')) return <Routes><Route path="/scan/:code" element={<ScanPage />} /></Routes>;
 
@@ -201,14 +214,17 @@ function Shell() {
             const items = g.items.filter(visible);
             if (!items.length) return null;
             const sc = SEC_C[g.group ?? ''] ?? '#fff';
-            const on = items.some((i) => i.to && (path === i.to || (i.to.startsWith('/data/') && path.startsWith('/data/'))));
+            const on = items.some(isOn);
             const open = mini || !g.group || !folded.has(g.group) || on;
             return (
               <div key={gi} className="navsec" style={{ '--sc': sc } as CSSProperties}>
                 {g.group && <button type="button" className={`sech${open ? ' open' : ''}${on ? ' has' : ''}`} aria-expanded={open} title={g.group} onClick={() => !mini && fold(g.group!)}>
                   <i className="sdot" /><span>{g.group.toUpperCase()}</span><span className="chev">{open ? '▾' : '▸'}</span></button>}
-                {open && <div className="secitems">{items.map((i) => i.to
-                  ? <NavLink key={i.label} to={i.to} title={mini ? i.label : undefined} className={({ isActive }) => (isActive || (i.to?.startsWith('/data/') && path.startsWith('/data/')) ? 'active' : '')}><Icon name={i.icon} /><span className="nl">{i.label}</span>{i.to === '/approvals' && apprN > 0 && <span className="navb amber">{apprN}</span>}{i.to === '/inbox' && inboxN > 0 && <span className="navb amber" title="Unread notices and things to do">{inboxN}</span>}{i.to === '/messages' && msgN > 0 && role !== 'platform_admin' && <span className="navb">{msgN}</span>}{i.to === '/audit' && alertN > 0 && <span className="navb red" title="Security alerts to review">{alertN}</span>}</NavLink>
+                {open && <div className="secitems">{items.map((i) => hrefOf(i)
+                  ? <NavLink key={i.label} to={hrefOf(i)!} title={mini ? labelOf(i) : undefined} className={() => (isOn(i) ? 'active' : '')}><Icon name={i.icon} /><span className="nl">{labelOf(i)}</span>
+                    {(() => { const ts = i.tabs ? tabsOf(i).map((t) => t.to) : [i.to!]; const amber = ts.reduce((a, t) => a + badge(t), 0);
+                      return <>{amber > 0 && <span className="navb amber" title={ts.includes('/approvals') ? 'Waiting for your approval' : 'Unread notices, things to do and messages'}>{amber}</span>}
+                        {i.to === '/audit' && alertN > 0 && <span className="navb red" title="Security alerts to review">{alertN}</span>}</>; })()}</NavLink>
                   : <a key={i.label} className="soon" aria-disabled="true" title={`${i.label} · coming in stage ${i.stage}`}><Icon name={i.icon} /><span className="nl">{i.label}</span><span className="soonchip">S{i.stage}</span></a>)}</div>}
               </div>
             );
@@ -223,6 +239,10 @@ function Shell() {
         </div>
       </aside>
       <main className="main">
+        {section && tabsOf(section).length > 1 && <nav className="sectabs" aria-label={section.label}>
+          <span className="sectl"><Icon name={section.icon} size={16} />{section.label}</span>
+          {tabsOf(section).map((t) => <NavLink key={t.to} to={t.to} className={() => (path === t.to ? 'on' : '')}>{t.label}{badge(t.to) > 0 && <span className="navb amber">{badge(t.to)}</span>}</NavLink>)}
+        </nav>}
         <Routes>
           <Route path="/" element={<Navigate to={role === 'platform_admin' && !tenant ? '/console' : '/home'} replace />} />
           <Route path="/console" element={<Gate ok={role === 'platform_admin'}><Console /></Gate>} />

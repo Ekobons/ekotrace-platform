@@ -2,6 +2,12 @@
 
 Newest first.
 
+## 2026-10-15 · Side menu: related pages under one entry, as tabs
+
+- Menu entries with `tabs` (`NavItem.tabs`): one entry for several pages; on those pages a tab bar (`.sectabs`) above the page switches between them. Routes are unchanged, so old links and notification links open the right tab. Each tab keeps its own roles; the entry shows only if a tab is allowed, takes the tab's name when only one is, and its count adds up the counts of its tabs.
+- Merged: Dashboards + KPI dashboard; Entries & results + Approvals (**Entries & approvals**); Data progress + Collection calendar; Inbox & to-dos + Message centre (**Inbox & messages**); Methodology & boundaries + Metric registry (**Methodology & metrics**); Energy certificates & suppliers + Currencies & price index (**Energy & currency data**); Integrations & API + Batch runs (**Integrations & batch runs**). Product LCA moved into Value chain; the AI models placeholder removed. Organisation & groups and People & access stay separate. Super admin: 30 entries → 22.
+- Manual: Getting started (menu entries and their tabs) and menu paths throughout.
+
 ## 2026-10-15 · Product LCA: product carbon footprints (ISO 14067 / GHG Protocol Product Standard)
 
 - **Menu → Product LCA → Product footprints** (`/lca`, its own menu section, replaces the stage-4 placeholder). Tabs: Products · LCA workspace · Life-cycle inventory · Scenarios · Published factors.

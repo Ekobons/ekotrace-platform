@@ -72,7 +72,7 @@ Everything that **describes** a facility — set up once, changed rarely — is 
 | Vehicle fleet | the vehicles based here, with in-service and retired dates |
 | Landfill sites | landfills the company operates here, with their history of waste placed |
 
-What **arrives** month after month is under Add data, in the tab it belongs to: **Bills** (PDF bills, checked, previewed, then published) and **Meter readings** (batches sent by connected meters, previewed before they count). Certificates and supplier factors are kept for the whole company under Setup → Energy certificates & suppliers; the Energy tab shows the ones that apply to the facility.
+What **arrives** month after month is under Add data, in the tab it belongs to: **Bills** (PDF bills, checked, previewed, then published) and **Meter readings** (batches sent by connected meters, previewed before they count). Certificates and supplier factors are kept for the whole company under Setup → Energy & currency data → Energy certificates & suppliers; the Energy tab shows the ones that apply to the facility.
 
 **Methodology & boundaries** sets how the company reports: the consolidation approach (operational control, financial control or equity share — totals shown live for all three), the GWP set (AR4, AR5 or AR6) and the base year. A joint venture is handled by its ownership % and control flags.
 
@@ -91,13 +91,27 @@ A facility or a person above the limit cannot be added (or brought back); what t
 
 ## Moving around
 
-The menu on the left is grouped into coloured sections — Capture, Value chain, Net zero, Disclose, Setup and Help. Click a section title to fold or open it (the section of the page you are on always stays open). Greyed items with a stage label (S2, S3, S4) are coming later.
+The menu on the left is grouped into coloured sections — Capture, Value chain, Net zero, Disclose, Setup and Help. Click a section title to fold or open it (the section of the page you are on always stays open).
+
+Some menu entries hold related pages, shown as **tabs at the top of the page** (the menu entry's count adds up the counts of its tabs):
+
+| Menu entry | Tabs |
+|---|---|
+| Dashboards | Dashboards · KPI dashboard |
+| Entries & approvals | Entries & results · Approvals |
+| Data progress | Data progress · Collection calendar |
+| Inbox & messages | Inbox & to-dos · Message centre |
+| Methodology & metrics | Methodology & boundaries · Metric registry |
+| Energy & currency data | Energy certificates & suppliers · Currencies & price index |
+| Integrations & batch runs | Integrations & API · Batch runs |
+
+You see only the tabs your role allows; when only one is allowed, the menu entry takes its name. Links to a page (in e-mails and notifications) open the right tab.
 
 **▾▾ Collapse all / ▸▸ Expand all** (above the menu) folds or opens every section at once. **«** next to the logo narrows the menu to icons only (hover an icon for its name); **»** widens it again. Both are remembered on this browser.
 
-- **Home** — what needs your attention, for your role. **KPI dashboard** — the indicators you track against targets.
+- **Home** — what needs your attention, for your role. **Dashboards** — charts of the inventory, and the **KPI dashboard** tab with the indicators you track against targets.
 - **Add data** — categories on the left; facility and months on top; the result is calculated as you type.
-- **Entries & results** — everything saved for the year, totals per scope, per gas, and the detail of each entry.
+- **Entries & approvals** — everything saved for the year, totals per scope, per gas, and the detail of each entry; the Approvals tab lists what waits for you.
 - **Meters** and **Bills** — data that arrives from other systems or as PDF bills.
 - **QR & field app** — bins with QR labels; scans at the bin roll up into the month's waste entries.
 - **User manual** — this guide. It is updated with every release.

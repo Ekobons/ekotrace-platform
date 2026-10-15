@@ -1,6 +1,6 @@
 # Message centre
 
-Questions to the Ekotrace team, and the team's announcements. Menu → Help → **Message centre**. The count on the menu item is your unread replies and announcements.
+Questions to the Ekotrace team, and the team's announcements. Menu → Capture → Inbox & messages → **Message centre**. The count on the menu item is your unread replies and announcements.
 
 ## Conversations
 

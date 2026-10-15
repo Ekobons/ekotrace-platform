@@ -1,6 +1,6 @@
 # Product LCA
 
-Menu → Product LCA → **Product footprints** works out the carbon footprint of a product, per tonne (or kg, piece, litre, m³, kWh), following **ISO 14067** and the **GHG Protocol Product Standard**. It is used for two things:
+Menu → Value chain → **Product LCA** works out the carbon footprint of a product, per tonne (or kg, piece, litre, m³, kWh), following **ISO 14067** and the **GHG Protocol Product Standard**. It is used for two things:
 
 - **Your own products**, such as recycled aggregate, crumb rubber or recycled pellet: a footprint to give to customers, to put in a tender, or to compare production options.
 - **Your suppliers' products**, such as rebar or cement bought by the tonne: once published, the footprint becomes that supplier's factor, so purchases of the product are calculated with it instead of a spend-based factor.

@@ -1366,3 +1366,13 @@ ul.plain { list-style: none; margin: 0; padding: 0; }
 .lca-checks .chip { min-width: 22px; text-align: center; }
 @media (max-width: 1600px) { .lca-ws { grid-template-columns: 220px minmax(0, 1fr); } .lca-res { grid-column: 1 / -1; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); } }
 @media (max-width: 800px) { .lca-ws { grid-template-columns: minmax(0, 1fr); } .lca-ws .sp-steps { position: static; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); } }
+
+/* one menu entry for several pages: the pages as tabs above the page */
+.sectabs { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; margin: 14px 24px 0; padding: 4px; border-radius: 12px; background: var(--surface); box-shadow: 0 1px 2px #0000000d; align-self: flex-start; max-width: calc(100% - 48px); }
+.sectabs .sectl { display: inline-flex; align-items: center; gap: 6px; padding: 0 10px 0 8px; font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); border-right: 1px solid var(--line); margin-right: 4px; }
+.sectabs a { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border-radius: 9px; font-size: 13.5px; font-weight: 600; color: var(--muted); text-decoration: none; }
+.sectabs a:hover { background: #EEF2EF; color: var(--fg); }
+.sectabs a.on { background: var(--primary); color: #fff; }
+.sectabs .navb { margin-left: 2px; }
+.sectabs + .page { padding-top: 12px; min-height: calc(100vh - 62px); }
+@media (max-width: 700px) { .sectabs { margin: 10px 12px 0; max-width: calc(100% - 24px); } .sectabs .sectl { display: none; } }

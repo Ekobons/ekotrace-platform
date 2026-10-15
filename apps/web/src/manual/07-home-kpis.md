@@ -20,7 +20,7 @@
 
 ## KPI dashboard
 
-**KPI dashboard** (under Home) tracks the indicators you choose, for the selection at the top (company, sub-group, facility or dashboard group).
+**KPI dashboard** (menu → Dashboards → KPI dashboard tab) tracks the indicators you choose, for the selection at the top (company, sub-group, facility or dashboard group).
 
 - **Monthly / Quarterly / Semi-annual / Annual** groups the bars.
 - **Aggregate** shows one chart per KPI for the selection; **Compare facilities** shows one bar per facility for the period.

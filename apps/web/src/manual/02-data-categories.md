@@ -114,7 +114,7 @@ They feed the Waste dashboard (GRI 306): waste generated, hazardous and non-haza
 ```
 
 - Both Scope 2 figures are always reported side by side and never added together.
-- **Certificates** (Setup → Energy certificates & suppliers): each MWh can be claimed once — the tool refuses a claim beyond what is held, also when two people save at the same moment.
+- **Certificates** (Setup → Energy & currency data → Energy certificates & suppliers): each MWh can be claimed once — the tool refuses a claim beyond what is held, also when two people save at the same moment.
 - **Cooling:** the supplier's factor per TRh, or the plant's efficiency (kWh per TRh, or COP) × the grid factor.
 
 ## Purchased goods & services — Scope 3.1 (and 3.2, 3.4, 3.6, 3.8)

@@ -1,6 +1,6 @@
 # Batch runs
 
-Menu → Capture → **Batch runs** shows every batch of data that came in from a file or a connected system, whether it **reconciles** with what the source sent, and the **health** of each connection. Super admins, admins and verifiers see everything; managers see the batches of their facilities.
+Menu → Setup → Integrations & batch runs → **Batch runs** shows every batch of data that came in from a file or a connected system, whether it **reconciles** with what the source sent, and the **health** of each connection. Super admins, admins and verifiers see everything; managers see the batches of their facilities.
 
 ```flow
 > 1 · Send | a system (SAP, Oracle, BMS, fuel cards) calls the API, or someone uploads a file
@@ -22,7 +22,7 @@ One card per API client, plus purchase files and utility bills.
 | Gone quiet | nothing received for longer than its **Expected** interval |
 | Nothing sent yet / Key revoked | as it says |
 
-**Expected** (super admin, admin): how often the system should send — every hour, 6 hours, daily, every 2 days, weekly or monthly. When nothing successful arrives for longer, the super admins and admins get one notice (inbox and e-mail) for that gap. A failed call also tells them, at most once an hour per system. API clients and their keys are created under Setup → Integrations & API.
+**Expected** (super admin, admin): how often the system should send — every hour, 6 hours, daily, every 2 days, weekly or monthly. When nothing successful arrives for longer, the super admins and admins get one notice (inbox and e-mail) for that gap. A failed call also tells them, at most once an hour per system. API clients and their keys are created under Setup → Integrations & batch runs → Integrations & API.
 
 ## Purchase batches and reconciliation
 

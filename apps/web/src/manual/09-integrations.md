@@ -1,6 +1,6 @@
 # Integrations & API
 
-For IT teams connecting a system that sends meter readings — BMS, utility portal export, IoT platform, data logger. Clients are created under Setup → Integrations & API (super admin).
+For IT teams connecting a system that sends meter readings — BMS, utility portal export, IoT platform, data logger. Clients are created under Setup → Integrations & batch runs → Integrations & API (super admin).
 
 ## The exchange
 
@@ -75,4 +75,4 @@ At most 10,000 lines per call and 200,000 per reference. A completed reference i
 
 Batch runs then compares them with what arrived and flags any difference.
 
-**Every call is logged.** Each call to the API by a client, successful or not, appears under Capture → **Batch runs → Transfers** with the records received, accepted and refused (and why). A failed call tells the super admins and admins at most once an hour per client. Set how often each system is expected to send; when it goes quiet for longer, they are told once.
+**Every call is logged.** Each call to the API by a client, successful or not, appears under Setup → Integrations & batch runs → **Batch runs → Transfers** with the records received, accepted and refused (and why). A failed call tells the super admins and admins at most once an hour per client. Set how often each system is expected to send; when it goes quiet for longer, they are told once.
