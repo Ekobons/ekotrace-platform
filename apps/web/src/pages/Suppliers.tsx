@@ -11,6 +11,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useApp } from '../App';
 import { api, num, tco2e, type Supplier, type SupplierAnalytics, type SupplierFactor2, type SupplierProfile, type SupplierReview } from '../lib/api';
 import { ItemPicker } from '../components/ItemPicker';
+import { SupplierRequests } from '../components/SupplierRequests';
 import { Icon } from '../components/Icon';
 import { countryName, t as tonnes, usdShort } from '../components/Charts';
 import { Bars, DCard, Donut, DStat, HBars, Legend, MN, PAL as PAL2, Treemap, fmt0, fmtT, type BarRow } from '../components/DashCharts';
@@ -20,7 +21,7 @@ const UNITS = ['kg', 't', 'L', 'm3', 'kWh', 'pcs', 'AED', 'USD', 'EUR', 'GBP', '
 const usd = (v: number) => `$${Math.round(v).toLocaleString('en')}`;
 const TARGET_LABEL: Record<string, string> = { sbti_validated: 'SBTi target (validated)', sbti_committed: 'SBTi commitment', own: 'Own target', none: 'No target', unknown: 'Not known' };
 const SCOPE3_LABEL: Record<string, string> = { purchased_goods: '3.1 Purchased goods & services', capital_goods: '3.2 Capital goods', upstream_transport: '3.4 Upstream transport', business_travel: '3.6 Business travel', upstream_leased: '3.8 Upstream leased assets' };
-type Tab = 'list' | 'review' | 'analytics';
+type Tab = 'list' | 'review' | 'analytics' | 'portal';
 
 export function Suppliers() {
   const { role } = useApp();
@@ -43,10 +44,12 @@ export function Suppliers() {
         <button className={tab === 'list' ? 'on' : ''} onClick={() => setTab('list')}>Suppliers{counts ? ` (${counts.all.toLocaleString('en')})` : ''}</button>
         <button className={tab === 'review' ? 'on' : ''} onClick={() => setTab('review')}>Check names{toCheck ? <span className="chip warn" style={{ marginLeft: 6 }}>{toCheck}</span> : ''}</button>
         <button className={tab === 'analytics' ? 'on' : ''} onClick={() => setTab('analytics')}>Analytics</button>
+        <button className={tab === 'portal' ? 'on' : ''} onClick={() => setTab('portal')}>Supplier portal</button>
       </div>
       {tab === 'list' && <SupplierList canManage={canManage} counts={counts} onChanged={loadCounts} />}
       {tab === 'review' && <ReviewTab canManage={canManage} onChanged={loadCounts} />}
       {tab === 'analytics' && <Analytics />}
+      {tab === 'portal' && <SupplierRequests />}
     </div>
   );
 }

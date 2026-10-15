@@ -42,6 +42,7 @@ import { Surveys } from './pages/Surveys';
 import { MetricRegistry } from './pages/MetricRegistry';
 import { CarbonCredits } from './pages/CarbonCredits';
 import { BatchRuns } from './pages/BatchRuns';
+import { SupplierPortal } from './pages/SupplierPortal';
 import { CollectionCalendar } from './pages/CollectionCalendar';
 import { Inbox } from './pages/Inbox';
 import { BrandMark } from './components/BrandMark';
@@ -98,7 +99,9 @@ export function App() {
     try { setMe(await api.me()); setMustChange(false); }
     catch (e) { const code = (e as { code?: string }).code; if (code === 'MUST_CHANGE_PASSWORD') setMustChange(true); setMe(null); }
   }, []);
-  useEffect(() => { whenLoggedOut(() => setMe(null)); reload(); }, [reload]);
+  // public pages (survey, contractor and supplier portals) have no staff session to look up
+  const isPublic = ['/survey', '/contractor', '/supplier'].includes(window.location.pathname);
+  useEffect(() => { whenLoggedOut(() => setMe(null)); if (!isPublic) reload(); }, [reload, isPublic]);
   useEffect(() => {
     api.brand().then((b) => { document.title = b.productName ?? b.name; if (b.colors?.primary) document.documentElement.style.setProperty('--primary', b.colors.primary); }).catch(() => {});
   }, []);
@@ -108,6 +111,8 @@ export function App() {
   if (window.location.pathname === '/survey') return <SurveyAnswerPage />;
   // waste contractors: email + access code, no user account
   if (window.location.pathname === '/contractor') return <ContractorPortal />;
+  // suppliers answering a data request: email + access code, no user account
+  if (window.location.pathname === '/supplier') return <SupplierPortal />;
   if (me === 'loading') return <div className="empty">Loading…</div>;
   if (me === null) return <Login onDone={reload} />;
   if (me.user.mustChangePassword || mustChange) return <ChangePassword forced onDone={reload} />;

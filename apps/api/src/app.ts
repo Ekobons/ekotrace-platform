@@ -48,6 +48,7 @@ import { collectionRoutes } from './modules/collection.routes.js';
 import { restatementRoutes } from './modules/restatement.routes.js';
 import { creditRoutes } from './modules/credits.routes.js';
 import { batchRoutes } from './modules/batches.routes.js';
+import { supplierPortalRoutes, supplierPublicRoutes } from './modules/supplierPortal.routes.js';
 import { logTransfers } from './lib/integrations.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -106,6 +107,7 @@ export async function buildApp(opts: { logger?: boolean; rateLimit?: Limits | nu
   // Employees answering a survey with their personal code: no session.
   await app.register(surveyPublicRoutes);
   await app.register(contractorPublicRoutes);
+  await app.register(supplierPublicRoutes);
   await app.register(auditApiRoutes);
   await app.register(scimRoutes);
   await app.register(async (secured) => {
@@ -120,6 +122,7 @@ export async function buildApp(opts: { logger?: boolean; rateLimit?: Limits | nu
     await secured.register(restatementRoutes);
     await secured.register(creditRoutes);
     await secured.register(batchRoutes);
+    await secured.register(supplierPortalRoutes);
     await secured.register(qrRoutes);
     await secured.register(contractorRoutes);
     await secured.register(assuranceRoutes);

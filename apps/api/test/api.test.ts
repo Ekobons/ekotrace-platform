@@ -2850,3 +2850,74 @@ test('batch runs: every machine-API transfer logged (accepted, refused with reas
   assert.equal((await api('GET', `/api/batches/transfers/${part.id}`, undefined, tenantB)).status, 404);
   assert.equal((await api('GET', `/api/batches/purchase/${b.id}`, undefined, tenantB)).status, 404);
 });
+
+test('supplier portal: invite with a one-time code, supplier signs in with e-mail + code, saves sections, uploads evidence, submits; company queries, then accepts — profile updated, intensity and product factors created and used; codes expire or are revoked; companies kept apart', async () => {
+  const sup = (await api('POST', '/api/suppliers', { name: 'Portal Supplier LLC' }, tenantA)).body.id as string;
+  const nu = await api('POST', '/api/users', { name: 'Sami Admin', email: 'sp.admin@a.test', role: 'admin', scopeNodeId: (await api('GET', '/api/org', undefined, tenantA)).body.nodes.find((n: { kind: string }) => n.kind === 'group').id }, tenantA);
+  let adm = await login('sp.admin@a.test', nu.body.temporaryPassword);
+  await call(adm, 'POST', '/api/auth/password', { current: nu.body.temporaryPassword, next: 'a long enough pass' });
+  adm = await login('sp.admin@a.test', 'a long enough pass');
+  const inv = await call(adm, 'POST', '/api/supplier-portal/requests', { supplierId: sup, year: 2025, email: 'Esg@Portal.example', contactName: 'Noor', message: 'Please share your 2025 data.' });
+  assert.equal(inv.status, 200, JSON.stringify(inv.body));
+  assert.match(inv.body.code, /^[A-Z2-9]{10}$/);
+  assert.equal((await call(adm, 'POST', '/api/supplier-portal/requests', { supplierId: sup, year: 2025, email: 'x@portal.example' })).status, 409);
+  assert.equal((await pq(`SELECT count(*)::int AS n FROM email_outbox WHERE to_email = 'esg@portal.example' AND body LIKE '%' || $1 || '%'`, [inv.body.code])).rows[0].n, 1, 'invitation e-mail carries the code');
+  assert.equal((await pq(`SELECT count(*)::int AS n FROM supplier_request WHERE code_hash = $1`, [inv.body.code])).rows[0].n, 0, 'only the hash is kept');
+  // sign in: wrong code refused, right one (any case, spaces) accepted
+  const pub = (method: string, path: string, body?: unknown, tok?: string) => app.inject({ method: method as 'GET', url: `/api/public/supplier${path}`, payload: body as object, headers: { ...(tok ? { 'x-supplier-token': tok } : {}), ...(body !== undefined ? { 'content-type': 'application/json' } : {}) } });
+  assert.equal((await pub('POST', '/login', { email: 'esg@portal.example', code: 'WRONGCODE2' })).statusCode, 401);
+  const li = await pub('POST', '/login', { email: 'ESG@portal.example', code: ` ${inv.body.code.toLowerCase().slice(0, 5)} ${inv.body.code.toLowerCase().slice(5)} ` });
+  assert.equal(li.statusCode, 200, li.body);
+  const tok = li.json().token as string;
+  assert.equal((await pub('GET', '/me')).statusCode, 401);
+  const me = (await pub('GET', '/me', undefined, tok)).json();
+  assert.equal(me.supplier, 'Portal Supplier LLC'); assert.equal(me.year, 2025); assert.equal(me.editable, true); assert.equal(me.progress.n, 0);
+  // incomplete: cannot submit
+  assert.equal((await pub('POST', '/submit', { name: 'Noor Ali', title: 'ESG lead', confirm: true }, tok)).statusCode, 400);
+  const save = (section: string, data: unknown) => pub('PUT', '/answers', { section, data }, tok);
+  assert.equal((await save('profile', { legalName: 'Portal Supplier LLC', country: 'AE', contactName: 'Noor Ali', industry: 'Logistics', size: 'medium' })).statusCode, 200);
+  assert.equal((await save('inventory', { reports: 'yes', scope1: 1000, scope2Location: 600, scope2Market: 500, revenue: 10_000_000, currency: 'AED', verification: 'limited' })).statusCode, 200);
+  assert.equal((await save('allocation', { method: 'revenue', customerRevenue: 1_000_000 })).statusCode, 200);
+  assert.equal((await save('targets', { status: 'sbti_committed', targetYear: 2030, reductionPct: 42 })).statusCode, 200);
+  assert.equal((await save('products', { items: [{ name: 'Pallet delivery', co2e: 2.5, unit: 'pcs', standard: 'ISO 14067', documentId: '00000000-0000-0000-0000-000000000000' }] })).statusCode, 400, 'documents must be uploaded first');
+  const pdf = Buffer.from('%PDF-1.4\n% DEMO EPD\n');
+  const up = await app.inject({ method: 'POST', url: '/api/public/supplier/evidence', payload: pdf, headers: { 'x-supplier-token': tok, 'content-type': 'application/octet-stream', 'x-filename': 'epd.pdf', 'x-kind': 'epd' } });
+  assert.equal(up.statusCode, 200, up.body);
+  const sv = await save('products', { items: [{ name: 'Pallet delivery', co2e: 2.5, unit: 'pcs', standard: 'ISO 14067', boundary: 'cradle-to-gate', verified: true, documentId: up.json().documentId }] });
+  assert.equal(sv.json().progress.n, 5);
+  assert.ok(Math.abs(sv.json().derived.intensity - 0.15) < 1e-9, 'kg CO2e per AED');
+  assert.ok(Math.abs(sv.json().derived.allocated - 150) < 1e-9, 't for this customer');
+  assert.equal((await pub('POST', '/submit', { name: 'Noor Ali', title: 'ESG lead', confirm: true }, tok)).statusCode, 200);
+  assert.equal((await save('targets', { status: 'none' })).statusCode, 409, 'locked once submitted');
+  // the company: listed, queried (a reason needed), resubmitted, accepted
+  const list = (await call(adm, 'GET', '/api/supplier-portal?year=2025')).body;
+  const rq = list.requests.find((r: { supplier: string }) => r.supplier === 'Portal Supplier LLC');
+  assert.equal(rq.status, 'submitted'); assert.equal(rq.progress.n, 5);
+  assert.equal((await call(adm, 'POST', `/api/supplier-portal/requests/${rq.id}/review`, { decision: 'query' })).status, 400);
+  assert.equal((await call(adm, 'POST', `/api/supplier-portal/requests/${rq.id}/review`, { decision: 'query', note: 'Please add the verifier name' })).body.status, 'queried');
+  assert.equal((await pub('GET', '/me', undefined, tok)).json().review_note, 'Please add the verifier name');
+  assert.equal((await save('inventory', { reports: 'yes', scope1: 1000, scope2Location: 600, scope2Market: 500, revenue: 10_000_000, currency: 'AED', verification: 'limited', verifier: 'DEMO Verifier' })).statusCode, 200);
+  assert.equal((await pub('POST', '/submit', { name: 'Noor Ali', title: 'ESG lead', confirm: true }, tok)).statusCode, 200);
+  assert.equal((await api('POST', `/api/supplier-portal/requests/${rq.id}/review`, { decision: 'accept', intensity: { use: true } }, tenantA)).status, 403, 'platform staff do not accept company data');
+  const acc = await call(adm, 'POST', `/api/supplier-portal/requests/${rq.id}/review`, { decision: 'accept', intensity: { use: true }, products: [{ index: 0 }] });
+  assert.equal(acc.status, 200, JSON.stringify(acc.body));
+  assert.equal(acc.body.applied.factors.length, 2);
+  const prof = (await call(adm, 'GET', `/api/suppliers/${sup}`)).body;
+  const p = prof.supplier ?? prof;
+  assert.equal(p.climate_target ?? p.climateTarget, 'sbti_committed'); assert.equal(p.country, 'AE');
+  // the intensity is used for purchases from the supplier in 2025
+  const dry = await call(adm, 'POST', '/api/purchases/manual', { facilityId: facA, dryRun: true, lines: [{ date: '2025-06-01', description: 'Freight services', amount: 10000, currency: 'AED', supplier: 'Portal Supplier LLC', itemId: await itemId('epa:naics:334111') }] });
+  assert.equal(dry.status, 200, JSON.stringify(dry.body));
+  assert.ok(Math.abs(dry.body.lines[0].co2e - 1500) < 15, `${dry.body.lines[0].co2e} kg from 10,000 AED × 0.15`);
+  // the staff can open the evidence; the supplier sees the result; a revoked code no longer signs in
+  const file = await app.inject({ method: 'GET', url: `/api/supplier-portal/documents/${up.json().documentId}`, headers: { cookie: adm } });
+  assert.equal(file.statusCode, 200); assert.equal(file.rawPayload.subarray(0, 5).toString(), '%PDF-');
+  assert.equal((await pub('GET', '/me', undefined, tok)).json().status, 'accepted');
+  assert.equal((await call(adm, 'POST', `/api/supplier-portal/requests/${rq.id}/revoke`, {})).status, 200);
+  assert.equal((await pub('GET', '/me', undefined, tok)).statusCode, 401);
+  assert.equal((await pub('POST', '/login', { email: 'esg@portal.example', code: inv.body.code })).statusCode, 401);
+  // companies kept apart
+  assert.equal((await api('GET', `/api/supplier-portal/requests/${rq.id}`, undefined, tenantB)).status, 404);
+  assert.equal((await api('GET', `/api/supplier-portal/documents/${up.json().documentId}`, undefined, tenantB)).status, 404);
+  assert.equal((await api('GET', '/api/supplier-portal?year=2025', undefined, tenantB)).body.requests.length, 0);
+});

@@ -73,6 +73,7 @@ export function Login({ onDone }: { onDone: () => void }) {
               <span>Not a {BRAND.name} user?</span>
               <a href="/survey">Answer a commuting survey with your code</a>
               <a href={`/contractor${binCode ? `?bin=${binCode}` : ''}`}>Waste contractors: sign in with your access code</a>
+              <a href="/supplier">Suppliers: share your emissions data with your access code</a>
             </div>
           </>}
         </form>

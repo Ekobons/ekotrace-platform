@@ -522,6 +522,62 @@ async function main() {
                    VALUES ($1, 'purchase_map', $2, 'failed', 1, 'DEMO — the mapping job stopped: the server restarted while it ran', 'api:DEMO SAP', now() - interval '2 days', now() - interval '2 days', now() - interval '2 days')`, [t, fb]);
     console.log(`Batch runs: source totals on ${bs.length} purchase files (one with a DEMO difference), 3 DEMO connected systems with 30 days of transfers (Oracle failing), 1 failed batch to retry.`);
   });
+  // Supplier portal (DEMO, not real): the four largest suppliers of the base year asked for their data
+  const scode = temporaryPassword().replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, 10).padEnd(10, 'Y');
+  let sportal = '';
+  await platformTx(async (c: Tx) => {
+    const t = tenantId;
+    const by = (await c.query(`SELECT base_year FROM tenant WHERE id = $1`, [t])).rows[0].base_year as number;
+    const top = (await c.query(`SELECT s.id, s.name FROM purchase_line l JOIN supplier s ON s.id = l.supplier_id WHERE l.tenant_id = $1 AND l.status = 'published'
+                                 GROUP BY s.id ORDER BY sum(l.co2e) DESC NULLS LAST LIMIT 4`, [t])).rows as { id: string; name: string }[];
+    if (top.length < 4) return;
+    // invented supplier records (no real company is shown with made-up figures): the lines of the four largest suppliers move to them
+    const FAKE = ['Falcon Steel Works (DEMO, not real)', 'Oasis Cement Co (DEMO, not real)', 'Dunes Heavy Equipment (DEMO, not real)', 'Palm Ready Mix (DEMO, not real)'];
+    for (const [i, s] of top.entries()) {
+      const id = (await c.query(`INSERT INTO supplier (tenant_id, name, norm, country, origin) VALUES ($1,$2,$3,'AE','manual') RETURNING id`, [t, FAKE[i], FAKE[i]!.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()])).rows[0].id as string;
+      await c.query(`UPDATE purchase_line SET supplier_id = $2 WHERE supplier_id = $1`, [s.id, id]);
+      await c.query(`UPDATE supplier_ef SET supplier_id = $2 WHERE supplier_id = $1`, [s.id, id]);
+      top[i] = { id, name: FAKE[i]! };
+    }
+    const slug = (n: string) => n.replace(/\(DEMO, not real\)/, '').toLowerCase().replace(/[^a-z0-9]+/g, '').slice(0, 18) || 'supplier';
+    const pdf = await PDFDocument.create(); const pg = pdf.addPage([595, 842]); const font = await pdf.embedFont(StandardFonts.Helvetica);
+    pg.drawText('DEMO - not a real document', { x: 50, y: 790, size: 18, font }); pg.drawText(`${top[1]!.name}: sustainability report ${by} (DEMO, invented figures)`, { x: 50, y: 760, size: 11, font });
+    const buf = Buffer.from(await pdf.save());
+    const doc = (await c.query(`INSERT INTO document (tenant_id, kind, filename, content_type, size, sha256, data, uploaded_by) VALUES ($1,'supplier_evidence',$2,'application/pdf',$3,$4,$5,$6) RETURNING id`,
+      [t, 'DEMO sustainability report (not real).pdf', buf.length, createHash('sha256').update(buf).digest('hex'), sealFile(buf), `${top[1]!.name} (supplier, DEMO)`])).rows[0].id as string;
+    const full = (rev: number, s1: number, s2: number, sales: number, target: string) => ({
+      profile: { legalName: 'DEMO — invented company details', country: 'AE', industry: 'DEMO industry', size: 'large', contactName: 'DEMO Contact', contactRole: 'Sustainability manager' },
+      inventory: { reports: 'yes', scope1: s1, scope2Location: Math.round(s2 * 1.15), scope2Market: s2, scope3: s1 * 4, scope3Categories: '1, 4, 6, 7', boundary: 'operational', standard: 'GHG Protocol Corporate Standard',
+        verification: 'limited', verifier: 'DEMO Assurance (not real)', revenue: rev, currency: 'AED', notes: 'DEMO — invented figures' },
+      allocation: { method: 'revenue', customerRevenue: sales, notes: 'DEMO — sales to the customer from our ledger' },
+      targets: { status: target, baseYear: 2022, targetYear: 2030, reductionPct: 42, scopes: 'Scope 1 + 2', netZeroYear: 2050 },
+      products: { none: false, items: [{ name: 'DEMO product (not real)', co2e: 1.8, unit: 'kg', standard: 'EPD (ISO 14025 / EN 15804)', boundary: 'cradle-to-gate', verified: true, documentId: null as string | null }] },
+    });
+    const req = async (s: { id: string; name: string }, status: string, answers: unknown, docs: unknown[], code: string | null, daysAgo: number) => (await c.query(
+      `INSERT INTO supplier_request (tenant_id, supplier_id, year, contact_name, email, message, due_date, code_hash, expires_at, status, answers, documents, submitted_at, submitted_by, reviewed_by, reviewed_at, created_by, created_at, last_used_at)
+       VALUES ($1,$2,$3,'DEMO Contact',$4,$5,current_date + 30,$6,current_date + 180,$7,$8,$9,$10,$11,$12,$13,'demo',now() - make_interval(days => $14),$15) RETURNING id`,
+      [t, s.id, by, `esg@${slug(s.name)}.example`, `DEMO — please share your ${by} greenhouse-gas data.`, code ? createHash('sha256').update(code).digest('hex') : null, status, JSON.stringify(answers), JSON.stringify(docs),
+       ['submitted', 'accepted'].includes(status) ? new Date(Date.now() - 5 * 86400e3) : null, ['submitted', 'accepted'].includes(status) ? 'DEMO Contact, Sustainability manager' : null,
+       status === 'accepted' ? 'Nikhil (Super admin)' : null, status === 'accepted' ? new Date(Date.now() - 2 * 86400e3) : null, daysAgo, status === 'invited' ? null : new Date(Date.now() - 86400e3)])).rows[0].id as string;
+    // 1: accepted — its intensity is a supplier factor
+    const a1 = full(250_000_000, 4200, 1800, 12_000_000, 'sbti_validated');
+    const r1 = await req(top[0]!, 'accepted', { ...a1, declaration: { name: 'DEMO Contact', title: 'Sustainability manager', at: new Date().toISOString() } }, [], null, 40);
+    const k1 = (6000 * 1000) / 250_000_000;
+    await c.query(`INSERT INTO supplier_ef (tenant_id, supplier_id, co2e, unit, price_year, valid_from, valid_to, source, boundary, created_by, request_id)
+                   VALUES ($1,$2,$3,'AED',$4,$5,$6,$7,'Supplier operations (Scope 1+2)','demo',$8)`,
+      [t, top[0]!.id, k1, by, `${by}-01-01`, `${by + 1}-12-31`, `Supplier portal: ${top[0]!.name} ${by} — Scope 1+2 per unit of revenue (DEMO, not real)`, r1]);
+    await c.query(`UPDATE supplier SET climate_target = 'sbti_validated', reports_emissions = 'yes' WHERE id = $1`, [top[0]!.id]);
+    await c.query(`UPDATE supplier_request SET applied = $2 WHERE id = $1`, [r1, JSON.stringify({ profile: ['reports_emissions', 'climate_target'], factors: [{ kind: 'intensity', co2e: k1, unit: 'AED' }], linesRecalculated: 0 })]);
+    // 2: submitted with a report and a product footprint — to review
+    const a2 = full(80_000_000, 1500, 900, 6_500_000, 'sbti_committed'); a2.products.items[0]!.documentId = doc;
+    await req(top[1]!, 'submitted', { ...a2, declaration: { name: 'DEMO Contact', title: 'Sustainability manager', at: new Date().toISOString() } }, [{ id: doc, filename: 'DEMO sustainability report (not real).pdf', kind: 'report', size: buf.length }], null, 25);
+    // 3: in progress (the code is printed below so the portal can be tried)
+    await req(top[2]!, 'in_progress', { profile: full(1, 1, 1, 1, 'own').profile, targets: { status: 'own', targetYear: 2030, reductionPct: 30 } }, [], scode, 12);
+    // 4: invited, not started
+    await req(top[3]!, 'invited', {}, [], null, 3);
+    sportal = `esg@${slug(top[2]!.name)}.example`;
+    console.log(`Supplier portal: 4 DEMO requests for ${by} (accepted with a supplier factor, submitted to review, in progress, invited).`);
+  });
   // entries typed in during the year came in a few days after each month, most before the due date (before 2025 is locked below)
   await platformTx((c: Tx) => c.query(`UPDATE activity SET submitted_at = least(period_end + (2 + floor(random() * 11))::int, now() - interval '1 day')
                                          WHERE tenant_id = $1 AND status = 'approved' AND submitted_at IS NULL AND period_end < now()`, [tenantId]));
@@ -704,6 +760,7 @@ async function main() {
   for (const [name, email] of PEOPLE) console.log(`  ${email.padEnd(24)} ${name}`);
   console.log(`\n  Password: ${pw}\n`);
   console.log(`Waste contractor portal (/contractor, DEMO): collector@demo.example · access code ${ccode}\n`);
+  if (sportal) console.log(`Supplier portal (/supplier, DEMO): ${sportal} · access code ${scode}\n`);
 }
 
 main().catch((e) => { console.error('Demo not created:', e.message); process.exitCode = 1; }).finally(() => pool.end());

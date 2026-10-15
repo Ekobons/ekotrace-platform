@@ -2,6 +2,12 @@
 
 Newest first.
 
+## 2026-10-15 · Supplier portal (suppliers sign in and report)
+
+- **Public portal `/supplier`:** a supplier's contact signs in with work e-mail + access code (no account; code shown once, stored as a hash, 1–12 months, replaceable / revocable; 8-hour sessions, header `x-supplier-token`; sign-in rate-limited). Sections saved one by one: company profile; emissions inventory (Scope 1, 2 location / market, 3, categories, revenue and currency, boundary, standard, verification); share relating to the customer (by revenue, own calculation, or none); climate targets (SBTi validated / committed, own, none; %, years, net zero, link); product footprints (kg CO₂e per unit, standard, boundary, validity, verified, document); evidence files (PDF / JPEG / PNG ≤ 15 MB); review and declaration (name, title). Live intensity (kg CO₂e per currency unit) and tonnes for the customer. Locked after submitting until queried. Login page link "Suppliers: share your emissions data".
+- **Staff: Suppliers → Supplier portal** (super admin, admin, manager): invite (supplier, year, contact, message, due date, validity, e-mail the invitation with the code), new code, remove access; requests with status, progress, emissions from purchases and the supplier's figure; largest suppliers not asked yet; coverage of purchase emissions. Review drawer: every answer and file; **Accept** updates the profile and turns the intensity and chosen product footprints into supplier factors (`supplier_ef.request_id`), recalculating the supplier's unpublished lines; **Query** with a note. Platform staff cannot accept. Inbox notice on submission; e-mails on invitation, query, acceptance.
+- Migration 044 (`supplier_request`, `supplier_session`, RLS, purge). Audit trail of every supplier action. DEMO: four invented suppliers (accepted with a factor, submitted, in progress with a code printed by the demo, invited). Public pages no longer call the staff session check. Manual: Suppliers → Supplier portal. Test added (77 API tests pass).
+
 ## 2026-10-15 · Batch runs: transfer log, integration health, reconciliation, retry
 
 - **Batch runs** (Menu → Capture, was a stage-4 placeholder): `/batches`, for super admin, admin, verifier (all) and manager (batches of their facilities).

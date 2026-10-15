@@ -192,6 +192,22 @@ export interface RestatementData {
   canPropose: boolean; canDecide: boolean; canSettings: boolean;
 }
 
+// ------------------------------------------------------------ supplier portal --
+export interface SupplierRequestRow {
+  id: string; supplier_id: string; supplier: string; country: string | null; year: number; contact_name: string | null; email: string; due_date: string | null; expires_at: string | null; revoked: boolean;
+  status: import('./supplierPortal').SPStatus; submitted_at: string | null; reviewed_by: string | null; reviewed_at: string | null; review_note: string | null; last_used_at: string | null; created_by: string | null;
+  created_at: string; has_code: boolean; documents: number; kg: number; usd: number; progress: import('./supplierPortal').SPProgress; derived: import('./supplierPortal').SPDerived;
+}
+export interface SupplierPortalData {
+  year: number; requests: SupplierRequestRow[]; suggest: { id: string; name: string; country: string | null; contact_email: string | null; kg: number; usd: number; has_factor: boolean }[];
+  totalKg: number; statusText: Record<string, string>; canManage: boolean;
+}
+export interface SupplierRequestDetail extends Omit<SupplierRequestRow, 'documents' | 'kg' | 'usd'> {
+  message: string; answers: import('./supplierPortal').SPAnswers; documents: import('./supplierPortal').SPDoc[]; submitted_by: string | null; supplier_country: string | null; climate_target: string | null;
+  applied: { profile: string[]; factors: { id: string; kind: string; co2e: number; unit: string }[]; linesRecalculated: number } | null;
+  factors: { id: string; co2e: number; unit: string; item_id: number | null; item: string | null; valid_from: string; valid_to: string; source: string; request_id: string | null }[]; canManage: boolean;
+}
+
 // ------------------------------------------------------------ batch runs --
 export interface BatchCheck { id: string; name: string; ok: boolean | null; detail: string }
 export type Recon = 'balanced' | 'differences' | 'open' | 'no_control' | 'failed';
@@ -733,6 +749,14 @@ export const api = {
   restatementDecide: (id: string, decision: 'approve' | 'reject', note?: string) => call<{ status: string; applied: boolean; before: number; after: number; pct: number; cumulativePct: number; alsoApplied: number }>('POST', `/api/restatements/${id}/decide`, { decision, note }),
   restatementWithdraw: (id: string) => call<{ ok: true }>('DELETE', `/api/restatements/${id}`),
   restatementSettings: (threshold: number) => call<{ threshold: number }>('PUT', '/api/restatements/settings', { threshold }),
+  // supplier portal (staff)
+  supplierPortal: (year: number) => call<SupplierPortalData>('GET', `/api/supplier-portal?year=${year}`),
+  supplierRequest: (id: string) => call<SupplierRequestDetail>('GET', `/api/supplier-portal/requests/${id}`),
+  supplierInvite: (b: { supplierId: string; year: number; email: string; contactName: string; message: string; dueDate: string | null; months: number; sendEmail: boolean }) => call<{ id: string; code: string; expiresAt: string; emailed: boolean }>('POST', '/api/supplier-portal/requests', b),
+  supplierRequestCode: (id: string, sendEmail: boolean) => call<{ code: string; expiresAt: string; emailed: boolean }>('POST', `/api/supplier-portal/requests/${id}/code`, { sendEmail }),
+  supplierRequestRevoke: (id: string) => call<{ ok: true }>('POST', `/api/supplier-portal/requests/${id}/revoke`, {}),
+  supplierRequestReview: (id: string, b: { decision: 'accept' | 'query'; note?: string; profile?: boolean; intensity?: { use: boolean; itemId: number | null }; products?: { index: number; itemId: number | null }[] }) =>
+    call<{ status: string; applied?: { profile: string[]; factors: unknown[] }; linesRecalculated?: number }>('POST', `/api/supplier-portal/requests/${id}/review`, b),
   // batch runs
   batches: (days: number) => call<BatchesData>('GET', `/api/batches?days=${days}`),
   batchRecon: (id: string) => call<BatchRecon>('GET', `/api/batches/purchase/${id}`),

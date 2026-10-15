@@ -15,7 +15,7 @@ const uuid = z.string().uuid();
 const MANAGE = ['super_admin', 'admin', 'manager'] as const;
 
 /** Recalculate unpublished lines of these suppliers in every open batch. */
-async function recalcSupplier(c: Parameters<Parameters<typeof tenantTx>[1]>[0], tenant: string, supplierIds: string[], by: string) {
+export async function recalcSupplier(c: Parameters<Parameters<typeof tenantTx>[1]>[0], tenant: string, supplierIds: string[], by: string) {
   const batches = (await c.query(
     `SELECT batch_id, count(*)::int AS n FROM purchase_line WHERE supplier_id = ANY($1) AND status <> 'published' GROUP BY 1`, [supplierIds])).rows;
   for (const b of batches) {

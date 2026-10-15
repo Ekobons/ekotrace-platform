@@ -56,3 +56,40 @@ For a year, from calculated purchase lines (ready or published), shown as emissi
 | Profiles and climate targets | how much is known about suppliers, and the share of purchased emissions by the supplier's climate target |
 
 Lines that cannot be calculated yet (no exchange rate, facility not recognised, no spend category) are not in Analytics until fixed.
+
+## Supplier portal
+
+Suppliers → **Supplier portal** asks suppliers for their own data, so their purchases are counted with their real figures instead of spend-based averages. The supplier's contact signs in at **/supplier** with their work e-mail and an access code — no user account, no password.
+
+```flow
+> 1 · Invite | choose the supplier, the year, the contact's e-mail; an access code is made
+> 2 · Answer | the supplier fills in the sections, saving as they go, and attaches evidence
+> 3 · Submit | they confirm the answers with their name and title; you are told in your inbox
+> 4 · Review | accept (profile updated, chosen figures become supplier factors) or query with a note
+> 5 · Use | purchases from the supplier are recalculated with its own factor
+```
+
+**Inviting** (super admin, admin, manager): **+ Invite a supplier**, or **Invite** next to one of the largest suppliers not asked yet (ranked by emissions from that year's purchases). Give the contact's work e-mail and name, a message, a date to answer by, and how long the code is valid (1–12 months). The access code is shown **once**; with "E-mail the invitation" ticked, the invitation with the link and code is sent (once a mail server is set up). The code is stored only as a hash. **New code** replaces it (the old one stops working); **Remove access** ends it. A supplier is asked once per year.
+
+**What the supplier answers:**
+
+| Section | Content |
+|---|---|
+| Your company | legal name, country, registration number, website, industry, size, contact |
+| Emissions | whether they measure them; Scope 1, Scope 2 (location- and market-based), Scope 3 and its categories, in tCO₂e; revenue and currency; boundary, standard, verification and verifier |
+| Your share for us | the part of their Scope 1 + 2 relating to your purchases: by revenue (their sales to you ÷ their revenue), their own calculation, or "cannot say" |
+| Climate targets | SBTi validated or committed, own target or none; reduction %, base and target year, scopes, net-zero year, link |
+| Product footprints | per product: kg CO₂e per unit (kg, t, L, m³, kWh, piece or a currency), standard (EPD, ISO 14067…), boundary, validity, verified, document |
+| Evidence | reports, verification statements, EPDs — PDF, JPEG or PNG up to 15 MB |
+| Review & submit | a summary, the sections still missing, and a declaration with name and title |
+
+The page shows the figures that follow as they type: their **intensity** (Scope 1 + 2 in kg CO₂e per unit of revenue) and the **tonnes relating to you**. Once submitted the answers are locked until you query them.
+
+**Reviewing**: open the request (**Review**) to see every answer and file. Then:
+
+- **Accept** — optionally update the supplier's profile (country, registration, industry, size, contact, reports emissions, climate target); use the **intensity** as a supplier factor (in the answer's currency, for purchases in the reporting year and the next), for everything bought from the supplier or for one spend category; use any **product footprint** as a factor, again for everything or a chosen category. Purchase lines of the supplier not yet published are recalculated at once; published ones change when their batch is reopened. The supplier is thanked by e-mail.
+- **Query** — with a note the supplier sees on the portal and by e-mail; they correct and submit again.
+
+Platform staff cannot accept. Every step — invitation, sign-in, each saved section, files, submission, decision — is in the audit log, the supplier's actions under their name. The factors created point back to the request.
+
+**Coverage**: the tab shows how much of the year's purchase emissions comes from suppliers whose data you accepted.
