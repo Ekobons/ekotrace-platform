@@ -492,6 +492,33 @@ export interface AssurancePack { company: string; consolidation: string; gwp: st
 export type BinInput = { facilityId: string; name: string; location?: string; itemId: number; gri?: string; hazardous: boolean; contractor?: string; capacityL?: number; density?: number };
 
 const qs = (q: Record<string, unknown>) => new URLSearchParams(Object.entries(q).filter(([, v]) => v !== undefined && v !== '' && v !== null).map(([k, v]) => [k, String(v)]));
+// ---------------------------------------------------------------- product LCA --
+export interface LciFactor { id: string; code: string; name: string; unit: string; co2e: number; stage: string; source: string; indicative: boolean; own: boolean }
+export interface LcaProduct {
+  id: string; name: string; description: string; supplier_id: string | null; supplier: string | null; item_id: number | null; item: string | null; declared_unit: string; fu: string;
+  boundary: string; standard: string; allocation: string; cutoff: string; ref_year: number; notes: string; status: 'draft' | 'review' | 'verified' | 'published'; version: number;
+  created_name: string | null; last_edit_name: string | null; updated_at: string; sent_name: string | null; sent_at: string | null; verified_name: string | null; verified_at: string | null; review_note: string | null;
+  published_factor: number | null; published_at: string | null; published_name: string | null; supplier_ef_id: string | null; changed_since_publish: boolean; lines: number;
+  total?: number; stages?: Record<string, number>; dq?: number | null; inputs?: number;
+}
+export interface LcaLine { id: string; name: string; stage: string; qty: number; unit: string; co2e_per_unit: number; lci_id: string | null; lci_name?: string | null; dq: string; source: string; kg: number; counted: boolean; share: number }
+export interface LcaScenario { id: string; name: string; changes: { inputId: string; lciId?: string | null; qty?: number | null; co2e?: number | null }[]; created_name: string | null; total: number; stages: Record<string, number>; dq: number | null; delta: number; pct: number }
+export interface LcaData {
+  products: (LcaProduct & { total: number; stages: Record<string, number>; dq: number | null; inputs: number })[]; library: LciFactor[];
+  stages: Record<string, string>; boundaries: Record<string, string>; dqLabels: Record<string, string>; dqWeights: Record<string, number>;
+  counts: { products: number; published: number; review: number; suppliers: number; purchaseLines: number; purchaseT: number; indicative: number };
+  can: { edit: boolean; publish: boolean; library: boolean };
+}
+export interface LcaDetail {
+  product: LcaProduct; inputs: LcaLine[]; result: { total: number; stages: Record<string, number>; dq: number | null; excluded: number };
+  hotspots: LcaLine[]; levers: { inputId: string; input: string; to: string; toId: string; saves: number; pct: number }[]; scenarios: LcaScenario[];
+  publications: { id: string; version: number; factor: number; declared_unit: string; stages: Record<string, number>; dq: number | null; verified_name: string | null; published_name: string | null; published_at: string }[];
+  can: { edit: boolean; submit: boolean; verify: boolean; publish: boolean };
+}
+export interface LcaProductBody { name: string; description: string; supplierId: string | null; itemId: number | null; declaredUnit: string; fu: string; boundary: string; standard: string; allocation: string; cutoff: string; refYear: number; notes: string; copyFrom?: string | null }
+export interface LcaInputBody { name: string; stage: string; qty: number; unit: string; co2ePerUnit: number | null; lciId: string | null; dq: string; source: string }
+export interface LcaImportLine { row: number; name: string; stage: string | null; qty: number | null; unit: string; co2e: number | null; lciId: string | null; lciName: string | null; problems: string[] }
+
 export const api = {
   brand: () => call<{ name: string; productName?: string; colors?: Record<string, string> }>('GET', '/api/brand'),
   catalogue: (all = false) => call<{ categories: Category[] }>('GET', `/api/catalogue${all ? '?all=1' : ''}`),
@@ -789,6 +816,21 @@ export const api = {
   batchReadings: (id: string) => call<Omit<ReadingBatchRow, 'rejected'> & { rejected: { index: number; reason: string }[]; staged: Record<string, number>; meters: { name: string; external_id: string; facility: string; n: number }[] }>('GET', `/api/batches/readings/${id}`),
   transfer: (id: string) => call<Transfer>('GET', `/api/batches/transfers/${id}`),
   sourceExpect: (id: string, expectHours: number | null) => call<{ ok: true }>('PUT', `/api/batches/sources/${id}`, { expectHours }),
+  // product LCA
+  lca: () => call<LcaData>('GET', '/api/lca'),
+  lcaProduct: (id: string) => call<LcaDetail>('GET', `/api/lca/products/${id}`),
+  lcaProductSave: (b: LcaProductBody, id?: string) => call<{ id?: string; ok?: true }>(id ? 'PUT' : 'POST', id ? `/api/lca/products/${id}` : '/api/lca/products', b),
+  lcaProductDelete: (id: string) => call<{ ok: true }>('DELETE', `/api/lca/products/${id}`),
+  lcaInputSave: (b: LcaInputBody, productId: string, id?: string) => call<{ id?: string; ok?: true }>(id ? 'PUT' : 'POST', id ? `/api/lca/inputs/${id}` : `/api/lca/products/${productId}/inputs`, b),
+  lcaInputDelete: (id: string) => call<{ ok: true }>('DELETE', `/api/lca/inputs/${id}`),
+  lcaImport: (id: string, b: { text: string; replace: boolean; commit: boolean }) => call<{ lines?: LcaImportLine[]; ok?: number; problems?: number; imported?: number; skipped?: number }>('POST', `/api/lca/products/${id}/import`, b),
+  lcaScenarioSave: (b: { name: string; changes: LcaScenario['changes'] }, productId: string, id?: string) => call<{ id?: string; ok?: true }>(id ? 'PUT' : 'POST', id ? `/api/lca/scenarios/${id}` : `/api/lca/products/${productId}/scenarios`, b),
+  lcaScenarioDelete: (id: string) => call<{ ok: true }>('DELETE', `/api/lca/scenarios/${id}`),
+  lcaSubmit: (id: string, note?: string) => call<{ ok: true }>('POST', `/api/lca/products/${id}/submit`, { note }),
+  lcaVerify: (id: string, decision: 'verify' | 'return', note?: string) => call<{ ok: true }>('POST', `/api/lca/products/${id}/verify`, { decision, note }),
+  lcaPublish: (id: string) => call<{ version: number; factor: number; supplierFactor: string | null; linesRecalculated: number }>('POST', `/api/lca/products/${id}/publish`, {}),
+  lcaLibrarySave: (b: { name: string; unit: string; co2e: number; stage: string; source: string }, id?: string) => call<{ id?: string; ok?: true; models?: number }>(id ? 'PUT' : 'POST', id ? `/api/lca/library/${id}` : '/api/lca/library', b),
+  lcaLibraryDelete: (id: string) => call<{ ok: true; retired: boolean }>('DELETE', `/api/lca/library/${id}`),
   // carbon credits
   credits: (year?: number) => call<CreditData>('GET', `/api/credits${year ? `?year=${year}` : ''}`),
   creditLotSave: (b: CreditLotBody, id?: string) => call<{ id?: string; ok?: true }>(id ? 'PUT' : 'POST', id ? `/api/credits/lots/${id}` : '/api/credits/lots', b),

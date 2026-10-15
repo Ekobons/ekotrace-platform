@@ -2,6 +2,17 @@
 
 Newest first.
 
+## 2026-10-15 · Product LCA: product carbon footprints (ISO 14067 / GHG Protocol Product Standard)
+
+- **Menu → Product LCA → Product footprints** (`/lca`, its own menu section, replaces the stage-4 placeholder). Tabs: Products · LCA workspace · Life-cycle inventory · Scenarios · Published factors.
+- **Model** (migration 047): `lca_product` (goal & scope: declared unit from the unit table, functional unit, boundary cradle-to-gate / cradle-to-grave / gate-to-gate, standard, allocation, cut-off, reference year; supplier or own product; spend category), `lca_input` (stage, amount per declared unit, factor from the library or own value, data quality verified / measured / supplier / estimated, source), `lca_scenario` (changes per input: library factor, amount, factor), `lca_publication` (each published version frozen), `lci_factor` (shared indicative library of 29 factors readable by every company + company factors, RLS), `supplier_ef.lca_product_id`.
+- **Calculation** (`lib/lca.ts`): Σ amount × factor per declared unit, stages outside the boundary kept but not counted; emissions-weighted data quality (1 / 0.9 / 0.8 / 0.5); hotspots; ecodesign levers (lowest like-for-like library factor: same stage, unit and material family); scenarios.
+- **BOM import** (`POST /api/lca/products/:id/import`): CSV / tab / semicolon lines `input, stage, amount, unit, kgCO2e_per_unit`; blank factor matched to the library by name (ties to the higher factor); preview, then add or replace.
+- **Review**: draft → in review (super admin, admin, manager, preparer send) → verified (super admin, admin or verifier who did not last edit or send it; never platform staff; return needs a note) → published (super admin, admin), version + 1. Any later change returns the model to draft marked *republish*; the published factor stays in use until the next version. Notifications on send / verify / return. Published products cannot be deleted; their supplier is fixed.
+- **Supplier products**: publishing writes / updates one `supplier_ef` per product (unit = declared unit, source "Product LCA: name vN (standard, boundary, year; verified by …)") and recalculates the supplier's unpublished purchase lines. Products tab shows the purchase lines and tCO₂e calculated with LCA factors.
+- **Company factors**: add / edit / retire (super admin, admin, manager); editing updates the models using it (back to draft). Shared rows cannot be changed by a company.
+- DEMO (invented): recycled aggregate (published), crumb rubber from ELT (in review), recycled HDPE pellet (draft, solar scenario), rebar from "Desert Rebar Mills (DEMO, not real)" (published; H2 rebar purchase lines use it). Manual: Product LCA chapter. Test added (80 API tests pass).
+
 ## 2026-10-15 · Supplier answers checked for consistency; document uploads
 
 - **Consistency check** (`conflicts()` in the supplier portal): the share for the customer (own calculation) cannot exceed the supplier's Scope 1 + 2 (higher of location / market), sales to the customer cannot exceed revenue. Shown live on the portal (save disabled), refused on save of either section and on submit (`INCONSISTENT`), flagged in the staff review where accepting is blocked.

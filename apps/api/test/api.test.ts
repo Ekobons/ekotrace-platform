@@ -3006,3 +3006,76 @@ test('supplier answers must agree (share for the customer within Scope 1+2, sale
   assert.equal((await api('GET', `/api/suppliers/${sup}`, undefined, tenantA)).body.documents.length, 1);
   assert.equal((await api('GET', `/api/suppliers/${sup}`, undefined, tenantB)).status, 404);
 });
+
+test('product LCA: inventory from the library and own values, BOM import, scenarios, second-person verification, publishing a supplier product as its factor; companies kept apart', async () => {
+  const co = await api('POST', '/api/platform/companies', { name: 'LCA Co', country: 'AE', superAdmin: { name: 'Lia Super', email: 'super@lca.test' } });
+  const T = co.body.company.id as string;
+  const user = async (email: string, tmp: string) => { let c = await login(email, tmp); await call(c, 'POST', '/api/auth/password', { current: tmp, next: 'a long enough pass' }); c = await login(email, 'a long enough pass'); return c; };
+  const sa = await user('super@lca.test', co.body.superAdmin.temporaryPassword);
+  const group = (await call(sa, 'GET', '/api/org')).body.nodes.find((n: { kind: string }) => n.kind === 'group').id;
+  const adm = await user('admin@lca.test', (await call(sa, 'POST', '/api/users', { name: 'Ada Admin', email: 'admin@lca.test', role: 'admin', scopeNodeId: group })).body.temporaryPassword);
+  const man = await user('mgr@lca.test', (await call(sa, 'POST', '/api/users', { name: 'Mo Manager', email: 'mgr@lca.test', role: 'manager', scopeNodeId: group })).body.temporaryPassword);
+  const sup = (await call(sa, 'POST', '/api/suppliers', { name: 'Billet Mill Test' })).body.id as string;
+
+  const g0 = (await call(man, 'GET', '/api/lca')).body;
+  assert.ok(g0.library.length >= 29 && g0.library.every((f: { indicative: boolean }) => f.indicative), 'shared indicative library');
+  const lib = (code: string) => g0.library.find((f: { code: string }) => f.code === code);
+  const scope = { name: 'Test billet', fu: '1 tonne of billet at the mill gate', declaredUnit: 't', refYear: 2025, supplierId: sup };
+  assert.equal((await call(man, 'POST', '/api/lca/products', { ...scope, declaredUnit: 'AED' })).status, 400, 'a declared unit is a physical unit');
+  const pid = (await call(man, 'POST', '/api/lca/products', scope)).body.id as string;
+  const add = (b: Record<string, unknown>, ck = man) => call(ck, 'POST', `/api/lca/products/${pid}/inputs`, { dq: 'supplier', ...b });
+  assert.equal((await add({ name: 'Steel', stage: 'raw', qty: 1, unit: 't', lciId: lib('steel_p').id })).status, 400, 'library factor per kg: amount in kg');
+  const steel = (await add({ name: 'Primary steel', stage: 'raw', qty: 1000, unit: 'kg', lciId: lib('steel_p').id })).body.id as string;
+  await add({ name: 'Mill electricity', stage: 'manufacturing', qty: 100, unit: 'kWh', co2ePerUnit: 0.5, dq: 'measured' });
+  await add({ name: 'Disposal of slag', stage: 'eol', qty: 50, unit: 'kg', lciId: lib('landfill').id });
+  assert.equal((await add({ name: 'No factor', stage: 'raw', qty: 1, unit: 'kg' })).status, 400);
+  // import: blank factor matched by name (ties go to the higher factor), unknown lines skipped
+  const text = 'input,stage,amount,unit,kgCO2e_per_unit\nCardboard,packaging,2,kg,\nRoad freight truck,transport,"1,000",t-km,\nMystery additive,raw,1,kg,\nDolomite,raw,10,kg,0.03';
+  const pv = (await call(man, 'POST', `/api/lca/products/${pid}/import`, { text })).body;
+  assert.equal(pv.ok, 3); assert.equal(pv.problems, 1); assert.equal(pv.lines[0].lciName, 'Corrugated cardboard'); assert.equal(pv.lines[1].qty, 1000);
+  assert.equal((await call(man, 'POST', `/api/lca/products/${pid}/import`, { text, commit: true })).body.imported, 3);
+  let det = (await call(man, 'GET', `/api/lca/products/${pid}`)).body;
+  // 1000×2.1 + 100×0.5 + 2×0.9 + 1000×0.11 + 10×0.03 = 2262.1; end of life outside cradle-to-gate
+  assert.ok(Math.abs(det.result.total - 2262.1) < 1e-6, String(det.result.total));
+  assert.ok(Math.abs(det.result.excluded - 50 * 0.467) < 1e-6);
+  assert.ok(Math.abs(det.result.stages.raw - 2100.3) < 1e-6);
+  assert.equal(det.levers[0].to, 'Steel, recycled (EAF)'); assert.ok(Math.abs(det.levers[0].saves - 1400) < 1e-6);
+  // scenario: recycled steel
+  assert.equal((await call(man, 'POST', `/api/lca/products/${pid}/scenarios`, { name: 'Recycled steel', changes: [{ inputId: steel, lciId: lib('steel_r').id }] })).status, 200);
+  det = (await call(man, 'GET', `/api/lca/products/${pid}`)).body;
+  assert.ok(Math.abs(det.scenarios[0].total - 862.1) < 1e-6);
+  // review: the author does not verify; managers and platform staff do not verify; a reason to return
+  assert.equal((await call(man, 'POST', `/api/lca/products/${pid}/submit`, {})).status, 200);
+  assert.equal((await call(man, 'POST', `/api/lca/products/${pid}/verify`, { decision: 'verify' })).status, 403);
+  assert.equal((await api('POST', `/api/lca/products/${pid}/verify`, { decision: 'verify' }, T)).status, 403);
+  assert.equal((await call(adm, 'POST', `/api/lca/products/${pid}/verify`, { decision: 'return' })).status, 400);
+  assert.equal((await call(adm, 'POST', `/api/lca/products/${pid}/publish`, {})).status, 400, 'not verified yet');
+  assert.equal((await call(adm, 'POST', `/api/lca/products/${pid}/verify`, { decision: 'verify' })).status, 200);
+  assert.equal((await call(man, 'POST', `/api/lca/products/${pid}/publish`, {})).status, 403);
+  const pub = (await call(sa, 'POST', `/api/lca/products/${pid}/publish`, {})).body;
+  assert.equal(pub.version, 1); assert.ok(Math.abs(pub.factor - 2262.1) < 1e-6); assert.ok(pub.supplierFactor);
+  const ef = await tenantRow(T, `SELECT supplier_id, co2e::float8 AS co2e, unit, source, lca_product_id FROM supplier_ef WHERE id = $1`, [pub.supplierFactor]);
+  assert.equal(ef.supplier_id, sup); assert.equal(ef.unit, 't'); assert.ok(Math.abs(ef.co2e - 2262.1) < 1e-6); assert.match(ef.source, /Product LCA: Test billet v1 .*verified by Ada Admin/); assert.equal(ef.lca_product_id, pid);
+  // a change returns it to draft; the published factor stays until v2
+  await call(man, 'PUT', `/api/lca/inputs/${steel}`, { name: 'Primary steel', stage: 'raw', qty: 900, unit: 'kg', lciId: lib('steel_p').id, dq: 'supplier' });
+  det = (await call(man, 'GET', `/api/lca/products/${pid}`)).body;
+  assert.equal(det.product.status, 'draft'); assert.equal(det.product.changed_since_publish, true); assert.ok(Math.abs(det.product.published_factor - 2262.1) < 1e-6);
+  assert.equal((await call(man, 'PUT', `/api/lca/products/${pid}`, { ...scope, supplierId: null })).status, 400, 'the supplier of a published product is fixed');
+  assert.equal((await call(sa, 'DELETE', `/api/lca/products/${pid}`)).status, 409);
+  // second round: the admin edits and sends; the admin cannot verify their own change, the super admin can; v2 updates the same supplier factor
+  await call(adm, 'PUT', `/api/lca/inputs/${steel}`, { name: 'Primary steel', stage: 'raw', qty: 950, unit: 'kg', lciId: lib('steel_p').id, dq: 'verified' });
+  await call(adm, 'POST', `/api/lca/products/${pid}/submit`, {});
+  assert.equal((await call(adm, 'POST', `/api/lca/products/${pid}/verify`, { decision: 'verify' })).status, 403);
+  await call(sa, 'POST', `/api/lca/products/${pid}/verify`, { decision: 'verify' });
+  const v2 = (await call(adm, 'POST', `/api/lca/products/${pid}/publish`, {})).body;
+  assert.equal(v2.version, 2); assert.equal(v2.supplierFactor, pub.supplierFactor);
+  assert.ok(Math.abs((await tenantRow(T, `SELECT co2e::float8 AS c FROM supplier_ef WHERE id = $1`, [pub.supplierFactor])).c - (2262.1 - 50 * 2.1)) < 1e-6);
+  assert.equal((await call(man, 'GET', `/api/lca/products/${pid}`)).body.publications.length, 2);
+  // company factors: own to the company; editing one updates the models that use it
+  const own = (await call(man, 'POST', '/api/lca/library', { name: 'Billet EPD factor', unit: 'kg', co2e: 1.2, stage: 'raw', source: 'Test EPD' })).body.id as string;
+  assert.ok((await call(sa, 'GET', '/api/lca')).body.library.some((f: { id: string }) => f.id === own));
+  assert.ok(!(await api('GET', '/api/lca', undefined, tenantB)).body.library.some((f: { id: string }) => f.id === own), 'not visible to another company');
+  assert.ok((await api('GET', '/api/lca', undefined, tenantB)).body.library.length >= 29, 'the shared library is');
+  assert.equal((await api('GET', `/api/lca/products/${pid}`, undefined, tenantB)).status, 404);
+  assert.equal((await call(adm, 'PUT', `/api/lca/library/${lib('steel_p').id}`, { name: 'xx', unit: 'kg', co2e: 0, stage: 'raw', source: 'xx' })).status, 404, 'shared rows are not changed by a company');
+});

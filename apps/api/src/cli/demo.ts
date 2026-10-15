@@ -21,6 +21,7 @@ import { storeReadings, syncMeter, type MeterRow } from '../modules/meters.route
 import { bookBill, createBill } from '../modules/bills.routes.js';
 import { PDFDocument, StandardFonts } from 'pdf-lib';
 import { demoPurchases } from './demoPurchases.js';
+import { demoLca } from './demoLca.js';
 import { normSupplier } from '../modules/purchases/fields.js';
 import { purgeTenant } from '../db/purge.js';
 import { createHash, randomUUID } from 'node:crypto';
@@ -596,6 +597,8 @@ async function main() {
     }
     console.log(`Supplier portal: 4 DEMO requests for ${by} (accepted with a supplier factor, submitted to review, in progress, invited).`);
   });
+  // Product LCA (DEMO, not real)
+  await tenantTx(tenantId, (c: Tx) => demoLca(c, tenantId));
   // entries typed in during the year came in a few days after each month, most before the due date (before 2025 is locked below)
   await platformTx((c: Tx) => c.query(`UPDATE activity SET submitted_at = least(period_end + (2 + floor(random() * 11))::int, now() - interval '1 day')
                                          WHERE tenant_id = $1 AND status = 'approved' AND submitted_at IS NULL AND period_end < now()`, [tenantId]));

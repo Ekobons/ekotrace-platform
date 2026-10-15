@@ -41,6 +41,7 @@ import { SurveyAnswerPage } from './pages/SurveyAnswer';
 import { Surveys } from './pages/Surveys';
 import { MetricRegistry } from './pages/MetricRegistry';
 import { CarbonCredits } from './pages/CarbonCredits';
+import { ProductLca } from './pages/ProductLca';
 import { BatchRuns } from './pages/BatchRuns';
 import { SupplierPortal } from './pages/SupplierPortal';
 import { CollectionCalendar } from './pages/CollectionCalendar';
@@ -61,7 +62,7 @@ export const useApp = () => useContext(AppCtx);
 
 type NavItem = { to?: string; label: string; icon: string; roles?: Role[]; stage?: number };
 /** Section colours of the side menu, as in the prototype. */
-const SEC_C: Record<string, string> = { '': 'var(--lime)', Capture: '#7FD3B9', Analyse: '#8EC5FF', 'Value chain': '#F2C46D', 'Net zero': '#B6E36B', Disclose: '#C9A7F5', Setup: '#E7ECEA', Help: '#F7A8B8' };
+const SEC_C: Record<string, string> = { '': 'var(--lime)', Capture: '#7FD3B9', Analyse: '#8EC5FF', 'Value chain': '#F2C46D', 'Product LCA': '#F59E7A', 'Net zero': '#B6E36B', Disclose: '#C9A7F5', Setup: '#E7ECEA', Help: '#F7A8B8' };
 const NAV: { group?: string; items: NavItem[] }[] = [
   { items: [
     { to: '/home', label: 'Home', icon: 'home' }, { to: '/dashboards', label: 'Dashboards', icon: 'chart' }, { to: '/kpis', label: 'KPI dashboard', icon: 'gauge' },
@@ -74,7 +75,8 @@ const NAV: { group?: string; items: NavItem[] }[] = [
     { to: '/inbox', label: 'Inbox & to-dos', icon: 'inbox' }, { to: '/vault', label: 'Document vault', icon: 'folder' }, { to: '/batches', label: 'Batch runs', icon: 'upload', roles: ['super_admin', 'admin', 'manager', 'verifier'] },
     { to: '/qr', label: 'QR & field app', icon: 'qr', roles: ['super_admin', 'admin', 'manager', 'preparer', 'verifier'] },
   ] },
-  { group: 'Value chain', items: [{ to: '/suppliers', label: 'Suppliers', icon: 'users', roles: ['super_admin', 'admin', 'manager', 'preparer', 'verifier'] }, { label: 'Product LCA', icon: 'leaf', stage: 4 }] },
+  { group: 'Value chain', items: [{ to: '/suppliers', label: 'Suppliers', icon: 'users', roles: ['super_admin', 'admin', 'manager', 'preparer', 'verifier'] }] },
+  { group: 'Product LCA', items: [{ to: '/lca', label: 'Product footprints', icon: 'leaf', roles: ['super_admin', 'admin', 'manager', 'preparer', 'verifier'] }] },
   { group: 'Net zero', items: [{ to: '/targets', label: 'Targets & actions', icon: 'target' }, { to: '/credits', label: 'Carbon credits', icon: 'leaf' }] },
   { group: 'Disclose', items: [{ to: '/reports', label: 'Reports', icon: 'doc' }, { to: '/assurance', label: 'Audit & assurance', icon: 'shield', roles: ['super_admin', 'admin', 'manager', 'verifier'] }] },
   { group: 'Setup', items: [
@@ -228,6 +230,7 @@ function Shell() {
           <Route path="/vault" element={<NeedCo><Vault /></NeedCo>} />
           <Route path="/metrics" element={<NeedCo><MetricRegistry /></NeedCo>} />
           <Route path="/credits" element={<NeedCo><CarbonCredits /></NeedCo>} />
+          <Route path="/lca" element={<NeedCo><ProductLca /></NeedCo>} />
           <Route path="/batches" element={<NeedCo><BatchRuns /></NeedCo>} />
           <Route path="/calendar" element={<NeedCo><CollectionCalendar /></NeedCo>} />
           <Route path="/inbox" element={<NeedCo><Inbox onSeen={() => window.dispatchEvent(new Event('eko-inbox'))} /></NeedCo>} />
