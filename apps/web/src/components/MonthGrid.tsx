@@ -2,7 +2,8 @@
  * The months picked in Add data, entered side by side — one row per month, as in the prototype.
  *
  *  - Month · Type (when the form offers several) · Quantity · Note / reference and data type ·
- *    Emissions (calculated as you type) · Check (against this entry's usual months) · + line
+ *    Emissions (calculated as you type; "How?" opens the split per gas, the factors and the steps) ·
+ *    Check (against this entry's usual months) · + line
  *  - Paste a column of numbers from Excel into the first quantity: it fills the next rows.
  *  - Months that already have the same entry are marked "entered", so nothing goes in twice.
  *  - Save as draft, or Submit for approval (goes to the facility's approver). A row with a
@@ -10,8 +11,10 @@
  *
  * The other inputs (fuel, supplier, vehicle, factor…) are set once in the form above.
  */
-import { useEffect, useMemo, useState } from 'react';
-import { api, BASIS_SHORT, num, tco2e, type Activity, type Basis } from '../lib/api';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { api, BASIS_SHORT, num, tco2e, type Activity, type Basis, type CalcResponse } from '../lib/api';
+import { Result } from './Result';
+import { Icon } from './Icon';
 import { useApp } from '../App';
 import { useNavigate } from 'react-router-dom';
 import { saveDraft } from './MeterForm';
@@ -79,6 +82,15 @@ export function MonthGrid({ year, facilityId, label, unitName, build, bases = ['
   const [res, setRes] = useState<Record<number, { totals?: Record<Basis, number>; error?: string; warnings?: string[] }>>({});
   const [existing, setExisting] = useState<Activity[]>([]);
   const [busy, setBusy] = useState<'draft' | 'submit' | null>(null);
+  // "How?" on a row: the full calculation of that row (per gas, factors, steps)
+  const [how, setHow] = useState<{ k: number; m: number; v: string; unit: string; r?: CalcResponse; error?: string } | null>(null);
+  const openHow = (r: Row) => {
+    const e = entries.find((x) => x.k === r.k);
+    if (!e?.body) return;
+    const { dataType: _d, note: _n, ...body } = e.body as Record<string, unknown>; void _d; void _n;
+    setHow({ k: r.k, m: r.m, v: r.v, unit: unitName });
+    api.calculate(body).then((x) => setHow((h) => (h && h.k === r.k ? { ...h, r: x } : h))).catch((err: Error) => setHow((h) => (h && h.k === r.k ? { ...h, error: err.message } : h)));
+  };
 
   const entries = useMemo(() => rows.filter((r) => r.v !== '').map((r) => {
     const body = build(Number(r.v), monthPeriod(year, r.m), r.type || undefined);
@@ -169,7 +181,8 @@ export function MonthGrid({ year, facilityId, label, unitName, build, bases = ['
               <td style={{ minWidth: 160 }}><div style={{ display: 'grid', gap: 4 }}>
                 <input className="input" value={r.note} maxLength={1000} placeholder="Meter, invoice no." onChange={(e) => set(r.k, { note: e.target.value })} />
                 <select className="input" value={r.dt} onChange={(e) => set(r.k, { dt: e.target.value })}><option value="actual">Actual</option><option value="estimated">Estimated</option><option value="proxy">Proxy</option></select></div></td>
-              <td className="num" style={{ minWidth: 100 }}><b style={{ fontSize: 14 }}>{x?.totals ? tco2e(x.totals[main] ?? 0) : '—'}</b><div className="muted small">tCO₂e{bases.length > 1 && x?.totals && (x.totals[bases[1]!] ?? 0) !== 0 ? ` · ${BASIS_SHORT[bases[1]!]} ${tco2e(x.totals[bases[1]!] ?? 0)}` : ''}</div></td>
+              <td className="num" style={{ minWidth: 100 }}><b style={{ fontSize: 14 }}>{x?.totals ? tco2e(x.totals[main] ?? 0) : '—'}</b><div className="muted small">tCO₂e{bases.length > 1 && x?.totals && (x.totals[bases[1]!] ?? 0) !== 0 ? ` · ${BASIS_SHORT[bases[1]!]} ${tco2e(x.totals[bases[1]!] ?? 0)}` : ''}</div>
+                {x?.totals && <button className="howlink" onClick={() => openHow(r)} title="Split per gas, factors used and calculation steps">ⓘ How?</button>}</td>
               <td className={`small ${c.cls}`} style={{ minWidth: 110, maxWidth: 220 }}>{c.t}</td>
               <td style={{ whiteSpace: 'nowrap' }}>
                 <button className="btn ghost sm" title="Another line for this month" onClick={() => setRows((rs) => { const j = rs.findIndex((y) => y.k === r.k); const n = [...rs]; n.splice(j + 1, 0, blank(r.m, r.type)); return n; })}>+ line</button>
@@ -184,11 +197,29 @@ export function MonthGrid({ year, facilityId, label, unitName, build, bases = ['
         <span className="muted small">{factorText ?? 'Paste a column from Excel into the first quantity to fill the rows below.'}</span><span className="grow" />
         <b>{okRows} row{okRows === 1 ? '' : 's'} · {shown.map((b, i) => <span key={b}>{i ? ' · ' : ''}{tco2e(total(b))} tCO₂e{shown.length > 1 ? ` ${BASIS_SHORT[b]}` : ''}</span>)}</b>
       </div>
+      {how && <HowDrawer how={how} label={`${MONTHS[how.m]} ${year} · ${num(Number(how.v))} ${how.unit}`} energy={bases.includes('scope2')} onClose={() => setHow(null)} />}
       <div className="row">
         <span className="muted small">Goes to <b>{approver || 'the approver'}</b> for approval.</span><span className="grow" />
         <button className="btn" disabled={!ready || !!busy || !okRows || !facilityId} onClick={() => void save(false)}>{busy === 'draft' ? 'Saving…' : 'Save as draft'}</button>
         <button className="btn p" disabled={!ready || !!busy || !okRows || !facilityId} onClick={() => void save(true)}>{busy === 'submit' ? 'Submitting…' : 'Submit for approval'}</button>
       </div>
     </div>
+  );
+}
+
+/** The full calculation of one row: totals, factors, the split per gas and the steps (as in the entry drawer). */
+function HowDrawer({ how, label, energy, onClose }: { how: { v: string; unit: string; r?: CalcResponse; error?: string }; label: string; energy: boolean; onClose: () => void }) {
+  const dlg = useRef<HTMLDialogElement>(null);
+  useEffect(() => { dlg.current?.showModal(); }, []);
+  return (
+    <dialog ref={dlg} className="drawer wide" onClose={onClose}>
+      <div className="in">
+        <div className="row"><div className="grow"><div className="eyebrow">{label}</div><h2>{how.r ? how.r.item.name : 'How it is calculated'}</h2></div>
+          <button className="btn ghost" onClick={() => dlg.current?.close()} aria-label="Close"><Icon name="x" /></button></div>
+        {how.error ? <div className="note bad">{how.error}</div> : !how.r ? <div className="muted">Calculating…</div>
+          : <Result r={how.r} energy={energy} quantity={Number(how.v)} unitName={how.unit} defaultGas />}
+        <div className="muted small">Not saved yet: this is what will be stored with the entry when you save or submit it.</div>
+      </div>
+    </dialog>
   );
 }

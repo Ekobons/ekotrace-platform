@@ -2,6 +2,10 @@
 
 Newest first.
 
+## 2026-10-16 · Add data: the full calculation of each month row
+
+- **ⓘ How?** under each row's emissions in the month rows (fuels, vehicles, energy, waste, water) opens a drawer with that row's calculation before it is saved: totals per part (Scope 1, well-to-tank…), the factors with source and check (quantity × factor = t), the **split per gas** (kg of gas × GWP) and the numbered **calculation steps**, open at once. As in the prototype's "Understand calculation steps". Previously only the single whole-year form showed it.
+
 ## 2026-10-16 · `npm run app` and `npm run demo` bring the database up to date first
 
 - Both now run the migrations before starting, so pulling new code can no longer leave the screens running against an older database (new tables and columns missing, calculations and pages failing). Migrations already applied are skipped.

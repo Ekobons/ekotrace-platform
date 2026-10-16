@@ -12,15 +12,20 @@ interface Line { basis: Basis; gas: string; kgGas: number | null; kgCo2e: number
 /** Units of purchased energy: such entries show Scope 2 location- and market-based side by side. */
 export const ENERGY_UNITS = new Set(['kWh_e', 'MWh_e', 'kWh_th', 'MWh_th', 'GJ_th', 'MMBtu_th', 'kWh_c', 'MWh_c', 'TRh']);
 
-export function Result({ r, quantity, unitName, energy }: {
+export function Result({ r, quantity, unitName, energy, defaultGas }: {
   r: { gwpSet: string; totals: Record<Basis, number>; lines: Line[]; steps: string[]; warnings: string[]; factors?: FactorUsed[]; cv?: CvUsed };
   /** for entries saved before factors were stored: the factor is derived as total ÷ quantity */
   quantity?: number; unitName?: string;
   /** purchased energy (Scope 2 entry) */
   energy?: boolean;
+  /** open the split per gas and the steps at once (the "How?" view in Add data) */
+  defaultGas?: boolean;
 }) {
-  const [showSteps, setShowSteps] = useState(false);
-  const [showGas, toggleGas] = useGasSplit();
+  const [showSteps, setShowSteps] = useState(!!defaultGas);
+  const [savedGas, toggleSaved] = useGasSplit();
+  const [forceGas, setForceGas] = useState(!!defaultGas);
+  const showGas = forceGas || savedGas;
+  const toggleGas = () => { if (forceGas) { setForceGas(false); if (savedGas) toggleSaved(); } else toggleSaved(); };
   const gasCount = new Set(r.lines.filter((l) => l.kgGas != null).map((l) => l.gas)).size;
   const order: Basis[] = ['direct', 'scope2', 'scope2_market', 'scope3', 'td_loss', 'wtt', 'outside_scopes', 'memo'];
   const cls: Record<Basis, string> = { direct: 's1', scope2: 's2', scope2_market: 's2m', td_loss: 's3', wtt: 's3', scope3: 's3', outside_scopes: 'bio', memo: 'memo' };

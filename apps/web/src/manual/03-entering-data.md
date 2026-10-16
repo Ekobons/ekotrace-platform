@@ -23,7 +23,7 @@ The **ways in** are shown as cards: *Type it in*, *Upload bills* and *Meter read
 > Month · Type | the month; the type (e.g. the fuel) can differ per row
 > Quantity | typed, or a column pasted from Excel into the first row (fills the rows below)
 > Note / reference · data type | invoice or meter number; actual, estimated or proxy
-> Emissions | calculated as you type
+> Emissions | calculated as you type; **ⓘ How?** under the figure opens the full calculation of that row: the factors used and their source, the split per gas (CO₂, CH₄, N₂O… × GWP) and every step
 > Check | against the usual months of the same entry (✓ in line, ! far above or below); a month that already has the same entry is flagged
 > + line | a second row for the same month (e.g. two fuels)
 ```
