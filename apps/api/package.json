@@ -26,7 +26,7 @@
     "nodemailer": "10.0.12",
     "pdfjs-dist": "6.3.289",
     "pg": "8.23.1",
-    "zod": "4.6.5"
+    "zod": "4.6.6"
   },
   "devDependencies": {
     "@types/nodemailer": "8.0.2",
