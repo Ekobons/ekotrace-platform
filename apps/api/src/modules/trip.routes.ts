@@ -16,7 +16,7 @@ import { z } from 'zod';
 import { tenantTx } from '../db/pool.js';
 import { requireTenant } from '../lib/auth.js';
 import { AppError } from '../lib/errors.js';
-import { airport, greatCircleKm, haulOf, searchAirports, UPLIFT, SHORT_HAUL_MAX_KM, TYPICAL_KM } from '../lib/airports.js';
+import { airport, greatCircleKm, haulOf, searchAirports, UPLIFT, SHORT_HAUL_MAX_KM, TYPICAL_KM, searchCities } from '../lib/airports.js';
 import { tenantSettings } from './activity.routes.js';
 
 export const TRIP_CLASSES = [['economy', 'Economy'], ['premium', 'Premium economy'], ['business', 'Business'], ['first', 'First'], ['average', 'Not known (average)']] as const;
@@ -37,6 +37,12 @@ export async function tripRoutes(app: FastifyInstance) {
   app.get('/api/trips/airports', async (req) => {
     const q = z.object({ q: z.string().max(60).default('') }).parse(req.query);
     return { airports: searchAirports(q.q, 12).map((a) => ({ iata: a.iata, name: a.name, city: a.city, country: a.country, countryName: a.countryName })) };
+  });
+
+  // city suggestions for location fields (facility location…), from the airport list
+  app.get('/api/geo/cities', async (req) => {
+    const q = z.object({ q: z.string().max(60).default(''), country: z.string().regex(/^[A-Za-z]{2}$/).optional() }).parse(req.query);
+    return { cities: searchCities(q.q, q.country, 12) };
   });
 
   app.get('/api/trips/distance', async (req) => {

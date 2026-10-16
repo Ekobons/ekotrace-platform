@@ -2,6 +2,12 @@
 
 Newest first.
 
+## 2026-10-16 · Countries picked by name; city suggestions
+
+- **Country lists instead of typed codes** (`components/CountrySelect`, `lib/countries.ts`, 248 countries from the OurAirports list; common Gulf and partner countries first; the code is still what is stored): facility profile, new company (platform console), add supplier and supplier profile, supplier portal ("Your company"), fuel prices and the factor form (with "All countries (global)"). Earlier answers typed as a name (e.g. "India") are turned into the code when opened.
+- **City / area** on the facility profile suggests cities of the chosen country as you type (`GET /api/geo/cities`, from the airport list); any text is still accepted.
+- Countries shown by name where codes were shown: facility list, grid region ("United Arab Emirates — national average"), companies in the console, supplier lists and portal review, fuel prices.
+
 ## 2026-10-16 · Add data: the full calculation of each month row
 
 - **ⓘ How?** under each row's emissions in the month rows (fuels, vehicles, energy, waste, water) opens a drawer with that row's calculation before it is saved: totals per part (Scope 1, well-to-tank…), the factors with source and check (quantity × factor = t), the **split per gas** (kg of gas × GWP) and the numbered **calculation steps**, open at once. As in the prototype's "Understand calculation steps". Previously only the single whole-year form showed it.

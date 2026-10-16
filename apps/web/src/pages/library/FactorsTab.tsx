@@ -3,6 +3,7 @@
  * (year × part × unit) with its gas split and source. "Add or correct" saves a
  * new version — the previous one stays in history.
  */
+import { CountrySelect } from '../../components/CountrySelect';
 import { useEffect, useMemo, useState } from 'react';
 import { useApp } from '../../App';
 import { api, BASIS_LABEL, BASIS_SHORT, num, type Basis, type Category, type Factor, type Unit } from '../../lib/api';
@@ -178,7 +179,7 @@ function AddFactor({ itemId, units, onDone }: { itemId: number; units: Unit[]; o
         <label className="field"><span>Year</span><input className="input num" style={{ width: 90 }} value={f.year} onChange={set('year')} /></label>
         <label className="field"><span>Part</span><select className="input" value={f.basis} onChange={set('basis')}>{Object.entries(BASIS_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></label>
         <label className="field"><span>Per unit</span><select className="input" value={f.unit} onChange={set('unit')}>{units.map((u) => <option key={u.code} value={u.code}>{u.name}</option>)}</select></label>
-        <label className="field"><span>Country</span><input className="input" style={{ width: 90 }} value={f.region} onChange={set('region')} placeholder="GLOBAL or AE" /></label>
+        <label className="field" style={{ minWidth: 190 }}><span>Country</span><CountrySelect value={f.region} extra={[['GLOBAL', 'All countries (global)']]} onChange={(c) => setF({ ...f, region: c })} /></label>
         <label className="field"><span>Source code</span><input className="input" style={{ width: 130 }} value={f.source} onChange={set('source')} /></label>
       </div>
       <div className="row">

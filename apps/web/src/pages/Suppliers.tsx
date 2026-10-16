@@ -6,6 +6,8 @@
  *   Check names     possible duplicates (merge / keep apart) and names linked automatically (confirm / split)
  *   Analytics       spend and emissions by country, product group, sector, Scope 3 category, month; top suppliers
  */
+import { CountrySelect } from '../components/CountrySelect';
+import { countryLabel, toCountryCode } from '../lib/countries';
 import { useEffect, useMemo, useRef, useState, type InputHTMLAttributes } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useApp } from '../App';
@@ -193,7 +195,7 @@ function AddSupplierDrawer({ departments, onClose, onDone }: { departments: stri
             <div className="field span2"><span>Type</span><div className="sp-choice">
               {([['current', 'Current supplier', 'You buy from them'], ['prospect', 'Prospect', 'You may buy from them — compare before choosing']] as const).map(([k, l, sub]) =>
                 <label key={k} className={f.kind === k ? 'on' : ''}><input type="radio" name="kind" checked={f.kind === k} onChange={() => up({ kind: k })} /><span><b>{l}</b><small>{sub}</small></span></label>)}</div></div>
-            {txt('reference', 'Internal code / vendor number', 'as in the ERP — links future purchases')}{txt('country', 'Country', 'AE, India, Germany…')}
+            {txt('reference', 'Internal code / vendor number', 'as in the ERP — links future purchases')}<label className="field"><span>Country</span><CountrySelect value={f.country} empty="Not known" onChange={(c) => up({ country: c })} /></label>
             <label className="field"><span>Procurement department</span><input className="input" list="sup-depts" value={f.department} onChange={(e) => up({ department: e.target.value })} placeholder="e.g. Fleet, Facilities, IT" />
               <datalist id="sup-depts">{departments.map((d) => <option key={d} value={d} />)}</datalist></label>
             {txt('industry', 'Industry / what they supply')}
@@ -262,7 +264,7 @@ function ImportDrawer({ onClose, onDone }: { onClose: () => void; onDone: () => 
 const METHOD_LABEL: Record<string, string> = { new: 'first seen', exact: 'same name', alias: 'known spelling', reference: 'same vendor number', similar: 'near-identical name', merged: 'merged', manual: 'added by hand' };
 type ProfileForm = { name: string; country: string; reference: string; trn: string; website: string; industry: string; size: string; contactName: string; contactEmail: string; reportsEmissions: string; climateTarget: string; note: string;
   kind: string; department: string; cdpScore: string; cdpYear: string; reductionPct: string; baseYear: string; targetYear: string; netZeroYear: string };
-const formOf = (s: SupplierProfile): ProfileForm => ({ name: s.name, country: s.country ?? '', reference: s.reference ?? '', trn: s.trn ?? '', website: s.website ?? '', industry: s.industry ?? '', size: s.size ?? '',
+const formOf = (s: SupplierProfile): ProfileForm => ({ name: s.name, country: toCountryCode(s.country), reference: s.reference ?? '', trn: s.trn ?? '', website: s.website ?? '', industry: s.industry ?? '', size: s.size ?? '',
   contactName: s.contact_name ?? '', contactEmail: s.contact_email ?? '', reportsEmissions: s.reports_emissions ?? 'unknown', climateTarget: s.climate_target ?? 'unknown', note: s.note ?? '',
   kind: s.kind ?? 'current', department: s.department ?? '', cdpScore: s.cdp_score ?? '', cdpYear: s.cdp_year ? String(s.cdp_year) : '',
   reductionPct: s.target?.reductionPct != null ? String(s.target.reductionPct) : '', baseYear: s.target?.baseYear ? String(s.target.baseYear) : '', targetYear: s.target?.targetYear ? String(s.target.targetYear) : '', netZeroYear: s.target?.netZeroYear ? String(s.target.netZeroYear) : '' });
@@ -324,7 +326,7 @@ function SupplierPanel({ id, canManage, onChanged, onClose, onOpen }: { id: stri
         <fieldset className="box"><legend>Profile</legend>
           <div className="grid2">
             {F('name', 'Name')}{F('reference', 'Vendor number (ERP)')}
-            {F('country', 'Country (2 letters, e.g. AE)', { maxLength: 2 })}{F('trn', 'Tax registration number (TRN)')}
+            <label className="field"><span>Country</span><CountrySelect value={form.country} empty="Not known" disabled={!canManage} onChange={(c) => setForm({ ...form, country: c })} /></label>{F('trn', 'Tax registration number (TRN)')}
             {F('industry', 'Industry / what they supply')}
             <label className="field"><span>Size</span><select className="input" value={form.size} disabled={!canManage} onChange={(e) => setForm({ ...form, size: e.target.value })}><option value="">—</option><option value="micro">Micro</option><option value="small">Small</option><option value="medium">Medium</option><option value="large">Large</option></select></label>
             {F('contactName', 'Sustainability contact')}{F('contactEmail', 'Contact e-mail', { type: 'email' })}
@@ -474,7 +476,7 @@ function ReviewTab({ canManage, onChanged }: { canManage: boolean; onChanged: ()
             <thead><tr><th>New name</th><th /><th>Existing supplier</th><th className="num">Alike</th><th /></tr></thead>
             <tbody>{d.duplicates.map((x) => (
               <tr key={x.id}>
-                <td><a href="#" onClick={(e) => { e.preventDefault(); open(x.id); }}><b>{x.name}</b></a><div className="muted small">{[x.reference && `vendor ${x.reference}`, x.country, `${x.lines.toLocaleString('en')} lines`].filter(Boolean).join(' · ')}</div></td>
+                <td><a href="#" onClick={(e) => { e.preventDefault(); open(x.id); }}><b>{x.name}</b></a><div className="muted small">{[x.reference && `vendor ${x.reference}`, x.country && countryLabel(x.country), `${x.lines.toLocaleString('en')} lines`].filter(Boolean).join(' · ')}</div></td>
                 <td className="muted">≈</td>
                 <td><a href="#" onClick={(e) => { e.preventDefault(); open(x.other_id); }}>{x.other_name}</a><div className="muted small">{[x.other_reference && `vendor ${x.other_reference}`, x.other_country, `${x.other_lines.toLocaleString('en')} lines`].filter(Boolean).join(' · ')}</div></td>
                 <td className="num">{x.score ? `${Math.round(x.score * 100)}%` : ''}</td>

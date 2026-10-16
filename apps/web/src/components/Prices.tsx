@@ -3,6 +3,8 @@
  * Platform admin: the shared list for every company. Super admin / Admin: the
  * company's own prices (contract or fuel-card prices), which win over the shared list.
  */
+import { CountrySelect } from './CountrySelect';
+import { countryLabel } from '../lib/countries';
 import { useEffect, useState } from 'react';
 import { api, num, type Price } from '../lib/api';
 import { Icon } from './Icon';
@@ -39,7 +41,7 @@ export function Prices({ platform, canEdit = true }: { platform?: boolean; canEd
             <select className="input" value={f.itemId} onChange={(e) => { const it = items.find((i) => i.id === Number(e.target.value)); setF({ ...f, itemId: Number(e.target.value), unit: it?.default_unit && !it.name.startsWith('Grid') ? it.default_unit : 'L' }); }}>
               {[...new Set(items.map((i) => i.sub))].map((g) => <optgroup key={g} label={g}>{items.filter((i) => i.sub === g).map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}</optgroup>)}
             </select></label>
-          <label className="field" style={{ width: 80 }}><span>Country</span><input className="input mono" maxLength={2} value={f.region} onChange={(e) => setF({ ...f, region: e.target.value.toUpperCase() })} /></label>
+          <label className="field" style={{ minWidth: 190 }}><span>Country</span><CountrySelect value={f.region} extra={[['GLOBAL', 'All countries (global)']]} onChange={(c) => setF({ ...f, region: c })} /></label>
           <label className="field" style={{ width: 120 }}><span>Price</span><input className="input num" inputMode="decimal" value={f.price} onChange={(e) => setF({ ...f, price: e.target.value.replace(/[^0-9.]/g, '') })} /></label>
           <label className="field" style={{ width: 80 }}><span>Currency</span><input className="input mono" maxLength={3} value={f.currency} onChange={(e) => setF({ ...f, currency: e.target.value.toUpperCase() })} /></label>
           <label className="field" style={{ width: 100 }}><span>per</span>
@@ -60,7 +62,7 @@ export function Prices({ platform, canEdit = true }: { platform?: boolean; canEd
             <thead><tr><th>Fuel</th><th>Country</th><th className="num">Price</th><th>Months</th><th>Source</th>{!platform && <th>List</th>}{canEdit && <th />}</tr></thead>
             <tbody>{shown.map((r) => (
               <tr key={r.id}>
-                <td>{r.item}</td><td className="mono">{r.region}</td>
+                <td>{r.item}</td><td>{r.region === 'GLOBAL' ? 'Global' : countryLabel(r.region)}</td>
                 <td className="num">{num(Number(r.price))} {r.currency}/{r.unit === 'kWh_e' ? 'kWh' : r.unit}</td>
                 <td className="mono">{r.valid_from.slice(0, 7)}{r.valid_to.slice(0, 7) !== r.valid_from.slice(0, 7) ? ` → ${r.valid_to.slice(0, 7)}` : ''}</td>
                 <td>{r.source}</td>

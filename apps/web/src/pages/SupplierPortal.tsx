@@ -3,6 +3,8 @@
  * from the invitation, answers the questionnaire section by section (saved as they go), attaches evidence and
  * submits. The customer reviews the answers before anything is used.
  */
+import { CountrySelect } from '../components/CountrySelect';
+import { countryLabel, toCountryCode } from '../lib/countries';
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { BrandMark } from '../components/BrandMark';
 import { BRAND } from '../lib/brand';
@@ -168,13 +170,13 @@ const Foot = ({ ro, onSave, ok = true, label = 'Save and continue' }: { ro: bool
 
 function Profile({ me, ro, save }: { me: Me; ro: boolean; save: SaveFn }) {
   const a = me.answers.profile ?? {};
-  const [f, setF] = useState({ legalName: a.legalName ?? me.supplier, country: a.country ?? '', trn: a.trn ?? '', website: a.website ?? '', industry: a.industry ?? '', size: a.size ?? '',
+  const [f, setF] = useState({ legalName: a.legalName ?? me.supplier, country: toCountryCode(a.country), trn: a.trn ?? '', website: a.website ?? '', industry: a.industry ?? '', size: a.size ?? '',
     employees: str(a.employees), contactName: a.contactName ?? me.contact_name ?? '', contactRole: a.contactRole ?? '', phone: a.phone ?? '' });
   const t = (k: keyof typeof f, l: string, p = '') => <label className="field"><span>{l}</span><input className="input" disabled={ro} placeholder={p} value={f[k]} onChange={(e) => setF({ ...f, [k]: e.target.value })} /></label>;
   return <>
-    <Head t="Your company" sub="As it appears in your records. The country can be a two-letter code (AE, IN, DE…)." />
+    <Head t="Your company" sub="As it appears in your records." />
     <div className="vform">
-      {t('legalName', 'Legal name *')}{t('country', 'Country *', 'e.g. AE')}
+      {t('legalName', 'Legal name *')}<label className="field"><span>Country *</span><CountrySelect value={f.country} disabled={ro} onChange={(c) => setF({ ...f, country: c })} /></label>
       {t('trn', 'Tax / registration number')}{t('website', 'Website', 'https://')}
       {t('industry', 'Industry', 'e.g. Logistics, steel, IT services')}
       <label className="field"><span>Size</span><select className="input" disabled={ro} value={f.size} onChange={(e) => setF({ ...f, size: e.target.value })}><option value="">—</option><option value="micro">Micro (under 10 people)</option><option value="small">Small (10–49)</option><option value="medium">Medium (50–249)</option><option value="large">Large (250+)</option></select></label>
@@ -378,7 +380,7 @@ function Submit({ me, reload, toast, goto }: { me: Me; reload: () => Promise<voi
   return <>
     <Head t="Review & submit" sub={me.editable ? `Check your answers. Once submitted, ${me.company} reviews them; you can change them again only if they ask.` : 'What you sent.'} />
     <table className="t kv sp-sum"><tbody>
-      <Row l="Company" v={<>{a.profile?.legalName ?? '—'} · {a.profile?.country ?? '—'}{a.profile?.contactName ? ` · contact ${a.profile.contactName}` : ''}</>} />
+      <Row l="Company" v={<>{a.profile?.legalName ?? '—'} · {a.profile?.country ? countryLabel(a.profile.country) : '—'}{a.profile?.contactName ? ` · contact ${a.profile.contactName}` : ''}</>} />
       <Row l={`Emissions ${me.year}`} v={inv.reports === 'no' ? 'Not measured yet' : inv.reports ? <>Scope 1 <b>{nf(inv.scope1)}</b> · Scope 2 <b>{nf(inv.scope2Market ?? inv.scope2Location)}</b>{inv.scope2Market != null ? ' (market)' : ''} · Scope 3 {nf(inv.scope3)} tCO₂e{inv.verification ? ` · ${SP_VERIF[inv.verification]}` : ''}</> : '—'} />
       <Row l="Revenue and intensity" v={d.intensity != null ? <>{nf(inv.revenue, 0)} {inv.currency} · <b>{nf(d.intensity, 4)} kg CO₂e / {inv.currency}</b></> : '—'} />
       <Row l={`Relating to ${me.company}`} v={d.allocated != null ? <b>{nf(d.allocated, 2)} tCO₂e</b> : a.allocation?.method === 'none' ? 'Not given' : '—'} />

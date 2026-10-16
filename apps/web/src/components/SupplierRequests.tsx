@@ -3,6 +3,7 @@
  * follow their progress, review what they submit, and accept it (profile updated, chosen figures become
  * supplier-specific factors) or query it with a note.
  */
+import { countryLabel } from '../lib/countries';
 import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useApp } from '../App';
@@ -61,7 +62,7 @@ export function SupplierRequests() {
             <thead><tr><th>Supplier</th><th>Contact</th><th>Status</th><th>Progress</th><th className="num">Your purchases tCO₂e</th><th className="num">Their figure for you</th><th>Due</th><th /></tr></thead>
             <tbody>{d.requests.map((r) => { const [c, t] = SP_STATUS[r.status]; return (
               <tr key={r.id} className={r.revoked ? 'dim' : ''}>
-                <td style={{ minWidth: 190 }}><button className="linkbtn" style={{ textAlign: "left" }} onClick={() => setOpen(r.id)}><b>{r.supplier}</b></button>{r.country && <span className="muted small"> · {r.country}</span>}</td>
+                <td style={{ minWidth: 190 }}><button className="linkbtn" style={{ textAlign: "left" }} onClick={() => setOpen(r.id)}><b>{r.supplier}</b></button>{r.country && <span className="muted small"> · {countryLabel(r.country)}</span>}</td>
                 <td className="small">{r.contact_name ?? '—'}<div className="muted">{r.email}</div></td>
                 <td><span className={`chip ${c}`}>{t}</span>{r.revoked && <div className="small muted">access removed</div>}{!r.revoked && r.expires_at && new Date(r.expires_at) < new Date() && <div className="small" style={{ color: 'var(--bad)' }}>code expired</div>}
                   {r.last_used_at && <div className="small muted">last seen {d8(r.last_used_at)}</div>}</td>
@@ -78,7 +79,7 @@ export function SupplierRequests() {
       {d.suggest.length > 0 && <div className="card">
         <h3 style={{ margin: '0 0 4px' }}>Largest suppliers not asked yet</h3>
         <p className="muted small" style={{ margin: '0 0 8px' }}>By emissions from your {year} purchases. Their own data replaces spend-based averages where it matters most.</p>
-        <table className="t"><tbody>{d.suggest.map((s) => <tr key={s.id}><td><b>{s.name}</b>{s.country && <span className="muted small"> · {s.country}</span>}{s.has_factor && <> <span className="chip grey">has own factor</span></>}</td>
+        <table className="t"><tbody>{d.suggest.map((s) => <tr key={s.id}><td><b>{s.name}</b>{s.country && <span className="muted small"> · {countryLabel(s.country)}</span>}{s.has_factor && <> <span className="chip grey">has own factor</span></>}</td>
           <td className="num small">{t1(s.kg)} t</td><td className="num small muted">{d.totalKg ? `${((s.kg / d.totalKg) * 100).toFixed(1)}%` : ''}</td>
           <td className="num">{d.canManage && <button className="btn sm" onClick={() => setInviting({ id: s.id, name: s.name, email: s.contact_email })}>Invite</button>}</td></tr>)}</tbody></table>
       </div>}
@@ -180,7 +181,7 @@ function ReviewDrawer({ id, onClose, onChanged }: { id: string; onClose: () => v
           {r.status === 'invited' && <div className="note info small">The supplier has not started yet{r.last_used_at ? '' : ' (never signed in)'}.</div>}
           <h3 className="sp-h3">Company</h3>
           <table className="t kv"><tbody>
-            <Row l="Legal name" v={p.legalName} /><Row l="Country · registration" v={[p.country, p.trn].filter(Boolean).join(' · ') || null} />
+            <Row l="Legal name" v={p.legalName} /><Row l="Country · registration" v={[p.country && countryLabel(p.country), p.trn].filter(Boolean).join(' · ') || null} />
             <Row l="Industry · size" v={[p.industry, p.size, p.employees != null ? `${p.employees} people` : null].filter(Boolean).join(' · ') || null} />
             <Row l="Contact" v={[p.contactName, p.contactRole, p.phone].filter(Boolean).join(' · ') || null} />
           </tbody></table>

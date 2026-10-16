@@ -74,3 +74,20 @@ export function haulOf(a: Airport, b: Airport, km: number): Haul {
   if (a.country === b.country) return 'domestic';
   return km < SHORT_HAUL_MAX_KM ? 'short' : 'long';
 }
+
+/** City names starting with (or containing) the text, from the airport list; one country or all. For suggestions only. */
+export function searchCities(q: string, country?: string, limit = 12): string[] {
+  const s = q.trim().toLowerCase();
+  if (s.length < 2) return [];
+  const c = country?.trim().toUpperCase();
+  const score = new Map<string, number>();
+  for (const a of airports().list) {
+    if (!a.city || (c && a.country !== c)) continue;
+    const city = a.city.toLowerCase();
+    const sc = city === s ? 3 : city.startsWith(s) ? 2 : city.includes(s) ? 1 : 0;
+    if (!sc) continue;
+    const v = sc * 10 + (a.large ? 1 : 0);
+    if ((score.get(a.city) ?? 0) < v) score.set(a.city, v);
+  }
+  return [...score].sort((x, y) => y[1] - x[1] || x[0].localeCompare(y[0])).slice(0, limit).map(([n]) => n);
+}

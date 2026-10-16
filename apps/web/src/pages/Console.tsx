@@ -3,6 +3,8 @@
  * and the shared factor library. Creating a company creates its first
  * Super admin with a temporary password shown once.
  */
+import { CountrySelect } from '../components/CountrySelect';
+import { countryLabel } from '../lib/countries';
 import { useEffect, useRef, useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import { useApp } from '../App';
@@ -59,7 +61,7 @@ export function Console() {
           <thead><tr><th>Company</th><th>Plan</th><th>Subscription</th><th>Access until</th><th className="num">Facilities</th><th className="num">People</th><th className="num">Entries</th><th>Last login</th><th>Status</th><th /></tr></thead>
           <tbody>{list.map((c) => { const p = planOf(c.plan); const d = daysLeft(c.access_expiry); return (
             <tr key={c.id}>
-              <td><b>{c.name}</b><div className="sub">{c.country} · {c.gwp_set}</div></td>
+              <td><b>{c.name}</b><div className="sub">{countryLabel(c.country)} · {c.gwp_set}</div></td>
               <td><select className="input" style={{ height: 30 }} value={c.plan} onChange={(e) => update(c.id, { plan: e.target.value }, 'Plan changed')}>{plans.map((x) => <option key={x.code} value={x.code}>{x.name}</option>)}</select>
                 {p && <div className="sub" style={{ fontSize: 11.5, maxWidth: 220 }}>{planLine(p)}</div>}</td>
               <td className="small">{c.price != null ? <>{c.billing_currency} {c.price.toLocaleString('en')} / {c.billing_cycle === 'monthly' ? 'month' : 'year'}</> : <span className="muted">price not set</span>}{c.po_ref && <div className="muted">PO {c.po_ref}</div>}</td>
@@ -144,7 +146,7 @@ function NewCompany({ plans, onClose, onDone }: { plans: PlanLimits[]; onClose: 
         <h2>New company</h2>
         <label className="field"><span>Company name</span><input className="input" value={f.name} onChange={set('name')} /></label>
         <div className="row">
-          <label className="field" style={{ width: 110 }}><span>Country (ISO)</span><input className="input" maxLength={2} placeholder="GB, US, DE…" value={f.country} onChange={set('country')} /></label>
+          <label className="field" style={{ minWidth: 200 }}><span>Country</span><CountrySelect value={f.country} onChange={(c) => setF({ ...f, country: c })} /></label>
           <label className="field grow"><span>Plan</span><select className="input" value={f.plan} onChange={set('plan')}>{plans.map((p) => <option key={p.code} value={p.code}>{p.name}</option>)}</select></label>
           <label className="field grow"><span>Access until</span><input className="input" type="date" value={f.accessExpiry} onChange={set('accessExpiry')} /></label>
           <label className="field"><span>GWP</span><select className="input" value={f.gwpSet} onChange={set('gwpSet')}><option>AR4</option><option>AR5</option><option>AR6</option></select></label>

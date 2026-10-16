@@ -724,6 +724,7 @@ export const api = {
   wasteContractors: () => call<{ contractors: string[] }>('GET', '/api/waste/contractors'),
   surveyOptions: () => call<SurveyOptions>('GET', '/api/surveys/options'),
   tripOptions: (year: number) => call<TripOptions>('GET', `/api/trips/options?year=${year}`),
+  cities: (q: string, country?: string) => call<{ cities: string[] }>('GET', `/api/geo/cities?q=${encodeURIComponent(q)}${country ? `&country=${encodeURIComponent(country)}` : ''}`),
   airports: (q: string) => call<{ airports: AirportHit[] }>('GET', `/api/trips/airports?q=${encodeURIComponent(q)}`),
   flightDistance: (from: string, to: string) => call<{ from: string; to: string; gcKm: number; km: number; haul: string }>('GET', `/api/trips/distance?from=${from}&to=${to}`),
   home: (q: { year?: number; node?: string; group?: string }) => call<HomeData>('GET', `/api/home?${new URLSearchParams(Object.entries(q).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)]))}`),

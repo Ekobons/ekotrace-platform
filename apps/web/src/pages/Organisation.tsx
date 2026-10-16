@@ -3,6 +3,8 @@
  * main entity → sub-groups → facilities. Click a row to open its profile.
  * Super admin edits everything; an Admin edits inside their own sub-group.
  */
+import { CityInput, CountrySelect } from '../components/CountrySelect';
+import { countryLabel } from '../lib/countries';
 import { CompanyDetails } from '../components/CompanyDetails';
 import { Fragment, useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
 import { useSearchParams } from 'react-router-dom';
@@ -86,7 +88,7 @@ export function Organisation() {
             </div>
           </td>
           <td><span className={`ohchip ${n.kind}`}>{KIND_LABEL[n.kind]}</span> <span className="sub">{summary(n)}</span></td>
-          <td className="hide-sm">{fac ? [n.location, n.country].filter(Boolean).join(', ') || '—' : '—'}</td>
+          <td className="hide-sm">{fac ? [n.location, countryLabel(n.country)].filter(Boolean).join(', ') || '—' : '—'}</td>
           <td className="hide-sm">{fac ? n.manager_name ?? <span className="muted">no manager</span> : '—'}</td>
           <td>{fac ? <>{n.ownership_pct !== 100 && <span className="chip info">{n.ownership_pct}%</span>} {n.entries ? <span className="chip">{n.entries} entries</span> : <span className="chip grey">no data</span>}</> : '—'}</td>
           <td className="ohact">{fac
@@ -211,8 +213,8 @@ function NodeForm({ f, setF, kind, managers, disabled }: { f: F; setF: (f: F) =>
         <>
           <div className="row">
             <label className="field grow"><span>Facility type</span><select className="input" value={f.facilityType} onChange={set('facilityType')}><option value="">—</option>{TYPES.map((t) => <option key={t}>{t}</option>)}</select></label>
-            <label className="field grow"><span>Location (city / region)</span><input className="input" value={f.location} onChange={set('location')} /></label>
-            <label className="field" style={{ width: 80 }}><span>Country</span><input className="input" maxLength={2} value={f.country} onChange={set('country')} /></label>
+            <label className="field grow"><span>Country</span><CountrySelect value={f.country} onChange={(c) => setF({ ...f, country: c, gridRegion: c === f.country ? f.gridRegion : '' })} /></label>
+            <label className="field grow"><span>City / area</span><CityInput country={f.country} value={f.location} onChange={(v) => setF({ ...f, location: v })} /></label>
           </div>
           <div className="row">
             <label className="field grow"><span>Floor area m²</span><input className="input num" value={f.floorAreaM2} onChange={set('floorAreaM2')} /></label>
@@ -317,7 +319,7 @@ function GridRegionField({ country, value, onChange }: { country: string; value:
   return (
     <label className="field"><span>Grid region (electricity)</span>
       <select className="input" value={value} onChange={(e) => onChange(e.target.value)}>
-        <option value="">{country} national average</option>
+        <option value="">{countryLabel(country) || 'Country'} — national average</option>
         {here.map((r) => <option key={r.code} value={r.code}>{r.name} ({r.code}){r.factors?.some((x) => x.basis === 'scope2') ? '' : ' — no factor yet, national used'}</option>)}
       </select></label>
   );
