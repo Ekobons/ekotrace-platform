@@ -42,6 +42,9 @@ npm run db:seed        # loads gases, GWP values, DESNZ 2022–2026, IPCC coals 
 
 # 3. Your login (platform admin) — prints a temporary password once
 npm run admin:create -- --email you@ekobon.com --name "Your Name"
+# forgot which email, or the password?
+npm run admin:list                                   # platform admins on this server
+npm run admin:reset -- --email you@ekobon.com        # new temporary password, shown once; also unlocks the account
 
 # 4. Optional: demo company "BEEAH Group (demo)" with one login per role, 21 months of fuel data and a vehicle fleet
 npm run demo              # add "-- --reset" to delete the demo company and create it again

@@ -21,6 +21,8 @@
     "dev:api": "npm run dev -w @ekotrace/api",
     "dev:web": "npm run dev -w @ekotrace/web",
     "admin:create": "npm run admin:create -w @ekotrace/api --",
+    "admin:list": "npm run admin:list -w @ekotrace/api --",
+    "admin:reset": "npm run admin:reset -w @ekotrace/api --",
     "demo": "npm run demo -w @ekotrace/api --"
   },
   "devDependencies": {

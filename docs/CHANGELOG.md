@@ -2,6 +2,10 @@
 
 Newest first.
 
+## 2026-10-16 · Server commands for platform admin logins
+
+- `npm run admin:list` lists the platform admins on the server (email, name, MFA, last sign-in). `npm run admin:reset -- --email …` sets a new temporary password (shown once, must be changed at sign-in), unlocks the account, ends its sessions and records it in the audit log. MFA is left as it is. Server-only (`src/cli/admins.ts`); not reachable from the web.
+
 ## 2026-10-15 · Side menu: related pages under one entry, as tabs
 
 - Menu entries with `tabs` (`NavItem.tabs`): one entry for several pages; on those pages a tab bar (`.sectabs`) above the page switches between them. Routes are unchanged, so old links and notification links open the right tab. Each tab keeps its own roles; the entry shows only if a tab is allowed, takes the tab's name when only one is, and its count adds up the counts of its tabs.
