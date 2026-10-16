@@ -90,7 +90,7 @@ export function CarbonCredits() {
             <label className="row small" style={{ gap: 6 }}><input type="checkbox" checked={showCancelled} onChange={(e) => setShowCancelled(e.target.checked)} /> Show cancelled</label></div>
           {!lots.length ? <div className="empty" style={{ padding: 24 }}>No carbon credits recorded yet.{d.canEdit ? ' Record a purchase to start the register.' : ''}</div> : (
             <div className="scroll"><table className="t cctable">
-              <thead><tr><th>Project</th><th>Type</th><th className="num">Vintage</th><th className="num">Quantity</th><th>Use</th><th className="num">Price</th><th>Status</th><th>Labels</th><th /></tr></thead>
+              <thead><tr><th>Project</th><th>Type</th><th className="num">Vintage</th><th className="num">Quantity</th><th>Use</th><th className="num">Price</th><th className="ctr">Status</th><th>Labels</th><th /></tr></thead>
               <tbody>{lots.map((l) => (
                 <tr key={l.id} className={l.status === 'cancelled' ? 'dim' : ''}>
                   <td style={{ minWidth: 230 }}><b>{l.project}</b><div className="muted small">{l.registry}{l.project_id ? ` · ${l.project_id}` : ''}{l.methodology ? ` · ${l.methodology}` : ''}{l.country ? ` · ${l.country}` : ''}</div>
@@ -115,7 +115,7 @@ export function CarbonCredits() {
         <div className="card flush">
           {!d.retirements.length ? <div className="empty" style={{ padding: 24 }}>No retirements recorded.</div> : (
             <div className="scroll"><table className="t cctable">
-              <thead><tr><th>Retired</th><th>Project</th><th className="num">Tonnes</th><th>For year · purpose</th><th>Registry record</th><th>Status</th><th>Recorded / decided</th></tr></thead>
+              <thead><tr><th>Retired</th><th>Project</th><th className="num">Tonnes</th><th>For year · purpose</th><th>Registry record</th><th className="ctr">Status</th><th>Recorded / decided</th></tr></thead>
               <tbody>{d.retirements.map((r) => <RetRow key={r.id} r={r} d={d} note={note[r.id] ?? ''} setNote={(v) => setNote({ ...note, [r.id]: v })} act={act} />)}</tbody>
             </table></div>)}
         </div>

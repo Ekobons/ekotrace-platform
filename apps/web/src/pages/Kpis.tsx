@@ -218,7 +218,7 @@ function Perf({ d, c, home, freq, metric, setMetric, setFreq, name }: { d: Data;
         <span className="row" style={{ gap: 5 }}><i className="sw" style={{ background: 'var(--s2)' }} />At or below target</span><span className="row" style={{ gap: 5 }}><i className="sw" style={{ background: '#E3B25A' }} />Above target</span>
         <span className="row" style={{ gap: 5 }}><i className="sw" style={{ background: 'var(--line2)' }} />Data under 90% in</span><span className="row" style={{ gap: 5 }}><i style={{ width: 16, borderTop: '2.5px solid var(--fg)' }} />Target level</span>
         <span className="row" style={{ gap: 5 }}><i style={{ width: 16, borderTop: '2.5px dashed var(--fg)' }} />Target, no data yet</span>{rows.some((r) => r.partial) && <span>* part of the period so far; target scaled to the months with data</span>}</div>
-      <div className="scrollx"><table className="t"><thead><tr><th>Period</th><th className="num">Actual tCO₂e</th><th className="num">Target tCO₂e</th><th className="num">Variance</th><th>Status</th><th className="num">S1+2 actual / target</th><th className="num">S3 actual / target</th><th className="num">kg CO₂e / employee</th><th>Data in</th></tr></thead>
+      <div className="scrollx"><table className="t"><thead><tr><th>Period</th><th className="num">Actual tCO₂e</th><th className="num">Target tCO₂e</th><th className="num">Variance</th><th className="ctr">Status</th><th className="num">S1+2 actual / target</th><th className="num">S3 actual / target</th><th className="num">kg CO₂e / employee</th><th>Data in</th></tr></thead>
         <tbody>{rows.map((r) => {
           const val = act(r), t = tDone(r), dv = val !== null && t ? (val / t - 1) * 100 : null, f = r.partial ? r.done / r.ms.length : 1;
           return (

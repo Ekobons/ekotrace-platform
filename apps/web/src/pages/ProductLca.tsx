@@ -96,7 +96,7 @@ function ProductsTab({ d, open }: { d: LcaData; open: (id: string, t?: Tab) => v
     <div className="card">
       <h3 style={{ margin: '0 0 8px' }}>Products</h3>
       {!d.products.length ? <div className="muted">None yet.</div> : <div className="scroll"><table className="t">
-        <thead><tr><th>Product</th><th>From</th><th className="num">Footprint</th><th>Life-cycle stages</th><th className="num">Data quality</th><th>Status</th><th>Updated</th></tr></thead>
+        <thead><tr><th>Product</th><th>From</th><th className="num">Footprint</th><th>Life-cycle stages</th><th className="ctr">Data quality</th><th className="ctr">Status</th><th>Updated</th></tr></thead>
         <tbody>{d.products.map((p) => <tr key={p.id} className="click" onClick={() => open(p.id)}>
           <td><b>{p.name}</b><div className="muted small">{p.fu} · {d.boundaries[p.boundary]}</div></td>
           <td>{p.supplier ?? <span className="chip grey">own product</span>}</td>
@@ -202,7 +202,7 @@ function InputTable({ d, lines, can, act, edit, showStage }: { d: LcaData; lines
   if (!lines.length) return <div className="muted small">No inputs yet.</div>;
   const lib = new Map(d.library.map((f) => [f.id, f]));
   return <div className="scroll"><table className="t">
-    <thead><tr><th>Input</th>{showStage && <th>Stage</th>}<th className="num">Amount</th><th className="num">kg CO₂e / unit</th><th className="num">kg CO₂e</th><th className="num">Share</th><th>Data</th>{can && <th />}</tr></thead>
+    <thead><tr><th>Input</th>{showStage && <th className="ctr">Stage</th>}<th className="num">Amount</th><th className="num">kg CO₂e / unit</th><th className="num">kg CO₂e</th><th className="num">Share</th><th>Data</th>{can && <th />}</tr></thead>
     <tbody>{lines.map((l) => { const f = l.lci_id ? lib.get(l.lci_id) : null; return <tr key={l.id} style={l.counted ? undefined : { opacity: 0.55 }}>
       <td><b>{l.name}</b><div className="muted small">{f ? <>Library: {f.name}{f.indicative && <span className="chip warn" style={{ marginLeft: 4 }}>indicative</span>}</> : 'Own value'}{l.source ? ` · ${l.source}` : ''}</div></td>
       {showStage && <td><i className="sdot" style={{ background: STAGE_C[l.stage] }} /> {d.stages[l.stage]}</td>}
@@ -242,7 +242,7 @@ function Review({ d, x, act }: { d: LcaData; x: LcaDetail; act: Act }) {
       {p.status === 'published' && <span className="muted small">Published. Any change returns the model to draft; v{p.version} stays in use until the next version is published.</span>}
     </div>
     {x.publications.length > 0 && <><h3 style={{ margin: '8px 0 0' }}>Versions</h3><div className="scroll"><table className="t">
-      <thead><tr><th>Version</th><th className="num">Footprint</th><th>Stages</th><th className="num">Data quality</th><th>Verified by</th><th>Published</th></tr></thead>
+      <thead><tr><th className="ctr">Version</th><th className="num">Footprint</th><th>Stages</th><th className="ctr">Data quality</th><th>Verified by</th><th>Published</th></tr></thead>
       <tbody>{x.publications.map((v) => <tr key={v.id}><td>v{v.version}</td><td className="num">{kg(v.factor)} <span className="muted small">kg / {v.declared_unit}</span></td><td><StageBar stages={v.stages} w={110} /></td>
         <td className="num">{v.dq == null ? '—' : pct(v.dq)}</td><td>{v.verified_name}</td><td className="small">{v.published_name} · {d8(v.published_at)}</td></tr>)}</tbody></table></div></>}
   </>;
@@ -266,7 +266,7 @@ function Inventory({ d, x, act, setDrawer }: { d: LcaData; x: LcaDetail; act: Ac
         <select className="input" style={{ width: 180 }} value={stage} onChange={(e) => setStage(e.target.value)}><option value="">All stages</option>{Object.entries(d.stages).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select>
         {d.can.library && <button className="btn" onClick={() => setDrawer({ k: 'library', f: null })}>+ Company factor</button>}</div>
       <div className="scroll"><table className="t">
-        <thead><tr><th>Factor</th><th>Stage</th><th className="num">kg CO₂e</th><th>per</th><th>Source</th>{d.can.library && <th />}</tr></thead>
+        <thead><tr><th>Factor</th><th className="ctr">Stage</th><th className="num">kg CO₂e</th><th>per</th><th>Source</th>{d.can.library && <th />}</tr></thead>
         <tbody>{lib.map((f) => <tr key={f.id}><td><b>{f.name}</b> {f.indicative ? <span className="chip warn">indicative</span> : f.own ? <span className="chip info">company</span> : null}</td>
           <td><i className="sdot" style={{ background: STAGE_C[f.stage] }} /> {d.stages[f.stage]}</td><td className="num">{kg(f.co2e)}</td><td>{f.unit}</td><td className="small muted">{f.source}</td>
           {d.can.library && <td className="row" style={{ gap: 4, justifyContent: 'flex-end' }}>{f.own && <><button className="btn sm ghost" aria-label="Edit" onClick={() => setDrawer({ k: 'library', f })}><Icon name="edit" size={15} /></button>
@@ -306,7 +306,7 @@ function Published({ d, open }: { d: LcaData; open: (id: string, t?: Tab) => voi
     <h3 style={{ margin: '0 0 4px' }}>Published factors</h3>
     <div className="muted small" style={{ marginBottom: 8 }}>Draft → In review → Verified by a second person → Published (the version goes up). A supplier's product is used for purchases from that supplier; when the model changes it shows <span className="chip warn">republish</span> until the next version is published.</div>
     {!pub.length ? <div className="muted">Nothing published yet.</div> : <div className="scroll"><table className="t">
-      <thead><tr><th>Product</th><th className="num">Factor</th><th>Version</th><th>Verified</th><th>Published</th><th>Used for</th></tr></thead>
+      <thead><tr><th>Product</th><th className="num">Factor</th><th className="ctr">Version</th><th>Verified</th><th>Published</th><th>Used for</th></tr></thead>
       <tbody>{pub.map((p) => <tr key={p.id} className="click" onClick={() => open(p.id)}>
         <td><b>{p.name}</b><div className="muted small">{p.standard} · {d.boundaries[p.boundary]} · {p.ref_year}</div></td>
         <td className="num"><b>{kg(p.published_factor ?? 0)}</b> <span className="muted small">kg CO₂e / {p.declared_unit}</span></td>
@@ -432,7 +432,7 @@ function ImportDrawer({ x, d, onClose, onDone }: { x: LcaDetail; d: LcaData; onC
     <label className="field"><span>Or paste</span><textarea className="input mono" rows={8} value={text} onChange={(e) => { setText(e.target.value); setPrev(null); }} /></label>
     <label className="row small" style={{ gap: 6 }}><input type="checkbox" checked={replace} onChange={(e) => { setReplace(e.target.checked); setPrev(null); }} />Replace the current inventory ({x.inputs.length} inputs) instead of adding</label>
     {prev && <div className="scroll"><table className="t">
-      <thead><tr><th>Row</th><th>Input</th><th>Stage</th><th className="num">Amount</th><th className="num">kg CO₂e / unit</th><th>Check</th></tr></thead>
+      <thead><tr><th>Row</th><th>Input</th><th className="ctr">Stage</th><th className="num">Amount</th><th className="num">kg CO₂e / unit</th><th>Check</th></tr></thead>
       <tbody>{prev.lines.map((l) => <tr key={l.row}><td>{l.row}</td><td>{l.name}{l.lciName && <div className="muted small">library: {l.lciName}</div>}</td><td>{l.stage ? d.stages[l.stage] : '—'}</td>
         <td className="num">{l.qty ?? '—'} {l.unit}</td><td className="num">{l.co2e == null ? '—' : kg(l.co2e)}</td>
         <td>{l.problems.length ? <span className="chip bad">{l.problems.join('; ')}</span> : <span className="chip">ok</span>}</td></tr>)}</tbody></table></div>}

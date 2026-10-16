@@ -498,7 +498,7 @@ function EntryRows({ list, onAct, busy }: { list: ReviewEntry[]; onAct?: (e: Rev
   const [del, setDel] = useState<string | null>(null);
   return (
     <div className="scrollx"><table className="t">
-      <thead><tr><th>Month</th><th>What</th><th className="num">Quantity</th><th className="num">tCO₂e</th><th>Scope</th><th>Status</th><th>Entered by</th>{onAct && <th />}</tr></thead>
+      <thead><tr><th>Month</th><th>What</th><th className="num">Quantity</th><th className="num">tCO₂e</th><th className="ctr">Scope</th><th className="ctr">Status</th><th>Entered by</th>{onAct && <th />}</tr></thead>
       <tbody>{list.map((e) => (
         <tr key={e.id}>
           <td style={{ whiteSpace: 'nowrap' }}><b>{ml(e.period_start)}</b>{e.period_end.slice(0, 7) !== e.period_start.slice(0, 7) && <div className="muted small">to {ml(e.period_end)}</div>}</td>

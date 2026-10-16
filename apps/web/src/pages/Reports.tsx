@@ -146,7 +146,7 @@ function Inventory({ ctx, exportOk, reload, go }: { ctx: RepCtx; exportOk: boole
             <button className="btn sm" onClick={() => download(fname('Emission factors'), factorsCsv(lines, mb))}>Export emission factors</button>
             <button className="btn sm" onClick={() => download(fname('Entries'), mrvCsv(lines, mb))}>Export entries</button></div> : <span className="chip c-n">Export: Starter plan and above</span>}
         </div>
-        <div className="scrollx"><table className="t"><thead><tr><th>Code</th><th>Category</th><th className="num">tCO₂e</th><th>Share</th><th>Status</th><th>Exclusion justification / detail</th></tr></thead>
+        <div className="scrollx"><table className="t"><thead><tr><th>Code</th><th>Category</th><th className="num">tCO₂e</th><th>Share</th><th className="ctr">Status</th><th>Exclusion justification / detail</th></tr></thead>
           <tbody>{[1, 2, 3].map((sc) => [
             <tr key={`s${sc}`} className="scoperow"><td colSpan={6}><b>Scope {sc}</b> · {fmt(inv.s[sc - 1]!, 1)} tCO₂e · {Math.round((inv.s[sc - 1]! / tot) * 100)}%</td></tr>,
             ...GHG_CATS.filter((g) => g[1] === sc).map(([code, , name, desc]) => {
@@ -239,7 +239,7 @@ function Quality({ ctx, q, year, reload }: { ctx: RepCtx; q: { checks: RepCheck[
       <section className="card tacard">
         <div><h2>Quality controls</h2><div className="muted small">Automatic checks on {ctx.label}, {year}. Fix the data, or justify why it is right.</div></div>
         {!q ? <div className="muted">Loading…</div> : (
-          <div className="scrollx"><table className="t"><thead><tr><th>Control</th><th>Area</th><th>Status</th><th>Indicator</th><th /></tr></thead>
+          <div className="scrollx"><table className="t"><thead><tr><th>Control</th><th>Area</th><th className="ctr">Status</th><th>Indicator</th><th /></tr></thead>
             <tbody>{q.checks.map((k) => { const s = !k.n ? ['OK', 'c-ok'] : k.justified ? ['Justified', 'c-info'] : ['To check', 'c-warn']; return [
               <tr key={k.id}><td><b>{k.name}</b>{k.justified && k.n > 0 && <div className="muted" style={{ fontSize: 12 }}>“{k.justified.text}” — {k.justified.by}</div>}</td><td className="muted small">{k.area}</td>
                 <td><span className={`chip ${s[1]}`}>{s[0]}</span></td><td className="small">{k.n} warning{k.n === 1 ? '' : 's'}</td>
@@ -330,7 +330,7 @@ function Versions({ ctx, reload }: { ctx: RepCtx; reload: () => void }) {
               try { await api.saveVersion({ name: name.trim(), label: ctx.label, period: ctx.period, scope2: ctx.mb ? 'market' : 'location', s: inv.s, byCode: Object.fromEntries(Object.entries(inv.byCode).map(([k, val]) => [k, Math.round(val * 1000) / 1000])) }); setName(''); toast('Version saved'); reload(); }
               catch (e) { toast((e as Error).message); }
             }}>Save current version</button></>}</div>
-        <div className="scrollx"><table className="t"><thead><tr><th>Version</th><th>Scope</th><th className="num">S1</th><th className="num">S2</th><th className="num">S3</th><th className="num">Total</th><th>Saved</th><th /></tr></thead>
+        <div className="scrollx"><table className="t"><thead><tr><th className="ctr">Version</th><th className="ctr">Scope</th><th className="num">S1</th><th className="num">S2</th><th className="num">S3</th><th className="num">Total</th><th>Saved</th><th /></tr></thead>
           <tbody>{st.versions.map((x) => (
             <tr key={x.id} className={x.id === cmp ? 'sel' : ''}><td><b>{x.name}</b></td><td className="small">{x.label} · {x.period} · {x.scope2}-based</td><td className="num">{fmt0(x.s1)}</td><td className="num">{fmt0(x.s2)}</td><td className="num">{fmt0(x.s3)}</td><td className="num"><b>{fmt0(x.s1 + x.s2 + x.s3)}</b></td>
               <td className="muted small">{new Date(x.at).toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })} · {x.by}</td>
@@ -340,7 +340,7 @@ function Versions({ ctx, reload }: { ctx: RepCtx; reload: () => void }) {
       </section>
       {vc && (
         <section className="card tacard"><h2>{vc.name} vs now</h2>
-          <div className="scrollx"><table className="t"><thead><tr><th>Category</th><th className="num">Version</th><th className="num">Now</th><th className="num">Change</th></tr></thead>
+          <div className="scrollx"><table className="t"><thead><tr><th>Category</th><th className="ctr">Version</th><th className="num">Now</th><th className="num">Change</th></tr></thead>
             <tbody>{[...new Set([...Object.keys(vc.byCode), ...Object.keys(inv.byCode)])].sort((a, b) => a.localeCompare(b, 'en', { numeric: true })).map((k) => { const a = vc.byCode[k] ?? 0, b = inv.byCode[k] ?? 0, dv = b - a; return (
               <tr key={k}><td>{ghgName(k)}</td><td className="num">{fmt(a, 1)}</td><td className="num">{fmt(b, 1)}</td><td className="num" style={{ color: Math.abs(dv) < 0.05 ? 'var(--muted)' : dv > 0 ? 'var(--bad)' : 'var(--ok)', fontWeight: 600 }}>{Math.abs(dv) < 0.05 ? '—' : `${dv > 0 ? '+' : '−'}${fmt(Math.abs(dv), 1)}`}</td></tr>); })}
               <tr className="totrow"><td><b>Total</b></td><td className="num"><b>{fmt(vc.s1 + vc.s2 + vc.s3, 1)}</b></td><td className="num"><b>{fmt(inv.tot, 1)}</b></td><td className="num"><b>{fmt(inv.tot - (vc.s1 + vc.s2 + vc.s3), 1)}</b></td></tr></tbody></table></div>

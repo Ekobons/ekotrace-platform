@@ -136,7 +136,7 @@ function SubEditor({ cat, sub, units, tenantName, hidden, run }: {
         </div>
         <div className="scroll" style={{ maxHeight: 460 }}>
           <table className="t">
-            <thead><tr><th>Name</th><th>Move to</th><th>Default unit</th><th>Status</th>{tenantName && <th>Shown</th>}<th /></tr></thead>
+            <thead><tr><th>Name</th><th>Move to</th><th>Default unit</th><th className="ctr">Status</th>{tenantName && <th>Shown</th>}<th /></tr></thead>
             <tbody>{sub.items.map((i) => <ItemRow key={i.id} i={i} cat={cat} units={units} shown={!hidden.items.has(i.id)} tenantName={tenantName} run={run} />)}</tbody>
           </table>
         </div>

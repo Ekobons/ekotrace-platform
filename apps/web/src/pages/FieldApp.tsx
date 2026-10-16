@@ -159,7 +159,7 @@ function Scans({ fac, ym }: { fac: string; ym: { y: number; m: number } }) {
       <div className="row"><h2>Scans · {MN[ym.m - 1]} {ym.y} · {s?.length ?? 0}</h2><span className="grow" />{flagged > 0 && <span className="chip warn">{flagged} with checks to look at</span>}</div>
       {!s ? <div className="muted">Loading…</div> : !s.length ? <div className="muted">No scans this month.</div> : (
         <div className="scrollx"><table className="t">
-          <thead><tr><th>When</th><th>Bin</th><th>Type</th><th className="num">kg</th><th>Manifest</th><th>Checks</th><th>By</th><th>Status</th><th /></tr></thead>
+          <thead><tr><th>When</th><th>Bin</th><th>Type</th><th className="num">kg</th><th>Manifest</th><th>Checks</th><th>By</th><th className="ctr">Status</th><th /></tr></thead>
           <tbody>{s.map((x) => (
             <tr key={x.id} style={x.status === 'void' ? { opacity: 0.5 } : undefined}>
               <td className="small nowrap">{new Date(x.at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</td>

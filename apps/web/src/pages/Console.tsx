@@ -58,7 +58,7 @@ export function Console() {
       ) : (
       <div className="card flush"><div className="scrollx">
         <table className="t">
-          <thead><tr><th>Company</th><th>Plan</th><th>Subscription</th><th>Access until</th><th className="num">Facilities</th><th className="num">People</th><th className="num">Entries</th><th>Last login</th><th>Status</th><th /></tr></thead>
+          <thead><tr><th>Company</th><th>Plan</th><th>Subscription</th><th>Access until</th><th className="num">Facilities</th><th className="num">People</th><th className="num">Entries</th><th>Last login</th><th className="ctr">Status</th><th /></tr></thead>
           <tbody>{list.map((c) => { const p = planOf(c.plan); const d = daysLeft(c.access_expiry); return (
             <tr key={c.id}>
               <td><b>{c.name}</b><div className="sub">{countryLabel(c.country)} · {c.gwp_set}</div></td>

@@ -99,7 +99,7 @@ export function CollectionCalendar() {
       ) : view === 'grid' ? <Grid rows={rows} year={year} today={d.today} onOpen={setOpenKey} /> : (
         <div className="card flush"><div className="scroll"><table className="t caltable">
           <thead><tr><th style={{ width: 28 }}>{chaseable.length > 0 && <input type="checkbox" aria-label="Select all" checked={sel.size > 0 && chaseable.every((o) => sel.has(o.key))} onChange={(e) => setSel(e.target.checked ? new Set(chaseable.map((o) => o.key)) : new Set())} />}</th>
-            <th>Due</th><th>Facility</th><th>Metric</th><th>Period</th><th>Status</th><th>Responsible</th><th className="num">Data in</th><th>Reminders</th></tr></thead>
+            <th>Due</th><th>Facility</th><th>Metric</th><th>Period</th><th className="ctr">Status</th><th>Responsible</th><th className="num">Data in</th><th>Reminders</th></tr></thead>
           <tbody>{rows.map((o) => { const [t, c] = stateOf(o); return (
             <tr key={o.key} className={`click${openKey === o.key ? ' sel' : ''}`} onClick={() => setOpenKey(o.key)}>
               <td onClick={(e) => e.stopPropagation()}>{o.canChase && o.timing !== 'done' && <input type="checkbox" aria-label="Select" checked={sel.has(o.key)} onChange={(e) => { const n = new Set(sel); if (e.target.checked) n.add(o.key); else n.delete(o.key); setSel(n); }} />}</td>

@@ -65,7 +65,7 @@ export function Restatements() {
       </div>
       {!d.items.length ? <div className="muted small">No changes recorded for {d.baseYear}.</div> : (
         <div className="scroll"><table className="t rstable">
-          <thead><tr><th>Change</th><th>Trigger</th><th>Facility</th><th className="num">S1</th><th className="num">S2</th><th className="num">S3</th><th className="num">% of base</th><th>Status</th><th>Recorded / decided</th></tr></thead>
+          <thead><tr><th>Change</th><th>Trigger</th><th>Facility</th><th className="num">S1</th><th className="num">S2</th><th className="num">S3</th><th className="num">% of base</th><th className="ctr">Status</th><th>Recorded / decided</th></tr></thead>
           <tbody>{d.items.map((x) => { const [c, t] = ST(x); return (
             <tr key={x.id}>
               <td style={{ minWidth: 220 }}><b>{x.title}</b>{x.description && <div className="muted small">{x.description}</div>}{x.document && <div className="small"><Icon name="doc" /> {x.document}</div>}

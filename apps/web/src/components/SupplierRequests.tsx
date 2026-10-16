@@ -59,7 +59,7 @@ export function SupplierRequests() {
       <div className="card flush">
         {!d.requests.length ? <div className="empty" style={{ padding: 24 }}>No supplier asked for {year} yet.{d.suggest.length ? ' Start with the largest ones below.' : ''}</div> : (
           <div className="scroll"><table className="t sptable">
-            <thead><tr><th>Supplier</th><th>Contact</th><th>Status</th><th>Progress</th><th className="num">Your purchases tCO₂e</th><th className="num">Their figure for you</th><th>Due</th><th /></tr></thead>
+            <thead><tr><th>Supplier</th><th>Contact</th><th className="ctr">Status</th><th>Progress</th><th className="num">Your purchases tCO₂e</th><th className="num">Their figure for you</th><th>Due</th><th /></tr></thead>
             <tbody>{d.requests.map((r) => { const [c, t] = SP_STATUS[r.status]; return (
               <tr key={r.id} className={r.revoked ? 'dim' : ''}>
                 <td style={{ minWidth: 190 }}><button className="linkbtn" style={{ textAlign: "left" }} onClick={() => setOpen(r.id)}><b>{r.supplier}</b></button>{r.country && <span className="muted small"> · {countryLabel(r.country)}</span>}</td>

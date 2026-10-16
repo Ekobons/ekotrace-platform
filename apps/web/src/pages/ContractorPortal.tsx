@@ -125,7 +125,7 @@ function Collections({ me, reload, toast }: { me: Me; reload: () => Promise<void
       <div className="row"><span className="muted small">The weighbridge weight replaces the site's own estimates for that bin in the month.</span><span className="grow" /><button className="btn p" disabled={!ok || busy} onClick={() => void save()}>{busy ? 'Saving…' : 'Record collection'}</button></div>
     </section>
     <section className="card"><h2>Collections · last 120 days</h2>
-      {!me.collections.length ? <div className="muted">None yet.</div> : <table className="t"><thead><tr><th>Date</th><th>Site · bin</th><th className="num">kg</th><th>Manifest</th><th>Vehicle</th><th>Status</th><th /></tr></thead>
+      {!me.collections.length ? <div className="muted">None yet.</div> : <table className="t"><thead><tr><th>Date</th><th>Site · bin</th><th className="num">kg</th><th>Manifest</th><th>Vehicle</th><th className="ctr">Status</th><th /></tr></thead>
         <tbody>{me.collections.map((c) => <tr key={c.id}><td className="small">{new Date(c.at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</td><td>{c.facility}<div className="muted small">{c.bin}</div></td>
           <td className="num"><b>{fmt(c.kg)}</b></td><td className="small mono">{c.manifest ?? ''}</td><td className="small">{c.vehicle ?? ''}</td>
           <td><span className={`chip ${c.status === 'rolled' ? '' : 'info'}`}>{c.status === 'rolled' ? 'In the site’s figures' : c.byYou ? 'Received' : 'Recorded by the site'}</span></td>

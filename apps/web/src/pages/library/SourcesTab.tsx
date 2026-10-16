@@ -55,7 +55,7 @@ export function SourcesTab() {
       <div className="card flush">
         <div style={{ padding: '14px 16px 6px' }}><h2>Sources</h2></div>
         <table className="t">
-          <thead><tr><th>Code</th><th>Title</th><th>Version</th><th>GWP set</th><th>Loaded</th></tr></thead>
+          <thead><tr><th>Code</th><th>Title</th><th className="ctr">Version</th><th>GWP set</th><th>Loaded</th></tr></thead>
           <tbody>{sources.map((s) => (
             <tr key={s.id}><td className="mono">{s.code}</td><td>{s.url ? <a href={s.url} target="_blank" rel="noreferrer">{s.title}</a> : s.title}</td><td>{s.version ?? '—'}</td><td>{s.gwp_set ?? '—'}</td><td>{s.imported_at.slice(0, 10)}</td></tr>
           ))}</tbody>

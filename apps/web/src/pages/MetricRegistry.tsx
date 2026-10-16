@@ -93,7 +93,7 @@ export function MetricRegistry() {
             <span className="muted small">{rows.length} metric{rows.length === 1 ? '' : 's'}</span>
           </div>
           <div className="scroll"><table className="t mtable">
-            <thead><tr><th>ID</th><th>Metric</th><th>Scope · category</th><th>Unit</th><th>Frequency · due</th><th>Owner</th><th>Applies to</th><th>Evidence</th><th className="num">Check</th><th className="num">Version</th></tr></thead>
+            <thead><tr><th>ID</th><th>Metric</th><th>Scope · category</th><th>Unit</th><th>Frequency · due</th><th>Owner</th><th>Applies to</th><th>Evidence</th><th className="num">Check</th><th className="ctr">Version</th></tr></thead>
             <tbody>{rows.map((m) => (
               <tr key={m.id} className={`click${m.active ? '' : ' dim'}${openId === m.id ? ' sel' : ''}`} onClick={() => set('metric', m.id)}>
                 <td className="mono nowrap"><b>{m.code}</b></td>

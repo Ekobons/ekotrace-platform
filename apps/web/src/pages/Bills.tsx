@@ -170,7 +170,7 @@ export function BillReview({ id, onChanged, onClose, category }: { id: string; o
 
         {err && <div className="note bad">{err}</div>}
         {b.entries.length > 0 && (
-          <table className="t"><thead><tr><th>Entries from this meter in the period</th><th className="num">Quantity</th><th className="num">tCO₂e</th><th>Status</th></tr></thead>
+          <table className="t"><thead><tr><th>Entries from this meter in the period</th><th className="num">Quantity</th><th className="num">tCO₂e</th><th className="ctr">Status</th></tr></thead>
             <tbody>{b.entries.map((e) => <tr key={e.id}><td className="mono">{e.period_start.slice(0, 7)}</td><td className="num">{num(Number(e.quantity))} {unitLabel(e.unit)}</td>
               <td className="num">{tco2e(Number(e.co2e_scope2) || Number(e.co2e_direct))}</td><td><span className="chip grey">{e.status}</span></td></tr>)}</tbody></table>
         )}

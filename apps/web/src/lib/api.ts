@@ -944,7 +944,7 @@ export async function download(path: string, filename: string) {
 }
 
 /** Unit code → short label for tables ("kWh_e" → "kWh", "TRh" → "TRh", "kWh_gcv" → "kWh gross"). */
-const UNIT_NAMES: Record<string, string> = { m3: 'm³', gal_uk: 'imperial gallons', kgal_uk: '000 imperial gallons', ML: 'megalitres', kL: 'kL', pkm: 'passenger-km' };
+const UNIT_NAMES: Record<string, string> = { m3: 'm³', gal_uk: 'imperial gallons', kgal_uk: '000 imperial gallons', ML: 'megalitres', kL: 'kL', pkm: 'passenger-km', room_night: 'room-nights', sqm_hour: 'm²-hours', fte_h: 'FTE hours', tkm: 't-km', ton_us: 'short tons', gal_us: 'US gallons' };
 export function unitLabel(code: string): string {
   if (UNIT_NAMES[code]) return UNIT_NAMES[code];
   return code.replace(/_e$/, '').replace(/_th$/, ' heat').replace(/_c$/, ' cooling').replace(/_gcv$/, ' gross');

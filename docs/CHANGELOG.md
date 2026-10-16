@@ -2,6 +2,12 @@
 
 Newest first.
 
+## 2026-10-17 · Table alignment everywhere
+
+- Number headings now sit over their numbers: `.t th` (left) was overriding `.num` on headings, so every number column had its heading on the left and its values on the right. Number headings and cells are right-aligned; a number column's heading follows its cells even without a class (CSS `:has`).
+- Short tag columns (Scope, Status, Stage, Version, Data quality) are centred (`th.ctr` centres its column). Rows are centred vertically; headings no longer wrap.
+- Entries & results: period shown as "Sep 2026" on one line; unit names (room-nights, m²-hours, t-km, US gallons…) instead of codes.
+
 ## 2026-10-16 · Countries picked by name; city suggestions
 
 - **Country lists instead of typed codes** (`components/CountrySelect`, `lib/countries.ts`, 248 countries from the OurAirports list; common Gulf and partner countries first; the code is still what is stored): facility profile, new company (platform console), add supplier and supplier profile, supplier portal ("Your company"), fuel prices and the factor form (with "All countries (global)"). Earlier answers typed as a name (e.g. "India") are turned into the code when opened.

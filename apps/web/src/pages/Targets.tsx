@@ -144,7 +144,7 @@ function Register({ C }: { C: Ctx }) {
       </div>
       <section className="card tacard">
         <div className="row"><h2>Objectives</h2><span className="grow" />{t.canTarget && <button className="btn sm" onClick={() => setObj({ name: '', scope: 'Scope 3', year: String(x.T.year), pct: '30', growth: String(x.growth) })}>+ Add objective</button>}</div>
-        <div className="scrollx"><table className="t"><thead><tr><th>Name</th><th>Scope</th><th>Base</th><th>Target year</th><th className="num">Reduction</th><th className="num">Growth / yr</th><th className="num">Target level</th><th>Status</th><th /></tr></thead>
+        <div className="scrollx"><table className="t"><thead><tr><th>Name</th><th className="ctr">Scope</th><th>Base</th><th>Target year</th><th className="num">Reduction</th><th className="num">Growth / yr</th><th className="num">Target level</th><th className="ctr">Status</th><th /></tr></thead>
           <tbody>{objs.map((o) => (
             <tr key={o.id}><td><b>{o.name}</b>{o.main && <> <span className="chip c-info" style={{ fontSize: 10 }}>main</span></>}</td><td>{o.scope}</td><td>{x.by}</td><td>{o.year}</td><td className="num">−{fmt(o.pct, 0)}%</td><td className="num">{fmt(o.growth, 0)}%</td>
               <td className="num">{fmt0(baseOf(o.scope) * (1 - o.pct / 100))} t</td><td><span className={`chip ${o.main ? 'c-ok' : 'c-n'}`}>{o.main ? 'Set' : 'Internal'}</span></td>
@@ -165,7 +165,7 @@ function Register({ C }: { C: Ctx }) {
       </section>
       <section className="card tacard">
         <div className="row"><h2>Action portfolio</h2><span className="grow" /><button className="btn sm ghost" onClick={() => go('port')}>All actions →</button></div>
-        <div className="scrollx"><table className="t"><thead><tr><th>Action</th><th>Owner</th><th className="num">Abatement</th><th className="num">Cost</th><th className="num">Payback</th><th>Status</th></tr></thead>
+        <div className="scrollx"><table className="t"><thead><tr><th>Action</th><th>Owner</th><th className="num">Abatement</th><th className="num">Cost</th><th className="num">Payback</th><th className="ctr">Status</th></tr></thead>
           <tbody>{[...acts].sort((a, b) => b.abate - a.abate).slice(0, 6).map((a) => (
             <tr key={a.id}><td><b>{a.name}</b></td><td>{a.owner || '—'}</td><td className="num">{fmt0(a.abate)} t</td><td className="num">{money(a.capex, true)}</td><td className="num">{a.saving > 0 ? `${fmt(a.capex / a.saving, 1)} yrs` : '—'}</td><td><span className={`chip ${STATUS_CHIP[a.status]}`}>{a.status}</span></td></tr>))}
             {!acts.length && <tr><td colSpan={6} className="muted">No actions yet — pick them in Action portfolio.</td></tr>}</tbody></table></div>
@@ -231,7 +231,7 @@ function TargetsPaths({ C }: { C: Ctx }) {
       <div className="tagrid2 even">{card('Scope 1 + 2', x.base12, t12, p12, x.y12, x.T.s12, 'var(--s2)')}{card('Scope 3', x.base3, t3, p3, x.y3, x.T.s3, 'var(--s3)')}</div>
       <section className="card tacard">
         <h2>Scope 1+2 by facility</h2>
-        <div className="scrollx"><table className="t"><thead><tr><th>Facility</th><th className="num">{x.by} base</th><th className="num">{x.cy} path</th><th className="num">{x.cy} projected</th><th className="num">Gap</th><th>Status</th></tr></thead>
+        <div className="scrollx"><table className="t"><thead><tr><th>Facility</th><th className="num">{x.by} base</th><th className="num">{x.cy} path</th><th className="num">{x.cy} projected</th><th className="num">Gap</th><th className="ctr">Status</th></tr></thead>
           <tbody>{rows.map((r) => { const [l, c] = st(r.P, r.tg), gap = r.P - r.tg; return (
             <tr key={r.fc.id}><td><b>{r.fc.name}</b></td><td className="num">{fmt0(r.B)}</td><td className="num">{fmt0(r.tg)}</td><td className="num"><b>{fmt0(r.P)}</b></td>
               <td className="num" style={{ color: gap > 0 ? 'var(--bad)' : 'var(--ok)', fontWeight: 600 }}>{gap > 0 ? '+' : '−'}{fmt0(Math.abs(gap))} t</td><td>{r.B ? <span className={`chip ${c}`}>{l}</span> : <span className="muted">no base year data</span>}</td></tr>); })}</tbody></table></div>
@@ -420,7 +420,7 @@ function Portfolio({ C }: { C: Ctx }) {
           <select className="input" style={{ width: 'auto' }} aria-label="Category" value={cf} onChange={(e) => setCf(e.target.value)}>{['All', ...ACT_CATS].map((c) => <option key={c}>{c}</option>)}</select>
           <span className="grow" />{t.canAct && <button className="btn" onClick={() => C.open('new')}>+ Custom action</button>}
         </div>
-        <div className="scrollx"><table className="t tatable"><thead><tr><th>Category</th><th>Reduction action</th><th>Scopes</th><th className="num">Reduction t/yr</th><th>Period</th><th className="num">Metric value</th><th>Status</th><th /></tr></thead>
+        <div className="scrollx"><table className="t tatable"><thead><tr><th>Category</th><th>Reduction action</th><th>Scopes</th><th className="num">Reduction t/yr</th><th>Period</th><th className="num">Metric value</th><th className="ctr">Status</th><th /></tr></thead>
           <tbody>
             {lib.map(({ it, ex, abt }) => { const on = !!ex?.scenarioIds.includes(sid); return (
               <tr key={it.code} className={ex?.excluded ? 'excl' : ''}><td><span className="chip c-n">{it.cat}</span></td><td><b>{it.name}</b><div className="muted" style={{ fontSize: 12 }}>KPI: {ex?.kpi || it.kpi}</div></td><td className="nowrap">{chips(it.scopes)}</td>
@@ -554,7 +554,7 @@ function ActionsRoi({ C }: { C: Ctx }) {
           }}</Fit>
         </section>)}
       <section className="card tacard">
-        <div className="scrollx"><table className="t"><thead><tr><th>Action</th><th>Category</th><th className="num">Capex</th><th className="num">Saving / yr</th><th className="num">t / yr</th><th className="num">Payback</th><th className="num">{t.currency} / t</th><th>Status</th><th /></tr></thead>
+        <div className="scrollx"><table className="t"><thead><tr><th>Action</th><th>Category</th><th className="num">Capex</th><th className="num">Saving / yr</th><th className="num">t / yr</th><th className="num">Payback</th><th className="num">{t.currency} / t</th><th className="ctr">Status</th><th /></tr></thead>
           <tbody>{acts.map((a) => { const cv = cpt(a); return (
             <tr key={a.id} className={a.excluded ? 'excl' : ''}><td><b>{a.name}</b><div className="muted" style={{ fontSize: 12 }}>{C.facName(a.facilityId)}{a.owner ? ` · ${a.owner}` : ''}</div></td><td>{a.cat}</td><td className="num">{fmt0(a.capex)}</td><td className="num">{fmt0(a.saving)}</td><td className="num"><b>{fmt0(a.abate)}</b></td>
               <td className="num">{a.saving > 0 ? `${fmt(a.capex / a.saving, 1)} yrs` : '—'}</td><td className="num" style={{ color: cv !== null && cv < 0 ? 'var(--ok)' : undefined, fontWeight: 600 }}>{cv === null ? '—' : fmt0(cv)}</td>
@@ -642,7 +642,7 @@ function Delivery({ C }: { C: Ctx }) {
   const as = acts.filter((a) => a.scenarioIds.includes(sid) && !a.excluded).sort((a, b) => a.start - b.start);
   return (
     <section className="card tacard"><h2>Delivery tracking</h2>
-      <div className="scrollx"><table className="t"><thead><tr><th>#</th><th>Action</th><th>Period</th><th className="num">Planned t/yr</th><th className="num">Expected by {x.cy}</th><th>Owner</th><th>Status</th><th /></tr></thead>
+      <div className="scrollx"><table className="t"><thead><tr><th>#</th><th>Action</th><th>Period</th><th className="num">Planned t/yr</th><th className="num">Expected by {x.cy}</th><th>Owner</th><th className="ctr">Status</th><th /></tr></thead>
         <tbody>{as.map((a, i) => (
           <tr key={a.id}><td>{i + 1}</td><td><b>{a.name}</b><div className="muted" style={{ fontSize: 12 }}>{a.cat}</div></td><td>{a.start}–{a.end}</td><td className="num">{fmt0(a.abate)}</td><td className="num">{fmt0(a.abate * frac(a, x.cy))}</td><td>{a.owner || '—'}</td>
             <td><span className={`chip ${STATUS_CHIP[a.status]}`}>{a.status}</span></td><td>{t.canAct && <button className="btn sm ghost" onClick={() => C.open(a.id)}>Edit</button>}</td></tr>))}

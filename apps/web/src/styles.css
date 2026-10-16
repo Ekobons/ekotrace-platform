@@ -1378,3 +1378,44 @@ ul.plain { list-style: none; margin: 0; padding: 0; }
 @media (max-width: 700px) { .sectabs { margin: 10px 12px 0; max-width: calc(100% - 24px); } .sectabs .sectl { display: none; } }
 .howlink { display: inline-block; margin-top: 2px; border: 0; background: none; padding: 0; font: inherit; font-size: 11.5px; font-weight: 600; color: var(--primary); cursor: pointer; }
 .howlink:hover { text-decoration: underline; }
+
+/* Table alignment, everywhere: text left, numbers right with their heading right, short tags centred, rows centred vertically.
+   The heading of a number column follows its cells even when the heading has no class; a "ctr" heading centres its column. */
+.t th.num, .t td.num { text-align: right; }
+.t th.ctr, .t td.ctr { text-align: center; }
+.t td { vertical-align: middle; }
+.t th { white-space: nowrap; }
+.t td.top, .cctable td { vertical-align: top; }
+.t td.ctr .chip + .chip { margin-left: 4px; }
+.t:has(> tbody > tr > td:nth-child(1).num) > thead > tr > th:nth-child(1) { text-align: right; }
+.t:has(> thead > tr > th:nth-child(1).ctr) > tbody > tr > td:nth-child(1) { text-align: center; }
+.t:has(> tbody > tr > td:nth-child(2).num) > thead > tr > th:nth-child(2) { text-align: right; }
+.t:has(> thead > tr > th:nth-child(2).ctr) > tbody > tr > td:nth-child(2) { text-align: center; }
+.t:has(> tbody > tr > td:nth-child(3).num) > thead > tr > th:nth-child(3) { text-align: right; }
+.t:has(> thead > tr > th:nth-child(3).ctr) > tbody > tr > td:nth-child(3) { text-align: center; }
+.t:has(> tbody > tr > td:nth-child(4).num) > thead > tr > th:nth-child(4) { text-align: right; }
+.t:has(> thead > tr > th:nth-child(4).ctr) > tbody > tr > td:nth-child(4) { text-align: center; }
+.t:has(> tbody > tr > td:nth-child(5).num) > thead > tr > th:nth-child(5) { text-align: right; }
+.t:has(> thead > tr > th:nth-child(5).ctr) > tbody > tr > td:nth-child(5) { text-align: center; }
+.t:has(> tbody > tr > td:nth-child(6).num) > thead > tr > th:nth-child(6) { text-align: right; }
+.t:has(> thead > tr > th:nth-child(6).ctr) > tbody > tr > td:nth-child(6) { text-align: center; }
+.t:has(> tbody > tr > td:nth-child(7).num) > thead > tr > th:nth-child(7) { text-align: right; }
+.t:has(> thead > tr > th:nth-child(7).ctr) > tbody > tr > td:nth-child(7) { text-align: center; }
+.t:has(> tbody > tr > td:nth-child(8).num) > thead > tr > th:nth-child(8) { text-align: right; }
+.t:has(> thead > tr > th:nth-child(8).ctr) > tbody > tr > td:nth-child(8) { text-align: center; }
+.t:has(> tbody > tr > td:nth-child(9).num) > thead > tr > th:nth-child(9) { text-align: right; }
+.t:has(> thead > tr > th:nth-child(9).ctr) > tbody > tr > td:nth-child(9) { text-align: center; }
+.t:has(> tbody > tr > td:nth-child(10).num) > thead > tr > th:nth-child(10) { text-align: right; }
+.t:has(> thead > tr > th:nth-child(10).ctr) > tbody > tr > td:nth-child(10) { text-align: center; }
+.t:has(> tbody > tr > td:nth-child(11).num) > thead > tr > th:nth-child(11) { text-align: right; }
+.t:has(> thead > tr > th:nth-child(11).ctr) > tbody > tr > td:nth-child(11) { text-align: center; }
+.t:has(> tbody > tr > td:nth-child(12).num) > thead > tr > th:nth-child(12) { text-align: right; }
+.t:has(> thead > tr > th:nth-child(12).ctr) > tbody > tr > td:nth-child(12) { text-align: center; }
+.t:has(> tbody > tr > td:nth-child(13).num) > thead > tr > th:nth-child(13) { text-align: right; }
+.t:has(> thead > tr > th:nth-child(13).ctr) > tbody > tr > td:nth-child(13) { text-align: center; }
+.t:has(> tbody > tr > td:nth-child(14).num) > thead > tr > th:nth-child(14) { text-align: right; }
+.t:has(> thead > tr > th:nth-child(14).ctr) > tbody > tr > td:nth-child(14) { text-align: center; }
+.t:has(> tbody > tr > td:nth-child(15).num) > thead > tr > th:nth-child(15) { text-align: right; }
+.t:has(> thead > tr > th:nth-child(15).ctr) > tbody > tr > td:nth-child(15) { text-align: center; }
+.t:has(> tbody > tr > td:nth-child(16).num) > thead > tr > th:nth-child(16) { text-align: right; }
+.t:has(> thead > tr > th:nth-child(16).ctr) > tbody > tr > td:nth-child(16) { text-align: center; }

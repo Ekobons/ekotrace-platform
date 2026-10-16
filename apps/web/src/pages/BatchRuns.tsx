@@ -96,7 +96,7 @@ export function BatchRuns() {
           {only === 'attention' && <div className="row vfilters"><span className="grow small">Showing batches that failed or do not reconcile.</span><button className="btn sm" onClick={() => setOnly('all')}>Show all</button></div>}
           {!rows.length ? <div className="empty" style={{ padding: 24 }}>No batches in this period.</div> : (
             <div className="scroll"><table className="t brtable">
-              <thead><tr><th>Started</th><th>Batch</th><th>Source</th><th>Status</th><th className="num">Lines</th><th>Outcome</th><th className="num">tCO₂e</th><th>Reconciliation</th><th /></tr></thead>
+              <thead><tr><th>Started</th><th>Batch</th><th>Source</th><th className="ctr">Status</th><th className="num">Lines</th><th>Outcome</th><th className="num">tCO₂e</th><th>Reconciliation</th><th /></tr></thead>
               <tbody>{rows.map((b) => <BatchLine key={b.id} b={b} onRecon={() => setRecon(b.id)} onRetry={() => retry(b.id)} />)}</tbody>
             </table></div>)}
         </div>)}
@@ -104,7 +104,7 @@ export function BatchRuns() {
         <div className="card flush">
           {!d.readings.length ? <div className="empty" style={{ padding: 24 }}>No meter-reading batches in this period. Readings sent by systems wait for review here when the company reviews readings before publishing them.</div> : (
             <div className="scroll"><table className="t brtable">
-              <thead><tr><th>Received</th><th>System</th><th className="num">Readings</th><th className="num">Refused</th><th>New · corrections · duplicates · conflicts</th><th>Status</th></tr></thead>
+              <thead><tr><th>Received</th><th>System</th><th className="num">Readings</th><th className="num">Refused</th><th>New · corrections · duplicates · conflicts</th><th className="ctr">Status</th></tr></thead>
               <tbody>{d.readings.map((r) => (
                 <tr key={r.id}>
                   <td className="small nowrap">{dt(r.created_at)}</td><td><b>{r.client ?? '—'}</b></td><td className="num">{f0(r.received)}</td>
