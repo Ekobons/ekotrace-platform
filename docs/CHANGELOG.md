@@ -2,6 +2,10 @@
 
 Newest first.
 
+## 2026-10-16 · `npm run app` and `npm run demo` bring the database up to date first
+
+- Both now run the migrations before starting, so pulling new code can no longer leave the screens running against an older database (new tables and columns missing, calculations and pages failing). Migrations already applied are skipped.
+
 ## 2026-10-16 · Server commands for platform admin logins
 
 - `npm run admin:list` lists the platform admins on the server (email, name, MFA, last sign-in). `npm run admin:reset -- --email …` sets a new temporary password (shown once, must be changed at sign-in), unlocks the account, ends its sessions and records it in the audit log. MFA is left as it is. Server-only (`src/cli/admins.ts`); not reachable from the web.

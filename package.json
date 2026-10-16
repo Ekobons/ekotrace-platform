@@ -11,7 +11,7 @@
     "node": ">=22"
   },
   "scripts": {
-    "app": "npm run build -w @ekotrace/calc && npm run build -w @ekotrace/web && npm run serve -w @ekotrace/api",
+    "app": "npm run build -w @ekotrace/calc && npm run migrate -w @ekotrace/api && npm run build -w @ekotrace/web && npm run serve -w @ekotrace/api",
     "build": "npm run build -w @ekotrace/calc && npm run build -w @ekotrace/api && npm run build -w @ekotrace/web",
     "start": "node apps/api/dist/server.js",
     "test": "npm test -w @ekotrace/calc && npm test -w @ekotrace/api",
@@ -23,7 +23,7 @@
     "admin:create": "npm run admin:create -w @ekotrace/api --",
     "admin:list": "npm run admin:list -w @ekotrace/api --",
     "admin:reset": "npm run admin:reset -w @ekotrace/api --",
-    "demo": "npm run demo -w @ekotrace/api --"
+    "demo": "npm run migrate -w @ekotrace/api && npm run demo -w @ekotrace/api --"
   },
   "devDependencies": {
     "@types/node": "22.20.5",
