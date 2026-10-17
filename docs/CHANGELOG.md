@@ -2,6 +2,14 @@
 
 Newest first.
 
+## 2026-10-17 · CBAM (EU Carbon Border Adjustment Mechanism): producer and importer sides
+
+- **Menu → Disclose → CBAM** (`/cbam`): Overview · Installations · Emissions reports · Imports & declaration · Default values & benchmarks. Migration 048 (`cbam_installation`, `cbam_process`, `cbam_report`, `cbam_report_line`, `cbam_precursor`, `cbam_good`, `cbam_import`, `cbam_reference` with shared rows readable by all; RLS; purge).
+- **Rules in one place** (`lib/cbam.ts`): aggregated goods categories with routes and qualifying parameters (IR 2025/2547 Annex II); Annex I CN codes by prefix (`cnInfo`); SEE per process = (attributed direct + precursors) ÷ activity level, indirect = electricity × factor + precursors, indirect counted for cement and fertilisers only; share on default values; default-value mark-up 10/20/30 % (1 % fertilisers); CBAM factor 97.5 % 2026 → 0 % 2034; certificates = max(0, SEE − benchmark × CBAM factor − carbon price ÷ price) × mass.
+- **Producer**: installations as registered in the CBAM Registry (O3CI), production processes, yearly report (activity, attributed emissions, electricity, default share, parameters, goods by CN code checked against the sector, precursors actual/default), period, electricity factor, verification, carbon price paid, EORI numbers shared with; verified reports locked (super admin / admin reopen). **Export** `.xlsx`: summary emissions report (Annex IV 1.2 data points), sheet for EU importers per CN code, O3CI entry sheet in portal order. The installation's facility Scope 1 is shown beside the attributed emissions.
+- **Importer**: import lines (date → quarter, CN, origin, mass, procedure, supplier, installation, route), actual SEE (or from the company's own installation report) or default value; library lookup of default values (CN prefix + country) and benchmarks; certificate prices per quarter (2026 Q1–Q3 seeded); upload of the customs broker's Excel / CSV with preview, template; **declaration workbook** (summary, goods by CN × origin, installations & verification, certificates, lines).
+- DEMO (invented): an aluminium recovery line with a 2026 draft report (remelt and extrusion, own billets as precursor), five 2026 import lines, illustrative default values and benchmarks marked as such. Manual: CBAM chapter. Test added.
+
 ## 2026-10-17 · Table alignment everywhere
 
 - Number headings now sit over their numbers: `.t th` (left) was overriding `.num` on headings, so every number column had its heading on the left and its values on the right. Number headings and cells are right-aligned; a number column's heading follows its cells even without a class (CSS `:has`).

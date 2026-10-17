@@ -519,6 +519,36 @@ export interface LcaProductBody { name: string; description: string; supplierId:
 export interface LcaInputBody { name: string; stage: string; qty: number; unit: string; co2ePerUnit: number | null; lciId: string | null; dq: string; source: string }
 export interface LcaImportLine { row: number; name: string; stage: string | null; qty: number | null; unit: string; co2e: number | null; lciId: string | null; lciName: string | null; problems: string[] }
 
+// ---------------------------------------------------------------------- CBAM --
+export interface CbamCategory { sector: string; name: string; routes: string[]; params: { key: string; label: string; unit: string }[] }
+export interface CbamSee { seeDirect: number | null; seeIndirect: number | null; seeTotal: number | null; directTotal: number; indirectTotal: number; defaultShare: number; counted: boolean }
+export interface CbamInstallation {
+  id: string; name: string; facility_id: string | null; facility: string | null; registry_id: string | null; unlocode: string | null; address: string | null; city: string | null; postcode: string | null; country: string;
+  lat: number | null; lon: number | null; operator_name: string | null; operator_reg: string | null; operator_address: string | null; operator_country: string | null; contact_name: string | null; contact_email: string | null; contact_phone: string | null; notes: string;
+  processes: { id: string; category: string; route: string; name: string }[]; reports: { id: string; year: number; status: string; verifier_name: string | null; verification_date: string | null }[];
+}
+export interface CbamRef { id: string; kind: 'default' | 'benchmark' | 'price'; cn: string | null; country: string | null; route: string | null; year: number; quarter: number | null; value: number; source: string; indicative: boolean; own: boolean }
+export interface CbamData {
+  year: number; installations: CbamInstallation[]; facilities: { id: string; name: string; country: string }[];
+  reports: { id: string; installation_id: string; year: number; status: string; lines: { id: string; process: string; category: string; categoryName: string; route: string; activity_t: number | null; goods: string[]; see: CbamSee }[] }[];
+  imports: { lines: number; mass: number; embedded: number; certificates: number; cost: number; problems: number };
+  categories: Record<string, CbamCategory>; sectors: Record<string, string>; cn: [string, string, string][]; references: CbamRef[]; cbamFactor: number; markup: { other: number; fertilisers: number }; can: { edit: boolean };
+}
+export interface CbamPrecursor { id: string; category: string; cn: string | null; origin: string | null; quantity_t: number; see_direct: number; see_indirect: number; source: string; supplier: string | null; installation_ref: string | null; period: string | null }
+export interface CbamLine { id: string; process_id: string; process: string; category: string; categoryName: string; sector: string; route: string; activity_t: number | null; direct_t: number | null; elec_mwh: number | null; default_share: number; params: Record<string, string>; precursors: CbamPrecursor[]; goods: { id: string; cn: string; description: string; quantity_t: number | null }[]; see: CbamSee }
+export interface CbamReport {
+  report: { id: string; installation_id: string; installation: string; registry_id: string | null; country: string; year: number; period_start: string; period_end: string; status: 'draft' | 'verified' | 'shared'; elec_ef: number | null; elec_ef_source: string | null; monitoring_plan: string | null;
+    verifier_name: string | null; verifier_accreditation: string | null; verifier_country: string | null; verification_date: string | null; site_visit_date: string | null; opinion: string | null;
+    carbon_price: { instrument: string; country: string; eurPerT: number | null; amount: number | null; currency: string; rebate: string; evidence: string } | null; notes: string; shared_with: string; updated_name: string | null; updated_at: string };
+  lines: CbamLine[]; inventory: { s1: number; s2: number; total: number } | null; can: { edit: boolean; reopen: boolean };
+}
+export interface CbamImport {
+  id: string; year: number; import_date: string | null; quarter: number; cn: string; description: string; origin: string; mass: number; procedure: string | null; customs_ref: string | null; supplier: string | null;
+  installation: string | null; installation_id_reg: string | null; route: string | null; report_id: string | null; source: 'actual' | 'default'; see_direct: number | null; see_indirect: number | null; default_value: number | null; benchmark: number | null;
+  carbon_price_eur: number | null; verifier_ref: string | null; notes: string; sector: string; category: string | null; categoryName: string | null; defaultUsed: number | null; defaultFromLibrary: boolean; benchmarkUsed: number | null; benchmarkFromLibrary: boolean;
+  calc: { see: number | null; markup: number; embedded: number | null; sefa: number; faa: number; priceDeduct: number; certificates: number | null; price: number | null; cost: number | null; problems: string[] };
+}
+
 export const api = {
   brand: () => call<{ name: string; productName?: string; colors?: Record<string, string> }>('GET', '/api/brand'),
   catalogue: (all = false) => call<{ categories: Category[] }>('GET', `/api/catalogue${all ? '?all=1' : ''}`),
@@ -817,6 +847,27 @@ export const api = {
   batchReadings: (id: string) => call<Omit<ReadingBatchRow, 'rejected'> & { rejected: { index: number; reason: string }[]; staged: Record<string, number>; meters: { name: string; external_id: string; facility: string; n: number }[] }>('GET', `/api/batches/readings/${id}`),
   transfer: (id: string) => call<Transfer>('GET', `/api/batches/transfers/${id}`),
   sourceExpect: (id: string, expectHours: number | null) => call<{ ok: true }>('PUT', `/api/batches/sources/${id}`, { expectHours }),
+  // CBAM
+  cbam: (year: number) => call<CbamData>('GET', `/api/cbam?year=${year}`),
+  cbamInstallationSave: (b: Record<string, unknown>, id?: string) => call<{ id?: string; ok?: true }>(id ? 'PUT' : 'POST', id ? `/api/cbam/installations/${id}` : '/api/cbam/installations', b),
+  cbamInstallationDelete: (id: string) => call<{ ok: true }>('DELETE', `/api/cbam/installations/${id}`),
+  cbamProcessSave: (b: { category: string; route: string; name: string }, installationId: string, id?: string) => call<{ id?: string; ok?: true }>(id ? 'PUT' : 'POST', id ? `/api/cbam/processes/${id}` : `/api/cbam/installations/${installationId}/processes`, b),
+  cbamProcessDelete: (id: string) => call<{ ok: true }>('DELETE', `/api/cbam/processes/${id}`),
+  cbamReportCreate: (installationId: string, year: number) => call<{ id: string }>('POST', '/api/cbam/reports', { installationId, year }),
+  cbamReport: (id: string) => call<CbamReport>('GET', `/api/cbam/reports/${id}`),
+  cbamReportSave: (id: string, b: Record<string, unknown>) => call<{ ok: true }>('PUT', `/api/cbam/reports/${id}`, b),
+  cbamReportDelete: (id: string) => call<{ ok: true }>('DELETE', `/api/cbam/reports/${id}`),
+  cbamLineSave: (id: string, b: { activityT: number | null; directT: number | null; elecMwh: number | null; defaultShare: number; params: Record<string, string> }) => call<{ ok: true }>('PUT', `/api/cbam/lines/${id}`, b),
+  cbamPrecursorAdd: (lineId: string, b: Record<string, unknown>) => call<{ id: string }>('POST', `/api/cbam/lines/${lineId}/precursors`, b),
+  cbamPrecursorDelete: (id: string) => call<{ ok: true }>('DELETE', `/api/cbam/precursors/${id}`),
+  cbamGoodAdd: (lineId: string, b: { cn: string; description: string; quantityT: number | null }) => call<{ id: string }>('POST', `/api/cbam/lines/${lineId}/goods`, b),
+  cbamGoodDelete: (id: string) => call<{ ok: true }>('DELETE', `/api/cbam/goods/${id}`),
+  cbamImports: (year: number) => call<{ year: number; lines: CbamImport[]; ownReports: { id: string; year: number; status: string; installation: string }[]; prices: { quarter: number; price: number | null }[]; cbamFactor: number; can: { edit: boolean } }>('GET', `/api/cbam/imports?year=${year}`),
+  cbamImportSave: (b: Record<string, unknown>, id?: string) => call<{ id?: string; ok?: true }>(id ? 'PUT' : 'POST', id ? `/api/cbam/imports/${id}` : '/api/cbam/imports', b),
+  cbamImportDelete: (id: string) => call<{ ok: true }>('DELETE', `/api/cbam/imports/${id}`),
+  cbamImportUpload: (f: File, year: number, commit: boolean) => call<{ lines?: { row: number; cn: string; origin: string; mass: number | null; ok: boolean; problems: string[] }[]; ok?: number; problems?: number; imported?: number; skipped?: number }>('POST', `/api/cbam/imports/upload?year=${year}&commit=${commit ? 1 : 0}`, undefined, f, { 'x-filename': encodeURIComponent(f.name) }),
+  cbamReferenceAdd: (b: Record<string, unknown>) => call<{ id: string }>('POST', '/api/cbam/reference', b),
+  cbamReferenceDelete: (id: string) => call<{ ok: true }>('DELETE', `/api/cbam/reference/${id}`),
   // product LCA
   lca: () => call<LcaData>('GET', '/api/lca'),
   lcaProduct: (id: string) => call<LcaDetail>('GET', `/api/lca/products/${id}`),

@@ -1419,3 +1419,18 @@ ul.plain { list-style: none; margin: 0; padding: 0; }
 .t:has(> thead > tr > th:nth-child(15).ctr) > tbody > tr > td:nth-child(15) { text-align: center; }
 .t:has(> tbody > tr > td:nth-child(16).num) > thead > tr > th:nth-child(16) { text-align: right; }
 .t:has(> thead > tr > th:nth-child(16).ctr) > tbody > tr > td:nth-child(16) { text-align: center; }
+
+/* CBAM */
+.cbamgrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.cbsteps { margin: 0 0 10px; padding-left: 20px; display: grid; gap: 8px; font-size: 13.5px; line-height: 1.5; }
+.cbsee { display: flex; gap: 6px; flex-wrap: wrap; }
+.cbsee > div { display: grid; padding: 8px 12px; border-radius: 10px; background: #F4F7F5; min-width: 92px; text-align: right; }
+.cbsee > div.on { background: var(--primary); color: #fff; }
+.cbsee span { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; opacity: .75; }
+.cbsee b { font-size: 18px; font-variant-numeric: tabular-nums; }
+.cbsee small { font-size: 11px; opacity: .85; }
+.vform.four { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.cbh { margin: 0 0 6px; font-size: 13px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+.cbprec { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin-top: 8px; padding: 10px; border-radius: 10px; background: #F4F7F5; }
+@media (max-width: 1100px) { .vform.four, .cbprec { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 800px) { .cbamgrid { grid-template-columns: minmax(0, 1fr); } }

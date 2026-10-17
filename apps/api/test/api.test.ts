@@ -3079,3 +3079,63 @@ test('product LCA: inventory from the library and own values, BOM import, scenar
   assert.equal((await api('GET', `/api/lca/products/${pid}`, undefined, tenantB)).status, 404);
   assert.equal((await call(adm, 'PUT', `/api/lca/library/${lib('steel_p').id}`, { name: 'xx', unit: 'kg', co2e: 0, stage: 'raw', source: 'xx' })).status, 404, 'shared rows are not changed by a company');
 });
+
+test('CBAM: installation, processes, yearly report with precursors and goods, specific embedded emissions, verification rules, exports; importer lines with defaults, benchmarks and certificates; companies kept apart', async () => {
+  const T = tenantA;
+  const inst = (await api('POST', '/api/cbam/installations', { name: 'Test smelter', country: 'AE', registryId: 'TEST-1', lat: 25.1, lon: 55.2 }, T)).body.id as string;
+  assert.ok(inst);
+  assert.equal((await api('POST', `/api/cbam/installations/${inst}/processes`, { category: 'crude_steel', route: '', name: 'No route' }, T)).status, 400, 'crude steel needs a route');
+  const pEaf = (await api('POST', `/api/cbam/installations/${inst}/processes`, { category: 'crude_steel', route: 'Electric arc furnace', name: 'EAF' }, T)).body.id as string;
+  const pCem = (await api('POST', `/api/cbam/installations/${inst}/processes`, { category: 'cement', route: '', name: 'Grinding' }, T)).body.id as string;
+  assert.ok(pEaf && pCem);
+  const rep = (await api('POST', '/api/cbam/reports', { installationId: inst, year: 2026 }, T)).body.id as string;
+  assert.equal((await api('POST', '/api/cbam/reports', { installationId: inst, year: 2026 }, T)).status, 409);
+  let d = (await api('GET', `/api/cbam/reports/${rep}`, undefined, T)).body;
+  const eaf = d.lines.find((l: { process: string }) => l.process === 'EAF'), cem = d.lines.find((l: { process: string }) => l.process === 'Grinding');
+  // steel: 1,000 t, 400 t direct + 100 t DRI precursor at 1.5 t/t; electricity 500 MWh (not counted for steel)
+  await api('PUT', `/api/cbam/lines/${eaf.id}`, { activityT: 1000, directT: 400, elecMwh: 500, defaultShare: 0.5, params: { scrap_t: '0.9' } }, T);
+  await api('POST', `/api/cbam/lines/${eaf.id}/precursors`, { category: 'dri', quantityT: 100, seeDirect: 1.5, seeIndirect: 0.2, source: 'default' }, T);
+  assert.equal((await api('POST', `/api/cbam/lines/${eaf.id}/goods`, { cn: '2523 29 00' }, T)).status, 400, 'cement CN on a steel process');
+  assert.equal((await api('POST', `/api/cbam/lines/${eaf.id}/goods`, { cn: '84714100' }, T)).status, 400, 'not a CBAM good');
+  assert.equal((await api('POST', `/api/cbam/lines/${eaf.id}/goods`, { cn: '7207 11 14', quantityT: 1000 }, T)).status, 200);
+  // cement: 2,000 t, 1,600 t direct, 100 MWh at 0.5 t/MWh = 50 t indirect (counted)
+  await api('PUT', `/api/cbam/lines/${cem.id}`, { activityT: 2000, directT: 1600, elecMwh: 100, defaultShare: 0, params: {} }, T);
+  await api('POST', `/api/cbam/lines/${cem.id}/goods`, { cn: '25232900' }, T);
+  const head = { periodStart: '2026-01-01', periodEnd: '2026-12-31', elecEf: 0.5, elecEfSource: 'test', notes: '', sharedWith: '' };
+  assert.match((await api('PUT', `/api/cbam/reports/${rep}`, { ...head, status: 'verified' }, T)).body.message, /verifier/);
+  await api('PUT', `/api/cbam/reports/${rep}`, { ...head, status: 'draft' }, T);
+  d = (await api('GET', `/api/cbam/reports/${rep}`, undefined, T)).body;
+  const se = d.lines.find((l: { process: string }) => l.process === 'EAF').see, sc = d.lines.find((l: { process: string }) => l.process === 'Grinding').see;
+  assert.ok(Math.abs(se.seeDirect - 0.55) < 1e-9, JSON.stringify(se));             // (400 + 150) / 1000
+  assert.ok(Math.abs(se.seeIndirect - 0.27) < 1e-9);                                 // (500 × 0.5 + 20) / 1000
+  assert.ok(Math.abs(se.seeTotal - 0.55) < 1e-9 && se.counted === false, 'steel: direct only');
+  assert.ok(Math.abs(se.defaultShare - (200 + 150) / 550) < 1e-9);                    // half of own 400 + default precursor 150
+  assert.ok(Math.abs(sc.seeTotal - 0.825) < 1e-9 && sc.counted === true, 'cement: indirect counted');  // (1600 + 50) / 2000
+  assert.equal((await api('PUT', `/api/cbam/reports/${rep}`, { ...head, verifierName: 'Test Verifier', verificationDate: '2027-02-01', opinion: 'Satisfactory, reasonable assurance', status: 'verified' }, T)).status, 200);
+  assert.equal((await api('PUT', `/api/cbam/lines/${eaf.id}`, { activityT: 1, directT: 1, elecMwh: 0, defaultShare: 0, params: {} }, T)).status, 409, 'verified figures are locked');
+  const x = await app.inject({ method: 'GET', url: `/api/cbam/reports/${rep}/export`, headers: { cookie: adminCookie, 'x-tenant-id': T } });
+  assert.equal(x.statusCode, 200); assert.match(String(x.headers['content-type']), /spreadsheetml/);
+  // importer: one default line (with company default and benchmark), one actual line from the own installation
+  await api('POST', '/api/cbam/reference', { kind: 'default', cn: '7207', country: 'TR', year: 2026, value: 2.31, source: 'test' }, T);
+  await api('POST', '/api/cbam/reference', { kind: 'benchmark', cn: '7207', year: 2026, value: 1.364, source: 'test' }, T);
+  assert.equal((await api('POST', '/api/cbam/imports', { year: 2026, importDate: '2026-02-11', cn: '84714100', origin: 'TR', mass: 10 }, T)).status, 200, 'saved, flagged as not CBAM');
+  await api('POST', '/api/cbam/imports', { year: 2026, importDate: '2026-02-11', cn: '72071114', origin: 'TR', mass: 10000 }, T);
+  await api('POST', '/api/cbam/imports', { year: 2026, importDate: '2026-08-01', cn: '72071114', origin: 'AE', mass: 1000, source: 'actual', reportId: rep }, T);
+  assert.equal((await api('POST', '/api/cbam/imports', { year: 2026, importDate: '2027-01-05', cn: '72071114', origin: 'TR', mass: 1 }, T)).status, 400, 'date outside the year');
+  const im = (await api('GET', '/api/cbam/imports?year=2026', undefined, T)).body;
+  const def = im.lines.find((l: { origin: string; cn: string }) => l.origin === 'TR' && l.cn === '72071114'), act = im.lines.find((l: { origin: string }) => l.origin === 'AE');
+  assert.ok(Math.abs(def.calc.see - 2.541) < 1e-9 && Math.abs(def.calc.sefa - 1.3299) < 1e-9, JSON.stringify(def.calc));   // the Commission's worked example
+  assert.ok(Math.abs(def.calc.certificates - 12111) < 1e-6); assert.equal(def.calc.price, 75.36);
+  assert.ok(Math.abs(act.see_direct - 0.55) < 1e-9 && act.calc.certificates === 0, 'own verified data used, below the free allocation');
+  assert.match(im.lines.find((l: { cn: string }) => l.cn === '84714100').calc.problems[0], /not a CBAM good/);
+  const dec = await app.inject({ method: 'GET', url: '/api/cbam/declaration?year=2026', headers: { cookie: adminCookie, 'x-tenant-id': T } });
+  assert.equal(dec.statusCode, 200);
+  // upload preview from CSV
+  const csv = 'Import date,CN code,Country of origin,Net mass (t),Emissions\n2026-03-01,7207 11 14,Turkey,500,default\n2026-03-02,8471 41 00,TR,5,default\n';
+  const up = await app.inject({ method: 'POST', url: '/api/cbam/imports/upload?year=2026', payload: Buffer.from(csv), headers: { cookie: adminCookie, 'x-tenant-id': T, 'content-type': 'application/octet-stream', 'x-filename': 'imports.csv' } });
+  assert.equal(up.statusCode, 200, up.body); assert.equal(up.json().ok, 1); assert.equal(up.json().problems, 1);
+  // companies kept apart
+  assert.equal((await api('GET', `/api/cbam/reports/${rep}`, undefined, tenantB)).status, 404);
+  assert.equal((await api('GET', '/api/cbam/imports?year=2026', undefined, tenantB)).body.lines.length, 0);
+  assert.ok(!(await api('GET', '/api/cbam?year=2026', undefined, tenantB)).body.references.some((r: { source: string }) => r.source === 'test'));
+});

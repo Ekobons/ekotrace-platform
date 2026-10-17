@@ -42,6 +42,7 @@ import { Surveys } from './pages/Surveys';
 import { MetricRegistry } from './pages/MetricRegistry';
 import { CarbonCredits } from './pages/CarbonCredits';
 import { ProductLca } from './pages/ProductLca';
+import { Cbam } from './pages/Cbam';
 import { BatchRuns } from './pages/BatchRuns';
 import { SupplierPortal } from './pages/SupplierPortal';
 import { CollectionCalendar } from './pages/CollectionCalendar';
@@ -84,7 +85,7 @@ const NAV: { group?: string; items: NavItem[] }[] = [
     { to: '/lca', label: 'Product LCA', icon: 'leaf', roles: ['super_admin', 'admin', 'manager', 'preparer', 'verifier'] },
   ] },
   { group: 'Net zero', items: [{ to: '/targets', label: 'Targets & actions', icon: 'target' }, { to: '/credits', label: 'Carbon credits', icon: 'leaf' }] },
-  { group: 'Disclose', items: [{ to: '/reports', label: 'Reports', icon: 'doc' }, { to: '/assurance', label: 'Audit & assurance', icon: 'shield', roles: ['super_admin', 'admin', 'manager', 'verifier'] }] },
+  { group: 'Disclose', items: [{ to: '/reports', label: 'Reports', icon: 'doc' }, { to: '/cbam', label: 'CBAM', icon: 'scale', roles: ['super_admin', 'admin', 'manager', 'verifier'] }, { to: '/assurance', label: 'Audit & assurance', icon: 'shield', roles: ['super_admin', 'admin', 'manager', 'verifier'] }] },
   { group: 'Setup', items: [
     { to: '/organisation', label: 'Organisation & groups', icon: 'tree' },
     { to: '/people', label: 'People & access', icon: 'users', roles: ['super_admin', 'admin', 'manager'] },
@@ -251,6 +252,7 @@ function Shell() {
           <Route path="/metrics" element={<NeedCo><MetricRegistry /></NeedCo>} />
           <Route path="/credits" element={<NeedCo><CarbonCredits /></NeedCo>} />
           <Route path="/lca" element={<NeedCo><ProductLca /></NeedCo>} />
+          <Route path="/cbam" element={<NeedCo><Cbam /></NeedCo>} />
           <Route path="/batches" element={<NeedCo><BatchRuns /></NeedCo>} />
           <Route path="/calendar" element={<NeedCo><CollectionCalendar /></NeedCo>} />
           <Route path="/inbox" element={<NeedCo><Inbox onSeen={() => window.dispatchEvent(new Event('eko-inbox'))} /></NeedCo>} />
