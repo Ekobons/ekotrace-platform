@@ -2878,6 +2878,10 @@ test('supplier portal: invite with a one-time code, supplier signs in with e-mai
   assert.equal((await save('profile', { legalName: 'Portal Supplier LLC', country: 'AE', contactName: 'Noor Ali', industry: 'Logistics', size: 'medium' })).statusCode, 200);
   assert.equal((await save('inventory', { reports: 'yes', scope1: 1000, scope2Location: 600, scope2Market: 500, revenue: 10_000_000, currency: 'AED', verification: 'limited' })).statusCode, 200);
   assert.equal((await save('allocation', { method: 'revenue', customerRevenue: 1_000_000 })).statusCode, 200);
+  // optional ESG impact section (double materiality input): validated, never blocks submitting
+  assert.equal((await save('esg', { industry: 'transport', topics: [{ topic: 'X9', impact: 3 }] })).statusCode, 400, 'unknown topic');
+  assert.equal((await save('esg', { industry: 'transport', topics: [{ topic: 'E1', impact: 7 }] })).statusCode, 400, 'rating 0–5');
+  assert.equal((await save('esg', { industry: 'transport', topics: [{ topic: 'E1', impact: 5, financial: 4, note: 'diesel fleet' }, { topic: 'S1', impact: 3 }], facts: { iso14001: true, womenPct: 12 } })).statusCode, 200);
   assert.equal((await save('targets', { status: 'sbti_committed', targetYear: 2030, reductionPct: 42 })).statusCode, 200);
   assert.equal((await save('products', { items: [{ name: 'Pallet delivery', co2e: 2.5, unit: 'pcs', standard: 'ISO 14067', documentId: '00000000-0000-0000-0000-000000000000' }] })).statusCode, 400, 'documents must be uploaded first');
   const pdf = Buffer.from('%PDF-1.4\n% DEMO EPD\n');
@@ -3138,4 +3142,57 @@ test('CBAM: installation, processes, yearly report with precursors and goods, sp
   assert.equal((await api('GET', `/api/cbam/reports/${rep}`, undefined, tenantB)).status, 404);
   assert.equal((await api('GET', '/api/cbam/imports?year=2026', undefined, tenantB)).body.lines.length, 0);
   assert.ok(!(await api('GET', '/api/cbam?year=2026', undefined, tenantB)).body.references.some((r: { source: string }) => r.source === 'test'));
+});
+
+test('ESG: frameworks decide the materiality needed, double materiality scoring (actual, potential, human rights), decisions need a reason, second-person approval, industry questions with answers checked, export; companies kept apart', async () => {
+  const T = tenantA, Y = 2023;
+  let d = (await api('GET', `/api/esg?year=${Y}`, undefined, T)).body;
+  assert.equal(d.assessment, null); assert.equal(d.catalogue.frameworks.length, 9); assert.equal(d.topics.length, 10);
+  assert.equal((await api('PUT', '/api/esg/topics/E1', { year: Y, impact: null, financial: null }, T)).status, 400, 'set up first');
+  assert.equal((await api('PUT', '/api/esg/assessment', { year: Y, industry: 'nope', frameworks: [] }, T)).status, 400);
+  await api('PUT', '/api/esg/assessment', { year: Y, industry: 'waste', frameworks: ['vsme', 'adx'] }, T);
+  d = (await api('GET', `/api/esg?year=${Y}`, undefined, T)).body;
+  assert.deepEqual([d.needs.impact, d.needs.financial, d.needs.recommended], [false, false, true], 'VSME and ADX need no assessment');
+  await api('PUT', '/api/esg/assessment', { year: Y, industry: 'waste', frameworks: ['esrs', 'gri'], stakeholders: [{ group: 'Employees', method: 'Survey' }] }, T);
+  d = (await api('GET', `/api/esg?year=${Y}`, undefined, T)).body;
+  assert.equal(d.needs.double, true);
+  assert.ok(d.topics.find((t: { code: string }) => t.code === 'E5').likely, 'circular economy usually material for waste');
+  assert.ok(d.questions.some((q: { code: string }) => q.code.startsWith('WM.')), 'industry questions shown before any topic is material');
+  // scoring
+  let r = await api('PUT', '/api/esg/topics/E1', { year: Y, impact: { type: 'actual', nature: 'negative', scale: 4, scope: 4, irremediability: 4 }, financial: { kind: 'risk', magnitude: 4, likelihood: 4 } }, T);
+  assert.deepEqual(r.body, { impactScore: 4, financialScore: 3.2 });
+  r = await api('PUT', '/api/esg/topics/S2', { year: Y, impact: { type: 'potential', nature: 'negative', scale: 4, scope: 3, irremediability: 4, likelihood: 1 }, financial: null }, T);
+  assert.equal(r.body.impactScore, 0.73, 'potential: severity × likelihood ÷ 5');
+  r = await api('PUT', '/api/esg/topics/S2', { year: Y, impact: { type: 'potential', nature: 'negative', scale: 4, scope: 3, irremediability: 4, likelihood: 1, humanRights: true }, financial: null }, T);
+  assert.equal(r.body.impactScore, 3.67, 'human rights: severity takes precedence');
+  assert.equal((await api('PUT', '/api/esg/topics/G1', { year: Y, impact: { type: 'actual', nature: 'negative', scale: 1, scope: 1, irremediability: 1 }, financial: null, material: true }, T)).status, 400, 'reason needed');
+  await api('PUT', '/api/esg/topics/G1', { year: Y, impact: { type: 'actual', nature: 'negative', scale: 1, scope: 1, irremediability: 1 }, financial: null, material: true, rationale: 'Public contracts' }, T);
+  d = (await api('GET', `/api/esg?year=${Y}`, undefined, T)).body;
+  assert.deepEqual(d.material.sort(), ['E1', 'G1', 'S2']);
+  assert.ok(!d.questions.some((q: { topic: string }) => q.topic === 'E5'), 'questions follow the material topics');
+  // answers checked
+  assert.equal((await api('PUT', '/api/esg/answers', { year: Y, code: 'S2.1', value: 'maybe' }, T)).status, 400);
+  const pct = d.questions.find((q: { type: string }) => q.type === 'percent');
+  assert.equal((await api('PUT', '/api/esg/answers', { year: Y, code: pct.code, value: '120' }, T)).status, 400);
+  assert.equal((await api('PUT', '/api/esg/answers', { year: Y, code: pct.code, value: '40', note: 'test' }, T)).status, 200);
+  assert.equal((await api('PUT', '/api/esg/answers', { year: Y, code: 'ZZ.1', value: '1' }, T)).status, 404);
+  // submit needs every topic; then a second person approves
+  assert.match((await api('POST', '/api/esg/assessment/submit', { year: Y }, T)).body.message, /every topic/);
+  for (const t of ['E2', 'E3', 'E4', 'E5', 'S1', 'S3', 'S4']) await api('PUT', `/api/esg/topics/${t}`, { year: Y, impact: { type: 'actual', nature: 'negative', scale: 2, scope: 2, irremediability: 2 }, financial: null }, T);
+  const grp = (await api('GET', '/api/org', undefined, T)).body.nodes.find((n: { kind: string }) => n.kind === 'group').id;
+  const mk = async (email: string) => { const u = await api('POST', '/api/users', { name: email, email, role: 'admin', scopeNodeId: grp }, T); let c = await login(email, u.body.temporaryPassword); await call(c, 'POST', '/api/auth/password', { current: u.body.temporaryPassword, next: 'a long enough pass' }); c = await login(email, 'a long enough pass'); return c; };
+  const u1 = await mk('esg.one@a.test'), u2 = await mk('esg.two@a.test');
+  assert.equal((await call(u1, 'POST', '/api/esg/assessment/submit', { year: Y })).status, 200);
+  assert.equal((await call(u1, 'PUT', '/api/esg/topics/E1', { year: Y, impact: null, financial: null })).status, 409, 'locked while waiting');
+  assert.equal((await api('POST', '/api/esg/assessment/decide', { year: Y, decision: 'approve' }, T)).status, 403, 'platform staff never approve');
+  assert.equal((await call(u1, 'POST', '/api/esg/assessment/decide', { year: Y, decision: 'approve' })).status, 403, 'not the sender');
+  assert.equal((await call(u2, 'POST', '/api/esg/assessment/decide', { year: Y, decision: 'return' })).status, 400, 'say what to change');
+  assert.equal((await call(u2, 'POST', '/api/esg/assessment/decide', { year: Y, decision: 'approve' })).status, 200);
+  assert.equal((await api('GET', `/api/esg?year=${Y}`, undefined, T)).body.assessment.status, 'approved');
+  await call(u1, 'PUT', '/api/esg/topics/S4', { year: Y, impact: { type: 'actual', nature: 'negative', scale: 1, scope: 1, irremediability: 1 }, financial: null });
+  assert.equal((await api('GET', `/api/esg?year=${Y}`, undefined, T)).body.assessment.status, 'draft', 'a change returns it to draft');
+  const x = await app.inject({ method: 'GET', url: `/api/esg/export?year=${Y}`, headers: { cookie: adminCookie, 'x-tenant-id': T } });
+  assert.equal(x.statusCode, 200); assert.match(String(x.headers['content-type']), /spreadsheet/);
+  // companies kept apart
+  assert.equal((await api('GET', `/api/esg?year=${Y}`, undefined, tenantB)).body.assessment, null);
 });

@@ -1434,3 +1434,10 @@ ul.plain { list-style: none; margin: 0; padding: 0; }
 .cbprec { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin-top: 8px; padding: 10px; border-radius: 10px; background: #F4F7F5; }
 @media (max-width: 1100px) { .vform.four, .cbprec { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 800px) { .cbamgrid { grid-template-columns: minmax(0, 1fr); } }
+
+/* ESG & materiality */
+.esg-fw { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px; }
+.esg-fwc { display: flex; flex-direction: column; gap: 4px; border: 1px solid var(--line, #DDE5E2); border-radius: 12px; padding: 10px 12px; cursor: pointer; }
+.esg-fwc.on { border-color: var(--teal, #0E7C66); background: #0E7C660D; }
+.esg-mx { width: 100%; max-width: 520px; height: auto; display: block; }
+.spesg td select.input { min-width: 140px; }

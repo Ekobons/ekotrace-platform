@@ -5,6 +5,7 @@
 import type { Tx } from './pool.js';
 
 const ORDERED = [
+  'DELETE FROM esg_answer WHERE tenant_id = $1', 'DELETE FROM esg_topic WHERE tenant_id = $1', 'DELETE FROM esg_assessment WHERE tenant_id = $1',
   'DELETE FROM cbam_import WHERE tenant_id = $1', 'DELETE FROM cbam_good WHERE tenant_id = $1', 'DELETE FROM cbam_precursor WHERE tenant_id = $1', 'DELETE FROM cbam_report_line WHERE tenant_id = $1', 'DELETE FROM cbam_report WHERE tenant_id = $1', 'DELETE FROM cbam_process WHERE tenant_id = $1', 'DELETE FROM cbam_installation WHERE tenant_id = $1', 'DELETE FROM cbam_reference WHERE tenant_id = $1',
   'UPDATE supplier_ef SET lca_product_id = NULL WHERE tenant_id = $1', 'DELETE FROM lca_publication WHERE tenant_id = $1', 'DELETE FROM lca_scenario WHERE tenant_id = $1', 'DELETE FROM lca_input WHERE tenant_id = $1', 'DELETE FROM lca_product WHERE tenant_id = $1', 'DELETE FROM lci_factor WHERE tenant_id = $1',
   'DELETE FROM supplier_session WHERE tenant_id = $1', 'UPDATE supplier_ef SET request_id = NULL WHERE tenant_id = $1', 'DELETE FROM supplier_request WHERE tenant_id = $1', 'DELETE FROM integration_run WHERE tenant_id = $1', 'DELETE FROM carbon_credit_retirement WHERE tenant_id = $1', 'DELETE FROM carbon_credit_lot WHERE tenant_id = $1', 'DELETE FROM base_restatement WHERE tenant_id = $1', 'DELETE FROM notification WHERE tenant_id = $1', 'DELETE FROM reminder_log WHERE tenant_id = $1', 'DELETE FROM email_outbox WHERE tenant_id = $1', 'DELETE FROM collection_exception WHERE tenant_id = $1',

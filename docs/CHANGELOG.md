@@ -2,6 +2,15 @@
 
 Newest first.
 
+## 2026-10-17 · ESG & materiality: frameworks, double materiality assessment, industry questions; supplier portal ESG impact
+
+- **Menu → Disclose → ESG & materiality** (`/esg`): Frameworks & set-up · Double materiality · ESG data · Content index · Excel export. Migration 049 (`esg_assessment` per year, `esg_topic`, `esg_answer`, all with row-level security; purge order updated).
+- **Rules in one place** (`lib/esg.ts`): 9 frameworks with the materiality each needs (ESRS double; GRI impact; IFRS S1/S2 and SASB financial; VSME, ADX, DFM, Saudi Exchange, CDP none — recommended); the 10 ESRS topics; 16 industries with their usually-material topics; general and industry-specific questions with references to ESRS, GRI, IFRS S2, ADX, Saudi Exchange and SASB; scoring — impact severity = mean(scale, scope, irremediability) (positive: scale, scope), potential × likelihood ÷ 5 except potential negative human-rights impacts; financial = magnitude × likelihood ÷ 5.
+- **Assessment**: thresholds per side (default 3), materiality follows the scores needed by the frameworks chosen, or a decision with a required reason; matrix; suppliers' 0–5 ratings aggregated per topic; send for approval once every topic is assessed and stakeholders are listed; a second super admin/admin approves or returns with a note; platform staff never approve; any change reopens an approved assessment.
+- **ESG data**: questions of the material topics (or the industry's usual topics before any is material); numbers, percentages ≤ 100 and yes/no checked; GHG questions filled from the inventory. Export: materiality, IROs, ESG data with one reference column per framework, content index, method and stakeholders.
+- **Supplier portal**: new optional step "ESG impact — double materiality" (industry, 0–5 impact and financial rating per topic with the main issue, ISO/policy/workforce/environment facts, report link); validated, not counted towards completeness; shown in the staff review drawer.
+- DEMO (invented): a 2025 assessment for the demo waste company (GRI, IFRS S1/S2, ADX), every topic scored, 5 stakeholder groups, 13 data points; two demo suppliers answer the ESG section. Manual: ESG chapter. Test added.
+
 ## 2026-10-17 · CBAM (EU Carbon Border Adjustment Mechanism): producer and importer sides
 
 - **Menu → Disclose → CBAM** (`/cbam`): Overview · Installations · Emissions reports · Imports & declaration · Default values & benchmarks. Migration 048 (`cbam_installation`, `cbam_process`, `cbam_report`, `cbam_report_line`, `cbam_precursor`, `cbam_good`, `cbam_import`, `cbam_reference` with shared rows readable by all; RLS; purge).

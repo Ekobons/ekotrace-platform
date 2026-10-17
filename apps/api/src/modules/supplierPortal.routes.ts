@@ -15,6 +15,7 @@
  * Public:  POST /api/public/supplier/login · /logout · GET /api/public/supplier/me · PUT /api/public/supplier/answers
  *          POST /api/public/supplier/evidence · DELETE /api/public/supplier/evidence/:id · POST /api/public/supplier/submit
  */
+import { INDUSTRIES, TOPICS } from '../lib/esg.js';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { z } from 'zod';
@@ -70,6 +71,18 @@ export const SECTIONS = {
       verified: z.boolean().optional(), documentId: z.string().uuid().nullable().optional(),
     })).max(50).optional(),
   }),
+  /** ESG impact — double materiality from the supplier's side: how its own operations affect each topic (impact) and how
+   *  each topic affects its business (financial), 0 = not relevant … 5 = very high; plus a few ESG facts. Optional. */
+  esg: z.object({
+    industry: txt(40),
+    topics: z.array(z.object({ topic: z.string().regex(/^[ESG][1-5]$/), impact: z.number().int().min(0).max(5).nullable().optional(), financial: z.number().int().min(0).max(5).nullable().optional(), note: txt(600) })).max(10).optional(),
+    facts: z.object({
+      iso14001: z.boolean().nullable().optional(), iso45001: z.boolean().nullable().optional(), codeOfConduct: z.boolean().nullable().optional(), humanRights: z.boolean().nullable().optional(),
+      antiCorruption: z.boolean().nullable().optional(), whistleblowing: z.boolean().nullable().optional(), womenPct: z.number().min(0).max(100).nullable().optional(),
+      ltifr: num, fatalities: z.number().int().min(0).max(100000).nullable().optional(), renewablePct: z.number().min(0).max(100).nullable().optional(),
+      waterM3: num, wasteT: num, recycledPct: z.number().min(0).max(100).nullable().optional(), report: txt(400),
+    }).optional(),
+  }),
 };
 type Answers = { [K in keyof typeof SECTIONS]?: z.infer<(typeof SECTIONS)[K]> } & { declaration?: { name: string; title: string; at: string } };
 
@@ -106,7 +119,9 @@ export function completeness(a: Answers) {
     targets: !!t.status,
     products: !!pr.none || !!pr.items?.length,
   };
-  return { done, n: Object.values(done).filter(Boolean).length, of: Object.keys(done).length };
+  // the ESG impact section is optional: shown as done when filled, not needed to submit
+  const esg = !!(a.esg?.topics?.filter((x) => x.impact != null).length);
+  return { done, n: Object.values(done).filter(Boolean).length, of: Object.keys(done).length, esg };
 }
 
 const STATUS_TEXT: Record<string, string> = { invited: 'Invited', in_progress: 'In progress', submitted: 'Submitted', queried: 'Queried', accepted: 'Accepted' };
@@ -356,6 +371,7 @@ export async function supplierPublicRoutes(app: FastifyInstance) {
                                                                        AND status IN ('ready','check','published') AND extract(year FROM period_start) = $2`, [k.id, r.year])).rows[0].t) : null;
       const { cdp_score: _c, target: _t, reports_emissions: _r, climate_target: _ct, near_status: _n, net_zero_year: _z, share_estimate: _s, ...rest } = r;
       return { ...rest, progress: completeness(r.answers), derived: derived(r.answers), statusText: STATUS_TEXT, editable: ['invited', 'in_progress', 'queried'].includes(r.status),
+        esgCatalogue: { topics: TOPICS.map(({ code, pillar, name, sub }) => ({ code, pillar, name, sub })), industries: INDUSTRIES },
         score: { score: sc.score, letter: sc.letter, parts: sc.parts.map((p) => (p.key === 'data' && !['submitted', 'accepted'].includes(r.status) ? { ...p, note: 'counted once you submit' } : p)), actions: sc.actions.filter((x) => !/customer's data request/.test(x)) }, contribution };
     });
   });

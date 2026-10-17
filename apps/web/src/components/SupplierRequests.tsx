@@ -8,7 +8,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useApp } from '../App';
 import { api, type Supplier, type SupplierPortalData, type SupplierRequestDetail } from '../lib/api';
-import { SP_DOCKIND, SP_STATUS, SP_TARGET, SP_VERIF, SP_BOUNDARY, nf } from '../lib/supplierPortal';
+import { SP_ESG_FACTS, SP_ESG_TOPIC, SP_DOCKIND, SP_STATUS, SP_TARGET, SP_VERIF, SP_BOUNDARY, nf } from '../lib/supplierPortal';
 import { ItemPicker } from './ItemPicker';
 import { Icon } from './Icon';
 
@@ -207,6 +207,12 @@ function ReviewDrawer({ id, onClose, onChanged }: { id: string; onClose: () => v
                 <td className="num">{nf(x.co2e, 4)} / {x.unit}</td><td className="small">{x.standard ?? '—'}{x.boundary ? ` · ${x.boundary}` : ''}{x.verified ? ' · verified' : ''}</td><td className="small">{x.validFrom ?? '—'} → {x.validTo ?? '—'}</td>
                 {can && r.status === 'submitted' && <td style={{ minWidth: 220 }}><label className="row small" style={{ gap: 6 }}><input type="checkbox" checked={!!prods[i]?.use} onChange={(e) => setProds({ ...prods, [i]: { itemId: prods[i]?.itemId ?? null, itemName: prods[i]?.itemName ?? null, use: e.target.checked } })} />use</label>
                   {prods[i]?.use && <ItemPicker compact value={prods[i]!.itemId} valueName={prods[i]!.itemName ?? 'everything from this supplier'} onPick={(it) => setProds({ ...prods, [i]: { use: true, itemId: it?.id ?? null, itemName: it?.name ?? null } })} />}</td>}</tr>)}</tbody></table>}
+          <h3 className="sp-h3">ESG impact — double materiality</h3>
+          {!a.esg?.topics?.length && !a.esg?.facts ? <div className="muted small">Not answered (optional).</div> : <>
+            {a.esg.topics?.length ? <table className="t"><thead><tr><th>Topic</th><th className="num">Their impact (0–5)</th><th className="num">Effect on them (0–5)</th><th>Main issue</th></tr></thead>
+              <tbody>{a.esg.topics.map((x) => <tr key={x.topic}><td><b>{x.topic}</b> {SP_ESG_TOPIC[x.topic] ?? ''}</td><td className="num">{x.impact ?? '—'}</td><td className="num">{x.financial ?? '—'}</td><td className="small">{x.note ?? ''}</td></tr>)}</tbody></table> : null}
+            <table className="t kv"><tbody>{SP_ESG_FACTS.filter(([k]) => a.esg?.facts?.[k] != null && a.esg.facts[k] !== '').map(([k, l, ty]) => { const v = a.esg!.facts![k]; return <Row key={k} l={l} v={ty === 'bool' ? (v ? 'Yes' : 'No') : ty === 'text' && /^https?:/.test(String(v)) ? <a href={String(v)} target="_blank" rel="noreferrer noopener">{String(v)}</a> : String(v)} />; })}</tbody></table>
+            <div className="muted small">Feeds the supplier column of ESG & materiality → Double materiality once accepted or submitted.</div></>}
           <h3 className="sp-h3">Evidence</h3>
           {!r.documents.length ? <div className="muted small">No files.</div> : <ul className="sp-docs">{r.documents.map((x) => <li key={x.id}><span className="grow"><a href={`/api/supplier-portal/documents/${x.id}`} target="_blank" rel="noreferrer"><b>{x.filename}</b></a><small>{SP_DOCKIND[x.kind]}</small></span></li>)}</ul>}
           {r.status === 'accepted' && r.applied && <div className="note ok small">Accepted by {r.reviewed_by} on {d8(r.reviewed_at)}: profile fields {r.applied.profile.join(', ') || 'none'}; {r.applied.factors.length} factor(s) created{r.applied.linesRecalculated ? `; ${r.applied.linesRecalculated} open purchase lines recalculated` : ''}.</div>}

@@ -23,6 +23,7 @@ import { PDFDocument, StandardFonts } from 'pdf-lib';
 import { demoPurchases } from './demoPurchases.js';
 import { demoLca } from './demoLca.js';
 import { demoCbam } from './demoCbam.js';
+import { demoEsg } from './demoEsg.js';
 import { normSupplier } from '../modules/purchases/fields.js';
 import { purgeTenant } from '../db/purge.js';
 import { createHash, randomUUID } from 'node:crypto';
@@ -602,6 +603,8 @@ async function main() {
   await tenantTx(tenantId, (c: Tx) => demoLca(c, tenantId));
   // CBAM (DEMO, not real)
   await tenantTx(tenantId, (c: Tx) => demoCbam(c, tenantId));
+  // ESG and double materiality (DEMO, not real)
+  await tenantTx(tenantId, (c: Tx) => demoEsg(c, tenantId));
   // entries typed in during the year came in a few days after each month, most before the due date (before 2025 is locked below)
   await platformTx((c: Tx) => c.query(`UPDATE activity SET submitted_at = least(period_end + (2 + floor(random() * 11))::int, now() - interval '1 day')
                                          WHERE tenant_id = $1 AND status = 'approved' AND submitted_at IS NULL AND period_end < now()`, [tenantId]));

@@ -549,6 +549,24 @@ export interface CbamImport {
   calc: { see: number | null; markup: number; embedded: number | null; sefa: number; faa: number; priceDeduct: number; certificates: number | null; price: number | null; cost: number | null; problems: string[] };
 }
 
+export interface EsgFramework { code: string; name: string; region: string; materiality: 'double' | 'impact' | 'financial' | 'none'; who: string; note: string }
+export interface EsgImpact { type?: 'actual' | 'potential'; nature?: 'negative' | 'positive'; scale?: number; scope?: number; irremediability?: number; likelihood?: number; humanRights?: boolean; where?: ('upstream' | 'own' | 'downstream')[]; description?: string }
+export interface EsgFinancial { kind?: 'risk' | 'opportunity'; magnitude?: number; likelihood?: number; horizon?: 'short' | 'medium' | 'long'; description?: string }
+export interface EsgTopic {
+  code: string; pillar: 'E' | 'S' | 'G'; name: string; sub: string; refs: Record<string, string>; likely: boolean; impact: EsgImpact | null; financial: EsgFinancial | null; impactScore: number | null; financialScore: number | null;
+  override: boolean | null; material: boolean; assessed: boolean; rationale: string; suppliers: { n: number; avgImpact: number | null; high: string[]; list: { supplier: string; impact: number; financial: number | null; note: string | null }[] };
+}
+export interface EsgQuestion { code: string; topic: string; industry?: string; text: string; type: 'number' | 'percent' | 'yesno' | 'text'; unit?: string; refs: Record<string, string>; auto?: string; answer: { value: string | null; note: string; updated_name: string | null; updated_at: string } | null; autoValue: number | null }
+export interface EsgStakeholder { group: string; method: string; when: string; people: string }
+export interface EsgData {
+  year: number; years: number[];
+  assessment: { id: string; industry: string | null; frameworks: string[]; threshold_impact: number; threshold_financial: number; value_chain: string; stakeholders: EsgStakeholder[]; methodology: string; status: 'draft' | 'review' | 'approved'; sent_name: string | null; approved_name: string | null; approved_at: string | null; approval_note: string | null; updated_name: string | null; updated_at: string } | null;
+  needs: { impact: boolean; financial: boolean; double: boolean; recommended: boolean };
+  topics: EsgTopic[]; material: string[]; questions: EsgQuestion[]; suppliersAnswered: number; answered: number;
+  catalogue: { frameworks: EsgFramework[]; industries: { code: string; name: string; likely: string[] }[]; topics: { code: string; pillar: string; name: string; sub: string; refs: Record<string, string> }[] };
+  can: { edit: boolean; submit: boolean; decide: boolean };
+}
+
 export const api = {
   brand: () => call<{ name: string; productName?: string; colors?: Record<string, string> }>('GET', '/api/brand'),
   catalogue: (all = false) => call<{ categories: Category[] }>('GET', `/api/catalogue${all ? '?all=1' : ''}`),
@@ -848,6 +866,12 @@ export const api = {
   transfer: (id: string) => call<Transfer>('GET', `/api/batches/transfers/${id}`),
   sourceExpect: (id: string, expectHours: number | null) => call<{ ok: true }>('PUT', `/api/batches/sources/${id}`, { expectHours }),
   // CBAM
+  esg: (year: number) => call<EsgData>('GET', `/api/esg?year=${year}`),
+  esgSetup: (b: Record<string, unknown>) => call<{ id: string }>('PUT', '/api/esg/assessment', b),
+  esgTopic: (topic: string, b: Record<string, unknown>) => call<{ impactScore: number | null; financialScore: number | null }>('PUT', `/api/esg/topics/${topic}`, b),
+  esgSubmit: (year: number) => call<{ ok: true }>('POST', '/api/esg/assessment/submit', { year }),
+  esgDecide: (year: number, decision: 'approve' | 'return' | 'reopen', note?: string) => call<{ ok: true }>('POST', '/api/esg/assessment/decide', { year, decision, note }),
+  esgAnswer: (year: number, code: string, value: string | null, note: string) => call<{ ok: true }>('PUT', '/api/esg/answers', { year, code, value, note }),
   cbam: (year: number) => call<CbamData>('GET', `/api/cbam?year=${year}`),
   cbamInstallationSave: (b: Record<string, unknown>, id?: string) => call<{ id?: string; ok?: true }>(id ? 'PUT' : 'POST', id ? `/api/cbam/installations/${id}` : '/api/cbam/installations', b),
   cbamInstallationDelete: (id: string) => call<{ ok: true }>('DELETE', `/api/cbam/installations/${id}`),

@@ -3,6 +3,7 @@
  * from the invitation, answers the questionnaire section by section (saved as they go), attaches evidence and
  * submits. The customer reviews the answers before anything is used.
  */
+import { SP_ESG_FACTS, SP_ESG_SCALE } from '../lib/supplierPortal';
 import { CountrySelect } from '../components/CountrySelect';
 import { countryLabel, toCountryCode } from '../lib/countries';
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
@@ -32,11 +33,12 @@ interface Me {
   id: string; year: number; contact_name: string | null; email: string; message: string; due_date: string | null; expires_at: string; status: SPStatus; answers: SPAnswers; documents: SPDoc[];
   submitted_at: string | null; submitted_by: string | null; review_note: string | null; supplier: string; company: string; company_currency: string; progress: SPProgress; derived: SPDerived; editable: boolean;
   score: { score: number; letter: string; parts: { key: string; label: string; points: number; max: number; note: string }[]; actions: string[] }; contribution: number | null;
+  esgCatalogue: { topics: { code: string; pillar: string; name: string; sub: string }[]; industries: { code: string; name: string; likely: string[] }[] };
 }
-type Step = 'profile' | 'inventory' | 'allocation' | 'targets' | 'products' | 'evidence' | 'submit';
+type Step = 'profile' | 'inventory' | 'allocation' | 'targets' | 'products' | 'esg' | 'evidence' | 'submit';
 const STEPS: [Step, string, string][] = [
   ['profile', 'Your company', 'Who you are and who to contact'], ['inventory', 'Emissions', 'Scope 1, 2 and 3 for the year'], ['allocation', 'Your share for us', 'Emissions relating to what we buy'],
-  ['targets', 'Climate targets', 'Reduction and net-zero targets'], ['products', 'Product footprints', 'Carbon footprints of what you sell us'], ['evidence', 'Evidence', 'Reports, verification, EPDs'],
+  ['targets', 'Climate targets', 'Reduction and net-zero targets'], ['products', 'Product footprints', 'Carbon footprints of what you sell us'], ['esg', 'ESG impact', 'Double materiality · optional'], ['evidence', 'Evidence', 'Reports, verification, EPDs'],
   ['submit', 'Review & submit', 'Check and send'],
 ];
 const d8 = (x: string | null) => (x ? new Date(x).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : '');
@@ -92,7 +94,7 @@ function SignIn({ onDone, err }: { onDone: () => void; err: string | null }) {
 }
 
 function Portal({ me, reload, toast }: { me: Me; reload: () => Promise<void>; toast: (m: string) => void }) {
-  const first = (STEPS.find(([k]) => k !== 'evidence' && k !== 'submit' && !me.progress.done[k as keyof SPProgress['done']])?.[0]) ?? 'submit';
+  const first = (STEPS.find(([k]) => k !== 'evidence' && k !== 'esg' && k !== 'submit' && !me.progress.done[k as keyof SPProgress['done']])?.[0]) ?? 'submit';
   const [step, setStep] = useState<Step>(me.editable ? first : 'submit');
   const ro = !me.editable;
   const idx = STEPS.findIndex(([k]) => k === step);
@@ -123,7 +125,7 @@ function Portal({ me, reload, toast }: { me: Me; reload: () => Promise<void>; to
     <div className="sp-body">
       <nav className="sp-steps" aria-label="Sections">
         {STEPS.map(([k, l, sub], i) => {
-          const done = k === 'evidence' ? me.documents.length > 0 : k === 'submit' ? ['submitted', 'accepted'].includes(me.status) : me.progress.done[k as keyof SPProgress['done']];
+          const done = k === 'evidence' ? me.documents.length > 0 : k === 'esg' ? !!me.progress.esg : k === 'submit' ? ['submitted', 'accepted'].includes(me.status) : me.progress.done[k as keyof SPProgress['done']];
           return <button key={k} className={`${step === k ? 'on' : ''}${done ? ' done' : ''}`} onClick={() => setStep(k)}>
             <span className="n">{done ? '✓' : i + 1}</span><span><b>{l}</b><small>{sub}</small></span></button>;
         })}
@@ -134,6 +136,7 @@ function Portal({ me, reload, toast }: { me: Me; reload: () => Promise<void>; to
         {step === 'allocation' && <Allocation me={me} ro={ro} save={save} />}
         {step === 'targets' && <Targets me={me} ro={ro} save={save} />}
         {step === 'products' && <Products me={me} ro={ro} save={save} reload={reload} toast={toast} />}
+        {step === 'esg' && <Esg me={me} ro={ro} save={save} />}
         {step === 'evidence' && <Evidence me={me} ro={ro} reload={reload} toast={toast} next={next} />}
         {step === 'submit' && <Submit me={me} reload={reload} toast={toast} goto={setStep} />}
       </div>
@@ -303,6 +306,39 @@ function Targets({ me, ro, save }: { me: Me; ro: boolean; save: SaveFn }) {
     </div>}
     <Foot ro={ro} ok={!!f.status} onSave={() => void save('targets', { status: f.status || null, baseYear: has ? int(f.baseYear) : null, targetYear: has ? int(f.targetYear) : null,
       reductionPct: has && f.reductionPct.trim() ? Number(f.reductionPct) : null, scopes: has ? f.scopes.trim() || null : null, netZeroYear: has ? int(f.netZeroYear) : null, link: has ? f.link.trim() || null : null })} />
+  </>;
+}
+
+function Esg({ me, ro, save }: { me: Me; ro: boolean; save: SaveFn }) {
+  const a = me.answers.esg ?? {};
+  const cat = me.esgCatalogue;
+  const [industry, setIndustry] = useState(a.industry ?? '');
+  const [rows, setRows] = useState<Record<string, { impact: number | null; financial: number | null; note: string }>>(() => Object.fromEntries(cat.topics.map((t) => {
+    const x = a.topics?.find((y) => y.topic === t.code); return [t.code, { impact: x?.impact ?? null, financial: x?.financial ?? null, note: x?.note ?? '' }];
+  })));
+  const [facts, setFacts] = useState<Record<string, string>>(() => Object.fromEntries(Object.entries(a.facts ?? {}).map(([k, v]) => [k, v == null ? '' : typeof v === 'boolean' ? (v ? 'yes' : 'no') : String(v)])));
+  const likely = cat.industries.find((i) => i.code === industry)?.likely ?? [];
+  const set = (t: string, p: Partial<{ impact: number | null; financial: number | null; note: string }>) => setRows((r) => ({ ...r, [t]: { ...r[t]!, ...p } }));
+  const rated = Object.values(rows).filter((r) => r.impact != null).length;
+  return <>
+    <Head t="ESG impact — double materiality" sub={`Optional, and it helps ${me.company}'s own double materiality assessment. For each topic, rate how much your operations affect people and the environment (impact), and how much the topic affects your business (financial). 0 = not relevant, 5 = very high.`} />
+    <label className="field" style={{ maxWidth: 420 }}><span>Your industry</span><select className="input" disabled={ro} value={industry} onChange={(e) => setIndustry(e.target.value)}><option value="">Choose…</option>{cat.industries.map((i) => <option key={i.code} value={i.code}>{i.name}</option>)}</select></label>
+    {industry && <div className="muted small">Topics usually material in your industry are marked ●.</div>}
+    <div className="scrollx"><table className="t spesg">
+      <thead><tr><th>Topic</th><th className="ctr">Your impact</th><th className="ctr">Effect on your business</th><th>Main issue (optional)</th></tr></thead>
+      <tbody>{cat.topics.map((t) => <tr key={t.code}>
+        <td><b>{likely.includes(t.code) ? '● ' : ''}{t.name}</b><div className="muted small">{t.sub}</div></td>
+        {(['impact', 'financial'] as const).map((k) => <td key={k} className="ctr"><select className="input" disabled={ro} value={rows[t.code]![k] ?? ''} onChange={(e) => set(t.code, { [k]: e.target.value === '' ? null : Number(e.target.value) })}>
+          <option value="">—</option>{SP_ESG_SCALE.map((l, i) => <option key={i} value={i}>{i} · {l}</option>)}</select></td>)}
+        <td><input className="input" disabled={ro} value={rows[t.code]!.note} maxLength={600} placeholder="e.g. diesel fleet, heat stress" onChange={(e) => set(t.code, { note: e.target.value })} /></td></tr>)}</tbody></table></div>
+    <h3 style={{ margin: '6px 0 0' }}>A few ESG facts</h3>
+    <div className="vform">{SP_ESG_FACTS.map(([k, l, ty]) => ty === 'bool'
+      ? <label key={k} className="field"><span>{l}</span><select className="input" disabled={ro} value={facts[k] ?? ''} onChange={(e) => setFacts({ ...facts, [k]: e.target.value })}><option value="">—</option><option value="yes">Yes</option><option value="no">No</option></select></label>
+      : <label key={k} className={`field${ty === 'text' ? ' span2' : ''}`}><span>{l}</span><input className={`input${ty === 'text' ? '' : ' num'}`} disabled={ro} value={facts[k] ?? ''} placeholder={ty === 'text' ? 'https://' : ''}
+          onChange={(e) => setFacts({ ...facts, [k]: e.target.value })} /></label>)}</div>
+    <Foot ro={ro} ok={rated > 0} onSave={() => void save('esg', { industry: industry || null,
+      topics: Object.entries(rows).filter(([, r]) => r.impact != null || r.financial != null || r.note.trim()).map(([topic, r]) => ({ topic, impact: r.impact, financial: r.financial, note: r.note.trim() || null })),
+      facts: Object.fromEntries(SP_ESG_FACTS.map(([k, , ty]) => { const v = (facts[k] ?? '').trim(); return [k, v === '' ? null : ty === 'bool' ? v === 'yes' : ty === 'text' ? v : toNum(v)]; })) })} />
   </>;
 }
 
