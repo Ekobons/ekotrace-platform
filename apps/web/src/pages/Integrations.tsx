@@ -100,7 +100,7 @@ Content-Type: application/json
   "lines": [
     { "date": "2026-03-10", "description": "Copier paper A4 80gsm", "amount": 4250, "supplier": "Office Supplies Ltd",
       "supplierRef": "V100231", "supplierCountry": "AE", "category": "Office supplies", "glAccount": "Office expenses", "poNumber": "4500123", "quantity": 50, "unit": "box" },
-    { "date": "2026-03-12", "description": "Ready mix concrete C40", "amount": 182000, "facility": "Al Saja'a Recycling Complex",
+    { "date": "2026-03-12", "description": "Ready mix concrete C40", "amount": 182000, "facility": "Recycling plant",
       "supplierEf": 210, "supplierEfUnit": "m3", "quantity": 400, "unit": "m3", "capital": true }
 ] }
 

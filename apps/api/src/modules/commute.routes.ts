@@ -342,11 +342,11 @@ export async function commuteRoutes(app: FastifyInstance) {
     ws.addRow(['Employee ID (optional)', 'Site', 'Main way to work', 'One-way distance (km)', 'Days at the workplace per week', 'People in the car, including you', 'Car fuel', 'Second way (if you change)', 'Second distance (km)']);
     styleHeader(ws, [20, 24, 24, 20, 18, 20, 16, 24, 18]);
     const ex = [
-      ['E001', 'BEEAH Headquarters', 'Car, driving alone', 18, 5, 1, 'Petrol', '', ''],
-      ['E002', 'BEEAH Headquarters', 'Car-pool / lift', 25, 4, 3, 'Hybrid', '', ''],
-      ['E003', 'BEEAH Headquarters', 'Public bus', 6, 5, '', '', 'Metro / tram', 14],
-      ['E004', 'BEEAH Headquarters', 'Staff shuttle bus', 32, 5, '', '', '', ''],
-      ['E005', 'BEEAH Headquarters', 'Works from home', '', 0, '', '', '', ''],
+      ['E001', 'Head office', 'Car, driving alone', 18, 5, 1, 'Petrol', '', ''],
+      ['E002', 'Head office', 'Car-pool / lift', 25, 4, 3, 'Hybrid', '', ''],
+      ['E003', 'Head office', 'Public bus', 6, 5, '', '', 'Metro / tram', 14],
+      ['E004', 'Head office', 'Staff shuttle bus', 32, 5, '', '', '', ''],
+      ['E005', 'Head office', 'Works from home', '', 0, '', '', '', ''],
     ];
     for (const r of ex) ws.addRow(r).font = { italic: true, color: { argb: 'FF6B7C78' } };
     const modes = COMMUTE_MODES.map((m) => `"${m.label}"`).join(',');

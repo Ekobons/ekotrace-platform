@@ -205,7 +205,7 @@ function People({ d, man, answered, invite, reload, onBehalf }: { d: SurveyDetai
       <h2 style={{ fontSize: 16, margin: 0 }}>Add people</h2>
       <p className="sub" style={{ margin: 0 }}>One person per line: <span className="mono">name, email, facility, department</span>. Facility can be its name; if missing, the one picked here is used. Or upload a CSV with those columns.</p>
       <div className="row" style={{ alignItems: 'flex-start', gap: 10, flexWrap: 'wrap' }}>
-        <textarea className="input" rows={4} style={{ flex: '1 1 360px', height: 'auto', padding: 10 }} value={text} placeholder="Fatima Al Hashimi, fatima@company.ae, BEEAH Headquarters, Finance" onChange={(e) => setText(e.target.value)} />
+        <textarea className="input" rows={4} style={{ flex: '1 1 360px', height: 'auto', padding: 10 }} value={text} placeholder="Fatima Al Hashimi, fatima@company.ae, Head office, Finance" onChange={(e) => setText(e.target.value)} />
         <div style={{ display: 'grid', gap: 8, flex: '0 1 240px' }}>
           <label className="field"><span>Default facility</span><select className="input" value={fac} onChange={(e) => setFac(e.target.value)}>{d.facilities.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}</select></label>
           <button className="btn p" disabled={!text.trim()} onClick={() => add(text)}>Add people</button>

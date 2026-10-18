@@ -169,7 +169,7 @@ function ApprovalLevels({ edit }: { edit: boolean }) {
         <div style={{ opacity: P.selfApproval ? 1 : 0.5, display: 'grid', gap: 8 }}>
           <label className="field" style={{ width: 300 }}><span>…only below this size (tCO₂e; blank: any size)</span><input className="input num" inputMode="decimal" disabled={!edit || !P.selfApproval} value={P.selfMaxT} onChange={(e) => setP({ ...P, selfMaxT: e.target.value })} /></label>
         </div>
-        <p className="sub">Off by default. When on, approving your own entry needs a note saying what it was checked against; the entry is marked <b>self-reviewed</b> on the entry, in the data-quality report ("segregation of duties") and in the verifier pack. Data preparers and platform staff never approve. Level 2, when it applies, is always a different person. Verifiers and frameworks expect an independent check (the BEEAH RFP asks for one): leave it off where that applies.</p>
+        <p className="sub">Off by default. When on, approving your own entry needs a note saying what it was checked against; the entry is marked <b>self-reviewed</b> on the entry, in the data-quality report ("segregation of duties") and in the verifier pack. Data preparers and platform staff never approve. Level 2, when it applies, is always a different person. Verifiers, frameworks and many client policies expect an independent check: leave it off where that applies.</p>
         {edit && <div><button className="btn" onClick={() => void save()}>Save</button></div>}
       </div>
     </div>);

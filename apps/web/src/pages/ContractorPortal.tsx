@@ -1,8 +1,8 @@
 /**
  * Waste contractor portal (public page /contractor): sign in with the work email and the access code given by
- * the BEEAH contact. Collections (date, manifest, weighbridge weight, vehicle, ticket) for the bins assigned to the
+ * the company contact. Collections (date, manifest, weighbridge weight, vehicle, ticket) for the bins assigned to the
  * contractor, and the monthly statement (tonnes per site, material and method, with the statement file).
- * Nothing sent here enters the emissions inventory without a BEEAH person's review.
+ * Nothing sent here enters the emissions inventory without a company person's review.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { methodName } from '../lib/waste';
@@ -66,7 +66,7 @@ function SignIn({ onDone, err }: { onDone: () => void; err: string | null }) {
       <label className="field"><span>Access code</span><input className="input mono" autoComplete="one-time-code" style={{ letterSpacing: '.12em', textTransform: 'uppercase' }} value={code} onChange={(x) => setCode(x.target.value)} /></label>
       {e && <div className="note bad">{e}</div>}
       <button className="btn p" disabled={busy || !email || !code}>{busy ? 'Checking…' : 'Sign in'}</button>
-      <a className="muted small" href="/">BEEAH staff: sign in here</a>
+      <a className="muted small" href="/">Company staff: sign in here</a>
     </form>);
 }
 

@@ -97,7 +97,7 @@ function SiteForm({ d, facilityId, site, onDone }: { d: WasteDefaults; facilityI
     <div className="card" style={{ display: 'grid', gap: 12 }}>
       <h2>{site ? `Edit ${site.name}` : 'Add a landfill'}</h2>
       <div className="row" style={{ gap: 8, alignItems: 'flex-end' }}>
-        <label className="field grow"><span>Name</span><input className="input" value={name} maxLength={120} placeholder="e.g. Al Saja'a landfill, cell 3" onChange={(e) => setName(e.target.value)} /></label>
+        <label className="field grow"><span>Name</span><input className="input" value={name} maxLength={120} placeholder="e.g. Municipal landfill, cell 3" onChange={(e) => setName(e.target.value)} /></label>
         <label className="field" style={{ width: 110 }}><span>Opened (year)</span><input className="input mono" maxLength={4} value={opened} onChange={(e) => setOpened(e.target.value.replace(/\D/g, ''))} /></label>
         <label className="field" style={{ width: 110 }}><span>Closed (year)</span><input className="input mono" maxLength={4} value={closed} placeholder="open" onChange={(e) => setClosed(e.target.value.replace(/\D/g, ''))} /></label>
       </div>

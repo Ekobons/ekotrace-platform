@@ -660,7 +660,7 @@ export async function purchaseRoutes(app: FastifyInstance) {
     const ws = wb.addWorksheet('Purchases');
     const cols = ['Date', 'Description', 'Category', 'Amount', 'Currency', 'Quantity', 'Unit', 'Supplier', 'GL account', 'PO number', 'Facility', 'Supplier EF', 'Supplier EF unit', 'Capital goods'];
     ws.addRow(cols);
-    ws.addRow([new Date('2026-03-15'), 'A4 copier paper 80gsm', 'Office supplies', 4250, 'AED', 50, 'box', 'Gulf Stationery LLC', 'Office expenses', 'PO-26-0412', 'BEEAH Headquarters', null, null, 'No']);
+    ws.addRow([new Date('2026-03-15'), 'A4 copier paper 80gsm', 'Office supplies', 4250, 'AED', 50, 'box', 'Gulf Stationery LLC', 'Office expenses', 'PO-26-0412', 'Head office', null, null, 'No']);
     ws.addRow([new Date('2026-03-20'), 'Ready mix concrete C40', 'Construction materials', 182000, 'AED', 400, 'm3', 'Emirates Concrete', 'Capital WIP', 'PO-26-0433', 'Al Saja\'a Recycling Complex', 210, 'm3', 'Yes']);
     styleHeader(ws, [12, 40, 24, 14, 10, 10, 8, 26, 20, 14, 28, 12, 14, 12]);
     ws.getColumn(1).numFmt = 'dd/mm/yyyy';
