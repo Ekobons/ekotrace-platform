@@ -27,21 +27,77 @@ All three go through the same steps; an upload or API batch is reviewed before p
 ? Publish | ready lines become entries | the rest wait in the batch
 ```
 
-## How the spend category is found
+## How purchases are mapped — the whole flow
 
-The first answer wins, for each kind of purchase:
+A year of purchases can be 50,000 lines but only a few thousand *kinds* of purchase. Ekotrace decides once per kind, spends a person's time only where the emissions are, and never leaves a line without a factor.
 
-| # | Source | Example |
-|---|---|---|
-| 1 | A choice remembered for this description | “Copier paper A4” → Stationery, decided last month |
-| 2 | A NAICS code written in the file | 322230 |
-| 3 | A clear description | “Ready mix concrete C40” → Ready-mix concrete |
-| 4 | The supplier's default category | “Monthly charges” from a guarding company → Security services |
-| 5 | The account's default category | account “Audit fees” → Accounting services |
-| 6 | A weaker description match | shown with how sure it is |
-| 7 | An average factor (estimate) | median EPA factor of services (0.11 kg CO₂e per 2022 USD) or of goods (0.28) |
+```flow
+> 1 · Clean | each description is normalised: lower case, accents, PO / invoice numbers, dates and bare numbers removed
+> 2 · Club together | lines with the same cleaned description, category text and account form one kind of purchase; a vague one is split by supplier
+> 3 · Map each kind | first answer wins: remembered → NAICS code → clear description → supplier / account / category default → weaker description → AI (if on) → average factor
+> 4 · Other categories | travel, freight, rent moved; fuel, energy, waste excluded; capital goods and non-purchases set aside
+> 5 · Calculate | every line with the best factor: supplier per unit → supplier per money → spend-based
+* 6 · Review by impact | the kinds making up 95 % of the emissions are confirmed by a person; the small tail is accepted as it is
+? 7 · Publish | entries per facility × month × category × spend category, each with its lines behind it
+```
 
-No AI is used unless the company switches on an approved AI service; even then only for large unclear purchases, choosing among the candidates found. Services have similar factors, so a wrong guess for a small purchase barely changes the total.
+### 1 · Cleaning the description
+
+“Ready mix concrete C40 – 25 m3 – PO 4500123 – 31/03/2026” becomes **ready mix concrete c40 m3**. Two invoices for the same thing therefore look the same, whatever their PO number, date or quantity. The cleaned text is also what a remembered choice is stored against.
+
+### 2 · Clubbing similar lines together
+
+- **One kind of purchase** = same cleaned description + same category text from the file (if there is such a column) + same account (GL). “Copier paper A4 – PO 4500123” and “Copier paper A4 – PO 4500988” are one kind; the decision is taken once and applies to every line in it.
+- **Vague descriptions are split by supplier.** A description is vague when nothing remembered applies, it carries no NAICS code and the text match is not clear (confidence below 0.6) — e.g. “Monthly charges”, “Services rendered”, “Annual contract”. Such lines are split into one kind per supplier, so “Monthly charges” from a security company and from a cleaning company can go to different categories (through each supplier's default).
+- Each kind shows its lines, total spend, suppliers, account and — after calculation — its tCO₂e.
+
+### 3 · Mapping each kind to a spend category
+
+The first answer wins:
+
+| # | Source | Example | Confirmed automatically? |
+|---|---|---|---|
+| 1 | **Remembered choice** for this description | “Copier paper A4” → Stationery, decided last month | Yes |
+| 2 | **NAICS code** (6 digits) in the description or category column | 322230 | Yes |
+| 3 | **Clear description match** (confidence ≥ 0.6) | “Ready mix concrete C40” → Ready-mix concrete | No |
+| 4 | **Supplier's default** category | “Monthly charges” from a guarding company → Security services | Yes |
+| 5 | **Account's default** category | account “Audit fees” → Accounting services | Yes |
+| 6 | **Category-text default** (a value of the file's category column) | “IT consumables” → Computer supplies | Yes |
+| 7 | **Weaker description match** (confidence 0.3–0.6) | shown with how sure it is | No |
+| 8 | **AI** — only if switched on (below) | picks among the candidates of the text match | No |
+| 9 | **Average factor** (estimate) | nothing above identified it | No |
+
+Defaults 4–6 and remembered choices are created by people (*Remember my choices* in the review, or set on a supplier or account), so they count as confirmed. Description matches, AI picks and average factors are proposals: in the large kinds they wait for a person.
+
+**How the description match works.** No data leaves the platform for this step.
+
+- The catalogue: 2,655 spend categories — the 1,016 US EPA commodities (NAICS) and the 1,639 products of the previous Ekotrace list — each a small “document” of its name, aliases and group.
+- Procurement words are first translated into the words category names use: 264 of them, e.g. *laptop* → computer manufacturing, *airfare* → passenger air transportation, *DEWA* → electric power and water. Words that say nothing about what was bought are ignored (pack sizes, *LLC*, *invoice*, *monthly*, currencies…).
+- The description is scored against every category with **BM25**, the ranking used by search engines: rare words that match (e.g. *concrete*) count more than common ones (e.g. *steel*). The file's category text or account title helps rank, at half weight.
+- **Confidence (0–1)** = how much of the description the best category explains × how clearly it beats the runner-up (a different factor). Unknown words such as brand names and model numbers lower it a little. Categories with the same NAICS code share a factor, so they do not compete.
+- The 5 best candidates are kept on the kind of purchase, so a person (or the AI) can pick among them.
+
+**AI — optional, for what is still unidentified.** When the company has it switched on, every kind still without a category after steps 1–7 and with at least one candidate is sent to the AI in batches of 40. The AI may only choose **one of the candidates** found by the text match, or none — it cannot invent a category, and its answer is a proposal like any other. Sent: the cleaned description, the category text or account title, and the candidate names — never amounts, suppliers, people or the file. Needs: an AI service approved for the deployment, the Professional or Enterprise plan, and the super admin switching it on. If the AI service does not answer, the batch carries on without it and says so.
+
+**Average factor — when nothing identifies the purchase.** The kind gets the median EPA factor of **services** (0.11 kg CO₂e per 2022 USD) or of **goods** (0.28), chosen from its best candidate (an agriculture, mining, construction or manufacturing code → goods) or from units in the description (kg, t, L, m³, pcs, box… → goods). It is marked *average factor (estimate)*. Whether it needs a person depends on its size, not on the method:
+
+- in the **large kinds** (the top 95 % of emissions) it waits under *To confirm* — someone picks the right category from the candidates or the full list;
+- in the **small tail** it is accepted as it is. Factors of services are close to each other, so a rough estimate on a small purchase barely moves the total.
+
+### 4–7 · The rest of the flow
+
+Capital goods and non-purchases, other categories, factors, currencies and review by impact are explained in the sections below.
+
+### Example
+
+| Line in the file | Cleaned | Kind of purchase | Mapped by | Result |
+|---|---|---|---|---|
+| “Copier paper A4 – PO 4500123” (AED 1,200) | copier paper a4 | Copier paper A4 (42 lines) | remembered choice | Stationery — confirmed |
+| “Ready mix concrete C40 – 25 m3” (AED 180,000) | ready mix concrete c40 m3 | Ready mix concrete C40 (12 lines) | clear description | Ready-mix concrete — in the top 95 %: a person confirms |
+| “Monthly charges” from *Al Amn Guarding* | monthly charges | Monthly charges · Al Amn Guarding | supplier default | Security services — confirmed |
+| “Monthly charges” from *Sparkle Cleaning* | monthly charges | Monthly charges · Sparkle Cleaning | weaker description | Janitorial services — small: accepted |
+| “ZX-200 kit” (AED 900) | zx kit | ZX-200 kit | nothing found → average factor (goods) | estimate, small: accepted |
+| “Flight DXB–LHR” | flight dxb lhr | Flight DXB–LHR | description | Air transport — moved to Business travel (3.6) |
 
 ## Capital goods and what is not a purchase
 

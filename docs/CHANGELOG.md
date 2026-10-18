@@ -2,6 +2,10 @@
 
 Newest first.
 
+## 2026-10-18 · Manual: purchases mapping flow
+
+- Purchases chapter: new section "How purchases are mapped — the whole flow" (cleaning, grouping and the split of vague descriptions by supplier, the mapping order with what is confirmed automatically, how the BM25 description match and its confidence work, AI among candidates, average factor for goods or services and when a person must confirm it, worked example). Corrected: AI is used for every kind still unidentified after the text match, not only large ones; the category-text default (step 6) was missing.
+
 ## 2026-10-18 · Quantity check: seasonal band, and shown while typing
 
 - **New check method** (`lib/rangeCheck.ts`), chosen under Methodology → Quantity check (`checkMethod` in the approval settings; default `smart`): two forecasts — seasonal (same month last year × recent trend, last 3 months vs the same 3 a year earlier, clamped ×0.5–×2) and level (6-month average) — are scored on the last 12 months; the one with the smaller robust spread (MAD of log errors) gives the expected value (bias-corrected by its median error) and the band, ±3 × that spread, at least ±10%, at most ×3; ± the limit around the seasonal forecast until it can be scored; 6-month average ± limit with less than a year. The 6-month average ± limit stays available.
