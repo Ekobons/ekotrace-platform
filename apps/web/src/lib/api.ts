@@ -396,10 +396,11 @@ export interface RepSettings {
   credits?: { claim_year: number; t: number; retired_on: string; purpose: string; serials: string | null; registry_url: string | null; project: string; project_id: string | null; registry: string; category: string; vintage: number; ccp: boolean; ca: boolean; corsia: boolean }[];
   templates: RepTemplate[]; versions: RepVersion[]; canEntity: boolean; canEdit: boolean;
 }
-export interface ApprovalSettings { l2: boolean; minT: number; cats: string[]; checkPct: number; selfApproval: boolean; selfMaxT: number | null }
+export interface ApprovalSettings { l2: boolean; minT: number; cats: string[]; checkPct: number; checkMethod?: 'avg6' | 'smart'; selfApproval: boolean; selfMaxT: number | null }
+export interface RangeCheck { ok: boolean; txt: string; method: 'avg6' | 'smart'; expected: number; low: number; high: number; basis: string; usual: number }
 export interface ApprovalRow {
   id: string; f: string; facility: string; month: string; cat: string; category: string; item: string; note: string | null; dataType: string; qty: number; unit: string; kg: number;
-  by: string | null; at: string | null; stage: 'L2' | null; l1: string | null; mine: boolean; self?: boolean; canApprove: boolean; waitingFor: string; check: { ok: boolean; txt: string } | null; willNeedL2: boolean;
+  by: string | null; at: string | null; stage: 'L2' | null; l1: string | null; mine: boolean; self?: boolean; canApprove: boolean; waitingFor: string; check: RangeCheck | null; willNeedL2: boolean;
 }
 export interface ApprovalsData { settings: ApprovalSettings; mine: ApprovalRow[]; others: ApprovalRow[]; categories: { code: string; name: string; scope: number }[]; canSettings: boolean }
 export interface HomeData {
@@ -951,6 +952,7 @@ export const api = {
   uploadLogo: (f: File) => call<{ ok: true }>('POST', '/api/tenant/logo', undefined, f),
   removeLogo: () => call<{ ok: true }>('DELETE', '/api/tenant/logo'),
   makeRollup: (q: { facilityId: string; year: number; month: number }) => call<{ made: { item: string; kg: number; dataType: string; id: string | null; warnings: string[] }[] }>('POST', '/api/qr/rollup', q),
+  rangeCheck: (entries: (Record<string, unknown> | null)[]) => call<{ method: 'avg6' | 'smart'; checks: (RangeCheck | null)[] }>('POST', '/api/activities/check', { entries }),
   saveApprovalSettings: (b: ApprovalSettings) => call<ApprovalSettings>('PUT', '/api/approvals/settings', b),
   reviewAction: (ids: string[], action: 'submit' | 'withdraw' | 'approve' | 'return', note?: string) => call<{ done: number; skipped: { id: string; reason: string }[]; toLevel2?: number }>('POST', '/api/activities/review', { ids, action, note }),
   deleteActivity: (id: string) => call<{ ok: true }>('DELETE', `/api/activities/${id}`),

@@ -5,7 +5,7 @@
 **Approvals** (menu → Capture → Entries & approvals) lists the entries submitted for the facilities you look after.
 
 - **Waiting for you** — entries you can approve. For each: facility and month, category and item (with the note), quantity, tCO₂e (**How calculated** shows the factors and steps), the **check**, and who entered it and when.
-- **Check** — the quantity against the average for the same item at the same facility over the 6 months before. Outside the limit (±35% by default) it is flagged, e.g. “+42% vs 6-month average — add a note”. No history = nothing to compare yet.
+- **Check** — the quantity against the approved history of the same item at the same facility (see *Quantity check* below). Outside the usual range it is flagged, e.g. “+42% vs expected 1,240 (usual range 1,010–1,520…) — add a note”; hover the check to see how the range was worked out. No history = nothing to compare yet. The person entering the data sees the same check while typing.
 - **Approve** — the entry counts in the dashboards and reports. **Send back** — write what needs fixing; the person who entered it sees it on Home and in Add data.
 - **Approve all N without warnings** — approves every entry in its usual range in one go; flagged ones stay for a closer look.
 - **Waiting for someone else** — entries in your facilities waiting for another approver, and who (your own entries, which you never approve yourself).
@@ -18,7 +18,10 @@ Set by the super admin under **Methodology & boundaries → Approval levels**:
 
 - **Level 1** — another manager of the facility, else the sub-group admin, else the super admin. Nobody approves their own entry (unless self-approval is switched on, below).
 - **Level 2** (optional) — for entries of at least a number of tCO₂e, or always for chosen categories, a second approval by a sub-group admin or the super admin, a different person from level 1. After level 1 the entry shows **Level 2 · Level 1 approved by …**.
-- **Quantity check** — the ± % limit for the check.
+- **Quantity check** — how the usual range is worked out, and the ± % limit:
+  - **Seasonal band** (default): two forecasts are tried on each of the last 12 months — (a) the same month last year × the recent trend (the last 3 months against the same 3 months a year earlier, kept between ×0.5 and ×2) and (b) the average of the 6 months before. The one that has been closer gives the expected value, and the band is 3 × its usual error (a robust spread, so one odd month does not widen it), at least ±10% and at most ×3. Seasonal entries (cooling, irrigation) end up judged against last year's season, steady ones against their recent level; regular data gets a tight band, erratic data a wider one. Until the forecasts can be scored the band is ± the limit around (a); with less than a year of history the 6-month average ± the limit is used.
+  - **6-month average ± limit**: the average of the 6 months before, ± the limit (±35% by default). Simple, but flags normal seasonal swings such as summer cooling.
+  - A metric in the Metric registry can have its own limit.
 
 Sending an entry back clears both levels; when it is resubmitted it starts again at level 1.
 

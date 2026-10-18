@@ -61,7 +61,7 @@ export function Approvals() {
         {can && l.willNeedL2 && <div className="muted small">Goes on to level 2 after your approval</div>}</td>
       <td className="num nowrap">{fmt(l.qty, l.qty < 100 ? 2 : 0)} <span className="muted">{unitLabel(l.unit)}</span></td>
       <td className="num"><b>{fmt(l.kg / 1000, 2)}</b><div><button className="btn xs ghost" onClick={() => void show(l.id)}>How calculated</button></div></td>
-      <td className="small" style={{ color: l.check ? (l.check.ok ? 'var(--ok)' : 'var(--warn)') : 'var(--muted)', maxWidth: 240 }}>{l.check ? l.check.txt : 'No history to compare'}</td>
+      <td className="small" title={l.check?.basis} style={{ color: l.check ? (l.check.ok ? 'var(--ok)' : 'var(--warn)') : 'var(--muted)', maxWidth: 240 }}>{l.check ? l.check.txt : 'No history to compare'}</td>
       <td className="muted small nowrap">{l.by?.replace(/ \(.*\)$/, '') ?? '—'}<br />{l.at ? new Date(l.at).toLocaleDateString('en-GB') : ''}</td>
       <td>{can && l.self && ret?.id !== l.id ? (own?.id === l.id
         ? <div className="row nowrap" style={{ gap: 6 }}><input className="input sm" autoFocus style={{ minWidth: 240 }} placeholder="Checked against… (e.g. the March bill)" value={own.note} onChange={(e) => setOwn({ id: l.id, note: e.target.value })} />
@@ -95,7 +95,7 @@ export function Approvals() {
           <span className="grow" /><span className="muted small">{mine.length + others.length} of {all.length} shown</span>
         </div>
         <section className="card tacard">
-          <div className="row"><h2>Waiting for you · {mine.length}{filtered ? ` of ${d.mine.length}` : ''}</h2><span className="grow" /><span className="muted small">Check = quantity against the facility’s average for the same item over the 6 months before (limit ±{d.settings.checkPct}%). {d.settings.selfApproval ? 'Your company allows self-approval: your own entries need a note and are marked self-reviewed.' : 'Nobody approves their own entry.'}</span></div>
+          <div className="row"><h2>Waiting for you · {mine.length}{filtered ? ` of ${d.mine.length}` : ''}</h2><span className="grow" /><span className="muted small">{d.settings.checkMethod === 'avg6' ? <>Check = quantity against the facility’s average for the same item over the 6 months before (limit ±{d.settings.checkPct}%).</> : <>Check = quantity against its seasonal band: the same month last year × the recent trend, with a band from past accuracy.</>} {d.settings.selfApproval ? 'Your company allows self-approval: your own entries need a note and are marked self-reviewed.' : 'Nobody approves their own entry.'}</span></div>
           <div className="scrollx"><table className="t">{head}<tbody>{mine.map((l) => row(l, true))}{!mine.length && <tr><td colSpan={7} className="muted">{d.mine.length ? 'Nothing matches the filters.' : 'Nothing waiting for your approval.'}</td></tr>}</tbody></table></div>
         </section>
         {others.length > 0 && (

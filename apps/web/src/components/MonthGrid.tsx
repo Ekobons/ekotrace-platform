@@ -3,7 +3,8 @@
  *
  *  - Month · Type (when the form offers several) · Quantity · Note / reference and data type ·
  *    Emissions (calculated as you type; "How?" opens the split per gas, the factors and the steps) ·
- *    Check (against this entry's usual months) · + line
+ *    Check (against this entry's own history: seasonal band or 6-month average, as set under
+ *    Methodology — the same check the approver sees) · + line
  *  - Paste a column of numbers from Excel into the first quantity: it fills the next rows.
  *  - Months that already have the same entry are marked "entered", so nothing goes in twice.
  *  - Save as draft, or Submit for approval (goes to the facility's approver). A row with a
@@ -12,7 +13,7 @@
  * The other inputs (fuel, supplier, vehicle, factor…) are set once in the form above.
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { api, BASIS_SHORT, num, tco2e, type Activity, type Basis, type CalcResponse } from '../lib/api';
+import { api, BASIS_SHORT, num, tco2e, type Activity, type Basis, type CalcResponse, type RangeCheck } from '../lib/api';
 import { Result } from './Result';
 import { Icon } from './Icon';
 import { useApp } from '../App';
@@ -111,25 +112,31 @@ export function MonthGrid({ year, facilityId, label, unitName, build, bases = ['
     return () => window.clearTimeout(t);
   }, [key]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // range check of each typed month against the entry's approved history (server: lib/rangeCheck)
+  const [rc, setRc] = useState<Record<number, RangeCheck | null>>({});
+  useEffect(() => {
+    const list = entries.filter((e) => e.body && (e.body as Record<string, unknown>).itemId != null);
+    if (!list.length) { setRc({}); return; }
+    const t = window.setTimeout(() => {
+      api.rangeCheck(list.map((e) => { const b = e.body as Record<string, unknown>; return { facilityId: b.facilityId, itemId: b.itemId, unit: b.unit, sub: (b.vehicle as { vehicleId?: string } | undefined)?.vehicleId ?? (b.meterId as string | undefined) ?? null, periodStart: b.periodStart, periodEnd: b.periodEnd, quantity: b.quantity }; }))
+        .then((x) => { const r: Record<number, RangeCheck | null> = {}; x.checks.forEach((c, i) => { r[list[i]!.k] = c; }); setRc(r); }).catch(() => setRc({}));
+    }, 400);
+    return () => window.clearTimeout(t);
+  }, [key]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const loadExisting = () => { if (dup && facilityId) api.activities({ facilityId, category: dup.category, limit: 1000 }).then((r) => setExisting(r.activities)).catch(() => {}); };
   useEffect(loadExisting, [facilityId, year, dup?.category]); // eslint-disable-line react-hooks/exhaustive-deps
   /** months of this year that already have the same entry (per type) */
   const taken = (m: number, type: string) => !!dup && existing.some((a) => dup.same(a, type || undefined) && a.period_start.slice(0, 7) === `${year}-${pad(m + 1)}` && a.period_end.slice(0, 7) === a.period_start.slice(0, 7));
-  /** the usual monthly quantity of the same entry (median of saved months) */
-  const usual = (type: string) => {
-    if (!dup) return null;
-    const q = existing.filter((a) => dup.same(a, type || undefined) && a.period_start.slice(0, 7) === a.period_end.slice(0, 7)).map((a) => Number(a.quantity)).filter((x) => x > 0).sort((a, b) => a - b);
-    return q.length >= 2 ? q[Math.floor(q.length / 2)]! : null;
-  };
   const check = (r: Row) => {
     if (r.v === '') return { cls: 'muted', t: 'Checked when you type' };
     const x = res[r.k];
     if (x?.error) return { cls: 'bad', t: x.error };
     if (taken(r.m, r.type)) return { cls: 'warn', t: `! ${MONTHS[r.m]} already has this entry` };
-    const u = usual(r.type), v = Number(r.v);
-    if (u && (v > u * 1.6 || v < u * 0.4)) return { cls: 'warn', t: `! ${v > u ? Math.round((v / u - 1) * 100) + '% above' : Math.round((1 - v / u) * 100) + '% below'} the usual ${num(u)}` };
-    if (u) return { cls: 'ok', t: `✓ In line with the usual ${num(u)}` };
-    return { cls: 'ok', t: '✓ Looks fine' };
+    const k = rc[r.k];
+    if (k && !k.ok) return { cls: 'warn', t: `! ${k.txt.replace(/ — add a note$/, '')} — explain in the note`, tip: k.basis };
+    if (k) return { cls: 'ok', t: `✓ ${k.txt}`, tip: k.basis };
+    return { cls: 'ok', t: '✓ No history yet to compare' };
   };
 
   // Paste a column (or row) of numbers: fills this row and the rows below.
@@ -179,11 +186,11 @@ export function MonthGrid({ year, facilityId, label, unitName, build, bases = ['
                   onChange={(e) => set(r.k, { v: e.target.value.replace(/[^0-9.]/g, '') })} />
                 <span className="muted small" style={{ whiteSpace: 'nowrap' }}>{unitName}</span></div></td>
               <td style={{ minWidth: 160 }}><div style={{ display: 'grid', gap: 4 }}>
-                <input className="input" value={r.note} maxLength={1000} placeholder="Meter, invoice no." onChange={(e) => set(r.k, { note: e.target.value })} />
+                <input className="input" value={r.note} maxLength={1000} placeholder={c.cls === 'warn' && rc[r.k] && !rc[r.k]!.ok ? 'Why is it different? (e.g. new chiller)' : 'Meter, invoice no.'} onChange={(e) => set(r.k, { note: e.target.value })} />
                 <select className="input" value={r.dt} onChange={(e) => set(r.k, { dt: e.target.value })}><option value="actual">Actual</option><option value="estimated">Estimated</option><option value="proxy">Proxy</option></select></div></td>
               <td className="num" style={{ minWidth: 100 }}><b style={{ fontSize: 14 }}>{x?.totals ? tco2e(x.totals[main] ?? 0) : '—'}</b><div className="muted small">tCO₂e{bases.length > 1 && x?.totals && (x.totals[bases[1]!] ?? 0) !== 0 ? ` · ${BASIS_SHORT[bases[1]!]} ${tco2e(x.totals[bases[1]!] ?? 0)}` : ''}</div>
                 {x?.totals && <button className="howlink" onClick={() => openHow(r)} title="Split per gas, factors used and calculation steps">ⓘ How?</button>}</td>
-              <td className={`small ${c.cls}`} style={{ minWidth: 110, maxWidth: 220 }}>{c.t}</td>
+              <td className={`small ${c.cls}`} title={'tip' in c ? c.tip : undefined} style={{ minWidth: 110, maxWidth: 260 }}>{c.t}</td>
               <td style={{ whiteSpace: 'nowrap' }}>
                 <button className="btn ghost sm" title="Another line for this month" onClick={() => setRows((rs) => { const j = rs.findIndex((y) => y.k === r.k); const n = [...rs]; n.splice(j + 1, 0, blank(r.m, r.type)); return n; })}>+ line</button>
                 {again && <button className="btn ghost sm" aria-label="Remove line" onClick={() => setRows((rs) => rs.filter((y) => y.k !== r.k))}>×</button>}

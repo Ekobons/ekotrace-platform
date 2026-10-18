@@ -16,6 +16,9 @@ import { calcInputSchema, calculate, findPrice, type CalcContext, type CalcInput
 import type { Tx } from '../db/pool.js';
 import { syncMeter, type MeterRow } from './meters.routes.js';
 import { sealFile, openFile } from '../lib/secrets.js';
+import { approvalSettings } from './approvals.routes.js';
+import { rangeChecks } from '../lib/rangeCheck.js';
+import { METRIC_JOIN } from '../lib/collection.js';
 
 /**
  * A fleet vehicle chosen for the entry: its type, fuel and charging become the
@@ -310,6 +313,26 @@ export async function activityRoutes(app: FastifyInstance) {
     const b = saveSchema.parse(req.body);
     const t = await tenantSettings(tenant);
     return tenantTx(tenant, (c) => saveEntry(c, req, t, b));
+  });
+
+  /**
+   * Range check while typing (Add data month grid): each monthly entry against its own history — the
+   * 6-month average or the seasonal band, as set under Methodology. Same check the approver sees.
+   */
+  app.post('/api/activities/check', async (req) => {
+    const tenant = requireTenant(req);
+    const b = z.object({ entries: z.array(z.object({ facilityId: z.string().uuid(), itemId: z.coerce.number().int(), unit: z.string().max(40), sub: z.string().max(40).nullish(), periodStart: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+      periodEnd: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), quantity: z.coerce.number() }).nullable()).max(400) }).parse(req.body);
+    return tenantTx(tenant, async (c) => {
+      const s = await scopeOf(c, req.user), set = await approvalSettings(c, tenant);
+      const ok = b.entries.map((e, i) => ({ e, i })).filter((x): x is { e: NonNullable<typeof x.e>; i: number } => !!x.e && s.see.has(x.e.facilityId)
+        && (Date.parse(x.e.periodEnd) - Date.parse(x.e.periodStart)) / 86400000 < 40);
+      const items = [...new Set(ok.map((x) => x.e.itemId))];
+      const pcts = new Map<number, number | null>((await c.query(`SELECT a.item_id, mt.check_pct FROM (SELECT i.id AS item_id, s.category_id FROM item i JOIN subcategory s ON s.id = i.subcategory_id WHERE i.id = ANY($1)) a
+        JOIN category cat ON cat.id = a.category_id ${METRIC_JOIN}`, [items])).rows.map((r) => [r.item_id as number, r.check_pct as number | null]));
+      const ck = await rangeChecks(c, ok.map((x) => ({ key: String(x.i), facilityId: x.e.facilityId, itemId: x.e.itemId, unit: x.e.unit, sub: x.e.sub ?? '', month: x.e.periodStart.slice(0, 7) + '-01', qty: x.e.quantity, pct: pcts.get(x.e.itemId) ?? set.checkPct })), set.checkMethod);
+      return { method: set.checkMethod, checks: b.entries.map((_, i) => ck.get(String(i)) ?? null) };
+    });
   });
 
   /**

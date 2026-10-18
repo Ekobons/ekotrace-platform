@@ -1690,6 +1690,11 @@ test('approvals: waiting for me vs someone else, 6-month check; level 2 for larg
   const b = ap.mine.find((x: { id: string }) => x.id === big), o = ap.mine.find((x: { id: string }) => x.id === ok);
   assert.ok(b && o, JSON.stringify(ap.mine.map((x: { id: string }) => x.id)));
   assert.equal(b.check.ok, false); assert.match(b.check.txt, /\+200% vs 6-month average/); assert.equal(o.check.ok, true);
+  // the same check while typing (Add data): one call for several months; not monthly or unseen facility → null
+  const live = (await call(prep, 'POST', '/api/activities/check', { entries: [e('04', 3000), e('06', 1000), null, { ...e('07', 5), periodEnd: '2024-12-31' }] })).body;
+  assert.equal(live.checks[0].ok, false); assert.match(live.checks[0].txt, /6-month average/); assert.equal(live.checks[1].ok, true);
+  assert.equal(live.checks[2], null); assert.equal(live.checks[3], null);
+  assert.equal(live.method, 'smart', 'seasonal band by default (falls back to the 6-month average without a year of history)');
   assert.ok((await call(prep, 'GET', '/api/approvals')).body.others.some((x: { id: string; waitingFor: string }) => x.id === big && x.waitingFor === 'rmgr@a.test'));
   // level 2 for every entry from 0 t: the manager's approval moves it to level 2
   assert.equal((await call(mgr, 'PUT', '/api/approvals/settings', { l2: true, minT: 0, cats: [], checkPct: 35 })).status, 403);

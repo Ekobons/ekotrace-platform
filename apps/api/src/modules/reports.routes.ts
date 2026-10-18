@@ -17,7 +17,7 @@ import { tenantTx, type Tx } from '../db/pool.js';
 import { audit, requireRole, requireTenant } from '../lib/auth.js';
 import { scopeOf, subtreeFacilities } from '../lib/access.js';
 import { AppError } from '../lib/errors.js';
-import { USUAL_SQL, approvalSettings } from './approvals.routes.js';
+import { approvalSettings, checksFor } from './approvals.routes.js';
 import { EVIDENCE_SQL, METRIC_JOIN } from '../lib/collection.js';
 
 const sel = z.object({ year: z.coerce.number().int().min(2000).max(2100), node: z.string().uuid().optional(), group: z.string().uuid().optional(), pend: z.enum(['0', '1']).optional() });
@@ -67,17 +67,17 @@ export async function reportsRoutes(app: FastifyInstance) {
     const tenant = requireTenant(req);
     const q = sel.parse(req.query);
     return tenantTx(tenant, async (c) => {
-      const facs = await viewFacs(c, req, q), set = await approvalSettings(c, tenant), pct = set.checkPct / 100;
+      const facs = await viewFacs(c, req, q), set = await approvalSettings(c, tenant);
       const nm = (r: { facility: string; item: string; month: string }) => `${r.facility} · ${r.item} · ${r.month.slice(0, 7)}`;
       const base = `FROM activity a JOIN org_node f ON f.id = a.facility_id JOIN item i ON i.id = a.item_id JOIN category cat ON cat.id = a.category_id
                     WHERE a.facility_id = ANY($1) AND extract(year FROM a.period_start) = $2`;
       const q2 = async (sql: string) => (await c.query(sql, [facs, q.year])).rows;
       // metric registry: its own check limit, and whether it needs evidence
       const baseM = base.replace('WHERE a.facility_id', `${METRIC_JOIN} WHERE a.facility_id`);
-      const odd = (await q2(`SELECT f.name AS facility, i.name AS item, a.period_start::text AS month, a.quantity::float8 AS qty, ${USUAL_SQL} AS usual, mt.check_pct ${baseM}
-                               AND a.status IN ('approved', 'submitted') AND coalesce(trim(a.note), '') = '' AND a.period_end - a.period_start < 40`))
-        .filter((r) => r.usual && Math.abs(r.qty / r.usual - 1) >= (r.check_pct != null ? r.check_pct / 100 : pct))
-        .map((r) => `${nm(r)} — ${r.qty > r.usual ? '+' : '−'}${Math.round(Math.abs(r.qty / r.usual - 1) * 100)}% vs 6-month average (limit ±${r.check_pct ?? set.checkPct}%), no explanation`);
+      const oddRows = await q2(`SELECT a.id, a.facility_id::text AS f, a.item_id AS iid, a.unit, coalesce(a.vehicle_id::text, a.meter_id::text, '') AS sub, true AS monthly, f.name AS facility, i.name AS item, a.period_start::text AS month, a.quantity::float8 AS qty, mt.check_pct ${baseM}
+                               AND a.status IN ('approved', 'submitted') AND coalesce(trim(a.note), '') = '' AND a.period_end - a.period_start < 40`);
+      const oddCk = await checksFor(c, set, oddRows);
+      const odd = oddRows.flatMap((r) => { const k = oddCk.get(r.id); return k && !k.ok ? [`${nm(r)} — ${k.txt.replace(/ — add a note$/, '')}, no explanation`] : []; });
       const reqev = (await q2(`SELECT f.name AS facility, i.name AS item, a.period_start::text AS month, mt.metric_code ${baseM}
                                  AND a.status IN ('approved', 'submitted') AND mt.evidence = 'required' AND NOT ${EVIDENCE_SQL} ORDER BY 3 LIMIT 500`)).map((r) => `${nm(r)} · ${r.metric_code}`);
       const noev = (await q2(`SELECT f.name AS facility, i.name AS item, a.period_start::text AS month ${base}
@@ -111,7 +111,7 @@ export async function reportsRoutes(app: FastifyInstance) {
       const just = Object.fromEntries((await c.query(`SELECT j.check_id, j.text, u.name AS by, j.created_at AS at FROM report_justification j LEFT JOIN app_user u ON u.id::text = j.created_by WHERE j.year = $1`, [q.year])).rows.map((r) => [r.check_id, { text: r.text, by: r.by, at: r.at }]));
       const checks: [string, string, string, string[]][] = [
         ['missing', 'Data missing in months so far (categories the facility reports)', 'Completeness', miss],
-        ['odd', `Values more than ${set.checkPct}% off the 6-month average without a note`, 'Outliers', odd],
+        ['odd', set.checkMethod === 'smart' ? 'Values outside their usual range (season and trend) without a note' : `Values more than ${set.checkPct}% off the 6-month average without a note`, 'Outliers', odd],
         ['noev', 'Electricity, fuel and water entries approved without a bill or meter', 'Evidence', noev],
         ['reqev', 'Entries of metrics that require evidence (metric registry), without it', 'Evidence', reqev],
         ['spend', 'Purchases calculated with spend averages (not supplier-specific)', 'Emission factors', spend],

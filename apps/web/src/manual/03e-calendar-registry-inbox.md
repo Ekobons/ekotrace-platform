@@ -33,7 +33,7 @@ A company starts with one standard metric per category, numbered EKO-001, EKO-00
 | Required | Ticked: every facility it applies to owes it every period. Not ticked: only facilities that report it (data this year or last). |
 | Source system, methods | Where the data comes from (SAP MM, fuel cards, DEWA bills…) and how it is captured (form, upload, bill or meter, API, QR, survey) |
 | Frequency and due | Monthly, quarterly or yearly. Due on a day of the month after the period, or later. Without a day, the company's due day applies. |
-| Check limit | How far from the 6-month average an entry may be before it is flagged on Approvals and in the data-quality checks (company default ±35%) |
+| Check limit | The ± % limit of the quantity check for this metric (company default ±35%): used by the 6-month average, and by the seasonal band until it can be measured. Flagged entries show in Add data, Approvals and the data-quality checks |
 | Evidence | **Required**: an entry cannot be submitted or approved until it has evidence, which can be a bill, a meter, a purchase file, bin scans or a document linked in the Document vault. **Optional**: flagged only. |
 
 ### Changes and versions

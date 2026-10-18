@@ -128,12 +128,12 @@ export function Methodology() {
 function ApprovalLevels({ edit }: { edit: boolean }) {
   const { toast } = useApp();
   const [d, setD] = useState<ApprovalsData | null>(null);
-  const [P, setP] = useState<{ l2: boolean; minT: string; cats: string[]; checkPct: string; selfApproval: boolean; selfMaxT: string } | null>(null);
-  useEffect(() => { api.approvals().then((x) => { setD(x); setP({ l2: x.settings.l2, minT: String(x.settings.minT), cats: x.settings.cats, checkPct: String(x.settings.checkPct), selfApproval: !!x.settings.selfApproval, selfMaxT: x.settings.selfMaxT == null ? '' : String(x.settings.selfMaxT) }); }).catch(() => {}); }, []);
+  const [P, setP] = useState<{ l2: boolean; minT: string; cats: string[]; checkPct: string; checkMethod: 'avg6' | 'smart'; selfApproval: boolean; selfMaxT: string } | null>(null);
+  useEffect(() => { api.approvals().then((x) => { setD(x); setP({ l2: x.settings.l2, minT: String(x.settings.minT), cats: x.settings.cats, checkPct: String(x.settings.checkPct), checkMethod: x.settings.checkMethod ?? 'smart', selfApproval: !!x.settings.selfApproval, selfMaxT: x.settings.selfMaxT == null ? '' : String(x.settings.selfMaxT) }); }).catch(() => {}); }, []);
   if (!d || !P) return null;
   const groups = [...new Map(d.categories.map((c) => { const g = c.code.startsWith('waste_') ? 'waste' : c.code.startsWith('water_') ? 'water' : c.code; return [g, g === 'waste' ? 'Waste' : g === 'water' ? 'Water' : c.name] as [string, string]; })).entries()];
   const save = async () => {
-    try { const r = await api.saveApprovalSettings({ l2: P.l2, minT: Math.max(0, Number(P.minT) || 0), cats: P.cats, checkPct: Math.max(1, Math.round(Number(P.checkPct) || 35)), selfApproval: P.selfApproval, selfMaxT: P.selfMaxT.trim() === '' ? null : Math.max(0, Number(P.selfMaxT) || 0) }); setD({ ...d, settings: r }); toast(r.l2 ? `Level 2 for entries of ${r.minT} t or more${r.cats.length ? ` and ${r.cats.length} categories` : ''}` : 'One approval level'); }
+    try { const r = await api.saveApprovalSettings({ l2: P.l2, minT: Math.max(0, Number(P.minT) || 0), cats: P.cats, checkPct: Math.max(1, Math.round(Number(P.checkPct) || 35)), checkMethod: P.checkMethod, selfApproval: P.selfApproval, selfMaxT: P.selfMaxT.trim() === '' ? null : Math.max(0, Number(P.selfMaxT) || 0) }); setD({ ...d, settings: r }); toast(r.l2 ? `Level 2 for entries of ${r.minT} t or more${r.cats.length ? ` and ${r.cats.length} categories` : ''}` : 'One approval level'); }
     catch (e) { toast((e as Error).message); }
   };
   return (
@@ -152,8 +152,14 @@ function ApprovalLevels({ edit }: { edit: boolean }) {
       </div>
       <div className="card" style={{ display: 'grid', gap: 10, alignContent: 'start' }}>
         <h2>Quantity check</h2>
-        <label className="field" style={{ width: 220 }}><span>Flag entries more than ± % from usual</span><input className="input num" inputMode="numeric" disabled={!edit} value={P.checkPct} onChange={(e) => setP({ ...P, checkPct: e.target.value })} /></label>
-        <p className="sub">Each entry waiting for approval is compared with the same item at the same facility over the 6 months before. Entries outside the limit are flagged in Approvals and on Home, and are left out of “Approve all without warnings”.</p>
+        <div style={{ display: 'grid', gap: 6 }}>
+          {([['smart', 'Seasonal band (recommended)', 'Two forecasts are tried on the last 12 months of each entry: the same month last year × the recent trend, and the 6-month average. The one that has been closer gives the expected value, and the band is 3 × its usual error (at least ±10%). Seasonal entries such as cooling are judged against last year’s season; steady ones against their recent level. Regular data gets a tight band, erratic data a wider one. With less than a year of history the 6-month average ± the limit below is used.'],
+            ['avg6', '6-month average ± limit', 'The average of the same item at the same facility over the 6 months before, ± the limit below. Simple, but flags normal seasonal swings.']] as const).map(([k, l, d]) => (
+            <label key={k} className="soft" style={{ cursor: edit ? 'pointer' : 'default' }}><span className="row" style={{ gap: 8 }}><input type="radio" name="checkMethod" disabled={!edit} checked={P.checkMethod === k} onChange={() => setP({ ...P, checkMethod: k })} /><b>{l}</b></span>
+              <span className="muted" style={{ fontSize: 12.5 }}>{d}</span></label>))}
+        </div>
+        <label className="field" style={{ width: 260 }}><span>Limit ± % {P.checkMethod === 'smart' ? '(used until the band can be measured)' : ''}</span><input className="input num" inputMode="numeric" disabled={!edit} value={P.checkPct} onChange={(e) => setP({ ...P, checkPct: e.target.value })} /></label>
+        <p className="sub">Each monthly entry is compared with approved months of the same item at the same facility. The check shows while data is typed in Add data, in Approvals and on Home; flagged entries are left out of “Approve all without warnings” and listed in the data-quality checks when they have no note. A metric in the Metric registry can have its own limit.</p>
         {edit && <div><button className="btn" onClick={() => void save()}>Save</button></div>}
       </div>
       <div className="card" style={{ display: 'grid', gap: 10, gridColumn: '1 / -1' }}>

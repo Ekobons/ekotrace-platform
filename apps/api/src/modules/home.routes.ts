@@ -18,7 +18,7 @@ import { tenantTx } from '../db/pool.js';
 import { audit, requireRole, requireTenant } from '../lib/auth.js';
 import { scopeOf, subtreeFacilities } from '../lib/access.js';
 import { AppError } from '../lib/errors.js';
-import { SELF_ROLES, USUAL_SQL, approvalSettings, checkOf, selfAllowed } from './approvals.routes.js';
+import { SELF_ROLES, approvalSettings, checksFor, selfAllowed } from './approvals.routes.js';
 import { METRIC_JOIN } from '../lib/collection.js';
 
 export const KPI_IDS = ['tot', 's12', 's3', 'pemp', 'pm2', 'elec', 'ren', 'eui', 'cool', 'water', 'wemp', 'waste', 'div', 'fuel', 'fleet', 'travel', 'purch', 'supsp', 'refr'] as const;
@@ -66,13 +66,15 @@ export async function homeRoutes(app: FastifyInstance) {
       const set = await approvalSettings(c, tenant), canL2 = ['super_admin', 'admin', 'platform_admin'].includes(req.user.role);
       const approvals = (await c.query(
         `SELECT a.id, a.facility_id AS f, fo.name AS facility, cat.code AS cat, cat.name AS category, i.name AS item, a.period_start::text AS month, a.quantity::float8 AS qty, a.unit,
-                (a.co2e_direct + a.co2e_scope2 + a.co2e_scope3)::float8 AS kg, ue.name AS by, a.submitted_at AS at, a.approval_stage AS stage, a.l1_by, a.created_by, a.submitted_by, ${USUAL_SQL} AS usual, mt.check_pct
+                (a.co2e_direct + a.co2e_scope2 + a.co2e_scope3)::float8 AS kg, ue.name AS by, a.submitted_at AS at, a.approval_stage AS stage, a.l1_by, a.created_by, a.submitted_by, a.facility_id::text AS f2, a.item_id AS iid, coalesce(a.vehicle_id::text, a.meter_id::text, '') AS sub, (a.period_end - a.period_start < 40) AS monthly, mt.check_pct
            FROM activity a JOIN category cat ON cat.id = a.category_id JOIN item i ON i.id = a.item_id JOIN org_node fo ON fo.id = a.facility_id LEFT JOIN app_user ue ON ue.id::text = a.created_by ${METRIC_JOIN}
           WHERE a.facility_id = ANY($1) AND a.status = 'submitted' AND ($2 OR (coalesce(a.created_by, '') <> $3 AND coalesce(a.submitted_by, '') <> $3))
           ORDER BY a.submitted_at NULLS LAST LIMIT 500`, [apprFacs, solo || (set.selfApproval && SELF_ROLES.includes(req.user.role)), me])).rows
         .filter((r) => solo || (r.created_by !== me && r.submitted_by !== me) || selfAllowed(set, req.user.role, r.kg))
         .filter((r) => r.stage !== 'L2' || (canL2 && r.l1_by !== me))
-        .map(({ usual, l1_by: _l, check_pct, created_by: _cb, submitted_by: _sb, ...r }) => { const ck = checkOf(r.qty, usual, check_pct ?? set.checkPct); return { ...r, usual, warn: ck && !ck.ok ? ck.txt : null }; });
+        .map(({ l1_by: _l, created_by: _cb, submitted_by: _sb, ...r }) => r);
+      const hc = await checksFor(c, set, approvals.map((r) => ({ ...r, f: r.f2 })));
+      const approvalsOut = approvals.map(({ f2: _f, iid: _i, sub: _s, monthly: _m, check_pct: _p, ...r }) => { const ck = hc.get(r.id); return { ...r, usual: ck?.usual ?? null, warn: ck && !ck.ok ? ck.txt : null }; });
       const mine = (await c.query(
         `SELECT a.id, a.facility_id AS f, fo.name AS facility, CASE WHEN cat.code LIKE 'waste_%' THEN 'waste' WHEN cat.code LIKE 'water_%' THEN 'water' ELSE cat.code END AS cat, cat.name AS category,
                 i.name AS item, a.period_start::text AS month, a.status, a.review_note, ur.name AS reviewed_by
@@ -92,7 +94,7 @@ export async function homeRoutes(app: FastifyInstance) {
         year, solo, users,
         settings: { dueDay: t.due_day, remindDays: t.remind_days, escalateDays: t.escalate_days, baseYear: t.base_year, target: { year: t.target_year, s12: t.s12, s3: t.s3 }, plan: t.plan, accessExpiry: t.access_expiry },
         facilities: facilities.map((f) => ({ ...f, usual: usual.filter((u) => u.f === f.id).map((u) => u.cat as string) })),
-        cells, approvals, mine, batches, verifier: { ...approved, sample },
+        cells, approvals: approvalsOut, mine, batches, verifier: { ...approved, sample },
       };
     });
   });

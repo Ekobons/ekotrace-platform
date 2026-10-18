@@ -2,6 +2,14 @@
 
 Newest first.
 
+## 2026-10-18 · Quantity check: seasonal band, and shown while typing
+
+- **New check method** (`lib/rangeCheck.ts`), chosen under Methodology → Quantity check (`checkMethod` in the approval settings; default `smart`): two forecasts — seasonal (same month last year × recent trend, last 3 months vs the same 3 a year earlier, clamped ×0.5–×2) and level (6-month average) — are scored on the last 12 months; the one with the smaller robust spread (MAD of log errors) gives the expected value (bias-corrected by its median error) and the band, ±3 × that spread, at least ±10%, at most ×3; ± the limit around the seasonal forecast until it can be scored; 6-month average ± limit with less than a year. The 6-month average ± limit stays available.
+- One history query for any number of entries (approved monthly entries of the same facility, item and unit); replaces the per-row `USUAL_SQL` subquery in Approvals, Home and the data-quality checks.
+- **Add data month grid**: the Check column now calls `POST /api/activities/check` (same rule and limits as the approver, including a metric's own limit) instead of the browser's median ±60%; outside the range the note asks why. Hover shows how the range was worked out.
+- Entries of a vehicle or a meter are compared with that vehicle's or meter's own months (before, one van was compared with the whole fleet's monthly total, which flagged every van of a two-van fleet as −50%).
+- Tests: unit tests of the band (a normal summer peak passes where the 6-month average flags it; a 50% jump is flagged; steady noisy data uses the 6-month level; fallback without a year of history) and the live-check endpoint. Manual updated.
+
 ## 2026-10-17 · ESG & materiality: frameworks, double materiality assessment, industry questions; supplier portal ESG impact
 
 - **Menu → Disclose → ESG & materiality** (`/esg`): Frameworks & set-up · Double materiality · ESG data · Content index · Excel export. Migration 049 (`esg_assessment` per year, `esg_topic`, `esg_answer`, all with row-level security; purge order updated).
