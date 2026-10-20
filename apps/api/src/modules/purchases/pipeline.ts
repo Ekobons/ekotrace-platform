@@ -21,8 +21,8 @@
 import { createHash } from 'node:crypto';
 import { buildIndex, calcPurchase, chooseFx, classify, detectOverlap, normText, type ClassIndex, type FxMethod, type FxRate, type PriceIndex, type PurchaseContext, type SpendFactor, type UnitFactor } from '@ekotrace/calc';
 import { platformTx, tenantTx, type Tx } from '../../db/pool.js';
-import { config } from '../../config.js';
 import { aiChoose } from '../../lib/aiMap.js';
+import { tenantAi } from '../../lib/ai.js';
 import { scopeOf } from '../../lib/access.js';
 import type { User } from '../../lib/auth.js';
 import { cellText, detectKind, sheetRows, type Cell } from '../../lib/sheet.js';
@@ -260,7 +260,7 @@ const MOVE_TO = ['business_travel', 'upstream_transport', 'upstream_leased'];
  * in the file → clear description match → supplier default → account default → category text
  * default → weaker description match → approved AI (large unclear groups only) → average factor.
  */
-export async function mapGroups(c: Tx, tenant: string, batchId: string, opts: { keys?: string[]; jobId?: number } = {}) {
+export async function mapGroups(c: Tx, tenant: string, batchId: string, opts: { keys?: string[]; jobId?: number; aiPicks?: Map<string, { itemId: number; confidence: number }> } = {}) {
   const groups = (await c.query(
     `SELECT key, description, category_text, gl_account, supplier, supplier_id::text, item_id, map_method, decision, target, capital, confirmed, updated_by FROM purchase_group
       WHERE batch_id = $1 AND ($2::text[] IS NULL OR key = ANY($2))`, [batchId, opts.keys ?? null])).rows as GroupRow[];
@@ -275,7 +275,8 @@ export async function mapGroups(c: Tx, tenant: string, batchId: string, opts: { 
   const upd: Upd[] = [];
   const hits = new Map<string, number>();
   const hit = (r: Rule) => hits.set(r.id, (hits.get(r.id) ?? 0) + 1);
-  const tenantRow = (await c.query(`SELECT ai_mapping AND plan IN ('professional','enterprise') AS ai_mapping FROM tenant WHERE id = $1`, [tenant])).rows[0];
+  const ai = opts.aiPicks ? null : await tenantAi(c, tenant);
+  const aiNow = ai?.purchases === 'unidentified';
   const forAi: { g: GroupRow; u: Upd }[] = [];
   let n = 0;
   for (const g of groups) {
@@ -299,7 +300,9 @@ export async function mapGroups(c: Tx, tenant: string, batchId: string, opts: { 
       else if (rCat?.item_id) { u.item = rCat.item_id; u.method = 'category'; u.conf = 1; hit(rCat); }                    //    category-text default
       else if (text().itemId && text().confidence >= WEAK) { u.item = text().itemId; u.method = 'text'; u.conf = text().confidence; } // 6. weaker match
       if (cl) u.cand = (cl as ReturnType<typeof classify>).candidates;
-      if (!u.item && tenantRow?.ai_mapping && config.aiMap && text().candidates.length) forAi.push({ g, u });               // 7. AI (only if switched on)
+      const pick = opts.aiPicks?.get(g.key);
+      if (!u.item && pick) { u.item = pick.itemId; u.method = 'ai'; u.conf = pick.confidence; }                           // 7. AI (large kinds, after calculation)
+      if (!u.item && aiNow && text().candidates.length) forAi.push({ g, u });                                              // 7. AI (every unidentified kind)
       u.confirmed = CONFIRMED_METHODS.includes(u.method ?? '');
       // decisions remembered for this description, else the account's, supplier's or category's
       const dr = [rText, rGl, rSup, rCat].find((r) => r?.decision);
@@ -315,10 +318,11 @@ export async function mapGroups(c: Tx, tenant: string, batchId: string, opts: { 
     if (++n % 2000 === 0) await progress(opts.jobId, 'mapping', n, groups.length);
   }
   // AI, for unclear groups (only among the candidates)
-  if (forAi.length) {
+  if (ai && forAi.length) {
+    forAi.splice(ai.maxGroups);
     try {
       await progress(opts.jobId, 'mapping (AI)', 0, forAi.length);
-      const res = await aiChoose(forAi.map(({ g, u }) => ({ key: g.key, text: [g.description, g.category_text].filter(Boolean).join(' · '), candidates: ((u.cand ?? []) as { itemId: number }[]).map((x) => ({ id: x.itemId, name: ix.names.get(x.itemId) ?? '' })) })));
+      const res = await aiChoose(ai, forAi.map(({ g, u }) => ({ key: g.key, text: [g.description, g.category_text].filter(Boolean).join(' · '), candidates: ((u.cand ?? []) as { itemId: number }[]).map((x) => ({ id: x.itemId, name: ix.names.get(x.itemId) ?? '' })) })));
       for (const r of res) {
         const u = forAi.find((x) => x.g.key === r.key)?.u;
         if (u && r.itemId) { u.item = r.itemId; u.method = 'ai'; u.conf = r.confidence; }
@@ -359,6 +363,35 @@ export async function mapGroups(c: Tx, tenant: string, batchId: string, opts: { 
        p.map((u) => u.decision), p.map((u) => u.target), p.map((u) => u.capital), p.map((u) => u.capitalWhy), p.map((u) => u.overlap), p.map((u) => u.why), p.map((u) => u.confirmed)]);
   }
   for (const [id, h] of hits) await c.query('UPDATE purchase_rule SET hits = hits + $2 WHERE id = $1', [id, h]);
+}
+
+/**
+ * AI for the large kinds only (company setting "large"): after the first calculation, the kinds a person must
+ * confirm that still have no category (average factor) are sent to the AI, largest first, up to the company's
+ * limit; its picks are mapped like any other answer (other categories, capital goods) and recalculated.
+ */
+export async function aiLargeGroups(c: Tx, tenant: string, batchId: string, jobId?: number): Promise<number> {
+  const ai = await tenantAi(c, tenant);
+  if (ai?.purchases !== 'large') return 0;
+  const gs = (await c.query(
+    `SELECT key, description, category_text, candidates FROM purchase_group
+      WHERE batch_id = $1 AND material AND NOT confirmed AND updated_by IS NULL AND (item_id IS NULL OR map_method = 'fallback')
+        AND jsonb_typeof(candidates) = 'array' AND jsonb_array_length(candidates) > 0
+      ORDER BY co2e DESC NULLS LAST LIMIT $2`, [batchId, ai.maxGroups])).rows as { key: string; description: string; category_text: string | null; candidates: { itemId: number }[] }[];
+  if (!gs.length) return 0;
+  const ix = await spendIndex(c);
+  try {
+    await progress(jobId, 'mapping (AI)', 0, gs.length);
+    const res = await aiChoose(ai, gs.map((g) => ({ key: g.key, text: [g.description, g.category_text].filter(Boolean).join(' · '), candidates: g.candidates.map((x) => ({ id: x.itemId, name: ix.names.get(x.itemId) ?? '' })) })));
+    const picks = new Map(res.filter((r) => r.itemId).map((r) => [r.key, { itemId: r.itemId!, confidence: r.confidence }]));
+    if (!picks.size) return 0;
+    await mapGroups(c, tenant, batchId, { keys: [...picks.keys()], aiPicks: picks });
+    await calcLines(c, batchId, { keys: [...picks.keys()] });
+    return picks.size;
+  } catch (e) {
+    await c.query(`UPDATE purchase_batch SET error = $2 WHERE id = $1`, [batchId, `AI mapping not used: ${(e as Error).message}`]);
+    return 0;
+  }
 }
 
 /**
@@ -540,7 +573,8 @@ const CATEGORY_SQL = `CASE WHEN g.decision = 'move' AND g.target IS NOT NULL THE
 
 export interface PublishResult { entries: number; lines: number; co2e: number; skipped: { facility: string; lines: number }[] }
 
-/** Ready lines → entries (one per facility × period × category × spend category × method × unit). */
+/** Ready lines → entries (one per facility × period × category × spend category × method × unit), submitted for
+ *  approval: the batch review is the maker's check, the facility's approver is the checker (Approvals, or Add data → Review). */
 export async function publishBatch(c: Tx, tenant: string, batchId: string, user: User): Promise<PublishResult> {
   if (Number((await c.query(`SELECT count(*) FROM purchase_line WHERE batch_id = $1`, [batchId])).rows[0].count) > 5000) await freshStats(c, 'purchase_line', 'purchase_group');
   const scope = await scopeOf(c, user);
@@ -587,8 +621,8 @@ export async function publishBatch(c: Tx, tenant: string, batchId: string, user:
     });
     const ins = await c.query(
       `INSERT INTO activity (tenant_id, facility_id, category_id, item_id, period_start, period_end, quantity, unit, inputs, data_type, gwp_set, co2e_direct, co2e_scope3,
-                             steps, warnings, note, created_by, factors, purchase_batch_id)
-       SELECT $1, f, c, i, ps, pe, q, u, inp, 'actual', $2, 0, co2, st, w, $3, $4, fa, $5
+                             steps, warnings, note, created_by, factors, purchase_batch_id, status, submitted_at, submitted_by)
+       SELECT $1, f, c, i, ps, pe, q, u, inp, 'actual', $2, 0, co2, st, w, $3, $4, fa, $5, 'submitted', now(), $4
          FROM unnest($6::uuid[], $7::int[], $8::int[], $9::date[], $10::date[], $11::numeric[], $12::text[], $13::jsonb[], $14::numeric[], $15::jsonb[], $16::jsonb[], $17::jsonb[])
               AS x(f, c, i, ps, pe, q, u, inp, co2, st, w, fa)
        RETURNING id, inputs->>'key' AS key, co2e_scope3`,

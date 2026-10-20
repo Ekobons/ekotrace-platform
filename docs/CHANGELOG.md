@@ -2,6 +2,15 @@
 
 Newest first.
 
+## 2026-10-20 · Purchases: published entries go to the approver and show in Add data; AI connection per company
+
+- **Publish = submit for approval**: entries published from a purchase batch are created as submitted (submitted by the publisher); the batch review is the maker's check, the facility approver the checker. Before, they were drafts with no place to submit them for capital goods, upstream transport and leased assets.
+- **Add data → Purchases** now holds every purchase-derived entry (3.1, 3.2, 3.4, 3.8 and those moved to 3.6), marked "From purchases → category" (`CAT_SQL` in review.routes; `groupOf` in AddData). Moved business-travel entries also show in the Business travel tab.
+- **AI connection** (Setup → Integrations, AI & batch runs → AI, super admin; migration 050; `lib/ai.ts`, `modules/ai.routes.ts`): Claude (Anthropic Messages API), ChatGPT (OpenAI), Gemini (OpenAI-compatible endpoint), Azure OpenAI, other OpenAI-compatible, or the platform's service (AI_MAP_*). Key encrypted (AES-256-GCM), only the last 4 characters shown, never in the audit log; custom addresses https only and never into private networks (SSRF guard, `AI_ALLOW_PRIVATE_URLS` for tests / on-premise); test call; master switch; plan check.
+- **When AI runs** for purchases: `large` (default — after the first calculation, material kinds still on the average factor, largest first: `aiLargeGroups`), `unidentified` (every unidentified kind during mapping), `off`; at most N kinds per file (default 300). `aiMap.ts` now takes the company's connection.
+- Factor library: spend categories without their own list (3.2, 3.4, 3.8) say they use the purchased-goods factors, with a link.
+- Removed client names from screens and templates (previous commit). Tests: publish status and the Purchases tab; AI settings (plan, key handling, encryption at rest, audit, address guard, test call, Anthropic and OpenAI formats, candidates only). Manual: Purchases and Integrations chapters.
+
 ## 2026-10-18 · Manual: purchases mapping flow
 
 - Purchases chapter: new section "How purchases are mapped — the whole flow" (cleaning, grouping and the split of vague descriptions by supplier, the mapping order with what is confirmed automatically, how the BM25 description match and its confidence work, AI among candidates, average factor for goods or services and when a person must confirm it, worked example). Corrected: AI is used for every kind still unidentified after the text match, not only large ones; the category-text default (step 6) was missing.

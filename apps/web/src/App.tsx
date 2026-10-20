@@ -44,6 +44,7 @@ import { CarbonCredits } from './pages/CarbonCredits';
 import { ProductLca } from './pages/ProductLca';
 import { Cbam } from './pages/Cbam';
 import { Esg } from './pages/Esg';
+import { AiSettingsPage } from './pages/AiSettings';
 import { BatchRuns } from './pages/BatchRuns';
 import { SupplierPortal } from './pages/SupplierPortal';
 import { CollectionCalendar } from './pages/CollectionCalendar';
@@ -93,7 +94,7 @@ const NAV: { group?: string; items: NavItem[] }[] = [
     { label: 'Methodology & metrics', icon: 'scale', tabs: [{ to: '/methodology', label: 'Methodology & boundaries', roles: ['super_admin', 'admin', 'verifier'] }, { to: '/metrics', label: 'Metric registry' }] },
     { label: 'Energy & currency data', icon: 'bolt', tabs: [{ to: '/energy', label: 'Energy certificates & suppliers', roles: ['super_admin', 'admin', 'manager', 'verifier'] }, { to: '/currency', label: 'Currencies & price index', roles: ['super_admin', 'admin', 'manager', 'verifier'] }] },
     { to: '/library', label: 'Factors & dictionary', icon: 'book', roles: [] },
-    { label: 'Integrations & batch runs', icon: 'plug', tabs: [{ to: '/integrations', label: 'Integrations & API', roles: ['super_admin', 'admin'] }, { to: '/batches', label: 'Batch runs', roles: ['super_admin', 'admin', 'manager', 'verifier'] }] },
+    { label: 'Integrations, AI & batch runs', icon: 'plug', tabs: [{ to: '/integrations', label: 'Integrations & API', roles: ['super_admin', 'admin'] }, { to: '/batches', label: 'Batch runs', roles: ['super_admin', 'admin', 'manager', 'verifier'] }, { to: '/ai', label: 'AI', roles: ['super_admin'] }] },
     { to: '/audit', label: 'Security & audit log', icon: 'lock', roles: ['super_admin', 'admin', 'verifier'] },
   ] },
   { group: 'Help', items: [{ to: '/help', label: 'User manual', icon: 'book' }] },
@@ -255,6 +256,7 @@ function Shell() {
           <Route path="/lca" element={<NeedCo><ProductLca /></NeedCo>} />
           <Route path="/cbam" element={<NeedCo><Cbam /></NeedCo>} />
           <Route path="/esg" element={<NeedCo><Esg /></NeedCo>} />
+          <Route path="/ai" element={<NeedCo><AiSettingsPage /></NeedCo>} />
           <Route path="/batches" element={<NeedCo><BatchRuns /></NeedCo>} />
           <Route path="/calendar" element={<NeedCo><CollectionCalendar /></NeedCo>} />
           <Route path="/inbox" element={<NeedCo><Inbox onSeen={() => window.dispatchEvent(new Event('eko-inbox'))} /></NeedCo>} />

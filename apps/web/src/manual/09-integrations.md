@@ -76,3 +76,23 @@ At most 10,000 lines per call and 200,000 per reference. A completed reference i
 Batch runs then compares them with what arrived and flags any difference.
 
 **Every call is logged.** Each call to the API by a client, successful or not, appears under Setup → Integrations & batch runs → **Batch runs → Transfers** with the records received, accepted and refused (and why). A failed call tells the super admins and admins at most once an hour per client. Set how often each system is expected to send; when it goes quiet for longer, they are told once.
+
+## AI
+
+Setup → Integrations, AI & batch runs → **AI** (super admin). The company connects the AI service it has approved and decides when it may run. Nothing is sent to any AI until it is switched on here.
+
+| Service | What is needed |
+|---|---|
+| Claude (Anthropic) | an API key from console.anthropic.com; model, e.g. claude-haiku-4-5-20251001 (fast, low cost) or claude-sonnet-5-5 |
+| ChatGPT (OpenAI) | an API key from platform.openai.com and the model name |
+| Gemini (Google) | an API key from Google AI Studio and the model name |
+| Azure OpenAI | the chat-completions address of your deployment and its key — data stays in your Azure region |
+| Other (OpenAI-compatible) | the address of any service with an OpenAI-style chat-completions endpoint, e.g. a model hosted in-country |
+| Platform AI service | shown only when the platform operator has approved one; no key needed |
+
+- **The key** is stored encrypted and never shown again — only its last 4 characters. Leave the field empty to keep it; a new provider needs a new key. Use a key made for this purpose, with a spending limit in your AI account.
+- **Addresses** must be https and may not point into a private network.
+- **Test the connection** sends one small classification request and shows whether the answer came back right, and how long it took.
+- **Use AI** is the master switch: off stops every AI call at once.
+- **When AI runs** — purchases: large unidentified purchases only (recommended), every unidentified purchase, or never; and at most how many kinds of purchase per file. See the Purchases chapter for what is sent and what the AI may do.
+- Every change and test is in the audit log, without the key. Needs the Professional or Enterprise plan.

@@ -27,7 +27,11 @@ import { notify } from '../lib/notify.js';
 const ymd = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 
 /** Category filter: a code, or a group shown as one tab (waste_*, water_*). */
-const CAT_SQL = `(cat.code = $X OR ($X IN ('waste', 'water') AND cat.code LIKE $X || '_%'))`;
+/** A tab's entries: its category (waste_*, water_* for the waste and water tabs). The Purchases tab also holds every
+ *  entry published from purchase files — capital goods (3.2), upstream transport (3.4), leased assets (3.8) and
+ *  purchases moved to business travel (3.6, also shown in its own tab) — so nothing published is left without a place. */
+const CAT_SQL = `(cat.code = $X OR ($X IN ('waste', 'water') AND cat.code LIKE $X || '_%')
+  OR ($X = 'purchased_goods' AND (cat.code IN ('capital_goods', 'upstream_transport', 'upstream_leased') OR a.purchase_batch_id IS NOT NULL)))`;
 
 export async function reviewRoutes(app: FastifyInstance) {
   app.get('/api/data/status', async (req) => {
@@ -65,7 +69,7 @@ export async function reviewRoutes(app: FastifyInstance) {
       const me = String(req.user.id);
       const rows = (await c.query(
         `SELECT a.id, a.period_start::text AS period_start, a.period_end::text AS period_end, i.name AS item, a.quantity::float8 AS quantity, a.unit, a.data_type, a.note, a.status,
-                (a.co2e_direct + a.co2e_scope2 + a.co2e_scope3)::float8 AS kg, cat.scope, cat.code AS category, a.created_by, a.submitted_by, a.review_note,
+                (a.co2e_direct + a.co2e_scope2 + a.co2e_scope3)::float8 AS kg, cat.scope, cat.code AS category, cat.name AS category_name, cat.ghg_category, a.created_by, a.submitted_by, a.review_note,
                 a.submitted_at, a.reviewed_at, ue.name AS entered_by, ur.name AS reviewed_by_name, v.name AS vehicle, mt.name AS meter, ws.name AS waste_site,
                 a.commute_record_id IS NOT NULL AS commute, a.purchase_batch_id IS NOT NULL AS purchase
            FROM activity a JOIN category cat ON cat.id = a.category_id JOIN item i ON i.id = a.item_id

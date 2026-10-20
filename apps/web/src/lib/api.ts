@@ -435,7 +435,7 @@ export interface StatusCell { cat: string; m: number; draft: number; submitted: 
 export interface DataStatus { facility: { id: string; name: string; type: string | null; manager: string | null }; approver: string; canEnter: boolean; canApprove: boolean; usual: string[]; cells: StatusCell[] }
 export interface ReviewEntry {
   id: string; period_start: string; period_end: string; item: string; quantity: number; unit: string; data_type: string; note: string | null; status: 'draft' | 'submitted' | 'approved' | 'rejected';
-  kg: number; scope: number; category: string; review_note: string | null; submitted_at: string | null; reviewed_at: string | null; entered_by: string | null; reviewed_by_name: string | null;
+  kg: number; scope: number; category: string; category_name?: string; ghg_category?: number | null; purchase?: boolean; review_note: string | null; submitted_at: string | null; reviewed_at: string | null; entered_by: string | null; reviewed_by_name: string | null;
   vehicle: string | null; meter: string | null; waste_site: string | null; mine: boolean; canApprove: boolean; canReturn: boolean; canSubmit: boolean; canWithdraw: boolean; canDelete: boolean;
 }
 
@@ -566,6 +566,12 @@ export interface EsgData {
   topics: EsgTopic[]; material: string[]; questions: EsgQuestion[]; suppliersAnswered: number; answered: number;
   catalogue: { frameworks: EsgFramework[]; industries: { code: string; name: string; likely: string[] }[]; topics: { code: string; pillar: string; name: string; sub: string; refs: Record<string, string> }[] };
   can: { edit: boolean; submit: boolean; decide: boolean };
+}
+
+export interface AiSettings {
+  enabled: boolean; provider: string | null; model: string | null; baseUrl: string | null; keyHint: string | null; purchases: 'off' | 'large' | 'unidentified'; maxGroups: number;
+  testedAt: string | null; testOk: boolean | null; updatedBy: string | null; onPlan: boolean; planName: string;
+  providers: { code: string; name: string; url: string | null; models: string[]; needsUrl: boolean; note: string }[];
 }
 
 export const api = {
@@ -867,6 +873,9 @@ export const api = {
   transfer: (id: string) => call<Transfer>('GET', `/api/batches/transfers/${id}`),
   sourceExpect: (id: string, expectHours: number | null) => call<{ ok: true }>('PUT', `/api/batches/sources/${id}`, { expectHours }),
   // CBAM
+  aiSettings: () => call<AiSettings>('GET', '/api/ai/settings'),
+  aiSave: (b: { enabled: boolean; provider: string | null; model: string | null; baseUrl: string | null; key?: string; purchases: string; maxGroups: number }) => call<{ ok: true }>('PUT', '/api/ai/settings', b),
+  aiTest: () => call<{ ok: boolean; message: string }>('POST', '/api/ai/test'),
   esg: (year: number) => call<EsgData>('GET', `/api/esg?year=${year}`),
   esgSetup: (b: Record<string, unknown>) => call<{ id: string }>('PUT', '/api/esg/assessment', b),
   esgTopic: (topic: string, b: Record<string, unknown>) => call<{ impactScore: number | null; financialScore: number | null }>('PUT', `/api/esg/topics/${topic}`, b),

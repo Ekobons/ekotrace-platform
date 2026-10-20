@@ -72,6 +72,9 @@ export function FactorsTab() {
                 {c.name}<span className="meta">{count(c)}</span></button>))}
           </div>))}
       </div>
+      {cat && !q && cat.calc_method === 'spend' && count(cat) === 0 && <div className="note info small">
+        {cat.name} has no factor list of its own: purchases counted here (by their account, the capital-goods list or a decision in the purchase review) use the same spend-based factors as <b>Purchased goods &amp; services</b> — the 1,016 US EPA commodities and the products of the previous Ekotrace list.{' '}
+        {cats.find((c) => c.code === 'purchased_goods') && <button className="btn xs ghost" onClick={() => pickCat(cats.find((c) => c.code === 'purchased_goods')!.id)}>Open those factors →</button>}</div>}
     <div className="grid2">
       <div className="card" style={{ padding: 12, display: 'grid', gap: 8, alignContent: 'start', maxHeight: 'calc(100vh - 260px)', overflow: 'auto', position: 'sticky', top: 12 }}>
         <input className="input" placeholder="Search every category…" value={search} onChange={(e) => setSearch(e.target.value)} />

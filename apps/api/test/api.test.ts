@@ -997,6 +997,13 @@ test('purchases: EPA factor file import; ERP export in its own layout → groups
   const sumLines = Number((await pq(`SELECT sum(co2e) FROM purchase_line WHERE batch_id = $1 AND status = 'published'`, [u.batchId])).rows[0].sum);
   assert.ok(Math.abs(acts.reduce((s, a) => s + a.co2e, 0) - sumLines) < 1e-6);
   assert.ok(acts.some((a) => a.code === 'business_travel'));
+  // published = submitted for approval; the Purchases tab of Add data holds every published entry (also those moved to business travel)
+  assert.deepEqual((await pq(`SELECT DISTINCT status FROM activity WHERE purchase_batch_id = $1`, [u.batchId])).rows.map((r) => r.status), ['submitted']);
+  const bt = (await pq(`SELECT a.facility_id FROM activity a JOIN category c ON c.id = a.category_id WHERE a.purchase_batch_id = $1 AND c.code = 'business_travel' LIMIT 1`, [u.batchId])).rows[0];
+  const tab = (await api('GET', `/api/review?facilityId=${bt.facility_id}&category=purchased_goods&from=2000-01-01&to=2100-01-01&stage=open`, undefined, tenantA)).body;
+  assert.ok(tab.entries.some((e: { category: string; purchase: boolean; category_name: string }) => e.category === 'business_travel' && e.purchase && e.category_name), JSON.stringify(tab.entries.map((e: { category: string }) => e.category)));
+  const travelTab = (await api('GET', `/api/review?facilityId=${bt.facility_id}&category=business_travel&from=2000-01-01&to=2100-01-01&stage=open`, undefined, tenantA)).body;
+  assert.ok(travelTab.entries.length && travelTab.entries.every((e: { category: string }) => e.category === 'business_travel'));
   assert.ok(acts.some((a) => a.code === 'purchased_goods' && a.unit === 't' && a.q === 10));
   const paperMarch = acts.find((a) => a.inputs.spend?.AED === 3672.5 && a.code === 'purchased_goods' && a.unit === 'USD');
   assert.ok(paperMarch, JSON.stringify(acts.map((a) => a.inputs)));
@@ -3200,4 +3207,70 @@ test('ESG: frameworks decide the materiality needed, double materiality scoring 
   assert.equal(x.statusCode, 200); assert.match(String(x.headers['content-type']), /spreadsheet/);
   // companies kept apart
   assert.equal((await api('GET', `/api/esg?year=${Y}`, undefined, tenantB)).body.assessment, null);
+});
+
+test('AI connection: company chooses the service, key stored encrypted and never returned, test call, safe addresses, plan, audit; AI may only pick a candidate', async () => {
+  const http = await import('node:http');
+  const { aiChat, checkAddress } = await import('../src/lib/ai.js');
+  const { aiChoose } = await import('../src/lib/aiMap.js');
+  const seen: { auth?: string; xkey?: string; body: string }[] = [];
+  const srv = http.createServer((req, res) => {
+    let b = ''; req.on('data', (d) => (b += d)); req.on('end', () => {
+      seen.push({ auth: req.headers.authorization, xkey: req.headers['x-api-key'] as string | undefined, body: b });
+      const j = JSON.parse(b);
+      const user = j.messages?.find((m: { role: string }) => m.role === 'user')?.content ?? '';
+      const answer = user.includes('copier paper') && !user.includes('candidates') ? '{"id":1}'
+        : JSON.stringify({ results: JSON.parse(user).map((g: { key: string; candidates: { id: number }[] }) => ({ key: g.key, id: g.key === 'bad' ? 999 : g.candidates[0]!.id, confidence: 0.8 })) });
+      res.setHeader('content-type', 'application/json');
+      res.end(JSON.stringify(req.url?.includes('/messages') ? { content: [{ type: 'text', text: answer }] } : { choices: [{ message: { content: answer } }] }));
+    });
+  });
+  await new Promise<void>((r) => srv.listen(0, '127.0.0.1', () => r()));
+  const planBefore = (await pq(`SELECT plan FROM tenant WHERE id = $1`, [tenantA])).rows[0].plan;
+  const port = (srv.address() as { port: number }).port;
+  try {
+    // addresses: https only, never into a private network (unless the server allows it)
+    delete process.env.AI_ALLOW_PRIVATE_URLS;
+    assert.match((await checkAddress('http://example.com/v1'))!, /https/);
+    assert.match((await checkAddress('https://localhost/v1'))!, /private/);
+    assert.match((await checkAddress('https://10.1.2.3/v1'))!, /private/);
+    assert.match((await checkAddress('https://169.254.169.254/latest'))!, /private/);
+    assert.equal((await api('PUT', '/api/ai/settings', { enabled: false, provider: 'compatible', model: 'm', baseUrl: `http://127.0.0.1:${port}/v1/chat/completions`, key: 'sk-test-12345678' }, tenantA)).status, 400);
+    process.env.AI_ALLOW_PRIVATE_URLS = 'true';
+    const url = `http://127.0.0.1:${port}/v1/chat/completions`;
+    await pq(`UPDATE tenant SET plan = 'trial' WHERE id = $1`, [tenantA]);
+    assert.equal((await api('PUT', '/api/ai/settings', { enabled: true, provider: 'compatible', model: 'mock-1', baseUrl: url, key: 'sk-test-12345678' }, tenantA)).status, 403, 'not on the plan');
+    await pq(`UPDATE tenant SET plan = 'professional' WHERE id = $1`, [tenantA]);
+    assert.equal((await api('PUT', '/api/ai/settings', { enabled: true, provider: 'compatible', model: 'mock-1', baseUrl: url }, tenantA)).status, 400, 'key needed');
+    assert.equal((await api('PUT', '/api/ai/settings', { enabled: true, provider: 'compatible', model: 'mock-1', baseUrl: url, key: 'sk-test-12345678', purchases: 'unidentified', maxGroups: 50 }, tenantA)).status, 200);
+    const g = (await api('GET', '/api/ai/settings', undefined, tenantA)).body;
+    assert.equal(g.keyHint, '…5678'); assert.equal(JSON.stringify(g).includes('sk-test'), false, 'key never returned');
+    assert.equal(g.purchases, 'unidentified'); assert.equal(g.enabled, true);
+    const stored = (await pq(`SELECT ai_key FROM tenant WHERE id = $1`, [tenantA])).rows[0].ai_key as string;
+    assert.ok(stored.startsWith('v1:') && !stored.includes('sk-test'), 'encrypted at rest');
+    // saving again without a key keeps it
+    assert.equal((await api('PUT', '/api/ai/settings', { enabled: true, provider: 'compatible', model: 'mock-2', baseUrl: url, purchases: 'large' }, tenantA)).status, 200);
+    assert.equal((await pq(`SELECT ai_key FROM tenant WHERE id = $1`, [tenantA])).rows[0].ai_key, stored);
+    const t = (await api('POST', '/api/ai/test', {}, tenantA)).body;
+    assert.equal(t.ok, true, t.message);
+    assert.equal(seen.at(-1)!.auth, 'Bearer sk-test-12345678');
+    assert.ok(!JSON.stringify((await pq(`SELECT detail FROM audit_log WHERE tenant_id = $1 AND action LIKE 'ai.%'`, [tenantA])).rows).includes('sk-test'), 'key not in the audit log');
+    // other companies see nothing of it; only the super admin opens the page
+    assert.equal((await api('GET', '/api/ai/settings', undefined, tenantB)).body.provider, null);
+    // the AI may only choose among the candidates; Anthropic's format works too
+    const cfg = { provider: 'anthropic' as const, name: 'Mock Claude', url: `http://127.0.0.1:${port}/v1/messages`, key: 'ak-test', model: 'm', style: 'anthropic' as const };
+    const picks = await aiChoose(cfg, [{ key: 'ok', text: 'Copier paper', candidates: [{ id: 11, name: 'Stationery' }] }, { key: 'bad', text: 'x', candidates: [{ id: 12, name: 'Y' }] }]);
+    assert.deepEqual(picks.map((p) => [p.key, p.itemId]), [['ok', 11], ['bad', null]]);
+    assert.equal(seen.at(-1)!.xkey, 'ak-test');
+    assert.ok(!/amount|supplier/i.test(seen.at(-1)!.body.replace(/You classify[^"]*/, '')), 'only descriptions and candidate names are sent');
+    assert.equal(await aiChat({ ...cfg, style: 'openai', url }, 's', 'Classify "copier paper A4"'), '{"id":1}');
+    // switching off stops it
+    await api('PUT', '/api/ai/settings', { enabled: false, provider: 'compatible', model: 'mock-2', baseUrl: url, purchases: 'large' }, tenantA);
+    const { tenantAi } = await import('../src/lib/ai.js');
+    const { tenantTx } = await import('../src/db/pool.js');
+    assert.equal(await tenantTx(tenantA, (c) => tenantAi(c, tenantA)), null);
+  } finally {
+    srv.close(); delete process.env.AI_ALLOW_PRIVATE_URLS;
+    await pq(`UPDATE tenant SET ai_mapping = false, ai_provider = NULL, ai_key = NULL, plan = $2 WHERE id = $1`, [tenantA, planBefore]);
+  }
 });

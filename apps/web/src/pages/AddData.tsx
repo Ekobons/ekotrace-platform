@@ -33,7 +33,8 @@ import { BRAND, productSlug } from '../lib/brand';
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const lastDay = (y: number, m: number) => new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
 const iso = (y: number, m: number, d: number) => `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-const groupOf = (code: string) => (code.startsWith('waste_') ? 'waste' : code.startsWith('water_') ? 'water' : code);
+/** The Add data tab a category's entries show under (capital goods, upstream transport and leased assets come from purchase files). */
+const groupOf = (code: string) => (code.startsWith('waste_') ? 'waste' : code.startsWith('water_') ? 'water' : ['capital_goods', 'upstream_transport', 'upstream_leased'].includes(code) ? 'purchased_goods' : code);
 const ICON: Record<string, string> = {
   stationary_combustion: 'flame', mobile_combustion: 'truck', purchased_electricity: 'bolt', fugitive: 'snow', waste: 'bin', water: 'drop',
   purchased_goods: 'cart', employee_commuting: 'bus', business_travel: 'plane',
@@ -490,7 +491,7 @@ function FuelForm({ cat, facilityId, year, period, rows, onSaved }: { cat: Categ
 
 // ------------------------------------------------------------------ Review and Approved --
 const ml = (d: string) => `${MONTHS[Number(d.slice(5, 7)) - 1]} ${d.slice(0, 4)}`;
-const what = (e: ReviewEntry) => [e.vehicle, e.meter, e.waste_site].filter(Boolean).join(' · ');
+const what = (e: ReviewEntry) => [e.purchase ? `From purchases → ${e.ghg_category && !/Scope 3\./.test(e.category_name ?? '') ? `3.${e.ghg_category} ` : ''}${e.category_name ?? ''}` : null, e.vehicle, e.meter, e.waste_site].filter(Boolean).join(' · ');
 
 function EntryRows({ list, onAct, busy }: { list: ReviewEntry[]; onAct?: (e: ReviewEntry, a: 'submit' | 'withdraw' | 'approve' | 'return' | 'delete', note?: string) => void; busy: boolean }) {
   const [back, setBack] = useState<string | null>(null);

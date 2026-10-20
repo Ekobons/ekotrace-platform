@@ -38,7 +38,7 @@ A year of purchases can be 50,000 lines but only a few thousand *kinds* of purch
 > 4 · Other categories | travel, freight, rent moved; fuel, energy, waste excluded; capital goods and non-purchases set aside
 > 5 · Calculate | every line with the best factor: supplier per unit → supplier per money → spend-based
 * 6 · Review by impact | the kinds making up 95 % of the emissions are confirmed by a person; the small tail is accepted as it is
-? 7 · Publish | entries per facility × month × category × spend category, each with its lines behind it
+? 7 · Publish | entries per facility × month × category × spend category, each with its lines behind it, sent to the approver
 ```
 
 ### 1 · Cleaning the description
@@ -77,7 +77,13 @@ Defaults 4–6 and remembered choices are created by people (*Remember my choice
 - **Confidence (0–1)** = how much of the description the best category explains × how clearly it beats the runner-up (a different factor). Unknown words such as brand names and model numbers lower it a little. Categories with the same NAICS code share a factor, so they do not compete.
 - The 5 best candidates are kept on the kind of purchase, so a person (or the AI) can pick among them.
 
-**AI — optional, for what is still unidentified.** When the company has it switched on, every kind still without a category after steps 1–7 and with at least one candidate is sent to the AI in batches of 40. The AI may only choose **one of the candidates** found by the text match, or none — it cannot invent a category, and its answer is a proposal like any other. Sent: the cleaned description, the category text or account title, and the candidate names — never amounts, suppliers, people or the file. Needs: an AI service approved for the deployment, the Professional or Enterprise plan, and the super admin switching it on. If the AI service does not answer, the batch carries on without it and says so.
+**AI — optional, for what is still unidentified.** The super admin connects the company's AI service and decides when it runs (Setup → Integrations, AI & batch runs → **AI**, see the Integrations chapter):
+
+- **Large unidentified purchases only** (recommended): after the first calculation, the kinds of purchase a person must confirm (the top of the emissions) that the text match could not identify;
+- **Every unidentified purchase**: every kind still without a category after steps 1–7, large or small;
+- **Never**.
+
+At most a set number of kinds per file (300 by default) go to the AI, largest first, in requests of 40. The AI may only choose **one of the candidates** found by the text match, or none — it cannot invent a category, and its answer is marked *AI* and is a proposal like any other (large ones still wait for a person). Sent: the cleaned description, the category text or account title, and the candidate names — never amounts, suppliers, people or the file. Needs the Professional or Enterprise plan. If the AI service does not answer, the file carries on without it and says so.
 
 **Average factor — when nothing identifies the purchase.** The kind gets the median EPA factor of **services** (0.11 kg CO₂e per 2022 USD) or of **goods** (0.28), chosen from its best candidate (an agriculture, mining, construction or manufacturing code → goods) or from units in the description (kg, t, L, m³, pcs, box… → goods). It is marked *average factor (estimate)*. Whether it needs a person depends on its size, not on the method:
 
@@ -138,7 +144,8 @@ An account can also move its lines (e.g. account “Travel” → business trave
 - The small rest is **accepted as it is** and publishes without a check.
 - The review bar shows confirmed, to confirm and accepted shares. Changing a category or decision confirms it; with **Remember my choices** the next uploads follow — for *this description*, *everything from this supplier* (the supplier's default) or *everything in this account*.
 - **Facilities not recognised:** choose the facility each value in the file stands for. **Lines:** every line, filterable; open one to see its calculation.
-- **Publish** creates one entry per facility, month, Scope 3 category, spend category and method, each with its lines behind it. **Reopen** takes the entries back (approved ones stay).
+- **Publish** creates one entry per facility, month, Scope 3 category, spend category and method, each with its lines behind it, and **submits them for approval**: the review of the file is the maker's check, the facility's approver is the checker (Entries & approvals, or Add data → Purchases → Review). **Reopen** takes back the entries not yet approved (approved ones stay).
+- **Where the entries show:** Add data → **Purchases** holds every entry published from purchase files — purchased goods (3.1), capital goods (3.2), upstream transport (3.4), leased assets (3.8) and purchases moved to business travel (3.6), each marked *From purchases → category*. Those moved to business travel also show under Add data → **Business travel**, in the months of the purchases.
 
 ## Factors
 
