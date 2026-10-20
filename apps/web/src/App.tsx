@@ -45,6 +45,7 @@ import { ProductLca } from './pages/ProductLca';
 import { Cbam } from './pages/Cbam';
 import { Esg } from './pages/Esg';
 import { AiSettingsPage } from './pages/AiSettings';
+import { SmartImport } from './pages/SmartImport';
 import { BatchRuns } from './pages/BatchRuns';
 import { SupplierPortal } from './pages/SupplierPortal';
 import { CollectionCalendar } from './pages/CollectionCalendar';
@@ -75,6 +76,7 @@ const NAV: { group?: string; items: NavItem[] }[] = [
   ] },
   { group: 'Capture', items: [
     { to: '/data/stationary_combustion', label: 'Add data', icon: 'plus', roles: ['super_admin', 'admin', 'manager', 'preparer'] },
+    { to: '/import', label: 'Smart import', icon: 'upload', roles: ['super_admin', 'admin', 'manager', 'preparer'] },
     { label: 'Entries & approvals', icon: 'check', tabs: [{ to: '/entries', label: 'Entries & results' }, { to: '/approvals', label: 'Approvals', roles: ['super_admin', 'admin', 'manager', 'preparer'] }] },
     { label: 'Data progress', icon: 'grid', tabs: [{ to: '/progress', label: 'Data progress' }, { to: '/calendar', label: 'Collection calendar' }] },
     { label: 'Inbox & messages', icon: 'inbox', tabs: [{ to: '/inbox', label: 'Inbox & to-dos' }, { to: '/messages', label: 'Message centre' }] },
@@ -257,6 +259,8 @@ function Shell() {
           <Route path="/cbam" element={<NeedCo><Cbam /></NeedCo>} />
           <Route path="/esg" element={<NeedCo><Esg /></NeedCo>} />
           <Route path="/ai" element={<NeedCo><AiSettingsPage /></NeedCo>} />
+          <Route path="/import" element={<NeedCo><SmartImport /></NeedCo>} />
+          <Route path="/import/:id" element={<NeedCo><SmartImport /></NeedCo>} />
           <Route path="/batches" element={<NeedCo><BatchRuns /></NeedCo>} />
           <Route path="/calendar" element={<NeedCo><CollectionCalendar /></NeedCo>} />
           <Route path="/inbox" element={<NeedCo><Inbox onSeen={() => window.dispatchEvent(new Event('eko-inbox'))} /></NeedCo>} />

@@ -3274,3 +3274,91 @@ test('AI connection: company chooses the service, key stored encrypted and never
     await pq(`UPDATE tenant SET ai_mapping = false, ai_provider = NULL, ai_key = NULL, plan = $2 WHERE id = $1`, [tenantA, planBefore]);
   }
 });
+
+test('smart import: any spreadsheet layout (months across, rows down, totals, notes sheet) → facilities, activities, units, periods; corrections remembered; created with the file as evidence and submitted; AI proposes the layout and picks among candidates only', async () => {
+  const T = tenantA;
+  const wb = new ExcelJS.Workbook();
+  const s1 = wb.addWorksheet('Fuel 2025');
+  s1.addRow(['Fuel consumption 2025 (DEMO)']); s1.addRow([]);
+  s1.addRow(['Site', 'Fuel', 'Unit', 'Jan', 'Feb', 'Mar']);
+  s1.addRow(['Sharjah plant', 'Diesel', 'litres', 1000, 1100, 900]);
+  s1.addRow(['Sharjah plant', 'Natural gas', 'm3', 500, 0, 450]);
+  s1.addRow(['Total', '', '', 1500, 1100, 1350]);
+  const s2 = wb.addWorksheet('Electricity');
+  s2.addRow(['Facility', 'Month', 'Consumption (kWh)']);
+  s2.addRow(['Sharjah plant', new Date(Date.UTC(2025, 0, 15)), 20000]);
+  s2.addRow(['Sharjah plant', 'Feb 2025', '21,000']);
+  s2.addRow(['Main warehouse', 'Mar 2025', 5000]);
+  const s3 = wb.addWorksheet('Notes'); s3.addRow(['Prepared by finance']); s3.addRow(['Figures are DEMO']);
+  const buf = Buffer.from(await wb.xlsx.writeBuffer());
+  const up = await raw('/api/smart-import', buf, T, { 'x-filename': 'emissions 2025.xlsx' });
+  assert.equal(up.statusCode, 200, up.body);
+  const id = up.json().id as string;
+  let d = (await api('GET', `/api/smart-import/${id}`, undefined, T)).body;
+  assert.equal(d.sheets.length, 3);
+  assert.equal(d.sheets[0].mapping.layout, 'months'); assert.equal(d.sheets[1].mapping.layout, 'rows');
+  const rows = d.rows as { sheet: string; description: string; period_start: string; quantity: number; unit: string; status: string; facility: string | null; problems: string[]; item: string | null }[];
+  assert.equal(rows.filter((r) => r.sheet === 'Fuel 2025').length, 5, 'zero and total rows skipped');
+  assert.ok(rows.some((r) => r.sheet === 'Electricity' && r.period_start === '2025-01-01' && r.quantity === 20000 && r.unit === 'kWh_e'), JSON.stringify(rows.filter((r) => r.sheet === 'Electricity')));
+  assert.ok(rows.some((r) => r.quantity === 21000 && r.period_start === '2025-02-01'), 'text month and thousands separator');
+  assert.ok(rows.find((r) => r.facility === null)!.problems[0]!.includes('Main warehouse'));
+  assert.ok(rows.filter((r) => r.description === 'Diesel').every((r) => r.unit === 'L' && r.item));
+  assert.ok(d.job.document_id, 'the file is kept in the vault');
+  // a person answers what was not recognised, and the answers are remembered
+  const fr = await api('PUT', `/api/smart-import/${id}/facilities`, { text: 'Main warehouse', facilityId: facA, remember: true }, T);
+  assert.equal(fr.status, 200, JSON.stringify(fr.body)); assert.equal(fr.body.rows, 1);
+  for (const a of d.activities as { description: string; unit_text: string; item_id: number | null; method: string }[])
+    if (a.item_id) await api('PUT', `/api/smart-import/${id}/items`, { description: a.description, unitText: a.unit_text, itemId: a.item_id, remember: true }, T);
+  d = (await api('GET', `/api/smart-import/${id}`, undefined, T)).body;
+  assert.equal(d.counts.ready?.n, 8, JSON.stringify(d.rows.filter((r: { status: string }) => r.status !== 'ready').map((r: { description: string; unit: string; item: string; problems: string[] }) => [r.description, r.unit, r.item, r.problems])));
+  assert.ok(d.counts.ready.kg > 0);
+  // created: entries submitted for approval, linked to the file
+  const cr = (await api('POST', `/api/smart-import/${id}/create`, {}, T)).body;
+  assert.deepEqual([cr.created, cr.submitted, cr.failed, cr.left], [8, 8, 0, 0], JSON.stringify(cr));
+  const acts = (await pq(`SELECT a.status, (SELECT count(*) FROM document_link l WHERE l.activity_id = a.id)::int AS docs FROM import_row r JOIN activity a ON a.id = r.activity_id WHERE r.job_id = $1`, [id])).rows;
+  assert.ok(acts.length === 8 && acts.every((a) => a.status === 'submitted' && a.docs === 1));
+  // the same file again: everything is already entered
+  const again = (await raw('/api/smart-import', buf, T, { 'x-filename': 'emissions 2025 (copy).xlsx' })).json().id;
+  const d2 = (await api('GET', `/api/smart-import/${again}`, undefined, T)).body;
+  assert.equal(d2.counts.excluded?.n, 8, JSON.stringify(d2.counts));
+  assert.ok(!d2.counts.problem, 'remembered facility');
+  // companies kept apart
+  assert.equal((await api('GET', `/api/smart-import/${id}`, undefined, tenantB)).status, 404);
+
+  // with AI: an odd layout the headings do not explain
+  const http = await import('node:http');
+  const calls: string[] = [];
+  const srv = http.createServer((req, res) => {
+    let b = ''; req.on('data', (x) => (b += x)); req.on('end', () => {
+      const j = JSON.parse(b); const sys = j.messages[0].content as string; const user = j.messages[1].content as string;
+      calls.push(sys.slice(0, 30));
+      const answer = sys.includes('layout') ? JSON.stringify({ use: true, headerRow: 0, layout: 'rows', cols: { facility: 0, description: 1, quantity: 2, unit: 3, date: 4 }, months: [], constant: {} })
+        : JSON.stringify({ results: JSON.parse(user).map((g: { key: string; candidates: { id: number }[] }) => ({ key: g.key, id: g.candidates[0]!.id, confidence: 0.7 })) });
+      res.setHeader('content-type', 'application/json'); res.end(JSON.stringify({ choices: [{ message: { content: answer } }] }));
+    });
+  });
+  await new Promise<void>((r) => srv.listen(0, '127.0.0.1', () => r()));
+  const planBefore = (await pq(`SELECT plan FROM tenant WHERE id = $1`, [T])).rows[0].plan;
+  process.env.AI_ALLOW_PRIVATE_URLS = 'true';
+  try {
+    await pq(`UPDATE tenant SET plan = 'professional' WHERE id = $1`, [T]);
+    assert.equal((await api('PUT', '/api/ai/settings', { enabled: true, provider: 'compatible', model: 'mock', baseUrl: `http://127.0.0.1:${(srv.address() as { port: number }).port}/v1/chat/completions`, key: 'sk-test-abcdefgh', importAllowed: true }, T)).status, 200);
+    const w2 = new ExcelJS.Workbook(); const s = w2.addWorksheet('Data');
+    s.addRow(['Loc', 'What', 'Qty', 'UoM', 'When']);
+    s.addRow(['Sharjah plant', 'Gas oil for generators', 300, 'L', '2025-04']);
+    const up2 = (await raw('/api/smart-import', Buffer.from(await w2.xlsx.writeBuffer()), T, { 'x-filename': 'odd.xlsx' })).json();
+    const d3 = (await api('GET', `/api/smart-import/${up2.id}`, undefined, T)).body;
+    assert.equal(d3.sheets[0].proposed_by, 'ai'); assert.equal(d3.job.ai_used, true);
+    assert.equal(d3.rows.length, 1); assert.equal(d3.rows[0].period_start, '2025-04-01');
+    assert.ok(calls.some((x) => x.includes('read company spreadsheets')));
+    // switched off for imports: worked out from the headings instead
+    await api('PUT', '/api/ai/settings', { enabled: true, provider: 'compatible', model: 'mock', baseUrl: `http://127.0.0.1:${(srv.address() as { port: number }).port}/v1/chat/completions`, importAllowed: false }, T);
+    const n = calls.length;
+    const up3 = (await raw('/api/smart-import', Buffer.from(await w2.xlsx.writeBuffer()), T, { 'x-filename': 'odd2.xlsx' })).json();
+    assert.equal((await api('GET', `/api/smart-import/${up3.id}`, undefined, T)).body.sheets[0].proposed_by, 'auto');
+    assert.equal(calls.length, n, 'no AI call');
+  } finally {
+    srv.close(); delete process.env.AI_ALLOW_PRIVATE_URLS;
+    await pq(`UPDATE tenant SET ai_mapping = false, ai_provider = NULL, ai_key = NULL, plan = $2 WHERE id = $1`, [T, planBefore]);
+  }
+});

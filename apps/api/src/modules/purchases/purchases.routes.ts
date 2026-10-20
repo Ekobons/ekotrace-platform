@@ -556,6 +556,31 @@ export async function purchaseRoutes(app: FastifyInstance) {
   });
 
   /** Spend categories for the picker: text search plus the matcher's ranking. */
+  /**
+   * The spend categories as people browse them: the previous Ekotrace list — category › subcategory › product,
+   * with its type (goods, services, capital goods) — each product carrying the EPA factor of its NAICS code.
+   */
+  app.get('/api/purchases/tree', async (req) => {
+    const tenant = requireTenant(req);
+    return tenantTx(tenant, async (c) => {
+      const rows = (await c.query(
+        `SELECT i.id, i.name, i.attrs->>'group' AS grp, i.attrs->>'oldType' AS type, i.attrs->>'naics' AS naics, coalesce((i.attrs->>'capital')::boolean, false) AS capital,
+                f.co2e::float8 AS co2e, f.unit, f.price_year
+           FROM item i
+           LEFT JOIN LATERAL (SELECT f.* FROM factor f JOIN factor_source x ON x.id = f.source_id WHERE f.item_id = i.id AND f.status = 'active' ORDER BY (x.code = 'DEMO-SPEND'), f.valid_from DESC LIMIT 1) f ON true
+          WHERE i.code LIKE 'old:%' AND i.active ORDER BY i.attrs->>'group', i.name`)).rows as { id: number; name: string; grp: string | null; type: string | null; naics: string | null; capital: boolean; co2e: number | null; unit: string | null; price_year: number | null }[];
+      const cats = new Map<string, Map<string, unknown[]>>();
+      for (const r of rows) {
+        const [cat = 'Other', sub = 'Other'] = (r.grp ?? 'Other › Other').split(' › ');
+        if (!cats.has(cat)) cats.set(cat, new Map());
+        const m = cats.get(cat)!;
+        if (!m.has(sub)) m.set(sub, []);
+        m.get(sub)!.push({ id: r.id, name: r.name, type: r.type, naics: r.naics, capital: r.capital, co2e: r.co2e, unit: r.unit, price_year: r.price_year });
+      }
+      return { categories: [...cats].sort((a, b) => a[0].localeCompare(b[0])).map(([name, subs]) => ({ name, subcategories: [...subs].sort((a, b) => a[0].localeCompare(b[0])).map(([n, items]) => ({ name: n, items })) })) };
+    });
+  });
+
   app.get('/api/purchases/items', async (req) => {
     const tenant = requireTenant(req);
     const q = z.object({ q: z.string().max(200).default(''), limit: z.coerce.number().int().min(1).max(100).default(30) }).parse(req.query);
@@ -568,11 +593,11 @@ export async function purchaseRoutes(app: FastifyInstance) {
         [`%${q.q}%`, `${q.q.replace(/\D/g, '') || 'x'}%`, q.limit])).rows.map((r) => r.id) : [];
       const ids = [...new Set([...like, ...ranked])].slice(0, q.limit);
       const rows = (await c.query(
-        `SELECT i.id, i.name, i.attrs->>'naics' AS naics, coalesce(i.attrs->>'group', s.name) AS "group", f.co2e::float8 AS co2e, f.unit, f.price_year, fs.code AS source
+        `SELECT i.id, i.name, i.attrs->>'naics' AS naics, coalesce(i.attrs->>'group', s.name) AS "group", i.attrs->>'oldType' AS type, i.code LIKE 'old:%' AS listed, f.co2e::float8 AS co2e, f.unit, f.price_year, fs.code AS source
            FROM item i JOIN subcategory s ON s.id = i.subcategory_id JOIN category ca ON ca.id = s.category_id
            LEFT JOIN LATERAL (SELECT f.* FROM factor f JOIN factor_source x ON x.id = f.source_id WHERE f.item_id = i.id AND f.status = 'active' ORDER BY (x.code = 'DEMO-SPEND'), f.valid_from DESC LIMIT 1) f ON true
            LEFT JOIN factor_source fs ON fs.id = f.source_id
-          WHERE ${q.q ? 'i.id = ANY($1)' : `ca.code = 'purchased_goods' AND i.active AND $1::int[] IS NOT NULL`} ORDER BY ${q.q ? 'array_position($1, i.id)' : 's.sort, i.name'} LIMIT ${q.limit}`,
+          WHERE ${q.q ? 'i.id = ANY($1)' : `ca.code = 'purchased_goods' AND i.active AND $1::int[] IS NOT NULL`} ORDER BY ${q.q ? `(i.code NOT LIKE 'old:%'), array_position($1, i.id)` : 's.sort, i.name'} LIMIT ${q.limit}`,
         [q.q ? ids : []])).rows;
       return { items: rows };
     });

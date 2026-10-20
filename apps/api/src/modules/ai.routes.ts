@@ -24,10 +24,10 @@ export async function aiRoutes(app: FastifyInstance) {
   app.get('/api/ai/settings', async (req) => {
     const tenant = requireTenant(req); requireRole(req, 'super_admin');
     return tenantTx(tenant, async (c) => {
-      const t = (await c.query(`SELECT ai_mapping, ai_provider, ai_model, ai_base_url, ai_key_hint, ai_purchases, ai_max_groups, ai_tested_at, ai_test_ok, ai_updated_by FROM tenant WHERE id = $1`, [tenant])).rows[0];
+      const t = (await c.query(`SELECT ai_mapping, ai_provider, ai_model, ai_base_url, ai_key_hint, ai_purchases, ai_max_groups, ai_import, ai_tested_at, ai_test_ok, ai_updated_by FROM tenant WHERE id = $1`, [tenant])).rows[0];
       const plan = await planOf(c, tenant);
       return {
-        enabled: t.ai_mapping, provider: t.ai_provider, model: t.ai_model, baseUrl: t.ai_base_url, keyHint: t.ai_key_hint, purchases: t.ai_purchases, maxGroups: t.ai_max_groups,
+        enabled: t.ai_mapping, provider: t.ai_provider, model: t.ai_model, baseUrl: t.ai_base_url, keyHint: t.ai_key_hint, purchases: t.ai_purchases, maxGroups: t.ai_max_groups, importAllowed: t.ai_import,
         testedAt: t.ai_tested_at, testOk: t.ai_test_ok, updatedBy: t.ai_updated_by, onPlan: plan.ai, planName: plan.name,
         providers: Object.entries(AI_PROVIDERS).filter(([k]) => k !== 'platform' || config.aiMap).map(([k, v]) => ({ code: k, ...v, url: v.needsUrl ? null : v.url, name: k === 'platform' ? `${v.name}: ${config.aiMap?.name}` : v.name })),
       };
@@ -39,7 +39,7 @@ export async function aiRoutes(app: FastifyInstance) {
     const b = z.object({
       enabled: z.boolean(), provider: z.enum(PROVIDERS).nullable(), model: z.string().trim().max(120).nullable().default(null),
       baseUrl: z.string().trim().max(500).nullable().default(null), key: z.string().trim().min(8).max(500).optional(),
-      purchases: z.enum(['off', 'large', 'unidentified']).default('large'), maxGroups: z.number().int().min(1).max(5000).default(300),
+      purchases: z.enum(['off', 'large', 'unidentified']).default('large'), maxGroups: z.number().int().min(1).max(5000).default(300), importAllowed: z.boolean().default(true),
     }).parse(req.body);
     if (b.provider === 'platform' && !config.aiMap) throw new AppError('No platform AI service on this server');
     if (b.provider && AI_PROVIDERS[b.provider].needsUrl) {
@@ -60,9 +60,9 @@ export async function aiRoutes(app: FastifyInstance) {
       const hint = b.key ? `…${b.key.slice(-4)}` : keepKey ? undefined : null;
       await c.query(
         `UPDATE tenant SET ai_mapping = $2, ai_provider = $3, ai_model = $4, ai_base_url = $5, ai_key = $6, ai_key_hint = CASE WHEN $7::boolean THEN ai_key_hint ELSE $8 END,
-                ai_purchases = $9, ai_max_groups = $10, ai_updated_by = $11, ai_tested_at = CASE WHEN $12::boolean THEN ai_tested_at END, ai_test_ok = CASE WHEN $12::boolean THEN ai_test_ok END WHERE id = $1`,
+                ai_purchases = $9, ai_max_groups = $10, ai_updated_by = $11, ai_import = $13, ai_tested_at = CASE WHEN $12::boolean THEN ai_tested_at END, ai_test_ok = CASE WHEN $12::boolean THEN ai_test_ok END WHERE id = $1`,
         [tenant, b.enabled, b.provider, b.provider === 'platform' ? null : b.model, b.provider && AI_PROVIDERS[b.provider].needsUrl ? b.baseUrl : null, key,
-         hint === undefined, hint ?? null, b.purchases, b.maxGroups, req.user.name, !b.key && cur.ai_provider === b.provider]);
+         hint === undefined, hint ?? null, b.purchases, b.maxGroups, req.user.name, !b.key && cur.ai_provider === b.provider, b.importAllowed]);
       const { key: _k, ...logged } = b; void _k;
       await audit(c, req, 'ai.settings', 'tenant', tenant, { ...logged, keyChanged: !!b.key });
       return { ok: true };

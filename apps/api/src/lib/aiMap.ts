@@ -15,12 +15,12 @@ export interface AiChoice { key: string; itemId: number | null; confidence: numb
 const CHUNK = 40;
 const SYSTEM = 'You classify company purchase lines into spend categories for greenhouse-gas accounting. For each line choose the single best category id from its candidates, or null if none fits. Reply with JSON only: {"results":[{"key":"…","id":123 or null,"confidence":0.0-1.0}]}';
 
-export async function aiChoose(cfg: AiConfig, groups: AiGroup[], opts: { timeoutMs?: number } = {}): Promise<AiChoice[]> {
+export async function aiChoose(cfg: AiConfig, groups: AiGroup[], opts: { timeoutMs?: number; system?: string } = {}): Promise<AiChoice[]> {
   const out: AiChoice[] = [];
   for (let i = 0; i < groups.length; i += CHUNK) {
     const part = groups.slice(i, i + CHUNK).filter((g) => g.candidates.length);
     if (!part.length) continue;
-    const text = await aiChat(cfg, SYSTEM, JSON.stringify(part.map((g) => ({ key: g.key, line: g.text.slice(0, 300), candidates: g.candidates.map((c) => ({ id: c.id, name: c.name })) }))), { json: true, timeoutMs: opts.timeoutMs });
+    const text = await aiChat(cfg, opts.system ?? SYSTEM, JSON.stringify(part.map((g) => ({ key: g.key, line: g.text.slice(0, 300), candidates: g.candidates.map((c) => ({ id: c.id, name: c.name })) }))), { json: true, timeoutMs: opts.timeoutMs });
     let parsed: { results?: { key: string; id: number | null; confidence?: number }[] };
     try { parsed = jsonOf(text); } catch { throw new Error(`${cfg.name}: the answer was not JSON`); }
     for (const r of parsed.results ?? []) {

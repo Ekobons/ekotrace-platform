@@ -76,7 +76,8 @@ export interface PurchaseLine {
   method: 'spend' | 'supplier' | null; item: string | null; co2e: number | null; usd: number | null; fx: number | null; fx_kind: string | null; cpi: number | null;
   problems: string[]; warnings: string[]; calc_error: string | null; dup_of: string | null; activity_id: string | null;
 }
-export interface SpendItem { id: number; name: string; naics: string | null; group: string; co2e: number | null; unit: string | null; price_year: number | null; source: string | null }
+export interface SpendItem { id: number; name: string; naics: string | null; group: string; type?: string | null; listed?: boolean; co2e: number | null; unit: string | null; price_year: number | null; source: string | null }
+export interface SpendTree { categories: { name: string; subcategories: { name: string; items: { id: number; name: string; type: string | null; naics: string | null; capital: boolean; co2e: number | null; unit: string | null; price_year: number | null }[] }[] }[] }
 export interface SupplierDoc { id: string; filename: string; kind: string; size?: number; at?: string; by?: string; year?: number; from: 'staff' | 'portal' }
 export type SupplierStage = 'not_engaged' | 'invited' | 'signed_in' | 'started' | 'submitted' | 'finished';
 export interface SbtiMatch { name: string; status: string; classification: string | null; nearYear?: number | null; netZero: string | null; netZeroYear: number | null }
@@ -569,9 +570,25 @@ export interface EsgData {
 }
 
 export interface AiSettings {
-  enabled: boolean; provider: string | null; model: string | null; baseUrl: string | null; keyHint: string | null; purchases: 'off' | 'large' | 'unidentified'; maxGroups: number;
+  enabled: boolean; provider: string | null; model: string | null; baseUrl: string | null; keyHint: string | null; purchases: 'off' | 'large' | 'unidentified'; maxGroups: number; importAllowed: boolean;
   testedAt: string | null; testOk: boolean | null; updatedBy: string | null; onPlan: boolean; planName: string;
   providers: { code: string; name: string; url: string | null; models: string[]; needsUrl: boolean; note: string }[];
+}
+
+export interface SheetMapping {
+  use: boolean; headerRow: number; layout: 'rows' | 'months';
+  cols: Partial<Record<'facility' | 'date' | 'month' | 'year' | 'description' | 'category' | 'quantity' | 'unit' | 'note' | 'dataType', number | null>>;
+  months: { col: number; month: string }[]; constant: { facility?: string | null; year?: number | null; month?: string | null; unit?: string | null; description?: string | null };
+}
+export interface ImportJob { id: string; filename: string; status: 'review' | 'done'; ai_used: boolean; ai_note?: string | null; created_name: string; created_at: string; done_at: string | null; document_id?: string | null; summary?: { created: number; submitted: number; failed: number; kg: number; left: number } | null;
+  ready?: number; check?: number; problem?: number; created?: number; rows?: number }
+export interface ImportRow { id: number; sheet: string; row_no: number; facility_text: string | null; facility: string | null; period_start: string | null; period_end: string | null; description: string | null; quantity: number; unit_text: string | null; unit: string | null; item: string | null; item_method: string | null; status: 'ready' | 'check' | 'problem' | 'excluded' | 'created'; problems: string[]; warnings?: string[]; co2e: number | null; activity_id: string | null; person: boolean; data_type: string }
+export interface ImportDetail {
+  job: ImportJob; sheets: { id: string; name: string; mapping: SheetMapping; proposed_by: 'ai' | 'auto' | 'person'; note: string | null; total_rows: number; head: (string | number | null)[][] | null }[];
+  counts: Partial<Record<ImportRow['status'], { n: number; kg: number }>>;
+  activities: { description: string | null; unit_text: string | null; category: string | null; rows: number; quantity: number; kg: number | null; item_id: number | null; item: string | null; method: string | null; conf: number | null; unit: string | null; problems: number; check: number; created: number }[];
+  facilities: { facility_text: string | null; facility_id: string | null; facility: string | null; rows: number }[];
+  rows: ImportRow[]; catalogue: { id: number; name: string; category: string; category_code: string; units: string[] }[]; enterable: { id: string; name: string }[];
 }
 
 export const api = {
@@ -750,6 +767,7 @@ export const api = {
   reopenBatch: (id: string) => call<{ removed: number; kept: number }>('POST', `/api/purchases/batches/${id}/reopen`),
   patchBatch: (id: string, b: { name?: string; includeDuplicates?: boolean }) => call<{ ok: true }>('PATCH', `/api/purchases/batches/${id}`, b),
   deleteBatch: (id: string) => call<{ ok: true }>('DELETE', `/api/purchases/batches/${id}`),
+  spendTree: () => call<SpendTree>('GET', '/api/purchases/tree'),
   spendItems: (q: string, limit = 30) => call<{ items: SpendItem[] }>('GET', `/api/purchases/items?${new URLSearchParams({ q, limit: String(limit) })}`),
   purchaseRules: () => call<{ rules: { id: string; field: string; pattern: string; item: string | null; decision: string | null; target: string | null; capital: boolean | null; hits: number; created_at: string; created_by: string | null }[] }>('GET', '/api/purchases/rules'),
   deleteRule: (id: string) => call<{ ok: true }>('DELETE', `/api/purchases/rules/${id}`),
@@ -873,8 +891,17 @@ export const api = {
   transfer: (id: string) => call<Transfer>('GET', `/api/batches/transfers/${id}`),
   sourceExpect: (id: string, expectHours: number | null) => call<{ ok: true }>('PUT', `/api/batches/sources/${id}`, { expectHours }),
   // CBAM
+  imports: () => call<{ jobs: ImportJob[]; ai: boolean }>('GET', '/api/smart-import'),
+  importUpload: (f: File) => call<{ id: string }>('POST', '/api/smart-import', undefined, f, { 'x-filename': encodeURIComponent(f.name) }),
+  importJob: (id: string, status = 'all', offset = 0) => call<ImportDetail>('GET', `/api/smart-import/${id}?status=${status}&offset=${offset}`),
+  importSheet: (id: string, sid: string, mapping: SheetMapping) => call<{ ok: true }>('PUT', `/api/smart-import/${id}/sheets/${sid}`, { mapping }),
+  importItem: (id: string, b: { description: string | null; unitText: string | null; itemId: number | null; remember: boolean }) => call<{ rows: number }>('PUT', `/api/smart-import/${id}/items`, b),
+  importFacility: (id: string, b: { text: string | null; facilityId: string | null; remember: boolean }) => call<{ rows: number }>('PUT', `/api/smart-import/${id}/facilities`, b),
+  importRows: (id: string, ids: number[], excluded: boolean) => call<{ ok: true }>('PUT', `/api/smart-import/${id}/rows`, { ids, excluded }),
+  importCreate: (id: string) => call<{ created: number; submitted: number; failed: number; kg: number; left: number }>('POST', `/api/smart-import/${id}/create`),
+  importDelete: (id: string) => call<{ ok: true }>('DELETE', `/api/smart-import/${id}`),
   aiSettings: () => call<AiSettings>('GET', '/api/ai/settings'),
-  aiSave: (b: { enabled: boolean; provider: string | null; model: string | null; baseUrl: string | null; key?: string; purchases: string; maxGroups: number }) => call<{ ok: true }>('PUT', '/api/ai/settings', b),
+  aiSave: (b: { enabled: boolean; provider: string | null; model: string | null; baseUrl: string | null; key?: string; purchases: string; maxGroups: number; importAllowed: boolean }) => call<{ ok: true }>('PUT', '/api/ai/settings', b),
   aiTest: () => call<{ ok: boolean; message: string }>('POST', '/api/ai/test'),
   esg: (year: number) => call<EsgData>('GET', `/api/esg?year=${year}`),
   esgSetup: (b: Record<string, unknown>) => call<{ id: string }>('PUT', '/api/esg/assessment', b),

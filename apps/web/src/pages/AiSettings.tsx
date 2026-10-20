@@ -16,11 +16,11 @@ const WHEN: [AiSettings['purchases'], string, string][] = [
 export function AiSettingsPage() {
   const { toast } = useApp();
   const [d, setD] = useState<AiSettings | null>(null);
-  const [f, setF] = useState({ enabled: false, provider: '', model: '', baseUrl: '', key: '', purchases: 'large' as AiSettings['purchases'], maxGroups: '300' });
+  const [f, setF] = useState({ enabled: false, provider: '', model: '', baseUrl: '', key: '', purchases: 'large' as AiSettings['purchases'], maxGroups: '300', importAllowed: true });
   const [busy, setBusy] = useState(false);
   const [test, setTest] = useState<{ ok: boolean; message: string } | null>(null);
   const load = () => api.aiSettings().then((x) => {
-    setD(x); setF({ enabled: x.enabled, provider: x.provider ?? '', model: x.model ?? '', baseUrl: x.baseUrl ?? '', key: '', purchases: x.purchases, maxGroups: String(x.maxGroups) });
+    setD(x); setF({ enabled: x.enabled, provider: x.provider ?? '', model: x.model ?? '', baseUrl: x.baseUrl ?? '', key: '', purchases: x.purchases, maxGroups: String(x.maxGroups), importAllowed: x.importAllowed });
   }).catch((e) => toast((e as Error).message));
   useEffect(() => { void load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   if (!d) return <div className="page"><div className="card empty">Loading…</div></div>;
@@ -30,7 +30,7 @@ export function AiSettingsPage() {
   const save = async () => {
     setBusy(true);
     try {
-      await api.aiSave({ enabled: f.enabled, provider: f.provider || null, model: f.model.trim() || null, baseUrl: f.baseUrl.trim() || null, key: f.key.trim() || undefined, purchases: f.purchases, maxGroups: Number(f.maxGroups) || 300 });
+      await api.aiSave({ enabled: f.enabled, provider: f.provider || null, model: f.model.trim() || null, baseUrl: f.baseUrl.trim() || null, key: f.key.trim() || undefined, purchases: f.purchases, maxGroups: Number(f.maxGroups) || 300, importAllowed: f.importAllowed });
       toast('Saved'); setTest(null); await load();
     } catch (e) { toast((e as Error).message); } finally { setBusy(false); }
   };
@@ -73,8 +73,11 @@ export function AiSettingsPage() {
             <label key={k} className="soft" style={{ cursor: 'pointer' }}><span className="row" style={{ gap: 8 }}><input type="radio" name="aiwhen" checked={f.purchases === k} onChange={() => up({ purchases: k })} /><b>{l}</b></span>
               <span className="muted" style={{ fontSize: 12.5 }}>{txt}</span></label>))}</div>
           <label className="field" style={{ maxWidth: 320 }}><span>At most this many kinds of purchase per file</span><input className="input num" inputMode="numeric" value={f.maxGroups} onChange={(e) => up({ maxGroups: e.target.value })} /></label>
+          <div className="eyebrow" style={{ marginTop: 6 }}>Smart import — reading any Excel of emissions data</div>
+          <label className="row chkline" style={{ gap: 8, alignItems: 'flex-start' }}><input type="checkbox" checked={f.importAllowed} onChange={(e) => up({ importAllowed: e.target.checked })} />
+            <span><b>Use AI when someone imports a spreadsheet</b><br /><span className="muted small">Runs only when a person uploads a file under Capture → Smart import. Sent: the first 40 rows of each sheet (headings and values, to read the layout), the facility names, and the distinct activity descriptions with candidate catalogue names. Without AI the layout is worked out from the headings and can be corrected by hand.</span></span></label>
           <div className="small">
-            <p style={{ margin: '0 0 6px' }}><b>What is sent:</b> the purchase description, the category or account title from the file, and the names of up to 5 candidate categories found by the text match. <b>Never</b> amounts, suppliers, people, facilities or the file.</p>
+            <p style={{ margin: '0 0 6px' }}><b>What is sent (purchases):</b> the purchase description, the category or account title from the file, and the names of up to 5 candidate categories found by the text match. <b>Never</b> amounts, suppliers, people, facilities or the file.</p>
             <p style={{ margin: 0 }}><b>What the AI may do:</b> choose one of the candidates, or none. It cannot invent a category or a factor; its answer is marked <i>AI</i> and, for large purchases, waits for a person to confirm. If the service does not answer, the file carries on without it and says so.</p>
           </div>
         </div>

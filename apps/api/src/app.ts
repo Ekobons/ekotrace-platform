@@ -51,6 +51,7 @@ import { lcaRoutes } from './modules/lca.routes.js';
 import { cbamRoutes } from './modules/cbam.routes.js';
 import { esgRoutes } from './modules/esg.routes.js';
 import { aiRoutes } from './modules/ai.routes.js';
+import { smartImportRoutes } from './modules/smartImport.routes.js';
 import { batchRoutes } from './modules/batches.routes.js';
 import { supplierPortalRoutes, supplierPublicRoutes } from './modules/supplierPortal.routes.js';
 import { supplierEngagementRoutes } from './modules/supplierEngagement.routes.js';
@@ -130,6 +131,7 @@ export async function buildApp(opts: { logger?: boolean; rateLimit?: Limits | nu
     await secured.register(cbamRoutes);
     await secured.register(esgRoutes);
     await secured.register(aiRoutes);
+    await secured.register(smartImportRoutes);
     await secured.register(batchRoutes);
     await secured.register(supplierPortalRoutes);
     await secured.register(supplierEngagementRoutes);

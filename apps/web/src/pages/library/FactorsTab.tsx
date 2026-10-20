@@ -21,6 +21,9 @@ export function FactorsTab() {
   const [showAll, setShowAll] = useState(false);
   const [history, setHistory] = useState<{ id: number; rows: Awaited<ReturnType<typeof api.factorHistory>>['history'] } | null>(null);
   const [adding, setAdding] = useState(false);
+  /** purchased goods: browse the Ekotrace list (category › subcategory › product) or the EPA commodities (NAICS sector) */
+  const [spendView, setSpendView] = useState<'list' | 'epa'>('list');
+  const [oldCat, setOldCat] = useState('');
 
   useEffect(() => {
     api.catalogue(true).then((c) => {
@@ -39,10 +42,19 @@ export function FactorsTab() {
   const cat = cats.find((c) => c.id === catId) ?? null;
   const match = (i: { name: string; aliases: string[] }) => !q || i.name.toLowerCase().includes(q) || i.aliases.some((a) => a.toLowerCase().includes(q));
   /** Groups shown on the left: with a search, matches in every category; otherwise the chosen category (and subcategory). */
+  const grpOf = (i: { attrs?: unknown }) => ((i.attrs ?? {}) as { group?: string }).group ?? 'Other › Other';
+  const isSpend = cat?.code === 'purchased_goods' && !q;
+  const spendItems = useMemo(() => (cat?.code === 'purchased_goods' ? cat.subcategories.flatMap((s) => s.items) : []), [cat]);
+  const oldCats = useMemo(() => [...new Set(spendItems.filter((i) => i.code.startsWith('old:')).map((i) => grpOf(i).split(' › ')[0]!))].sort(), [spendItems]); // eslint-disable-line react-hooks/exhaustive-deps
   const groups = useMemo(() => {
+    if (isSpend && spendView === 'list') {
+      const m = new Map<string, typeof spendItems>();
+      for (const i of spendItems) if (i.code.startsWith('old:') && (!oldCat || grpOf(i).startsWith(`${oldCat} › `))) { const g = grpOf(i); m.set(g, [...(m.get(g) ?? []), i]); }
+      return [...m].sort((a, b) => a[0].localeCompare(b[0])).map(([g, items]) => ({ key: g, title: g, items }));
+    }
     const src = q ? cats.flatMap((c) => c.subcategories.map((s) => ({ c, s }))) : (cat?.subcategories ?? []).filter((s) => !subId || s.id === subId).map((s) => ({ c: cat!, s }));
-    return src.map(({ c, s }) => ({ key: s.id, title: q ? `${c.name} › ${s.name}` : s.name, items: s.items.filter(match) })).filter((g) => g.items.length);
-  }, [cats, cat, subId, q]); // eslint-disable-line react-hooks/exhaustive-deps
+    return src.map(({ c, s }) => ({ key: s.id, title: q ? `${c.name} › ${s.name}` : s.name, items: s.items.filter(match).filter((i) => !isSpend || !i.code.startsWith('old:')) })).filter((g) => g.items.length);
+  }, [cats, cat, subId, q, isSpend, spendView, oldCat, spendItems]); // eslint-disable-line react-hooks/exhaustive-deps
   const count = (c: Category) => c.subcategories.reduce((n, s) => n + s.items.length, 0);
   const pickCat = (id: number) => {
     setCatId(id); setSubId(null); setSearch('');
@@ -78,7 +90,13 @@ export function FactorsTab() {
     <div className="grid2">
       <div className="card" style={{ padding: 12, display: 'grid', gap: 8, alignContent: 'start', maxHeight: 'calc(100vh - 260px)', overflow: 'auto', position: 'sticky', top: 12 }}>
         <input className="input" placeholder="Search every category…" value={search} onChange={(e) => setSearch(e.target.value)} />
-        {!q && cat && cat.subcategories.length > 1 && (
+        {isSpend && <div className="seg" style={{ display: 'flex', gap: 4 }}>
+          <button className={`btn xs ${spendView === 'list' ? 'p' : 'ghost'}`} onClick={() => setSpendView('list')}>Ekotrace list</button>
+          <button className={`btn xs ${spendView === 'epa' ? 'p' : 'ghost'}`} onClick={() => setSpendView('epa')}>EPA commodities (NAICS)</button></div>}
+        {isSpend && spendView === 'list' && <select className="input" value={oldCat} onChange={(e) => setOldCat(e.target.value)}>
+          <option value="">All categories ({spendItems.filter((i) => i.code.startsWith('old:')).length} products)</option>{oldCats.map((c) => <option key={c}>{c}</option>)}</select>}
+        {isSpend && <div className="muted small" style={{ padding: '0 4px' }}>{spendView === 'list' ? 'Products of the Ekotrace list; each uses the EPA factor of its NAICS code.' : 'The 1,016 US EPA commodities by NAICS sector — the factors behind the Ekotrace list.'}</div>}
+        {!q && cat && cat.subcategories.length > 1 && !(isSpend && spendView === 'list') && (
           <select className="input" value={subId ?? ''} onChange={(e) => {
             const id = e.target.value ? Number(e.target.value) : null;
             setSubId(id);

@@ -1441,3 +1441,12 @@ ul.plain { list-style: none; margin: 0; padding: 0; }
 .esg-fwc.on { border-color: var(--teal, #0E7C66); background: #0E7C660D; }
 .esg-mx { width: 100%; max-width: 520px; height: auto; display: block; }
 .spesg td select.input { min-width: 140px; }
+
+.ipick-browse { color: var(--primary) !important; font-weight: 600; }
+.ipick-crumb { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; font-size: 12px; padding: 2px 4px 6px; border-bottom: 1px solid var(--line); margin-bottom: 4px; }
+.ipick-crumb button { padding: 2px 6px !important; color: var(--primary) !important; }
+
+/* smart import */
+.sheetprev th.on, .sheetprev td.on { background: var(--primary-soft); }
+.sheetprev tr.hdr td { font-weight: 700; background: #F2C46D22; }
+.dropzone.busy { opacity: .6; pointer-events: none; }

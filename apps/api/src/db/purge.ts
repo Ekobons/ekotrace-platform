@@ -5,6 +5,7 @@
 import type { Tx } from './pool.js';
 
 const ORDERED = [
+  'DELETE FROM import_rule WHERE tenant_id = $1', 'DELETE FROM import_row WHERE tenant_id = $1', 'DELETE FROM import_sheet WHERE tenant_id = $1', 'DELETE FROM import_job WHERE tenant_id = $1',
   'DELETE FROM esg_answer WHERE tenant_id = $1', 'DELETE FROM esg_topic WHERE tenant_id = $1', 'DELETE FROM esg_assessment WHERE tenant_id = $1',
   'DELETE FROM cbam_import WHERE tenant_id = $1', 'DELETE FROM cbam_good WHERE tenant_id = $1', 'DELETE FROM cbam_precursor WHERE tenant_id = $1', 'DELETE FROM cbam_report_line WHERE tenant_id = $1', 'DELETE FROM cbam_report WHERE tenant_id = $1', 'DELETE FROM cbam_process WHERE tenant_id = $1', 'DELETE FROM cbam_installation WHERE tenant_id = $1', 'DELETE FROM cbam_reference WHERE tenant_id = $1',
   'UPDATE supplier_ef SET lca_product_id = NULL WHERE tenant_id = $1', 'DELETE FROM lca_publication WHERE tenant_id = $1', 'DELETE FROM lca_scenario WHERE tenant_id = $1', 'DELETE FROM lca_input WHERE tenant_id = $1', 'DELETE FROM lca_product WHERE tenant_id = $1', 'DELETE FROM lci_factor WHERE tenant_id = $1',

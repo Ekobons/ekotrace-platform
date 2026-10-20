@@ -2,6 +2,13 @@
 
 Newest first.
 
+## 2026-10-20 · Smart import (AI) of any emissions spreadsheet; purchases browsed by the Ekotrace list
+
+- **Capture → Smart import** (`/import`; migration 051: `import_job`, `import_sheet`, `import_row`, `import_rule`, `tenant.ai_import`; `lib/smartImport.ts`, `modules/smartImport.routes.ts`): upload .xlsx/.csv (20 MB, 5,000 rows per sheet; file kept in the vault as `data`). Per sheet a layout (`SheetMap`: header row, rows or months-across, column roles, months, constants) proposed by the company's AI from the first 40 rows (validated with zod; falls back) or worked out from the headings (month headings, keyword columns, numeric-column fallback, unit in heading, sheet name as activity), editable. Rows: totals/zeros skipped. Resolution: facility (rule → exact → unique contains → only facility), item (rule → word match against names/aliases/subcategories filtered by unit and factor units → AI among candidates), unit (item units, "kWh" → kWh_e on electricity), dry-run calculation with warnings, duplicates left out. Statuses ready / check / problem / excluded / created; confirm activities, choose facilities, remember answers, leave rows out. Create: `saveEntry` per row in a savepoint, linked to the file (evidence), submitted for approval.
+- AI settings: "Use AI when someone imports a spreadsheet" (`ai_import`, default on); what is sent is listed. `aiChoose` takes a system prompt.
+- **Purchases category picker**: "Browse the Ekotrace list" (category › subcategory › product with type and factor, `GET /api/purchases/tree`); search shows Ekotrace-list products first. **Factor library** (purchased goods): views *Ekotrace list* and *EPA commodities (NAICS)*.
+- Tests: smart import end to end (months across, rows down, totals, notes sheet, text months, thousands separators, kWh, remembered answers, evidence link, submitted, duplicates on re-import, companies apart, AI layout and AI off). Manual: new Smart import chapter; Purchases chapter (browsing).
+
 ## 2026-10-20 · Purchases: published entries go to the approver and show in Add data; AI connection per company
 
 - **Publish = submit for approval**: entries published from a purchase batch are created as submitted (submitted by the publisher); the batch review is the maker's check, the facility approver the checker. Before, they were drafts with no place to submit them for capital goods, upstream transport and leased assets.
