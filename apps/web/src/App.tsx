@@ -52,6 +52,10 @@ import { CollectionCalendar } from './pages/CollectionCalendar';
 import { Inbox } from './pages/Inbox';
 import { BrandMark } from './components/BrandMark';
 import { BRAND } from './lib/brand';
+import { FinDashboard } from './pages/fin/FinDashboard';
+import { FinPortfolios } from './pages/fin/FinPortfolios';
+import { FinCounterparties, FinCounterpartyProfile } from './pages/fin/FinCounterparties';
+import { FinFactors } from './pages/fin/FinFactors';
 
 interface Ctx {
   me: Me;
@@ -68,8 +72,26 @@ type Tab = { to: string; label: string; roles?: Role[] };
 /** A menu entry; with `tabs`, one entry for several pages shown as tabs at the top of each (old links keep working). */
 type NavItem = { to?: string; label: string; icon: string; roles?: Role[]; stage?: number; tabs?: Tab[] };
 /** Section colours of the side menu, as in the prototype. */
-const SEC_C: Record<string, string> = { '': 'var(--lime)', Capture: '#7FD3B9', Analyse: '#8EC5FF', 'Value chain': '#F2C46D', 'Net zero': '#B6E36B', Disclose: '#C9A7F5', Setup: '#E7ECEA', Help: '#F7A8B8' };
-const NAV: { group?: string; items: NavItem[] }[] = [
+const SEC_C: Record<string, string> = { '': 'var(--lime)', Portfolio: '#8EC5FF', Capture: '#7FD3B9', Analyse: '#8EC5FF', 'Value chain': '#F2C46D', 'Net zero': '#B6E36B', Disclose: '#C9A7F5', Setup: '#E7ECEA', Help: '#F7A8B8' };
+/** EKOFIN (financed emissions): its own menu; people, currencies, documents and the audit log are shared with EKOTRACE. */
+const FIN_NAV: { group?: string; items: NavItem[] }[] = [
+  { items: [{ to: '/fin', label: 'Portfolio dashboard', icon: 'chart' }] },
+  { group: 'Portfolio', items: [
+    { to: '/fin/portfolios', label: 'Portfolios & holdings', icon: 'folder' },
+    { to: '/fin/counterparties', label: 'Counterparties', icon: 'building' },
+  ] },
+  { group: 'Setup', items: [
+    { to: '/fin/factors', label: 'Sector factor library', icon: 'book' },
+    { to: '/people', label: 'People & access', icon: 'users', roles: ['super_admin', 'admin', 'manager'] },
+    { to: '/currency', label: 'Currencies', icon: 'bolt', roles: ['super_admin', 'admin', 'manager', 'verifier'] },
+    { to: '/vault', label: 'Document vault', icon: 'folder' },
+    { to: '/audit', label: 'Security & audit log', icon: 'lock', roles: ['super_admin', 'admin', 'verifier'] },
+  ] },
+  { group: 'Help', items: [{ to: '/help', label: 'User manual', icon: 'book' }] },
+];
+type Product = 'ekotrace' | 'ekofin';
+const PRODUCT_NAME: Record<Product, string> = { ekotrace: 'EKOTRACE', ekofin: 'EKOFIN' };
+const EKO_NAV: { group?: string; items: NavItem[] }[] = [
   { items: [
     { to: '/home', label: 'Home', icon: 'home' },
     { label: 'Dashboards', icon: 'chart', tabs: [{ to: '/dashboards', label: 'Dashboards' }, { to: '/kpis', label: 'KPI dashboard' }] },
@@ -153,6 +175,12 @@ function Shell() {
   // the whole menu narrowed to icons (as in the prototype), kept on this browser
   const [mini, setMini] = useState(() => { try { return localStorage.getItem('eko_mini') === '1'; } catch { return false; } });
   const toggleMini = () => setMini((m) => { try { localStorage.setItem('eko_mini', m ? '0' : '1'); } catch { /* not kept */ } return !m; });
+  // the products this company has (EKOTRACE, EKOFIN or both) and the one being used, kept on this browser
+  const products: Product[] = (tenant?.products?.length ? tenant.products : ['ekotrace']) as Product[];
+  const [picked, setPicked] = useState<Product>(() => { try { return (localStorage.getItem('eko_product') as Product) || 'ekotrace'; } catch { return 'ekotrace'; } });
+  const product: Product = path.startsWith('/fin') && products.includes('ekofin') ? 'ekofin' : products.includes(picked) ? picked : products[0]!;
+  const NAV = product === 'ekofin' ? FIN_NAV : EKO_NAV;
+  const switchTo = (p: Product) => { setPicked(p); try { localStorage.setItem('eko_product', p); } catch { /* not kept */ } nav(p === 'ekofin' ? '/fin' : '/home'); };
   const allGroups = NAV.flatMap((g) => (g.group ? [g.group] : []));
   const allClosed = allGroups.every((g) => folded.has(g));
   const foldAll = () => { const n = new Set(allClosed ? [] : allGroups); try { localStorage.setItem('eko_nav', JSON.stringify([...n])); } catch { /* not kept */ } setFolded(n); };
@@ -211,9 +239,13 @@ function Shell() {
             <><b style={{ fontSize: 14 }}>{tenant?.name}</b><span style={{ fontSize: 11.5, color: 'var(--side-dim)' }}>{tenant?.planLimits?.name ?? tenant?.plan} plan{tenant?.scope_name ? ` · ${tenant.scope_name}` : ' · whole group'}</span></>
           )}
         </div>
+        {tenant && products.length > 1 && (mini
+          ? <button type="button" className="prodmini" title={`Switch to ${PRODUCT_NAME[product === 'ekofin' ? 'ekotrace' : 'ekofin']}`} onClick={() => switchTo(product === 'ekofin' ? 'ekotrace' : 'ekofin')}>{product === 'ekofin' ? 'FIN' : 'TRC'}</button>
+          : <div className="prodsw" role="tablist" aria-label="Product">{products.map((p) => <button key={p} type="button" role="tab" aria-selected={p === product} className={p === product ? 'on' : ''} onClick={() => p !== product && switchTo(p)}>{PRODUCT_NAME[p]}</button>)}</div>)}
         {tenant && !mini && <div className="navtools"><button type="button" onClick={foldAll} title={allClosed ? 'Expand all sections' : 'Collapse all sections'}>{allClosed ? '▸▸ Expand all' : '▾▾ Collapse all'}</button></div>}
         <nav className="nav">
           {role === 'platform_admin' && <NavLink to="/console" title={mini ? 'Platform console' : undefined}><Icon name="gear" /><span className="nl">Platform console</span>{!tenant && alertN > 0 && <span className="navb red" title="Platform security alerts">{alertN}</span>}</NavLink>}
+          {role === 'platform_admin' && !tenant && <NavLink to="/fin/factors" title={mini ? 'EKOFIN sector factors' : undefined}><Icon name="book" /><span className="nl">EKOFIN sector factors</span></NavLink>}
           {role === 'platform_admin' && <NavLink to="/messages" title={mini ? 'Messages' : undefined}><Icon name="chat" /><span className="nl">Messages</span>{msgN > 0 && <span className="navb amber">{msgN}</span>}</NavLink>}
           {tenant && NAV.map((g, gi) => {
             const items = g.items.filter(visible);
@@ -249,7 +281,12 @@ function Shell() {
           {tabsOf(section).map((t) => <NavLink key={t.to} to={t.to} className={() => (path === t.to ? 'on' : '')}>{t.label}{badge(t.to) > 0 && <span className="navb amber">{badge(t.to)}</span>}</NavLink>)}
         </nav>}
         <Routes>
-          <Route path="/" element={<Navigate to={role === 'platform_admin' && !tenant ? '/console' : '/home'} replace />} />
+          <Route path="/" element={<Navigate to={role === 'platform_admin' && !tenant ? '/console' : product === 'ekofin' ? '/fin' : '/home'} replace />} />
+          <Route path="/fin" element={<NeedFin><FinDashboard /></NeedFin>} />
+          <Route path="/fin/portfolios" element={<NeedFin><FinPortfolios /></NeedFin>} />
+          <Route path="/fin/counterparties" element={<NeedFin><FinCounterparties /></NeedFin>} />
+          <Route path="/fin/counterparties/:id" element={<NeedFin><FinCounterpartyProfile /></NeedFin>} />
+          <Route path="/fin/factors" element={role === 'platform_admin' && !tenant ? <FinFactors /> : <NeedFin><FinFactors /></NeedFin>} />
           <Route path="/console" element={<Gate ok={role === 'platform_admin'}><Console /></Gate>} />
           <Route path="/messages" element={role === 'platform_admin' ? <Messages /> : <NeedCo><Messages /></NeedCo>} />
           <Route path="/vault" element={<NeedCo><Vault /></NeedCo>} />
@@ -304,6 +341,13 @@ function NeedCo({ children }: { children: ReactNode }) {
   const { tenant } = useApp();
   if (tenant) return <>{children}</>;
   return <div className="page"><div className="card empty"><h2>Choose a company first</h2><p className="sub">Pick one under “Viewing company” at the top left.</p></div></div>;
+}
+/** EKOFIN screens: a company must have EKOFIN switched on (platform console). */
+function NeedFin({ children }: { children: ReactNode }) {
+  const { tenant } = useApp();
+  if (!tenant) return <NeedCo>{children}</NeedCo>;
+  if (tenant.products?.includes('ekofin')) return <>{children}</>;
+  return <div className="page"><div className="card empty"><h2>EKOFIN is not switched on</h2><p className="sub">Financed emissions for banks and investors is a separate product. Contact the Ekobon team to add it to this company.</p></div></div>;
 }
 function Gate({ ok, children }: { ok: boolean; children: ReactNode }) {
   return ok ? <>{children}</> : <div className="page"><div className="card empty">You do not have access to this page.</div></div>;
