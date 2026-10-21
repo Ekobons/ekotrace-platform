@@ -2,6 +2,16 @@
 
 Newest first.
 
+## 2026-10-21 · Grid factors for ~150 more regions, each with its source
+
+- `data/grid/grid-factors.csv`: 106 → 421 rows, 207 regions (seeded on every start, `seedGrid`; changed values superseded). New source codes (publishers in `GRID_PUBLISHER`):
+  - Official: `EPA-eGRID2023-ST` (all 50 states + DC + PR, table 3 CO2e, T&D 4.2%), `NZ-MFE-2025`, `ZA-DFFE-2023`, `MY-ST-GEF-2024` (MY-PEN/SBH/SWK 2023–24), `TR-ETKB-2022`, `HK-CLP-2024`, `HK-HKE-2025`, `AE-MOCCAE-NDC3` (AE 0.55, 2019), `AE-DEWA-CCR2021` (AE-DU 2018–20 + T&D 2%), `AE-EWEC-2023` (AE-AZ 0.33), `OM-PWP-2025`, `PH-DOE-NGEF` (CDM margin).
+  - Official via press: `KR-GIR-2023`, `TW-MOEA-2025`, `BR-MCTI-2023`.
+  - Secondary / provisional: `SA-CT-2022`; `UNFCCC-IFI-2019` combined margin for QA, BH, KW, EG, JO; `IGES-GEF` (CDM grid factors, ~50 countries, last resort).
+  - `EKOTRACE-PREV`: Canada + provinces 2023–25 (location, T&D, WTT; NIR via carbondi), MY national 0.758, ID-JAMALI 0.87, AE-DU 2023 0.40 — from the previous Ekotrace list, not re-verified.
+- Left out: India state values (cBalance 2012, include AT&C losses), IEA-based values (licensed). Emirates other than Dubai/Abu Dhabi fall back to the national value.
+- Manual: Factors & methodology (sources table, region choice, confidence order).
+
 ## 2026-10-20 · Smart import (AI) of any emissions spreadsheet; purchases browsed by the Ekotrace list
 
 - **Capture → Smart import** (`/import`; migration 051: `import_job`, `import_sheet`, `import_row`, `import_rule`, `tenant.ai_import`; `lib/smartImport.ts`, `modules/smartImport.routes.ts`): upload .xlsx/.csv (20 MB, 5,000 rows per sheet; file kept in the vault as `data`). Per sheet a layout (`SheetMap`: header row, rows or months-across, column roles, months, constants) proposed by the company's AI from the first 40 rows (validated with zod; falls back) or worked out from the headings (month headings, keyword columns, numeric-column fallback, unit in heading, sheet name as activity), editable. Rows: totals/zeros skipped. Resolution: facility (rule → exact → unique contains → only facility), item (rule → word match against names/aliases/subcategories filtered by unit and factor units → AI among candidates), unit (item units, "kWh" → kWh_e on electricity), dry-run calculation with warnings, duplicates left out. Statuses ready / check / problem / excluded / created; confirm activities, choose facilities, remember answers, leave rows out. Create: `saveEntry` per row in a savepoint, linked to the file (evidence), submitted for approval.

@@ -6,11 +6,16 @@
 |---|---|---|
 | Fuels, vehicles, refrigerants, UK electricity and heat, waste sent to others | UK DESNZ greenhouse gas conversion factors (2022 onwards) | each June, by Ekobon (preview before loading) |
 | Waste treated at own sites | IPCC 2006 Guidelines Vol. 5 and 2019 Refinement | defaults in the tool; replaceable per site |
-| Grid electricity — United States (national + 27 eGRID sub-regions, with T&D losses) | US EPA eGRID2023 | when EPA publishes a new eGRID |
+| Grid electricity — United States (national, 27 eGRID sub-regions and all 50 states + DC + Puerto Rico, with T&D losses) | US EPA eGRID2023 | when EPA publishes a new eGRID |
 | Grid electricity — 27 EU countries | European Environment Agency, CO₂-equivalent intensity of electricity generation (2022) | when EEA publishes a new year |
 | Grid electricity — Australia (national, states and WA grids, with upstream Scope 3) | National Greenhouse Accounts Factors 2025 (DCCEEW) | each August |
 | Grid electricity — India, Singapore, China (incl. residual mix), Japan | CEA CO₂ Baseline Database v20; EMA grid emission factor; MEE national average 2023; Japan national average (MOE / METI) | as published |
-| Other grids (e.g. Gulf countries, Canadian provinces), residual mixes, T&D losses | entered by the platform admin with their source (utility, national inventory) | as published |
+| Grid electricity — New Zealand, South Africa, Türkiye, Malaysia (Peninsular, Sabah, Sarawak), Hong Kong (CLP, HK Electric), South Korea, Taiwan, Brazil, Philippines | the government, regulator or utility that publishes it (MfE, DFFE, ETKB, Energy Commission, the two utilities, the ministries) | as published |
+| Grid electricity — UAE (national, Dubai, Abu Dhabi), Oman | MOCCAE (UAE NDC, 2019 base year); DEWA climate change report; EWEC decarbonisation report; Nama PWP 7-year statement | as published |
+| Grid electricity — Saudi Arabia, Qatar, Bahrain, Kuwait, Egypt, Jordan | no official average found: Saudi Arabia from Climate Transparency (Enerdata data); the others from the UNFCCC/IFI combined-margin dataset — **provisional** | as published |
+| Grid electricity — Canada (national and provinces) | previous Ekotrace list, taken from Canada's National Inventory Report | when checked against the NIR |
+| Grid electricity — about 50 other countries (Africa, Latin America, South and South-East Asia) | IGES list of grid emission factors (government and UN CDM values) — **last resort** | as published |
+| Other grids, residual mixes, T&D losses | entered by the platform admin with their source (utility, national inventory) | as published |
 | Supplier factors, certificates | the company or the platform admin, with their source | per contract / period |
 | GWP values | IPCC AR4, AR5, AR6 | fixed per set |
 
@@ -18,7 +23,13 @@
 
 These come with Ekotrace in one file (`data/grid/grid-factors.csv`) and load by themselves when the server starts. Each factor keeps its source, year and a note (for example the eGRID value in lb/MWh it was converted from). Open **Factor library → Grid regions** to see them.
 
-- **Pick the right region for a facility.** In the United States choose the eGRID sub-region (e.g. *WECC California*), not the state; in Australia the state or WA grid. Without a region the country average is used.
+- **Pick the right region for a facility.** In the United States the eGRID sub-region (e.g. *WECC California*) is the better choice; the state is there when the sub-region is not known. In the UAE the emirate (Dubai, Abu Dhabi; the other emirates use the national value); in Australia the state or WA grid; in Canada the province; in Malaysia the grid (Peninsular, Sabah, Sarawak); in Hong Kong the utility. Without a region the country average is used.
+- **How sure each value is.** The library shows each factor's source. In order of preference:
+  1. **Official** — published by the government, regulator or utility (most countries above).
+  2. **Official, read from a press report** — South Korea, Taiwan and Brazil; the note says so. Check against the ministry's notice before a client report.
+  3. **Previous Ekotrace list** — Canada, Malaysia's national value and Indonesia's Java–Bali grid, carried over from the old tool with their original reference; not re-verified.
+  4. **IGES / CDM grid factors** — for countries that publish no average grid factor. These are *carbon-credit baseline* factors (combined or operating margin, CO₂ only); they are usually higher than an average grid factor. Replace them when the country publishes one.
+- **Left out on purpose.** India's state values (from a 2012 consultancy paper, with distribution losses inside) — the CEA national factor is used. IEA values — licensed data that cannot be republished.
 - **Years.** eGRID 2023 and EEA 2022 are the latest published. An entry for a later year uses the latest factor and shows a warning; when a newer year is loaded, recalculate.
 - **EEA values are generation intensities** (electricity produced in the country, imports not included). That is the common choice for EU location-based reporting; a national inventory value may replace it.
 - **To check before a client report:** Australia's values were taken from secondary summaries of the NGA 2025 workbook, and India's from the CEA figure as reported; compare them with the official publication.

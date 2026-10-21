@@ -39,6 +39,7 @@ async function login(email: string, password: string): Promise<string> {
   return String(r.headers['set-cookie']).split(';')[0]!;
 }
 
+let aeGridRemoved = 0;
 before(async () => {
   const admin = new pg.Client({ connectionString: url.replace(/\/[^/]+$/, '/postgres') });
   await admin.connect();
@@ -59,6 +60,8 @@ before(async () => {
   const c = new pg.Client({ connectionString: url });
   await c.connect();
   await c.query(`SELECT set_config('app.platform','on',false)`);
+  // The tests build their own UAE grid factors (a company without one, then one added): leave out the shipped ones.
+  aeGridRemoved = (await c.query(`DELETE FROM factor WHERE region LIKE 'AE%' AND created_by = 'seed' AND item_id = (SELECT id FROM item WHERE code = 'grid:electricity')`)).rowCount ?? 0;
   await c.query(`INSERT INTO app_user (tenant_id, email, name, role, password_hash, must_change_password) VALUES (NULL,'ops@ekobon.test','Ops','platform_admin',$1,false)`, [await hashPassword('correct horse battery')]);
   await c.end();
   adminCookie = await login('ops@ekobon.test', 'correct horse battery');
@@ -1969,12 +1972,19 @@ test('grid factors of other countries: eGRID sub-region, EU country with year fa
   // Queensland (NGA 2025): Scope 2 0.67, Scope 3 upstream 0.09
   const qld = await calc(await fac('Brisbane depot', 'AU', 'AU-QLD'), '2025-08-01', '2025-08-31');
   assert.ok(Math.abs(qld.body.totals.scope2 - 6700) < 1e-6 && Math.abs(qld.body.totals.wtt - 900) < 1e-6, JSON.stringify(qld.body.totals));
+  // Texas (eGRID2023 state table): 771.2 lb/MWh = 0.34981 kg/kWh, T&D 4.2%
+  const tx = await calc(await fac('Austin office', 'US', 'US-TX'), '2023-05-01', '2023-05-31');
+  assert.ok(Math.abs(tx.body.totals.scope2 - 3498.1) < 1e-6, JSON.stringify(tx.body.totals));
+  // Ontario (previous Ekotrace list, 2024): 0.035, T&D 0.003, upstream 0.02114
+  const on = await calc(await fac('Toronto office', 'CA', 'CA-ON'), '2024-05-01', '2024-05-31');
+  assert.ok(Math.abs(on.body.totals.scope2 - 350) < 1e-6 && Math.abs(on.body.totals.td_loss - 30) < 1e-6, JSON.stringify(on.body.totals));
+  assert.ok(aeGridRemoved >= 5, 'UAE factors ship with the file');
   // the library lists the regions with their source
   const regions = (await api('GET', '/api/grid-regions', undefined, tenantA)).body.regions;
   assert.ok(regions.find((r: { code: string }) => r.code === 'US-CAMX').factors.some((f: { source: string }) => f.source === 'EPA eGRID2023'));
   const { seedGrid } = await import('../src/db/seed.js');
   const c = await pool.connect();
-  try { await c.query('BEGIN'); const again = await seedGrid(c as never); await c.query('ROLLBACK'); assert.equal(again.added, 0); }
+  try { await c.query('BEGIN'); const again = await seedGrid(c as never); await c.query('ROLLBACK'); assert.equal(again.added, aeGridRemoved, 'only the UAE ones removed for the tests come back'); }
   finally { c.release(); }
 });
 
