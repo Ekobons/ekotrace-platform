@@ -2,6 +2,10 @@
 
 Newest first.
 
+## 2026-10-22 · Factor library: grid electricity by country
+
+- Factors tab: items with factors for several countries (grid electricity, hotels…) get a **country filter** (with counts) and a *Country / region* column; rows sorted by year, then region; the year list goes back to 2005; the source cell shows the factor's note on hover. Grid electricity points to the *Grid electricity & prices* tab (table by region and year).
+
 ## 2026-10-22 · Reporting year and factor year
 
 - Migration 053: `tenant.year_start_month` (1–12, default 1) and `tenant.factor_year` (`calendar` default | `fy_start` | `fy_end`); `PATCH /api/tenant` takes `yearStartMonth`, `factorYear`.

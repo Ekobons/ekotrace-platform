@@ -3,6 +3,7 @@
  * (year × part × unit) with its gas split and source. "Add or correct" saves a
  * new version — the previous one stays in history.
  */
+import { countryName } from '../../components/Charts';
 import { CountrySelect } from '../../components/CountrySelect';
 import { useEffect, useMemo, useState } from 'react';
 import { useApp } from '../../App';
@@ -21,6 +22,8 @@ export function FactorsTab() {
   const [showAll, setShowAll] = useState(false);
   const [history, setHistory] = useState<{ id: number; rows: Awaited<ReturnType<typeof api.factorHistory>>['history'] } | null>(null);
   const [adding, setAdding] = useState(false);
+  /** items with factors for many countries (grid electricity, hotels…): filter by country */
+  const [place, setPlace] = useState('');
   /** purchased goods: browse the Ekotrace list (category › subcategory › product) or the EPA commodities (NAICS sector) */
   const [spendView, setSpendView] = useState<'list' | 'epa'>('list');
   const [oldCat, setOldCat] = useState('');
@@ -63,15 +66,23 @@ export function FactorsTab() {
     if (first && !c!.subcategories.some((s) => s.items.some((i) => i.id === itemId))) setItemId(first.id);
   };
 
-  // Group rows by year for readability.
+  useEffect(() => setPlace(''), [itemId]);
+  const places = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const f of factors) { const c = f.region === 'GLOBAL' ? 'GLOBAL' : f.region.slice(0, 2); m.set(c, (m.get(c) ?? 0) + 1); }
+    return [...m].map(([code, n]) => ({ code, n, name: code === 'GLOBAL' ? 'All countries (global)' : countryName(code) || code })).sort((a, b) => a.name.localeCompare(b.name));
+  }, [factors]);
+  const multi = places.length > 1;
+  const shown = useMemo(() => (place ? factors.filter((f) => (place === 'GLOBAL' ? f.region === 'GLOBAL' : f.region.slice(0, 2) === place)) : factors), [factors, place]);
+  // Group rows by year for readability (by country within a year).
   const byYear = useMemo(() => {
     const m = new Map<string, Factor[]>();
-    for (const f of factors) {
+    for (const f of [...shown].sort((a, b) => b.valid_from.localeCompare(a.valid_from) || a.region.localeCompare(b.region))) {
       const y = f.valid_from.slice(0, 4) === f.valid_to.slice(0, 4) ? f.valid_from.slice(0, 4) : `${f.valid_from.slice(0, 4)}–${f.valid_to.slice(0, 4)}`;
       m.set(y, [...(m.get(y) ?? []), f]);
     }
     return [...m.entries()];
-  }, [factors]);
+  }, [shown]);
 
   return (
     <div style={{ display: 'grid', gap: 12 }}>
@@ -124,19 +135,22 @@ export function FactorsTab() {
       <div className="card" style={{ display: 'grid', gap: 12 }}>
         {item && (
           <>
-            <div className="row">
-              <div className="grow">
+            <div className="row" style={{ flexWrap: 'wrap', gap: 8 }}>
+              <div className="grow" style={{ flexBasis: '100%' }}>
                 <h2>{item.name}</h2>
                 <div className="sub">
                   {item.aliases.length > 0 && <>Also known as: {item.aliases.join(', ')}. </>}
                   {item.gas_code && <>Single gas: <span className="mono">{item.gas_code}</span> — uses the GWP table, no factor rows needed. </>}
                   {item.composition?.length ? <>Blend: {item.composition.map((c) => `${c.gas} ${num(c.fraction * 100, 4)} %`).join(' + ')} — calculated per gas. </> : null}
                   {item.note}
+                  {item.code === 'grid:electricity' && <> Factors for {places.length} countries — pick one with the country filter; the tab <b>Grid electricity &amp; prices</b> shows them as a table by region and year.</>}
                 </div>
               </div>
               <select className="input" value={year} onChange={(e) => setYear(e.target.value ? Number(e.target.value) : '')}>
-                <option value="">All years</option>{[2022, 2023, 2024, 2025, 2026].map((y) => <option key={y}>{y}</option>)}
+                <option value="">All years</option>{Array.from({ length: new Date().getFullYear() + 1 - 2005 }, (_, k) => new Date().getFullYear() - k).map((y) => <option key={y}>{y}</option>)}
               </select>
+              {multi && <select className="input" style={{ maxWidth: 230 }} value={place} onChange={(e) => setPlace(e.target.value)} aria-label="Country">
+                <option value="">All countries ({places.length})</option>{places.map((p) => <option key={p.code} value={p.code}>{p.name} ({p.n})</option>)}</select>}
               <label className="row" style={{ gap: 6, fontSize: 13 }}><input type="checkbox" checked={showAll} onChange={(e) => setShowAll(e.target.checked)} />Show superseded</label>
               <button className="btn p" onClick={() => setAdding(true)}>Add or correct a factor</button>
             </div>
@@ -144,7 +158,7 @@ export function FactorsTab() {
             {factors.length === 0 ? <div className="empty">{item.gas_code || item.composition?.length ? 'Calculated from the gas table (see Gases & GWP).' : item.code.startsWith('waste:') ? 'Calculated with the IPCC 2006 / 2019 Refinement method: its default values and their table numbers are shown on the waste entry screen, where they can be replaced per site.' : 'No factors for this item yet.'}</div> : (
               <div className="scroll">
                 <table className="t">
-                  <thead><tr><th>Year</th><th>Part</th><th>Per</th><th className="num">kg CO₂e</th><th className="num">CO₂ kg</th><th className="num">CH₄ kg</th><th className="num">N₂O kg</th><th>Source</th><th>Ver.</th></tr></thead>
+                  <thead><tr><th>Year</th>{multi && <th>Country / region</th>}<th>Part</th><th>Per</th><th className="num">kg CO₂e</th><th className="num">CO₂ kg</th><th className="num">CH₄ kg</th><th className="num">N₂O kg</th><th>Source</th><th>Ver.</th></tr></thead>
                   <tbody>
                     {byYear.map(([y, rows]) => rows.map((f, i) => {
                       const g = (code: string) => f.gases?.find((x) => x.gas === code || (code === 'CH4' && x.gas === 'CH4_fossil') || (code === 'CO2' && x.gas === 'CO2_biogenic'))?.kgPerUnit;
@@ -152,10 +166,11 @@ export function FactorsTab() {
                         <tr key={f.id} className={`click ${f.status !== 'active' ? 'off' : ''}`} onClick={async () => setHistory({ id: f.id, rows: (await api.factorHistory(f.id)).history })}
                           style={i === 0 ? { borderTop: '2px solid var(--line2)' } : undefined}>
                           <td><b>{i === 0 ? y : ''}</b></td>
+                          {multi && <td style={{ whiteSpace: 'nowrap' }}>{f.region === 'GLOBAL' ? 'Global' : <>{countryName(f.region.slice(0, 2)) || f.region.slice(0, 2)}{f.region.length > 2 && <span className="chip info" style={{ marginLeft: 4 }}>{f.region}</span>}</>}</td>}
                           <td style={{ whiteSpace: 'nowrap' }}><span className={`chip ${f.basis === 'direct' ? '' : f.basis === 'wtt' ? 'warn' : 'info'}`}>{BASIS_SHORT[f.basis as Basis]}</span></td>
                           <td style={{ whiteSpace: 'nowrap' }}>{unitName(f.unit)}</td>
                           <td className="num">{num(f.co2e)}</td><td className="num">{num(g('CO2'))}</td><td className="num">{num(g('CH4'))}</td><td className="num">{num(g('N2O'))}</td>
-                          <td style={{ whiteSpace: 'nowrap' }}>{f.source}{f.region !== 'GLOBAL' && <span className="chip info" style={{ marginLeft: 4 }}>{f.region}</span>}</td>
+                          <td style={{ whiteSpace: 'nowrap' }} title={f.note ?? undefined}>{f.source}{!multi && f.region !== 'GLOBAL' && <span className="chip info" style={{ marginLeft: 4 }}>{f.region}</span>}</td>
                           <td>v{f.version}{f.status !== 'active' && <span className="chip grey" style={{ marginLeft: 4 }}>{f.status}</span>}</td>
                         </tr>
                       );
