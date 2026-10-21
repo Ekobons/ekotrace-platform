@@ -229,7 +229,7 @@ export async function authRoutes(app: FastifyInstance) {
       const u = req.user;
       const company = u.tenantId
         ? await tenantTx(u.tenantId, async (c) => (await c.query(
-            `SELECT t.id, t.name, t.country, t.gwp_set, t.plan, t.products, t.status, t.access_expiry, t.consolidation, t.base_year, t.timezone, t.currency, t.logo_id IS NOT NULL AS has_logo,
+            `SELECT t.id, t.name, t.country, t.gwp_set, t.plan, t.products, t.status, t.access_expiry, t.consolidation, t.base_year, t.timezone, t.currency, t.logo_id IS NOT NULL AS has_logo, t.year_start_month, t.factor_year, t.flight_rf, t.target_year, t.target_s12_pct::float8 AS target_s12, t.target_s3_pct::float8 AS target_s3, t.due_day, t.remind_days, t.escalate_days,
                     (SELECT name FROM org_node WHERE kind = 'subgroup' AND id = $2) AS scope_name
                FROM tenant t WHERE t.id = $1`, [u.tenantId, u.scopeNodeId])).rows[0] ?? null)
         : null;
