@@ -75,10 +75,9 @@ export async function autoSetup(log: (m: string) => void) {
     log('[setup] factors loaded');
   }
   await encryptStoredFiles(log);
-  const codes = gridSourceCodes();
-  const have = new Set((await pool.query<{ code: string }>(`SELECT code FROM factor_source WHERE code = ANY($1)`, [codes])).rows.map((r) => r.code));
-  if (codes.some((c) => !have.has(c))) {
+  // grid factors of other countries: every start (a second or two); a changed value is superseded, history kept
+  if (gridSourceCodes().length) {
     const g = await platformTx((c) => seedGrid(c));
-    log(`[setup] grid factors of other countries loaded: ${g.regions} regions, ${g.added} factors`);
+    if (g.added) log(`[setup] grid factors of other countries: ${g.regions} regions, ${g.added} added${g.superseded ? ` (${g.superseded} replaced)` : ''}`);
   }
 }
