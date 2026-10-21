@@ -61,7 +61,7 @@ export function Console() {
           <thead><tr><th>Company</th><th>Plan</th><th>Subscription</th><th>Access until</th><th className="num">Facilities</th><th className="num">People</th><th className="num">Entries</th><th>Last login</th><th className="ctr">Status</th><th /></tr></thead>
           <tbody>{list.map((c) => { const p = planOf(c.plan); const d = daysLeft(c.access_expiry); return (
             <tr key={c.id}>
-              <td><b>{c.name}</b><div className="sub">{countryLabel(c.country)} · {c.gwp_set}</div></td>
+              <td><b>{c.name}</b><div className="sub">{countryLabel(c.country)} · {c.gwp_set}</div><div className="row" style={{ gap: 4, marginTop: 3 }}>{(c.products ?? ['ekotrace']).map((p) => <span key={p} className="chip grey">{PRODUCT_LABEL[p]}</span>)}</div></td>
               <td><select className="input" style={{ height: 30 }} value={c.plan} onChange={(e) => update(c.id, { plan: e.target.value }, 'Plan changed')}>{plans.map((x) => <option key={x.code} value={x.code}>{x.name}</option>)}</select>
                 {p && <div className="sub" style={{ fontSize: 11.5, maxWidth: 220 }}>{planLine(p)}</div>}</td>
               <td className="small">{c.price != null ? <>{c.billing_currency} {c.price.toLocaleString('en')} / {c.billing_cycle === 'monthly' ? 'month' : 'year'}</> : <span className="muted">price not set</span>}{c.po_ref && <div className="muted">PO {c.po_ref}</div>}</td>
@@ -86,9 +86,25 @@ export function Console() {
   );
 }
 
+const PRODUCT_LABEL: Record<'ekotrace' | 'ekofin', string> = { ekotrace: 'EKOTRACE', ekofin: 'EKOFIN' };
+type Prod = 'ekotrace' | 'ekofin';
+/** Which products the company has: EKOTRACE (own GHG inventory), EKOFIN (financed emissions), or both. */
+function ProductBoxes({ value, onChange }: { value: Prod[]; onChange: (v: Prod[]) => void }) {
+  const flip = (p: Prod) => onChange(value.includes(p) ? value.filter((x) => x !== p) : [...value, p]);
+  return (
+    <div className="field"><span>Products</span>
+      <div className="row" style={{ gap: 18 }}>
+        <label className="row chkline" style={{ gap: 6 }}><input type="checkbox" checked={value.includes('ekotrace')} onChange={() => flip('ekotrace')} />EKOTRACE · own GHG inventory</label>
+        <label className="row chkline" style={{ gap: 6 }}><input type="checkbox" checked={value.includes('ekofin')} onChange={() => flip('ekofin')} />EKOFIN · financed emissions (banks, investors)</label>
+      </div>
+      {!value.length && <small className="bad">Choose at least one</small>}
+    </div>);
+}
+
 function EditCompany({ c, plans, onClose, onSaved }: { c: Company; plans: PlanLimits[]; onClose: () => void; onSaved: () => void }) {
   const ref = useRef<HTMLDialogElement>(null);
   useEffect(() => { ref.current?.showModal(); }, []);
+  const [prods, setProds] = useState<Prod[]>(c.products ?? ['ekotrace']);
   const [f, setF] = useState({ name: c.name, plan: c.plan, accessExpiry: c.access_expiry, price: c.price != null ? String(c.price) : '', billingCurrency: c.billing_currency ?? 'AED', billingCycle: c.billing_cycle ?? 'annual', poRef: c.po_ref ?? '', billingEmail: c.billing_email ?? '', notes: c.notes ?? '' });
   const [err, setErr] = useState<string | null>(null);
   const set = (k: keyof typeof f) => (e: { target: { value: string } }) => setF({ ...f, [k]: e.target.value });
@@ -104,6 +120,7 @@ function EditCompany({ c, plans, onClose, onSaved }: { c: Company; plans: PlanLi
           <label className="field grow"><span>Access until</span><input className="input" type="date" value={f.accessExpiry} onChange={set('accessExpiry')} /></label>
         </div>
         {p && <div className="sub">{p.name}: {planLine(p)}.</div>}
+        <ProductBoxes value={prods} onChange={setProds} />
         {over && <div className="note warn">The company has {c.facilities} facilities and {c.users} people: above the {p!.name} limits. Nothing is removed; it cannot add more until it is under the limits.</div>}
         <h3>Subscription</h3>
         <div className="row">
@@ -120,10 +137,10 @@ function EditCompany({ c, plans, onClose, onSaved }: { c: Company; plans: PlanLi
         {c.status === 'suspended' && <Destroy c={c} onDone={() => { ref.current?.close(); onSaved(); }} />}
         <div className="row" style={{ justifyContent: 'flex-end' }}>
           <button className="btn" onClick={() => ref.current?.close()}>Cancel</button>
-          <button className="btn p" disabled={f.name.trim().length < 2} onClick={async () => {
+          <button className="btn p" disabled={f.name.trim().length < 2 || !prods.length} onClick={async () => {
             setErr(null);
             try {
-              await api.updateCompany(c.id, { name: f.name.trim(), plan: f.plan, accessExpiry: f.accessExpiry, price: f.price === '' ? null : Number(f.price), billingCurrency: f.billingCurrency || 'AED',
+              await api.updateCompany(c.id, { name: f.name.trim(), plan: f.plan, products: prods, accessExpiry: f.accessExpiry, price: f.price === '' ? null : Number(f.price), billingCurrency: f.billingCurrency || 'AED',
                 billingCycle: f.billingCycle, poRef: f.poRef.trim() || null, billingEmail: f.billingEmail.trim() || null, notes: f.notes.trim() || null });
               onSaved();
             } catch (e) { setErr((e as Error).message); }
@@ -137,6 +154,7 @@ function EditCompany({ c, plans, onClose, onSaved }: { c: Company; plans: PlanLi
 function NewCompany({ plans, onClose, onDone }: { plans: PlanLimits[]; onClose: () => void; onDone: (s: { email: string; pw: string }) => void }) {
   const ref = useRef<HTMLDialogElement>(null);
   useEffect(() => { ref.current?.showModal(); }, []);
+  const [prods, setProds] = useState<Prod[]>(['ekotrace']);
   const [f, setF] = useState({ name: '', country: '', gwpSet: 'AR5', plan: 'enterprise', accessExpiry: new Date(Date.now() + 365 * 864e5).toISOString().slice(0, 10), saName: '', saEmail: '' });
   const [err, setErr] = useState<string | null>(null);
   const set = (k: keyof typeof f) => (e: { target: { value: string } }) => setF({ ...f, [k]: e.target.value });
@@ -152,6 +170,7 @@ function NewCompany({ plans, onClose, onDone }: { plans: PlanLimits[]; onClose: 
           <label className="field"><span>GWP</span><select className="input" value={f.gwpSet} onChange={set('gwpSet')}><option>AR4</option><option>AR5</option><option>AR6</option></select></label>
         </div>
         {plans.find((p) => p.code === f.plan) && <div className="sub">{planLine(plans.find((p) => p.code === f.plan)!)}</div>}
+        <ProductBoxes value={prods} onChange={setProds} />
         <h3>First Super admin</h3>
         <div className="row">
           <label className="field grow"><span>Name</span><input className="input" value={f.saName} onChange={set('saName')} /></label>
@@ -160,10 +179,10 @@ function NewCompany({ plans, onClose, onDone }: { plans: PlanLimits[]; onClose: 
         {err && <div className="note bad">{err}</div>}
         <div className="row" style={{ justifyContent: 'flex-end' }}>
           <button className="btn" onClick={() => ref.current?.close()}>Cancel</button>
-          <button className="btn p" disabled={f.name.trim().length < 2 || f.saName.trim().length < 2 || !f.saEmail.includes('@')} onClick={async () => {
+          <button className="btn p" disabled={f.name.trim().length < 2 || f.saName.trim().length < 2 || !f.saEmail.includes('@') || !prods.length} onClick={async () => {
             setErr(null);
             try {
-              const r = await api.createCompany({ name: f.name.trim(), country: f.country.toUpperCase(), gwpSet: f.gwpSet, plan: f.plan, accessExpiry: f.accessExpiry, superAdmin: { name: f.saName.trim(), email: f.saEmail.trim() } });
+              const r = await api.createCompany({ name: f.name.trim(), country: f.country.toUpperCase(), gwpSet: f.gwpSet, plan: f.plan, products: prods, accessExpiry: f.accessExpiry, superAdmin: { name: f.saName.trim(), email: f.saEmail.trim() } });
               onDone({ email: r.superAdmin.email, pw: r.superAdmin.temporaryPassword });
             } catch (e) { setErr((e as Error).message); }
           }}>Create company</button>

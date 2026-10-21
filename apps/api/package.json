@@ -16,6 +16,7 @@
     "admin:list": "tsx src/cli/admins.ts list",
     "admin:reset": "tsx src/cli/admins.ts reset",
     "demo": "tsx src/cli/demo.ts",
+    "demo:fin": "tsx src/cli/demoFin.ts",
     "testfiles": "tsx src/cli/makeTestFiles.ts"
   },
   "dependencies": {

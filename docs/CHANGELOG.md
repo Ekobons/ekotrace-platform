@@ -2,6 +2,15 @@
 
 Newest first.
 
+## 2026-10-17 · EKOFIN: financed emissions (PCAF Part A) as a second product on the platform
+
+- **Products per company**: `tenant.products` (EKOTRACE, EKOFIN or both), set in the platform console (new and edit company); `/api/auth/me` returns it. With both, a switch at the top of the side menu moves between them; EKOFIN has its own menu (Portfolio dashboard · Portfolios & holdings · Counterparties · Sector factor library) and shares People, Currencies, Document vault and the audit log. EKOFIN routes refuse a company without the product (`PRODUCT_OFF`).
+- **Engine** (`packages/calc/src/pcaf.ts`, pure, tested): attribution = outstanding ÷ EVIC (listed) or ÷ (equity + debt), capped at 100%; best layer of five PCAF data quality scores (1 verified, 2 reported, 3 activity-based, 4 revenue × sector factor, 5 outstanding × asset factor), a forced layer used only when it can be calculated; portfolio totals, economic intensity, WACI with coverage, outstanding-weighted score, coverage, buckets by score, asset class and sector, top contributors.
+- **Migration 050**: `fin_factor` (shared sector factor libraries), `fin_portfolio`, `fin_period` (draft / locked with the results kept), `fin_counterparty` (LEI and ISIN unique per company), `fin_financials`, `fin_emission` (score 1–3), `fin_holding` (asset class, outstanding, currency, layer override with reason); RLS on all company tables; purge order updated.
+- **API** (`/api/fin/*`, `lib/ekofin.ts`): portfolios, reporting dates (copy holdings from another date), holdings, layer override, loan book upload (Excel / CSV, preview, match by LEI → ISIN → customer ID → name + country, fills blanks only, add or replace, nothing saved while any row has a problem) and template, lock / unlock with reason, CSV export, counterparties with financials and emissions (score 1 needs a Document vault file), sector factor import (platform admin, preview, upsert) and removal (refused while a portfolio uses the library). Amounts converted to the reporting currency with the company's exchange rates at the reporting date; a holding without a rate is left out and named.
+- **Screens**: portfolio dashboard (financed emissions, intensity, WACI, data quality score and mix, by asset class and sector, largest contributors, "ask for data first"); portfolios & holdings (filters, holding drawer with formula, inputs and warnings, layer choice); counterparty register and profile; sector factor library.
+- **DEMO** (`npm run demo:fin`, invented): "Gulf Demo Bank (demo)" with both products, three logins, a "DEMO factors (illustrative, not for reporting)" library, a corporate loan book and an equity fund at two dates. Manual: EKOFIN chapter. Tests: engine (9) and API (7).
+
 ## 2026-10-17 · ESG & materiality: frameworks, double materiality assessment, industry questions; supplier portal ESG impact
 
 - **Menu → Disclose → ESG & materiality** (`/esg`): Frameworks & set-up · Double materiality · ESG data · Content index · Excel export. Migration 049 (`esg_assessment` per year, `esg_topic`, `esg_answer`, all with row-level security; purge order updated).
