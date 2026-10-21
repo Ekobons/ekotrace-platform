@@ -96,6 +96,7 @@ export function Methodology() {
           <p className="sub">Radiative forcing adds the warming effect of aircraft emissions at altitude (contrails, NOx), about 70% more than the fuel's CO₂e. Applies to new flight entries; each entry shows which was used.</p>
         </div>
       </div>
+      <FactorYearCard edit={edit} save={save} />
       <div className="grid2" style={{ gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr)' }}>
         <div className="card" style={{ display: 'grid', gap: 10 }}>
           <h2>Reduction targets</h2>
@@ -172,5 +173,46 @@ function ApprovalLevels({ edit }: { edit: boolean }) {
         <p className="sub">Off by default. When on, approving your own entry needs a note saying what it was checked against; the entry is marked <b>self-reviewed</b> on the entry, in the data-quality report ("segregation of duties") and in the verifier pack. Data preparers and platform staff never approve. Level 2, when it applies, is always a different person. Verifiers, frameworks and many client policies expect an independent check: leave it off where that applies.</p>
         {edit && <div><button className="btn" onClick={() => void save()}>Save</button></div>}
       </div>
+    </div>);
+}
+
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const M3 = MONTHS.map((m) => m.slice(0, 3));
+/** Which year's factors an entry uses: its own calendar year, or one set for the whole reporting year. */
+function FactorYearCard({ edit, save }: { edit: boolean; save: (b: Record<string, unknown>, m: string) => Promise<void> }) {
+  const { tenant, toast } = useApp();
+  const [busy, setBusy] = useState(false);
+  const [changed, setChanged] = useState(false);
+  const sm = tenant?.year_start_month ?? 1, mode = tenant?.factor_year ?? 'calendar';
+  // an example reporting year: the one that started most recently before this year
+  const y0 = new Date().getFullYear() - 2;
+  const fyName = sm === 1 ? String(y0) : `${M3[sm - 1]} ${y0} – ${M3[(sm + 10) % 12]} ${y0 + 1}`;
+  const example = sm === 1 ? `Every month of ${y0} uses the ${y0} factors.`
+    : mode === 'calendar' ? `${M3[sm - 1]}–Dec ${y0} use the ${y0} factors; Jan–${M3[(sm + 10) % 12]} ${y0 + 1} use the ${y0 + 1} factors.`
+    : `All of ${fyName} uses the ${mode === 'fy_start' ? y0 : y0 + 1} factors.`;
+  const set = async (b: Record<string, unknown>, m: string) => { await save(b, m); setChanged(true); };
+  const recalc = async () => {
+    setBusy(true);
+    try { const r = await api.recalculate({ onlyWithWarnings: false }); toast(`${r.changed} of ${r.checked} entries changed${r.problems.length ? ` · ${r.problems.length} not recalculated (see the audit log)` : ''}`); setChanged(false); }
+    catch (e) { toast((e as Error).message); } finally { setBusy(false); }
+  };
+  return (
+    <div className="card" style={{ display: 'grid', gap: 10 }}>
+      <h2>Reporting year &amp; factor year</h2>
+      <div className="row" style={{ gap: 10, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+        <label className="field" style={{ width: 200 }}><span>Reporting year starts in</span>
+          <select className="input" disabled={!edit} value={sm} onChange={(e) => void set({ yearStartMonth: Number(e.target.value) }, `Reporting year starts in ${MONTHS[Number(e.target.value) - 1]}`)}>
+            {MONTHS.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}</select></label>
+        <label className="field" style={{ minWidth: 320, flex: 1 }}><span>Factor year follows</span>
+          <select className="input" disabled={!edit || sm === 1} value={sm === 1 ? 'calendar' : mode} onChange={(e) => void set({ factorYear: e.target.value }, 'Factor year changed')}>
+            <option value="calendar">Each month's calendar year (default)</option>
+            <option value="fy_start">The reporting year — the calendar year it starts in</option>
+            <option value="fy_end">The reporting year — the calendar year it ends in</option>
+          </select></label>
+      </div>
+      <p className="sub" style={{ margin: 0 }}><b>Example ({fyName}):</b> {example}</p>
+      <p className="sub" style={{ margin: 0 }}>Factor sets such as DESNZ are published once a year for a calendar year. With a reporting year that is not January–December, the default mixes two sets in one report — acceptable, but many companies prefer one set for the whole year, usually the year most of it falls in (April start: the year it starts in). Say which in the methodology note of your report. Where the chosen year has no factor yet, the latest earlier one is used with a warning, as always.</p>
+      {changed && edit && <div className="note warn small row" style={{ gap: 10, alignItems: 'center' }}><span className="grow">Saved entries keep the factors they were calculated with. Recalculate them to apply this choice (locked months are left as they are).</span>
+        <button className="btn" disabled={busy} onClick={() => void recalc()}>{busy ? 'Recalculating…' : 'Recalculate all entries'}</button></div>}
     </div>);
 }

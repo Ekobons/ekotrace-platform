@@ -129,6 +129,30 @@ test('companies and facilities; diesel 2025 calculates with DESNZ 2025 and split
   assert.equal(lb.status, 400); // lb is not offered for liquid fuels
 });
 
+test('factor year: April reporting year uses one DESNZ set for the whole year when the company chooses it; calendar months by default', async () => {
+  // UK electricity: DESNZ 2024 0.20705, DESNZ 2025 0.177 kg/kWh
+  const grid = await itemId('grid:electricity');
+  const london = (await api('POST', '/api/org/nodes', { parentId: (await api('GET', '/api/org', undefined, tenantA)).body.nodes.find((n: { kind: string }) => n.kind === 'group').id, kind: 'facility', name: 'London office', country: 'GB' }, tenantA)).body.id;
+  const calc = (ps: string, pe: string) => api('POST', '/api/calculate', { itemId: grid, quantity: 10, unit: 'MWh_e', periodStart: ps, periodEnd: pe, facilityId: london }, tenantA);
+  const feb25 = (await calc('2025-02-01', '2025-02-28')).body, nov24 = (await calc('2024-11-01', '2024-11-30')).body;
+  assert.ok(Math.abs(feb25.totals.scope2 - 1770) < 0.5 && Math.abs(nov24.totals.scope2 - 2070.5) < 0.5, JSON.stringify([feb25.totals, nov24.totals]));
+  // April–March, set of the year it starts in: Feb 2025 is in Apr 2024 – Mar 2025 → DESNZ 2024
+  assert.equal((await api('PATCH', '/api/tenant', { yearStartMonth: 4, factorYear: 'fy_start' }, tenantA)).status, 200);
+  const a = (await calc('2025-02-01', '2025-02-28')).body;
+  assert.ok(Math.abs(a.totals.scope2 - 2070.5) < 0.5, JSON.stringify(a.totals));
+  assert.ok(a.steps.some((x: string) => /Factors of 2024 used for the whole reporting year Apr 2024 – Mar 2025/.test(x)), JSON.stringify(a.steps));
+  // …the year it ends in: Nov 2024 → DESNZ 2025
+  await api('PATCH', '/api/tenant', { factorYear: 'fy_end' }, tenantA);
+  assert.ok(Math.abs((await calc('2024-11-01', '2024-11-30')).body.totals.scope2 - 1770) < 0.5);
+  // back to calendar months
+  await api('PATCH', '/api/tenant', { yearStartMonth: 1, factorYear: 'calendar' }, tenantA);
+  assert.ok(Math.abs((await calc('2025-02-01', '2025-02-28')).body.totals.scope2 - 1770) < 0.5);
+  const { factorDate } = svc;
+  assert.equal(factorDate('2024-02-29', { mode: 'fy_end', startMonth: 4 }), '2024-02-28');
+  assert.equal(factorDate('2025-07-01', { mode: 'fy_start', startMonth: 7 }), '2025-07-01');
+  assert.equal(factorDate('2025-06-01', { mode: 'fy_start', startMonth: 7 }), '2024-06-01');
+});
+
 test('AR6 company gets a different (recomputed) total from the same entry', async () => {
   const id = await diesel();
   const a = await api('POST', '/api/calculate', { itemId: id, quantity: 1000, unit: 'L', periodStart: '2025-03-01', periodEnd: '2025-03-31' }, tenantA);

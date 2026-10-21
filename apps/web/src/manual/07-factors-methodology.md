@@ -39,10 +39,38 @@ These come with Ekotrace in one file (`data/grid/grid-factors.csv`) and load by 
 
 ```flow
 > Country first | a factor for the facility's country beats a global one
-> Year of the activity | activity in 2025 uses the 2025 factors; if next year's set is not loaded yet, the latest one is used with a warning — recalculate later
+> Year of the activity | activity in 2025 uses the 2025 factors (or one year per reporting year, see below); if that year's set is not loaded yet, the latest earlier one is used with a warning — recalculate later
 > Same kind of unit | litres with litre factors, kg with mass factors, kWh net with net factors (net and gross energy are never mixed)
 > Per gas | CO₂, CH₄, N₂O masses × the company's GWP set, so AR4, AR5 or AR6 all work from the same factors
 ```
+
+## Factor year and reporting year
+
+Factor sets such as DESNZ are published once a year **for a calendar year**: the "2025" set (published June 2025) is for activity from January to December 2025. Set the start of the company's reporting year, and which factor year it follows, under **Setup → Methodology & boundaries → Reporting year & factor year** (super admin):
+
+| Factor year follows | April 2024 – March 2025 |
+|---|---|
+| Each month's calendar year (default) | Apr–Dec 2024 use the 2024 set, Jan–Mar 2025 the 2025 set |
+| The reporting year — the year it starts in | the whole year uses the 2024 set |
+| The reporting year — the year it ends in | the whole year uses the 2025 set |
+
+All three are acceptable; state the choice in the report's methodology note and keep it from year to year. One set per reporting year is common; with an April start most of the year falls in the year it starts. Each entry's calculation says which year's factors it used. The setting changes the year of the **factors**; dashboards and reports still group entries by calendar months.
+
+## When new factors come out — recalculation
+
+Each entry stores the result **and the factor it was calculated with**. Loading a new factor never changes saved entries by itself; recalculation is a deliberate step, logged.
+
+```flow
+> 1 · Before the set exists | e.g. Jan–May 2025 entered in April: the 2024 set is used and the entry carries a warning "no factor for 2025; the 2024 one was used"
+> 2 · New set loaded | the platform admin loads DESNZ 2025 in June (or a grid factor is added)
+> 3 · Recalculate | Add data → Recalculate entries with warnings: those entries are calculated again and pick the 2025 set; the warning goes
+> 4 · Logged | each change is in the audit log with the old and new totals; approved entries keep their status
+```
+
+- **Only entries that used a stand-in factor need recalculating** — they are the ones with the warning. Entries that already had their own year's factor do not change.
+- **Locked months** (audit period lock) are never recalculated; unlock with a reason first if a correction is needed.
+- **After changing the factor-year setting**, the Methodology page offers *Recalculate all entries*, because entries without a warning may now take another year's factors.
+- **Past years are not moved onto newer factors.** 2024 activity keeps the 2024 set; a newer set does not replace it. A corrected factor for the same year (a new version) is applied by recalculating, and if the change is significant for the base year it is recorded under Base year and restatements.
 
 ## Corrections and history
 

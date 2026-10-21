@@ -195,6 +195,8 @@ export interface CalcContext {
   lookupCertificates?: (ids: string[], excludeActivityId?: string) => Promise<CertificateRow[]>;
   /** price list lookup (company price first, then the platform list) */
   lookupPrice?: (itemId: number, region: string, date: string, currency: string) => Promise<PriceFound | null>;
+  /** the company's factor-year setting (calendar month, or one year per reporting year) */
+  lookupFactorYear?: () => Promise<FactorYear | null>;
   /** a landfill of the company with its tonnage history */
   lookupWasteSite?: (id: string) => Promise<WasteSiteRow | null>;
 }
@@ -206,6 +208,28 @@ export interface WasteSiteRow { id: string; name: string; facility_id: string; p
 
 /** What is stored as the entry's quantity: for spend, the fuel / kWh bought. */
 export interface Stored { quantity: number; unit: string; inputs: Record<string, unknown> }
+
+export type FactorYearMode = 'calendar' | 'fy_start' | 'fy_end';
+export interface FactorYear { mode: FactorYearMode; startMonth: number }
+const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+/** Start year of the reporting year a date falls in. */
+function fyStartYear(date: string, startMonth: number) { const y = Number(date.slice(0, 4)), m = Number(date.slice(5, 7)); return m >= startMonth ? y : y - 1; }
+/** e.g. "Apr 2024 – Mar 2025". */
+export function fyLabel(date: string, fy: FactorYear) {
+  const y = fyStartYear(date, fy.startMonth);
+  return fy.startMonth === 1 ? String(y) : `${MON[fy.startMonth - 1]} ${y} – ${MON[(fy.startMonth + 10) % 12]} ${y + 1}`;
+}
+/**
+ * The date used to choose factors. Calendar (default): the period's own date. Reporting year: every month of
+ * the reporting year uses one calendar year's factors — the year it starts in, or the year it ends in.
+ */
+export function factorDate(date: string, fy: FactorYear | null | undefined): string {
+  if (!fy || fy.mode === 'calendar' || fy.startMonth === 1) return date;
+  const start = fyStartYear(date, fy.startMonth);
+  const y = fy.mode === 'fy_start' ? start : start + 1;
+  const md = date.slice(4) === '-02-29' ? '-02-28' : date.slice(4);
+  return `${y}${md}`;
+}
 
 export async function calculate(input: CalcInput, ctx: CalcContext): Promise<{ result: CalcResult; item: ItemRow; gwpSet: string; stored: Stored }> {
   if (input.periodEnd < input.periodStart) throw new AppError('The period ends before it starts');
@@ -222,6 +246,9 @@ export async function calculate(input: CalcInput, ctx: CalcContext): Promise<{ r
   if (!gwp) throw new AppError(`Unknown GWP set ${gwpSet}`);
   const region = input.region ?? ctx.region;
   const date = input.periodStart;
+  // Which year's factors: the month's own calendar year, or one year for the whole reporting year (company setting).
+  const fy = ctx.lookupFactorYear ? await ctx.lookupFactorYear() : null;
+  const fdate = factorDate(date, fy);
 
   let result: CalcResult;
   let stored: Stored = { quantity: input.quantity ?? 0, unit: input.unit, inputs: input.cv ? { cv: input.cv } : {} };
@@ -239,7 +266,7 @@ export async function calculate(input: CalcInput, ctx: CalcContext): Promise<{ r
       if (pi) { factors = await loadFactors(pi.id); proxyNote = `No DESNZ factor for ${item.name}: ${pi.name} used as a proxy`; }
     }
     if (!factors.length) throw new AppError(`${item.name}: no factor in the library`);
-    result = calcCombustion({ itemName: item.name, quantity: input.quantity, unit: input.unit, date, region, factors, gwp, units: ref.units });
+    result = calcCombustion({ itemName: item.name, quantity: input.quantity, unit: input.unit, date: fdate, region, factors, gwp, units: ref.units });
     if (proxyNote) { result.steps.unshift(proxyNote); result.warnings.push(`${proxyNote} — mark the entry as proxy data.`); }
     const gri = input.wasteInfo?.gri, rt = (item.attrs as { route?: string } | null)?.route;
     if (gri === 'reuse') result.steps.push('Preparation for re-use: DESNZ has no re-use factor, the recycling factor (collection and transport to the facility) is used');
@@ -257,7 +284,7 @@ export async function calculate(input: CalcInput, ctx: CalcContext): Promise<{ r
       result = { totals: { ...zero, scope3: kg }, lines: [{ basis: 'scope3', gas: 'CO2e', kgGas: null, kgCo2e: kg, factorId: null, method: 'published' }], factors: [],
         steps: [`${fmtN(m3)} m³ × ${own} kg CO₂e/m³ (${input.water?.source || 'factor entered'}) = ${fmtN(kg)} kg CO₂e`], warnings: [] } as unknown as CalcResult;
     } else if (factors.length) {
-      result = calcCombustion({ itemName: item.name, quantity: m3, unit: 'm3', date, region, factors, gwp, units: ref.units });
+      result = calcCombustion({ itemName: item.name, quantity: m3, unit: 'm3', date: fdate, region, factors, gwp, units: ref.units });
       if (item.attrs && (item.attrs as { desal?: boolean }).desal) result.warnings.push('DESNZ water supply factor (UK average) used: desalinated water takes much more energy. Enter the utility\'s factor per m³ when you have it.');
     } else {
       result = { totals: zero, lines: [], factors: [], steps: [`${item.name}: ${fmtN(m3)} m³, no Scope 3 emissions`], warnings: [] } as unknown as CalcResult;
@@ -270,7 +297,7 @@ export async function calculate(input: CalcInput, ctx: CalcContext): Promise<{ r
       // walking and cycling: distance counted, no emissions
       result = { totals: { direct: 0, wtt: 0, outside_scopes: 0, memo: 0, scope2: 0, scope2_market: 0, td_loss: 0, scope3: 0 }, lines: [], steps: [`${item.name}: no emissions`], warnings: [], factors: [] } as unknown as CalcResult;
     } else {
-      result = calcCombustion({ itemName: item.name, quantity: input.quantity, unit: input.unit, date, region, factors, gwp, units: ref.units });
+      result = calcCombustion({ itemName: item.name, quantity: input.quantity, unit: input.unit, date: fdate, region, factors, gwp, units: ref.units });
       // Employee commuting: the fuel's well-to-tank belongs to the same category (3.7), not to 3.3.
       if (result.totals.wtt) {
         result.totals.scope3 += result.totals.wtt;
@@ -295,7 +322,7 @@ export async function calculate(input: CalcInput, ctx: CalcContext): Promise<{ r
           steps: [`${item.name}: no factor yet — not counted`], warnings: [] } as unknown as CalcResult;
       } else {
       if (!factors.length) throw new AppError(item.code.startsWith('bt:hotel') ? `${item.name}: no DESNZ factor — choose a nearby country.` : `${item.name}: no factor loaded — restart the app to load the DESNZ files.`);
-      result = calcCombustion({ itemName: item.name, quantity: input.quantity, unit: input.unit, date, region: tripInfo?.region ?? 'GLOBAL', factors, gwp, units: ref.units });
+      result = calcCombustion({ itemName: item.name, quantity: input.quantity, unit: input.unit, date: fdate, region: tripInfo?.region ?? 'GLOBAL', factors, gwp, units: ref.units });
       // The well-to-tank of the travel belongs to the same category (3.6), not to 3.3.
       if (result.totals.wtt) {
         result.totals.scope3 += result.totals.wtt;
@@ -310,15 +337,15 @@ export async function calculate(input: CalcInput, ctx: CalcContext): Promise<{ r
     stored = { quantity: input.quantity, unit: input.unit, inputs: input.trip ? { trip: { ...input.trip, ...(tripInfo?.stored ?? {}) } } : {} };
   } else if (item.calc_method === 'electricity') {
     if (input.quantity === undefined) throw new AppError('Enter the quantity of energy');
-    const e = await energyCalc(input, item, ctx, ref.units, gwp, date);
+    const e = await energyCalc(input, item, ctx, ref.units, gwp, date, fdate);
     result = e.result; stored = e.stored;
   } else if (item.calc_method === 'vehicle') {
     if (input.quantity === undefined && !input.vehicle?.spend) throw new AppError('Enter the distance, fuel, electricity or spend');
-    const v = await vehicleCalc(input, item, ctx, ref.units, gwp, region, date);
+    const v = await vehicleCalc(input, item, ctx, ref.units, gwp, region, date, fdate);
     result = v.result; stored = v.stored;
   } else if (item.calc_method === 'combustion') {
     if (input.quantity === undefined) throw new AppError('Enter the quantity of fuel');
-    result = calcCombustion({ itemName: item.name, quantity: input.quantity, unit: input.unit, date, region, factors: await loadFactors(item.id), gwp, units: ref.units, cv: input.cv });
+    result = calcCombustion({ itemName: item.name, quantity: input.quantity, unit: input.unit, date: fdate, region, factors: await loadFactors(item.id), gwp, units: ref.units, cv: input.cv });
   } else {
     if (input.cv) throw new AppError('A calorific value applies to fuels only');
     if (!input.fugitive) throw new AppError('Choose a method and enter the gas quantities');
@@ -327,12 +354,14 @@ export async function calculate(input: CalcInput, ctx: CalcContext): Promise<{ r
       : (await query<{ gas: string; fraction: number }>('SELECT gas, fraction FROM item_gas WHERE item_id = $1 ORDER BY fraction DESC', [item.id]));
     let blendFactors: Factor[] = [];
     if (!composition.length) {
-      const chosen = chooseFactors(await loadFactors(item.id), { date, region, unit: 'kg', units: ref.units });
+      const chosen = chooseFactors(await loadFactors(item.id), { date: fdate, region, unit: 'kg', units: ref.units });
       blendFactors = [...chosen.values()].map((c) => c.factor);
     }
     result = calcFugitive({ itemName: item.name, unit: input.unit, data: input.fugitive, composition, blendFactors, gwp, units: ref.units, kyoto: (g) => ref.kyoto.has(g) });
   }
-  if (input.periodStart.slice(0, 4) !== input.periodEnd.slice(0, 4) && item.calc_method !== 'waste') {
+  if (fdate.slice(0, 4) !== date.slice(0, 4)) {
+    result.steps.push(`Factors of ${fdate.slice(0, 4)} used for the whole reporting year ${fyLabel(date, fy!)} (company setting: factor year follows the reporting year).`);
+  } else if (input.periodStart.slice(0, 4) !== input.periodEnd.slice(0, 4) && item.calc_method !== 'waste') {
     result.warnings.push(`The period spans two calendar years; factors for ${input.periodStart.slice(0, 4)} were used.`);
   }
   if (item.calc_method === 'fugitive') stored = { quantity: result.lines.reduce((s, l) => s + (l.kgGas ?? 0), 0), unit: input.unit, inputs: input.fugitive ?? {} };
@@ -372,7 +401,7 @@ async function evEnergy(itemId: number, date: string, unit: string) {
 }
 
 async function vehicleCalc(input: CalcInput, item: ItemRow, ctx: CalcContext, units: Awaited<ReturnType<typeof refdata>>['units'],
-  gwp: Parameters<typeof calcVehicle>[0]['gwp'], region: string, date: string): Promise<{ result: CalcResult; stored: Stored }> {
+  gwp: Parameters<typeof calcVehicle>[0]['gwp'], region: string, date: string, fdate = date): Promise<{ result: CalcResult; stored: Stored }> {
   const v = input.vehicle ?? { method: 'distance' as const };
   const a = item.attrs ?? {};
   const electric = !!a.electric, phev = !!a.phev;
@@ -410,10 +439,10 @@ async function vehicleCalc(input: CalcInput, item: ItemRow, ctx: CalcContext, un
     qty = v.spend.amount * count;
   }
   const result = calcVehicle({
-    vehicleName: item.name, electric, phev, method: v.method, quantity: qty, unit, date, region,
+    vehicleName: item.name, electric, phev, method: v.method, quantity: qty, unit, date: fdate, region,
     vehicleFactors: a.distance === false ? [] : await loadFactors(item.id),
     fuel: fuel ? { name: fuel.name, factors: fuel.factors, cv: input.cv } : undefined,
-    evEnergy: (electric || phev) && v.method === 'distance' ? await evEnergy(item.id, date, unit) : null,
+    evEnergy: (electric || phev) && v.method === 'distance' ? await evEnergy(item.id, fdate, unit) : null,
     gridFactors, charging: v.charging ?? 'elsewhere', spend, gwp, units,
   });
   if (count > 1) {
@@ -440,7 +469,7 @@ export async function findPrice(c: { query: (q: string, p: unknown[]) => Promise
 const ENERGY_OF: Record<string, 'electricity' | 'heat' | 'cooling'> = { 'grid:electricity': 'electricity', 'heat:district': 'heat', 'cooling:district': 'cooling' };
 
 async function energyCalc(input: CalcInput, item: ItemRow, ctx: CalcContext, units: Awaited<ReturnType<typeof refdata>>['units'],
-  gwp: Parameters<typeof calcEnergy>[0]['gwp'], date: string): Promise<{ result: CalcResult; stored: Stored }> {
+  gwp: Parameters<typeof calcEnergy>[0]['gwp'], date: string, fdate = date): Promise<{ result: CalcResult; stored: Stored }> {
   const energy = ENERGY_OF[item.code];
   if (!energy) throw new AppError(`${item.name} is not set up for purchased energy`);
   const e = input.energy ?? {};
@@ -488,7 +517,7 @@ async function energyCalc(input: CalcInput, item: ItemRow, ctx: CalcContext, uni
   const gridItem = energy === 'cooling' ? (await query<{ id: number }>(`SELECT id FROM item WHERE code = 'grid:electricity'`))[0] : null;
   if (energy === 'cooling' && !e.cooling && !supplier) throw new AppError("District cooling needs the supplier's factor, or the plant's efficiency (kWh per TRh, or COP)");
   const result = calcEnergy({
-    energy, itemName: item.name, quantity: input.quantity!, unit: input.unit, date, regions,
+    energy, itemName: item.name, quantity: input.quantity!, unit: input.unit, date: fdate, regions,
     factors: energy === 'cooling' ? [] : await loadFactors(item.id),
     cooling: energy === 'cooling' ? { method: e.cooling?.method ?? 'supplier', kwhPerTrh: e.cooling?.kwhPerTrh, cop: e.cooling?.cop, gridFactors: gridItem ? await loadFactors(gridItem.id) : [] } : undefined,
     supplier, certificates: claims, gwp, units,

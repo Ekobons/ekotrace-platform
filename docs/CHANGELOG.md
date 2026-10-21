@@ -2,6 +2,13 @@
 
 Newest first.
 
+## 2026-10-22 · Reporting year and factor year
+
+- Migration 053: `tenant.year_start_month` (1–12, default 1) and `tenant.factor_year` (`calendar` default | `fy_start` | `fy_end`); `PATCH /api/tenant` takes `yearStartMonth`, `factorYear`.
+- `calculate()`: factors are chosen at `factorDate(periodStart, setting)` — the period's own date (calendar) or the same day in the calendar year the reporting year starts / ends in; the price list, supplier-factor validity and certificate vintages still use the real date. A step says "Factors of 2024 used for the whole reporting year Apr 2024 – Mar 2025". `CalcContext.lookupFactorYear` (in `contextFor`).
+- Methodology & boundaries: card *Reporting year & factor year* with a worked example; after a change it offers *Recalculate all entries* (`POST /api/activities/recalculate`, `onlyWithWarnings: false`).
+- Manual (Factors & methodology): factor year vs reporting year; how recalculation works when new factors come out. Test: UK electricity Feb 2025 with an April year → DESNZ 2024 (start) / Nov 2024 → DESNZ 2025 (end); leap day; back to calendar.
+
 ## 2026-10-21 · Grid factors for ~150 more regions, each with its source
 
 - `data/grid/grid-factors.csv`: 106 → 421 rows, 207 regions (seeded on every start, `seedGrid`; changed values superseded). New source codes (publishers in `GRID_PUBLISHER`):

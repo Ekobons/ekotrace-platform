@@ -44,6 +44,10 @@ export function contextFor(c: Tx, gwpSet: string, region: string, fac?: { id: st
   return {
     gwpSet, region, gridRegion: fac?.grid_region ?? null, facilityId: fac?.id, activityId,
     lookupPrice: (itemId, r, date, currency) => findPrice(c, itemId, r, date, currency),
+    lookupFactorYear: async () => {
+      const t = (await c.query(`SELECT factor_year, year_start_month FROM tenant WHERE id = nullif(current_setting('app.tenant_id', true), '')::uuid`)).rows[0];
+      return t ? { mode: t.factor_year, startMonth: Number(t.year_start_month) } : null;
+    },
     lookupWasteSite: async (id) => {
       const s = (await c.query('SELECT id, name, facility_id, params FROM waste_site WHERE id = $1', [id])).rows[0];
       if (!s) return null;
@@ -175,7 +179,7 @@ function recalcInput(a: Record<string, any>, periodStart: string, periodEnd: str
 }
 
 export async function tenantSettings(tenantId: string) {
-  const [t] = await query(`SELECT id, name, country, gwp_set, consolidation, base_year, plan, status, access_expiry, timezone, currency, logo_id IS NOT NULL AS has_logo, flight_rf, target_year, target_s12_pct::float8 AS target_s12, target_s3_pct::float8 AS target_s3, due_day, remind_days, escalate_days FROM tenant WHERE id = $1`, [tenantId]);
+  const [t] = await query(`SELECT id, name, country, gwp_set, consolidation, base_year, plan, status, access_expiry, timezone, currency, logo_id IS NOT NULL AS has_logo, flight_rf, target_year, target_s12_pct::float8 AS target_s12, target_s3_pct::float8 AS target_s3, due_day, remind_days, escalate_days, year_start_month, factor_year FROM tenant WHERE id = $1`, [tenantId]);
   if (!t) throw notFound('Company');
   return t as { id: string; name: string; country: string; gwp_set: string; consolidation: string; base_year: number; timezone: string; flight_rf: boolean };
 }
@@ -221,6 +225,7 @@ export async function activityRoutes(app: FastifyInstance) {
       gwpSet: z.enum(['AR4', 'AR5', 'AR6']).optional(), country: z.string().length(2).optional(),
       consolidation: z.enum(['operational', 'financial', 'equity']).optional(), baseYear: z.number().int().min(2000).max(2100).optional(),
       flightRf: z.boolean().optional(),
+      yearStartMonth: z.number().int().min(1).max(12).optional(), factorYear: z.enum(['calendar', 'fy_start', 'fy_end']).optional(),
       targetYear: z.number().int().min(2025).max(2100).optional(), targetS12: z.number().min(0).max(100).optional(), targetS3: z.number().min(0).max(100).optional(),
       dueDay: z.number().int().min(1).max(28).optional(), remindDays: z.number().int().min(0).max(30).optional(), escalateDays: z.number().int().min(1).max(90).optional(),
     }).parse(req.body);
@@ -228,10 +233,11 @@ export async function activityRoutes(app: FastifyInstance) {
       const r = (await c.query(`UPDATE tenant SET gwp_set = COALESCE($2, gwp_set), country = COALESCE($3, country),
                                   consolidation = COALESCE($4, consolidation), base_year = COALESCE($5, base_year), flight_rf = COALESCE($6, flight_rf),
                                     target_year = COALESCE($7, target_year), target_s12_pct = COALESCE($8, target_s12_pct), target_s3_pct = COALESCE($9, target_s3_pct),
-                                    due_day = COALESCE($10, due_day), remind_days = COALESCE($11, remind_days), escalate_days = COALESCE($12, escalate_days)
-                                WHERE id = $1 RETURNING id, name, country, gwp_set, consolidation, base_year, flight_rf, target_year, target_s12_pct::float8 AS target_s12, target_s3_pct::float8 AS target_s3, due_day, remind_days, escalate_days`,
+                                    due_day = COALESCE($10, due_day), remind_days = COALESCE($11, remind_days), escalate_days = COALESCE($12, escalate_days),
+                                    year_start_month = COALESCE($13, year_start_month), factor_year = COALESCE($14, factor_year)
+                                WHERE id = $1 RETURNING id, name, country, gwp_set, consolidation, base_year, flight_rf, target_year, target_s12_pct::float8 AS target_s12, target_s3_pct::float8 AS target_s3, due_day, remind_days, escalate_days, year_start_month, factor_year`,
         [tenant, b.gwpSet ?? null, b.country?.toUpperCase() ?? null, b.consolidation ?? null, b.baseYear ?? null, b.flightRf ?? null,
-         b.targetYear ?? null, b.targetS12 ?? null, b.targetS3 ?? null, b.dueDay ?? null, b.remindDays ?? null, b.escalateDays ?? null])).rows[0];
+         b.targetYear ?? null, b.targetS12 ?? null, b.targetS3 ?? null, b.dueDay ?? null, b.remindDays ?? null, b.escalateDays ?? null, b.yearStartMonth ?? null, b.factorYear ?? null])).rows[0];
       await audit(c, req, 'methodology.update', 'tenant', tenant, b);
       return r;
     });
