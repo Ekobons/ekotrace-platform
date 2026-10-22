@@ -2,6 +2,10 @@
 
 Newest first.
 
+## 2026-10-23 · Purchase review: one button instead of two
+
+- A kind of purchase moved, excluded or marked capital showed both *Keep in 3.1* and *Back to 3.1*, which did the same thing (`decision: 'keep'`; *Back* also clears the capital mark). Now *Back to 3.1* shows when a decision or capital mark exists, *Keep in 3.1* only when there is none.
+
 ## 2026-10-22 · Factor library: grid electricity by country
 
 - Factors tab: items with factors for several countries (grid electricity, hotels…) get a **country filter** (with counts) and a *Country / region* column; rows sorted by year, then region; the year list goes back to 2005; the source cell shows the factor's note on hover. Grid electricity points to the *Grid electricity & prices* tab (table by region and year).

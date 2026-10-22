@@ -426,7 +426,7 @@ function Groups({ batchId, d, canEdit, onChanged }: { batchId: string; d: BatchD
                     <div className="row" style={{ gap: 4, marginTop: 4 }}>
                       {g.overlap && g.overlap !== 'capital_goods' && !['fuel', 'energy', 'waste'].includes(g.overlap) && g.decision !== 'move' && <button className="btn xs" onClick={() => patch([g.key], { decision: 'move', target: g.overlap })}>Move</button>}
                       {g.overlap === 'capital_goods' && !g.capital && <button className="btn xs" onClick={() => patch([g.key], { capital: true, decision: 'keep' })}>Capital goods</button>}
-                      {g.decision !== 'keep' && !g.capital && <button className="btn xs" onClick={() => patch([g.key], { decision: 'keep' })}>Keep in 3.1</button>}
+                      {!g.decision && !g.capital && <button className="btn xs" onClick={() => patch([g.key], { decision: 'keep' })}>Keep in 3.1</button>}
                       {(g.decision && g.decision !== 'keep' || g.capital) && <button className="btn xs" onClick={() => patch([g.key], { decision: 'keep', capital: false })}>Back to 3.1</button>}
                       {g.decision !== 'exclude' && g.overlap !== 'capital_goods' && <button className="btn xs" onClick={() => patch([g.key], { decision: 'exclude' })}>Exclude</button>}
                     </div>
