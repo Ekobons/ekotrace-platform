@@ -10,9 +10,14 @@ import { Icon } from '../components/Icon';
 import { GasToggle, useGasSplit } from '../components/GasToggle';
 import { Evidence } from '../components/Evidence';
 
+const STATUS: Record<string, [string, string]> = { draft: ['Draft', 'c-n'], submitted: ['Waiting approval', 'c-warn'], approved: ['Approved', 'c-ok'], rejected: ['Sent back', 'c-bad'] };
+
 export function Entries() {
   const [year, setYear] = useState(new Date().getFullYear());
   const [rows, setRows] = useState<Activity[]>([]);
+  const [years, setYears] = useState<{ year: number; n: number; approved: number }[]>([]);
+  const [status, setStatus] = useState('');
+  const [cat, setCat] = useState('');
   const [gas, setGas] = useState<Awaited<ReturnType<typeof api.byGas>>['rows']>([]);
   const [open, setOpen] = useState<Awaited<ReturnType<typeof api.activity>> | null>(null);
   const [showGas, toggleGas] = useGasSplit();
@@ -30,11 +35,15 @@ export function Entries() {
   };
 
   useEffect(() => {
-    api.activities({ year, limit: 1000 }).then((r) => setRows(r.activities));
+    api.activities({ year, status: status || undefined, limit: 5000 }).then((r) => { setRows(r.activities); setYears(r.years ?? []); });
     api.byGas(year).then((r) => setGas(r.rows));
-  }, [year, reload]);
+  }, [year, status, reload]);
 
-  const sum = (k: keyof Activity) => rows.reduce((s, a) => s + Number(a[k] ?? 0), 0);
+  const cats = [...new Set(rows.map((a) => a.category))].sort();
+  const shown = cat ? rows.filter((a) => a.category === cat) : rows;
+  const sum = (k: keyof Activity) => shown.reduce((s, a) => s + Number(a[k] ?? 0), 0);
+  const yearList = [...new Set([...years.map((y) => y.year), new Date().getFullYear(), year])].sort((a, b) => b - a);
+  const other = years.filter((y) => y.year !== year && y.n > 0);
   const show = async (id: string) => { setOpen(await api.activity(id)); dlg.current?.showModal(); };
 
   return (
@@ -43,7 +52,14 @@ export function Entries() {
         <div><div className="eyebrow">Capture</div><h1>Entries & results</h1><p className="sub">Everything saved for this company. Click an entry to see how it was calculated.</p></div>
         {canRecalc && <button className="btn sm" style={{ alignSelf: 'flex-end' }} title="Recalculate entries that have a warning (e.g. a missing grid factor or next year's factors not yet loaded)" onClick={() => recalc({ year, onlyWithWarnings: true })}>Recalculate entries with warnings</button>}
         <label className="field"><span>Year</span>
-          <select className="input" value={year} onChange={(e) => setYear(Number(e.target.value))}>{[2022, 2023, 2024, 2025, 2026, 2027].map((y) => <option key={y}>{y}</option>)}</select>
+          <select className="input" value={year} onChange={(e) => setYear(Number(e.target.value))}>{yearList.map((y) => { const c = years.find((x) => x.year === y); return <option key={y} value={y}>{y}{c ? ` (${c.n})` : ''}</option>; })}</select>
+        </label>
+        <label className="field"><span>Status</span>
+          <select className="input" value={status} onChange={(e) => setStatus(e.target.value)}>
+            <option value="">All</option><option value="approved">Approved</option><option value="submitted">Waiting approval</option><option value="draft">Draft</option><option value="rejected">Sent back</option></select>
+        </label>
+        <label className="field"><span>Category</span>
+          <select className="input" value={cat} onChange={(e) => setCat(e.target.value)}><option value="">All categories</option>{cats.map((c) => <option key={c}>{c}</option>)}</select>
         </label>
       </div>
 
@@ -52,7 +68,7 @@ export function Entries() {
         <div className="stat s2"><small>Scope 2 · location-based</small><b>{tco2e(sum('co2e_scope2'))}</b><small>tCO₂e</small></div>
         <div className="stat s2m"><small>Scope 2 · market-based</small><b>{tco2e(sum('co2e_scope2_market'))}</b><small>tCO₂e</small></div>
         <div className="stat s3"><small>Scope 3.3 · upstream + T&D losses</small><b>{tco2e(sum('co2e_wtt') + sum('co2e_td'))}</b><small>tCO₂e</small></div>
-        <div className="stat s3"><small>Scope 3.5 · waste sent to others</small><b>{tco2e(sum('co2e_scope3'))}</b><small>tCO₂e</small></div>
+        <div className="stat s3"><small>Scope 3 · other categories (purchases, waste, travel…)</small><b>{tco2e(sum('co2e_scope3'))}</b><small>tCO₂e</small></div>
         <div className="stat bio"><small>Biogenic CO₂ (outside scopes)</small><b>{tco2e(sum('co2_biogenic'))}</b><small>tCO₂</small></div>
         <div className="stat memo"><small>Memo: non-Kyoto gases</small><b>{tco2e(sum('co2e_memo'))}</b><small>tCO₂e</small></div>
       </div>
@@ -73,21 +89,23 @@ export function Entries() {
       </div>
 
       <div className="card flush">
-        <div style={{ padding: '14px 16px 6px' }}><h2>Entries · {rows.length}</h2></div>
+        <div style={{ padding: '14px 16px 6px' }}><h2>Entries · {shown.length}{!status && shown.length ? ` · ${shown.filter((a) => a.status === 'approved').length} approved` : ''}</h2>
+          <p className="sub">Every status unless filtered; the totals above follow the filters. Dashboards and reports count approved entries only. Purchase files create one entry per facility, month and spend category — their lines are under Add data → Purchases → Published lines.</p>
+          {!rows.length && other.length > 0 && <div className="note info small">No entries in {year}. Entries exist in {other.map((y) => <button key={y.year} className="btn xs ghost" onClick={() => setYear(y.year)}>{y.year} ({y.n})</button>)}</div>}</div>
         {rows.length ? (
           <div className="scroll">
             <table className="t">
-              <thead><tr><th>Period</th><th>Facility</th><th>Category</th><th>Item</th><th className="num">Quantity</th><th className="num">Scope 1 tCO₂e</th><th className="num">Scope 2 loc.</th><th className="num">Scope 2 mkt.</th><th className="num">Scope 3.3</th><th className="num">Scope 3 other</th><th>GWP</th><th>Type</th></tr></thead>
-              <tbody>{rows.map((a) => (
+              <thead><tr><th>Period</th><th>Facility</th><th>Category</th><th>Item</th><th className="num">Quantity</th><th className="num">Scope 1 tCO₂e</th><th className="num">Scope 2 loc.</th><th className="num">Scope 2 mkt.</th><th className="num">Scope 3.3</th><th className="num">Scope 3 other</th><th>GWP</th><th>Type</th><th>Status</th></tr></thead>
+              <tbody>{shown.map((a) => (
                 <tr key={a.id} className="click" onClick={() => show(a.id)}>
-                  <td style={{ whiteSpace: 'nowrap' }}>{new Date(a.period_start + 'T00:00:00Z').toLocaleDateString('en-GB', { month: 'short', year: 'numeric', timeZone: 'UTC' })}</td><td>{a.facility}</td><td>{a.category}</td><td>{a.vehicle ? <><b>{a.vehicle}</b> · </> : null}{a.waste_site ? <><b>{a.waste_site}</b> · </> : null}{a.item}</td>
+                  <td style={{ whiteSpace: 'nowrap' }}>{new Date(a.period_start + 'T00:00:00Z').toLocaleDateString('en-GB', { month: 'short', year: 'numeric', timeZone: 'UTC' })}</td><td>{a.facility}</td><td>{a.category}{a.purchase_batch_id && <div className="muted small">from a purchase file</div>}</td><td>{a.vehicle ? <><b>{a.vehicle}</b> · </> : null}{a.waste_site ? <><b>{a.waste_site}</b> · </> : null}{a.item}</td>
                   <td className="num">{num(a.quantity)} {unitLabel(a.unit)}</td><td className="num">{tco2e(a.co2e_direct)}</td><td className="num">{tco2e(Number(a.co2e_scope2 ?? 0))}</td><td className="num">{tco2e(Number(a.co2e_scope2_market ?? 0))}</td><td className="num">{tco2e(Number(a.co2e_wtt) + Number(a.co2e_td ?? 0))}</td><td className="num">{a.ghg_category ? <>{tco2e(Number(a.co2e_scope3 ?? 0))} <span className="chip grey">3.{a.ghg_category}</span></> : tco2e(Number(a.co2e_scope3 ?? 0))}</td>
-                  <td>{a.gwp_set}</td><td><span className="chip grey">{a.data_type}</span></td>
+                  <td>{a.gwp_set}</td><td><span className="chip grey">{a.data_type}</span></td><td><span className={`chip ${STATUS[a.status]?.[1] ?? 'c-n'}`}>{STATUS[a.status]?.[0] ?? a.status}</span></td>
                 </tr>))}
               </tbody>
             </table>
           </div>
-        ) : <div className="empty">No entries for {year}.</div>}
+        ) : <div className="empty">No entries for {year}{status ? ' with this status' : ''}.</div>}
       </div>
 
       <dialog ref={dlg} className="drawer" onClose={() => setOpen(null)}>

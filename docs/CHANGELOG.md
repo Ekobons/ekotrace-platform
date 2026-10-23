@@ -2,6 +2,11 @@
 
 Newest first.
 
+## 2026-10-24 · Entries & results: status, category and year counts
+
+- `GET /api/activities`: `status` filter, limit up to 5,000, `years` (entries and approved per year), `category_code`, `purchase_batch_id`.
+- Entries & results: Status and Category filters, a Status column, "from a purchase file" under the category, the year list shows counts, and an empty year links to the years that have entries (the page opened on the current year, so 2025 purchase entries looked missing). The Scope 3 card was labelled 3.5 waste but summed every other Scope 3 category — relabelled. Approvals says where approved entries go.
+
 ## 2026-10-23 · Purchase review: one button instead of two
 
 - A kind of purchase moved, excluded or marked capital showed both *Keep in 3.1* and *Back to 3.1*, which did the same thing (`decision: 'keep'`; *Back* also clears the capital mark). Now *Back to 3.1* shows when a decision or capital mark exists, *Keep in 3.1* only when there is none.

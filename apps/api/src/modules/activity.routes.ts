@@ -431,18 +431,22 @@ export async function activityRoutes(app: FastifyInstance) {
 
   app.get('/api/activities', async (req) => {
     const tenant = requireTenant(req);
-    const q = z.object({ facilityId: z.string().uuid().optional(), year: z.coerce.number().int().optional(), category: z.string().optional(), limit: z.coerce.number().int().max(1000).default(200) }).parse(req.query);
+    const q = z.object({ facilityId: z.string().uuid().optional(), year: z.coerce.number().int().optional(), category: z.string().optional(), status: z.enum(['draft', 'submitted', 'approved', 'rejected']).optional(), limit: z.coerce.number().int().max(5000).default(200) }).parse(req.query);
     return tenantTx(tenant, async (c) => {
       const see = [...(await scopeOf(c, req.user)).see];
       return {
         activities: (await c.query(
           `SELECT a.id, a.facility_id, a.period_start, a.period_end, f.name AS facility, cat.name AS category, i.name AS item, a.quantity, a.unit, a.data_type, a.gwp_set,
-                  a.co2e_direct, a.co2e_wtt, a.co2_biogenic, a.co2e_memo, a.co2e_scope2, a.co2e_scope2_market, a.co2e_td, a.co2e_scope3, a.status, a.created_at, a.vehicle_id, v.name AS vehicle,
+                  a.co2e_direct, a.co2e_wtt, a.co2_biogenic, a.co2e_memo, a.co2e_scope2, a.co2e_scope2_market, a.co2e_td, a.co2e_scope3, a.status, a.created_at, a.vehicle_id, v.name AS vehicle, cat.code AS category_code, a.purchase_batch_id,
                   cat.scope, cat.ghg_category, ws.name AS waste_site, a.meter_id, mt.name AS meter
              FROM activity a JOIN org_node f ON f.id = a.facility_id JOIN item i ON i.id = a.item_id JOIN category cat ON cat.id = a.category_id
              LEFT JOIN vehicle v ON v.id = a.vehicle_id LEFT JOIN waste_site ws ON ws.id = a.waste_site_id LEFT JOIN meter mt ON mt.id = a.meter_id
             WHERE a.facility_id = ANY($5) AND ($1::uuid IS NULL OR a.facility_id = $1) AND ($2::int IS NULL OR extract(year FROM a.period_start) = $2) AND ($3::text IS NULL OR cat.code = $3 OR ($3 IN ('waste', 'water') AND cat.code LIKE $3 || '_%'))
-            ORDER BY a.period_start DESC, a.created_at DESC LIMIT $4`, [q.facilityId ?? null, q.year ?? null, q.category ?? null, q.limit, see])).rows,
+              AND ($6::text IS NULL OR a.status = $6)
+            ORDER BY a.period_start DESC, a.created_at DESC LIMIT $4`, [q.facilityId ?? null, q.year ?? null, q.category ?? null, q.limit, see, q.status ?? null])).rows,
+        /** years that have entries, with how many and how many approved (to pick the year) */
+        years: (await c.query(`SELECT extract(year FROM period_start)::int AS year, count(*)::int AS n, count(*) FILTER (WHERE status = 'approved')::int AS approved
+                                 FROM activity WHERE facility_id = ANY($1) GROUP BY 1 ORDER BY 1 DESC`, [see])).rows,
       };
     });
   });

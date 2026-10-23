@@ -78,7 +78,7 @@ export function Approvals() {
   return (
     <div className="page">
       <div className="row tahead">
-        <div><span className="lbl">Capture</span><h1>Approvals</h1><div className="muted">Entries submitted for facilities you look after. Approved data flows into dashboards and reports.</div></div>
+        <div><span className="lbl">Capture</span><h1>Approvals</h1><div className="muted">Entries submitted for facilities you look after. Once approved they leave this list: find them under Entries &amp; results (status Approved), and in dashboards and reports.</div></div>
         <span className="grow" />
         {d && d.settings.l2 && <span className="chip c-info">Level 2 on · ≥ {fmt(d.settings.minT, 0)} t{d.settings.cats.length ? ` or ${d.settings.cats.length} categories` : ''}</span>}
         {clean.length > 0 && <button className="btn p" disabled={busy} onClick={() => void act(clean.map((l) => l.id), 'approve')}>Approve all {clean.length}{filtered ? ' shown' : ''} without warnings</button>}
