@@ -401,7 +401,7 @@ export interface ApprovalSettings { l2: boolean; minT: number; cats: string[]; c
 export interface RangeCheck { ok: boolean; txt: string; method: 'avg6' | 'smart'; expected: number; low: number; high: number; basis: string; usual: number }
 export interface ApprovalRow {
   id: string; f: string; facility: string; month: string; cat: string; category: string; item: string; note: string | null; dataType: string; qty: number; unit: string; kg: number;
-  by: string | null; at: string | null; stage: 'L2' | null; l1: string | null; mine: boolean; self?: boolean; canApprove: boolean; waitingFor: string; check: RangeCheck | null; willNeedL2: boolean;
+  by: string | null; enteredBy?: string | null; source?: string | null; at: string | null; stage: 'L2' | null; l1: string | null; mine: boolean; self?: boolean; canApprove: boolean; waitingFor: string; check: RangeCheck | null; willNeedL2: boolean;
 }
 export interface ApprovalsData { settings: ApprovalSettings; mine: ApprovalRow[]; others: ApprovalRow[]; categories: { code: string; name: string; scope: number }[]; canSettings: boolean }
 export interface HomeData {
@@ -437,7 +437,7 @@ export interface DataStatus { facility: { id: string; name: string; type: string
 export interface ReviewEntry {
   id: string; period_start: string; period_end: string; item: string; quantity: number; unit: string; data_type: string; note: string | null; status: 'draft' | 'submitted' | 'approved' | 'rejected';
   kg: number; scope: number; category: string; category_name?: string; ghg_category?: number | null; purchase?: boolean; review_note: string | null; submitted_at: string | null; reviewed_at: string | null; entered_by: string | null; reviewed_by_name: string | null;
-  vehicle: string | null; meter: string | null; waste_site: string | null; mine: boolean; canApprove: boolean; canReturn: boolean; canSubmit: boolean; canWithdraw: boolean; canDelete: boolean;
+  vehicle: string | null; meter: string | null; waste_site: string | null; mine: boolean; selfApprove?: boolean; canApprove: boolean; canReturn: boolean; canSubmit: boolean; canWithdraw: boolean; canDelete: boolean;
 }
 
 // ------------------------------------------------------------------ surveys --

@@ -44,11 +44,11 @@ export async function approvalsRoutes(app: FastifyInstance) {
       const rows = (await c.query(
         `SELECT a.id, a.facility_id AS f, fo.name AS facility, a.period_start::text AS month, cat.code AS cat, cat.name AS category, i.name AS item, a.note, a.data_type,
                 a.quantity::float8 AS qty, a.unit, (a.co2e_direct + a.co2e_scope2 + a.co2e_scope3)::float8 AS kg, a.created_by, a.submitted_by, a.submitted_at AS at,
-                ue.name AS by, a.approval_stage AS stage, a.l1_by, a.l1_at, u1.name AS l1_name, coalesce(CASE WHEN fo.manager_user_id::text NOT IN (coalesce(a.created_by, ''), coalesce(a.submitted_by, '')) THEN um.name END,
+                ue.name AS by, uc.name AS entered_name, CASE WHEN a.purchase_batch_id IS NOT NULL THEN 'purchase file' WHEN a.meter_id IS NOT NULL THEN 'meter' WHEN a.commute_record_id IS NOT NULL THEN 'commuting' END AS source, a.approval_stage AS stage, a.l1_by, a.l1_at, u1.name AS l1_name, coalesce(CASE WHEN fo.manager_user_id::text NOT IN (coalesce(a.created_by, ''), coalesce(a.submitted_by, '')) THEN um.name END,
                   (SELECT u.name FROM user_facility uf JOIN app_user u ON u.id = uf.user_id WHERE uf.node_id = a.facility_id AND u.role = 'manager' AND NOT u.disabled
                       AND u.id::text NOT IN (coalesce(a.created_by, ''), coalesce(a.submitted_by, '')) ORDER BY u.name LIMIT 1)) AS manager, a.item_id AS iid, coalesce(a.vehicle_id::text, a.meter_id::text, '') AS sub, (a.period_end - a.period_start < 40) AS monthly, mt.check_pct, mt.metric_code
            FROM activity a JOIN category cat ON cat.id = a.category_id JOIN item i ON i.id = a.item_id JOIN org_node fo ON fo.id = a.facility_id
-           LEFT JOIN app_user ue ON ue.id::text = coalesce(a.submitted_by, a.created_by) LEFT JOIN app_user u1 ON u1.id::text = a.l1_by LEFT JOIN app_user um ON um.id = fo.manager_user_id ${METRIC_JOIN}
+           LEFT JOIN app_user ue ON ue.id::text = coalesce(a.submitted_by, a.created_by) LEFT JOIN app_user uc ON uc.id::text = a.created_by LEFT JOIN app_user u1 ON u1.id::text = a.l1_by LEFT JOIN app_user um ON um.id = fo.manager_user_id ${METRIC_JOIN}
           WHERE a.facility_id = ANY($1) AND a.status = 'submitted' ORDER BY a.submitted_at NULLS LAST, fo.name LIMIT 2000`, [[...s.see]])).rows;
       const ck = await checksFor(c, set, rows);
       const out = rows.map((r) => {
@@ -59,7 +59,7 @@ export async function approvalsRoutes(app: FastifyInstance) {
         const waitingFor = l2 ? 'an admin or the super admin (level 2)' : r.manager ?? 'an admin or the super admin';
         return {
           id: r.id, f: r.f, facility: r.facility, month: r.month, cat: r.cat, category: r.category, item: r.item, note: r.note, dataType: r.data_type, qty: r.qty, unit: r.unit, kg: r.kg,
-          by: r.by, at: r.at, stage: r.stage, l1: r.l1_name, mine, self: can && self, canApprove: can, waitingFor, check: ck.get(r.id) ?? null, metric: r.metric_code,
+          by: r.by, at: r.at, enteredBy: r.entered_name && r.entered_name !== r.by ? r.entered_name : null, source: r.source, stage: r.stage, l1: r.l1_name, mine, self: can && self, canApprove: can, waitingFor, check: ck.get(r.id) ?? null, metric: r.metric_code,
           willNeedL2: !l2 && needsL2(set, r.kg, r.cat),
         };
       });

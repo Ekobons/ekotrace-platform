@@ -497,6 +497,7 @@ function EntryRows({ list, onAct, busy }: { list: ReviewEntry[]; onAct?: (e: Rev
   const [back, setBack] = useState<string | null>(null);
   const [why, setWhy] = useState('');
   const [del, setDel] = useState<string | null>(null);
+  const [own, setOwn] = useState<string | null>(null);
   return (
     <div className="scrollx"><table className="t">
       <thead><tr><th>Month</th><th>What</th><th className="num">Quantity</th><th className="num">tCO₂e</th><th className="ctr">Scope</th><th className="ctr">Status</th><th>Entered by</th>{onAct && <th />}</tr></thead>
@@ -515,12 +516,18 @@ function EntryRows({ list, onAct, busy }: { list: ReviewEntry[]; onAct?: (e: Rev
               <input className="input" style={{ width: 220 }} autoFocus placeholder="Why — so it can be fixed" value={why} onChange={(x) => setWhy(x.target.value)} />
               <button className="btn sm p" disabled={!why.trim() || busy} onClick={() => { onAct(e, 'return', why.trim()); setBack(null); setWhy(''); }}>Send back</button>
               <button className="btn sm ghost" onClick={() => setBack(null)}>Cancel</button></span>
+            : own === e.id ? <span className="row" style={{ gap: 6, flexWrap: 'nowrap' }}>
+              <input className="input" style={{ width: 260 }} autoFocus placeholder="Checked against… (bill, meter, invoice)" value={why} onChange={(x) => setWhy(x.target.value)} />
+              <button className="btn sm p" disabled={!why.trim() || busy} onClick={() => { onAct(e, 'approve', why.trim()); setOwn(null); setWhy(''); }}>Approve my own</button>
+              <button className="btn sm ghost" onClick={() => { setOwn(null); setWhy(''); }}>Cancel</button></span>
             : del === e.id ? <span className="row" style={{ gap: 6, flexWrap: 'nowrap' }}><span className="small bad">Delete this entry?</span>
               <button className="btn sm danger" disabled={busy} onClick={() => { onAct(e, 'delete'); setDel(null); }}>Delete</button><button className="btn sm ghost" onClick={() => setDel(null)}>Keep</button></span>
             : <span className="row" style={{ gap: 6, flexWrap: 'nowrap', justifyContent: 'flex-end' }}>
               {e.canSubmit && <button className="btn sm" disabled={busy} onClick={() => onAct(e, 'submit')}>Submit</button>}
               {e.canWithdraw && e.mine && <button className="btn sm ghost" disabled={busy} onClick={() => onAct(e, 'withdraw')}>Withdraw</button>}
-              {e.canApprove && <button className="btn sm p" disabled={busy} onClick={() => onAct(e, 'approve')}>Approve</button>}
+              {e.canApprove && (e.selfApprove
+                ? <button className="btn sm p" disabled={busy} title="Your company allows self-approval: a note is needed and the entry is marked self-reviewed" onClick={() => setOwn(e.id)}>Approve my own…</button>
+                : <button className="btn sm p" disabled={busy} onClick={() => onAct(e, 'approve')}>Approve</button>)}
               {e.canReturn && <button className="btn sm ghost danger" disabled={busy} onClick={() => setBack(e.id)}>Send back</button>}
               {e.canDelete && <button className="btn sm ghost danger" disabled={busy} onClick={() => setDel(e.id)}>Delete</button>}
             </span>}
@@ -564,9 +571,9 @@ function ReviewStage({ facilityId, group, range, approver, onChange, toast }: { 
   const { busy, act } = useActions(load, onChange, toast);
   if (err) return <div className="note bad">{err}</div>;
   if (!list) return <div className="muted">Loading…</div>;
-  const drafts = list.filter((e) => e.canSubmit), toApprove = list.filter((e) => e.canApprove), sum = list.reduce((a, e) => a + e.kg, 0);
+  const drafts = list.filter((e) => e.canSubmit), toApprove = list.filter((e) => e.canApprove && !e.selfApprove), sum = list.reduce((a, e) => a + e.kg, 0);
   return <>
-    <div className="row"><span className="sub">Entries not yet approved. Approvers see the quantity, the note and the check — nobody approves their own entry.</span><span className="grow" />
+    <div className="row"><span className="sub">Entries not yet approved. Approvers see the quantity, the note and the check. Your own entries can be approved by you only when the company allows self-approval (Setup → Methodology &amp; boundaries), with a note.</span><span className="grow" />
       {drafts.length > 0 && <button className="btn p" disabled={busy} onClick={() => void act(drafts.map((e) => e.id), 'submit')}>Submit {drafts.length} draft{drafts.length === 1 ? '' : 's'}</button>}
       {toApprove.length > 1 && <button className="btn p" disabled={busy} onClick={() => void act(toApprove.map((e) => e.id), 'approve')}>Approve all {toApprove.length}</button>}
     </div>

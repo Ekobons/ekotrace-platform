@@ -62,7 +62,10 @@ export function Approvals() {
       <td className="num nowrap">{fmt(l.qty, l.qty < 100 ? 2 : 0)} <span className="muted">{unitLabel(l.unit)}</span></td>
       <td className="num"><b>{fmt(l.kg / 1000, 2)}</b><div><button className="btn xs ghost" onClick={() => void show(l.id)}>How calculated</button></div></td>
       <td className="small" title={l.check?.basis} style={{ color: l.check ? (l.check.ok ? 'var(--ok)' : 'var(--warn)') : 'var(--muted)', maxWidth: 240 }}>{l.check ? l.check.txt : 'No history to compare'}</td>
-      <td className="muted small nowrap">{l.by?.replace(/ \(.*\)$/, '') ?? '—'}<br />{l.at ? new Date(l.at).toLocaleDateString('en-GB') : ''}</td>
+      <td className="small nowrap"><b>{l.mine ? 'You' : l.by?.replace(/ \(.*\)$/, '') ?? 'System'}</b>
+        <div className="muted">{l.at ? new Date(l.at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : ''}</div>
+        {l.enteredBy && <div className="muted">entered by {l.enteredBy.replace(/ \(.*\)$/, '')}</div>}
+        {l.source && <div className="muted">from a {l.source}</div>}</td>
       <td>{can && l.self && ret?.id !== l.id ? (own?.id === l.id
         ? <div className="row nowrap" style={{ gap: 6 }}><input className="input sm" autoFocus style={{ minWidth: 240 }} placeholder="Checked against… (e.g. the March bill)" value={own.note} onChange={(e) => setOwn({ id: l.id, note: e.target.value })} />
             <button className="btn sm p" disabled={busy || !own.note.trim()} onClick={() => void act([l.id], 'approve', own.note.trim())}>Approve my own</button><button className="btn sm ghost" onClick={() => setOwn(null)}>Cancel</button></div>
@@ -73,7 +76,7 @@ export function Approvals() {
         : <div className="row nowrap" style={{ gap: 6 }}><button className="btn sm p" disabled={busy} onClick={() => void act([l.id], 'approve')}>Approve</button><button className="btn sm" disabled={busy} onClick={() => setRet({ id: l.id, note: '' })}>Send back</button></div>)
         : <span className="muted small">{l.mine ? 'Your entry → ' : 'Waiting for '}{l.waitingFor}</span>}</td>
     </tr>);
-  const head = <thead><tr><th>Facility</th><th>What</th><th className="num">Quantity</th><th className="num">tCO₂e</th><th>Check</th><th>Entered</th><th /></tr></thead>;
+  const head = <thead><tr><th>Facility</th><th>What</th><th className="num">Quantity</th><th className="num">tCO₂e</th><th>Check</th><th>Sent by</th><th /></tr></thead>;
 
   return (
     <div className="page">

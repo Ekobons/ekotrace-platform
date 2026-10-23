@@ -78,15 +78,20 @@ export async function reviewRoutes(app: FastifyInstance) {
           WHERE a.facility_id = $1 AND ${CAT_SQL.replaceAll('$X', '$2')} AND a.period_start >= $3 AND a.period_start <= $4
             AND (CASE WHEN $5 = 'approved' THEN a.status = 'approved' ELSE a.status <> 'approved' END)
           ORDER BY a.period_start, cat.code, i.name LIMIT 2000`, [q.facilityId, q.category, q.from, q.to, q.stage])).rows;
-      const canEnter = s.enter.has(q.facilityId), canApprove = s.approve.has(q.facilityId);
+      const canEnter = s.enter.has(q.facilityId), canApprove = s.approve.has(q.facilityId) && req.user.role !== 'platform_admin';
+      // own entries: approvable when the company allows self-approval (with a note), or when the super admin is the only user
+      const set = await approvalSettings(c, tenant);
+      const solo = req.user.role === 'super_admin' && Number((await c.query(`SELECT count(*)::int AS n FROM app_user WHERE NOT disabled AND role <> 'verifier'`)).rows[0].n) === 1;
       return {
         entries: rows.map(({ created_by, submitted_by, ...r }) => {
           const mine = created_by === me || submitted_by === me;
-          return { ...r, mine, canApprove: canApprove && !mine && r.status === 'submitted', canReturn: canApprove && !mine && (r.status === 'submitted' || r.status === 'approved'),
+          const selfOk = mine && (solo || selfAllowed(set, req.user.role, Number(r.kg)));
+          return { ...r, mine, selfApprove: mine && selfOk && !solo,
+            canApprove: canApprove && (!mine || selfOk) && r.status === 'submitted', canReturn: canApprove && (!mine || selfOk) && (r.status === 'submitted' || r.status === 'approved'),
             canSubmit: canEnter && (r.status === 'draft' || r.status === 'rejected'), canWithdraw: r.status === 'submitted' && (submitted_by === me || canEnter),
             canDelete: canEnter && (r.status === 'draft' || r.status === 'rejected') && !r.commute && !r.purchase };
         }),
-        canEnter, canApprove,
+        canEnter, canApprove, selfApproval: set.selfApproval,
       };
     });
   });

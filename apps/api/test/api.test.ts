@@ -2743,6 +2743,10 @@ test('self-approval: off by default; when on, super admin / admin / manager appr
   const ap = (await call(mgr, 'GET', '/api/approvals')).body;
   assert.ok(ap.mine.some((x: { id: string; self: boolean }) => x.id === small && x.self));
   assert.ok(!ap.mine.some((x: { id: string }) => x.id === big), 'above the size limit someone else approves');
+  // Add data → Review lists the manager's own small entry as approvable by them (with a note); the big one is not
+  const rv = (await call(mgr, 'GET', `/api/review?facilityId=${fac}&category=stationary_combustion&from=2025-05-01&to=2025-05-31`)).body.entries;
+  assert.ok(rv.some((x: { id: string; canApprove: boolean; selfApprove: boolean }) => x.id === small && x.canApprove && x.selfApprove), JSON.stringify(rv));
+  assert.ok(rv.some((x: { id: string; canApprove: boolean }) => x.id === big && !x.canApprove));
   assert.match((await call(mgr, 'POST', '/api/activities/review', { ids: [small], action: 'approve' })).body.skipped[0].reason, /needs a note/);
   assert.equal((await call(mgr, 'POST', '/api/activities/review', { ids: [small], action: 'approve', note: 'Checked against the May delivery notes' })).body.done, 1);
   assert.match((await call(mgr, 'POST', '/api/activities/review', { ids: [big], action: 'approve', note: 'x' })).body.skipped[0].reason, /self-approval is not allowed/);

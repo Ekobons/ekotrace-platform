@@ -2,6 +2,12 @@
 
 Newest first.
 
+## 2026-10-24 · Self-approval in Add data; who sent each entry
+
+- `GET /api/review`: own entries get `canApprove`/`canReturn` when the company allows self-approval for the role and size (or the super admin is the only user), with `selfApprove` (note required); before, Add data → Review never offered it, only the Approvals page did. Add data: *Approve my own…* asks for the note; *Approve all* leaves own entries out.
+- Approvals: column *Sent by* — name ("You" for your own), date and time, "entered by" when someone else entered it, and the source (purchase file, meter, commuting).
+- Test: the review list offers the manager's own small entry for self-approval, not the large one.
+
 ## 2026-10-24 · Entries & results: status, category and year counts
 
 - `GET /api/activities`: `status` filter, limit up to 5,000, `years` (entries and approved per year), `category_code`, `purchase_batch_id`.
