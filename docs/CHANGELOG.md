@@ -2,6 +2,15 @@
 
 Newest first.
 
+## 2026-10-24 · Scope 3.10, 3.11 and 3.12: sold products
+
+- Migration 055: categories `processing_sold` (3.10), `use_sold` (3.11), `eol_sold` (3.12), calc method `asset`. Subcategories: `p10_energy` (electricity, natural gas, diesel, fuel oil, LPG via grid / DESNZ), `p10_reported`; `u11_electricity`, `u11_fuel`, `u11_fuels_sold` (incl. jet, marine gas oil, fuel oil, coal), `u11_gas` (R-410A, R-32, R-134a, R-404A, R-407C, R-1234yf, R-290, R-600a, CO₂ → `via` to the fugitive gas or blend), `u11_reported`; `e12_<material>` mirroring the *Waste sent to others* materials (items `eol12:*` with `via` to the `waste3:*` item), `e12_reported`. Downstream leased assets re-sorted after 3.12.
+- `calculate()` asset branch: a `via` to a fugitive item is calculated as a quantity released (mass × GWP; non-Kyoto gases as memo); the closing step names the category's reason (sold products vs leased / transported); “grid losses and upstream” only for grid and fuel factors. `/api/items/:id/units`: waste-route and gas `via` items get their units.
+- DESNZ importer v14: each waste material × route also gets its `eol12:` item (hazardous materials included: batteries, fridges).
+- Add data: icons and short names, help per way, **lifetime helper** for 3.11 (units × years × use per year; gases: units × charge × (leak × years + share not recovered)) — *Use as the quantity* or *Copy*. Collection registry: 3.9, 3.10, 3.11, 3.12, 3.13 rows for new companies.
+- Manual: new chapter *Sold products: processing, use and end of life* (which category, ways of entering, helper, worked examples); getting started and data categories updated. Test: processing = grid, lifetime electricity / fuel = grid / DESNZ, R-32 × GWP, fuels sold, end of life = the same waste factor, reported, units, saved as GHG 3.11.
+- Pending: the old tool's average processing factors (`processing_of_sold_products_ef`) — to be added when the export is available.
+
 ## 2026-10-24 · Help videos for data entry
 
 - `tools/help-videos/`: Playwright recorder (`lib.mjs` `film()` + helpers: captions, visible cursor, title cards, an Excel overlay, paste, API setup step, PDFs shown as images in headless Chromium, en-GB locale) → H.264 MP4 + VP9 WebM + JPG poster in `apps/web/public/help/` (served with the app, `video/mp4`, same-origin under the CSP). `record.mjs [name…]`, `make-files.mjs` (specimen files: fictional utility *Harbourline Power & Water*, fictional suppliers, all marked DEMO), README.

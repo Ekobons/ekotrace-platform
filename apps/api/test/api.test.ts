@@ -2061,6 +2061,47 @@ test('transport & distribution (3.4, 3.9) and leased assets (3.8, 3.13): tonne-k
   assert.equal(row.code, 'upstream_transport'); assert.ok(Math.abs(row.s3 - fr.totals.scope3) < 1e-6); assert.equal(row.d, 0);
 });
 
+test('sold products (3.10, 3.11, 3.12): processing energy, lifetime electricity and fuel, refrigerant released (GWP), fuels sold, end-of-life by material and route — all in Scope 3', async () => {
+  const groupA = (await api('GET', '/api/org', undefined, tenantA)).body.nodes.find((n: { kind: string }) => n.kind === 'group').id;
+  const fac = (await api('POST', '/api/org/nodes', { parentId: groupA, kind: 'facility', name: 'Bristol moulding', country: 'GB' }, tenantA)).body.id;
+  const calc = async (code: string, quantity: number, unit: string) => {
+    const r = await api('POST', '/api/calculate', { facilityId: fac, itemId: await itemId(code), quantity, unit, periodStart: '2025-01-01', periodEnd: '2025-12-31' }, tenantA);
+    assert.equal(r.status, 200, JSON.stringify(r.body));
+    assert.equal(r.body.totals.direct, 0); assert.equal(r.body.totals.scope2, 0); assert.equal(r.body.totals.wtt, 0);
+    return r.body;
+  };
+  const same = async (code: string, quantity: number, unit: string) => {
+    const t = (await api('POST', '/api/calculate', { facilityId: fac, itemId: await itemId(code), quantity, unit, periodStart: '2025-01-01', periodEnd: '2025-12-31' }, tenantA)).body.totals;
+    return t.direct + t.scope2 + t.td_loss + t.wtt + t.scope3;
+  };
+  // processing: the processor's electricity = the grid factor with losses and upstream, all in 3.10
+  const p = await calc('p10_energy:electricity', 10000, 'kWh_e');
+  assert.ok(Math.abs(p.totals.scope3 - (await same('grid:electricity', 10000, 'kWh_e'))) < 1e-6, JSON.stringify(p.totals));
+  assert.ok(p.steps.at(-1).includes('after the sale'));
+  // use: lifetime electricity and fuel; fuels sold to customers
+  assert.ok(Math.abs((await calc('u11_electricity:electricity', 50000, 'kWh_e')).totals.scope3 - (await same('grid:electricity', 50000, 'kWh_e'))) < 1e-6);
+  assert.ok(Math.abs((await calc('u11_fuel:petrol', 1000, 'L')).totals.scope3 - (await same('desnz:petrol-100-mineral-petrol', 1000, 'L'))) < 1e-6);
+  assert.ok((await calc('u11_fuels_sold:diesel', 1000, 'L')).totals.scope3 > 2500, 'about 2.5 kg CO2e per litre plus upstream');
+  // refrigerant released by products in use: mass × GWP (HFC-32: 677 in AR5, 771 in AR6)
+  const r32 = await calc('u11_gas:r32', 10, 'kg');
+  assert.ok(r32.totals.scope3 > 6000 && r32.totals.scope3 < 8000, JSON.stringify(r32.totals));
+  // end of life: the DESNZ waste factor of the same material and route as "Waste sent to others"
+  const eol = (await pq(`SELECT code, substr(code, 7) AS rest FROM item WHERE code LIKE 'eol12:plastic:%landfill' ORDER BY code LIMIT 1`)).rows[0];
+  const e = await calc(eol.code, 10, 't');
+  assert.ok(Math.abs(e.totals.scope3 - (await same('waste3:' + eol.rest, 10, 't'))) < 1e-6, JSON.stringify(e.totals));
+  assert.equal((await calc('u11_reported:reported', 3, 'tco2e')).totals.scope3, 3000);
+  // units: gases in mass, reported in CO2e
+  const units = async (code: string) => (await api('GET', `/api/items/${await itemId(code)}/units`, undefined, tenantA)).body.units.map((u: { code: string }) => u.code);
+  assert.ok((await units('u11_gas:r410a')).includes('kg'));
+  assert.ok((await units(eol.code)).includes('t'));
+  assert.deepEqual((await units('e12_reported:reported')).sort(), ['kgco2e', 'tco2e']);
+  // saved in its own category, reported as GHG category 3.11
+  const saved = await api('POST', '/api/activities', { facilityId: fac, itemId: await itemId('u11_gas:r32'), quantity: 10, unit: 'kg', periodStart: '2025-01-01', periodEnd: '2025-12-31' }, tenantA);
+  assert.equal(saved.status, 200, JSON.stringify(saved.body));
+  const row = (await pq(`SELECT c.code, c.ghg_category, a.co2e_scope3::float8 AS s3, a.co2e_direct::float8 AS d FROM activity a JOIN category c ON c.id = a.category_id WHERE a.id = $1`, [saved.body.id])).rows[0];
+  assert.equal(row.code, 'use_sold'); assert.equal(row.ghg_category, 11); assert.ok(Math.abs(row.s3 - r32.totals.scope3) < 1e-6); assert.equal(row.d, 0);
+});
+
 // --------------------------------------------------------- vault & messages --
 test('document vault: upload with details, evidence on entries, other screens\' files listed, access by facility, versions, archive rules, locked months keep evidence', async () => {
   const sa = await login(superA.email, superA.temporaryPassword);

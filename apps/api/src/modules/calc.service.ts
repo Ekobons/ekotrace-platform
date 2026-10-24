@@ -340,7 +340,7 @@ export async function calculate(input: CalcInput, ctx: CalcContext): Promise<{ r
     const e = await energyCalc(input, item, ctx, ref.units, gwp, date, fdate);
     result = e.result; stored = e.stored;
   } else if (item.calc_method === 'asset') {
-    // Transport & distribution (3.4, 3.9) and leased assets (3.8, 3.13): everything lands in the category's Scope 3.
+    // Transport & distribution (3.4, 3.9), leased assets (3.8, 3.13) and sold products (3.10–3.12): everything lands in the category's Scope 3.
     if (input.quantity === undefined) throw new AppError('Enter the quantity');
     const a = (item.attrs ?? {}) as { via?: string; eui?: number; euiSource?: string; reported?: boolean };
     const zero = { direct: 0, wtt: 0, outside_scopes: 0, memo: 0, scope2: 0, scope2_market: 0, td_loss: 0, scope3: 0 };
@@ -359,16 +359,19 @@ export async function calculate(input: CalcInput, ctx: CalcContext): Promise<{ r
         qty = (m2d * a.eui) / 365.25; unit = 'kWh_e'; via = 'grid:electricity';
         pre.push(`${fmtN(input.quantity)} ${uName(input.unit)} = ${fmtN(m2d)} m²·days × ${a.eui} kWh per m² per year ÷ 365.25 = ${fmtN(qty)} kWh of electricity (typical ${item.name.toLowerCase()}${a.euiSource ? `, ${a.euiSource}` : ''})`);
       }
-      const [v] = await query<{ id: number }>('SELECT id FROM item WHERE code = $1 AND active', [via]);
+      const [v] = await query<{ id: number; calc_method: string }>(
+        'SELECT i.id, c.calc_method FROM item i JOIN subcategory s ON s.id = i.subcategory_id JOIN category c ON c.id = s.category_id WHERE i.code = $1 AND i.active', [via]);
       if (!v) throw new AppError(`${item.name}: its factor (${via}) is not in the library`);
-      const sub = await calculate({ ...input, itemId: v.id, quantity: qty, unit, energy: undefined, cv: undefined, trip: undefined }, ctx);
+      // a gas released by products in use (3.11): the mass released × its GWP
+      const fugitive = v.calc_method === 'fugitive' ? { method: 'quantity' as const, released: qty } : undefined;
+      const sub = await calculate({ ...input, itemId: v.id, quantity: fugitive ? undefined : qty, unit, energy: undefined, cv: undefined, trip: undefined, fugitive }, ctx);
       const t = sub.result.totals;
       const moved: Record<string, true> = { direct: true, scope2: true, td_loss: true, wtt: true, scope3: true };
       result = {
         totals: { ...zero, scope3: t.direct + t.scope2 + t.td_loss + t.wtt + t.scope3, outside_scopes: t.outside_scopes, memo: t.memo },
         lines: sub.result.lines.filter((l) => l.basis !== 'scope2_market').map((l) => (moved[l.basis] ? { ...l, basis: 'scope3' as const } : l)),
         factors: sub.result.factors.filter((f) => f.basis !== 'scope2_market'),
-        steps: [...pre, ...sub.result.steps.filter((x) => !/^Market-based/.test(x)), `All of it counted in ${item.category}: the energy of an asset you lease, or of transport and storage by others, is not your Scope 1 or 2. Grid losses and upstream fuel are included.`],
+        steps: [...pre, ...sub.result.steps.filter((x) => !/^Market-based/.test(x)), `All of it counted in ${item.category}: ${/sold products/i.test(item.category) ? 'what happens to your products after the sale (processing, use, disposal by others)' : 'the energy of an asset you lease, or of transport and storage by others,'} is not your Scope 1 or 2.${/^(grid|desnz):/.test(via ?? '') ? ' Grid losses and upstream fuel are included.' : ''}`],
         warnings: sub.result.warnings,
       } as unknown as CalcResult;
     } else {

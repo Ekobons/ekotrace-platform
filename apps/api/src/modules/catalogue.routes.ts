@@ -68,14 +68,14 @@ export async function catalogueRoutes(app: FastifyInstance) {
           AND ($3 = 'fugitive' AND u.dimension = 'mass'
                OR u.dimension IN (SELECT DISTINCT uu.dimension FROM factor f JOIN unit uu ON uu.code = f.unit
                                    WHERE f.item_id = $1 AND f.status = 'active' AND f.basis = 'direct')
-               -- transport & leased assets: the item's own factors (Scope 3), the factors of the grid or fuel it
-               -- stands for (energy used), or the subcategory's list (floor area, reported emissions)
+               -- transport, leased assets, sold products: the item's own factors (Scope 3), the factors of the grid, fuel or
+               -- waste route it stands for, or the subcategory's list (floor area, reported emissions, gas mass)
                OR $3 = 'asset' AND (
                     u.dimension IN (SELECT DISTINCT uu.dimension FROM factor f JOIN unit uu ON uu.code = f.unit
                                      WHERE f.item_id = $1 AND f.status = 'active' AND f.basis IN ('scope3', 'direct'))
                  OR u.dimension IN (SELECT DISTINCT uu.dimension FROM factor f JOIN item vi ON vi.id = f.item_id JOIN unit uu ON uu.code = f.unit
-                                     WHERE vi.code = $4 AND f.status = 'active' AND f.basis IN ('direct', 'scope2'))
-                 OR $4::text IS NULL AND cardinality($2::text[]) > 0 AND NOT EXISTS (SELECT 1 FROM factor f WHERE f.item_id = $1 AND f.status = 'active')))
+                                     WHERE vi.code = $4 AND f.status = 'active' AND f.basis IN ('direct', 'scope2', 'scope3'))
+                 OR ($4::text IS NULL OR $4::text ~ '^(gas|blend):') AND cardinality($2::text[]) > 0 AND NOT EXISTS (SELECT 1 FROM factor f WHERE f.item_id = $1 AND f.status = 'active')))
         ORDER BY u.sort, u.code`, [id, it.units, it.calc_method, it.via]);
     const def = [it.default_unit, it.sub_default].find((d) => d && rows.some((r) => r.code === d)) ?? rows[0]?.code ?? null;
     return { units: rows, defaultUnit: def };

@@ -15,7 +15,7 @@ import type { TravelMode } from './desnz.js';
 import { DESNZ_UNIT, slug, type DesnzParsed, type FreightMode, type WasteRoute } from './desnz.js';
 
 /** Raise when the importer learns to read more of the file: editions already loaded are read again once. */
-export const IMPORTER_VERSION = 13;
+export const IMPORTER_VERSION = 14;
 
 export interface ImportSummary {
   source: string;
@@ -229,6 +229,14 @@ export async function importDesnz(c: Tx, p: DesnzParsed, opts: { createdBy?: str
       await c.query('UPDATE item SET attrs = $2 WHERE id = $1', [item, JSON.stringify({ material: w.material, route: w.route, ...(HAZARDOUS_WASTE.has(w.material) ? { hazardous: true } : {}) })]);
     }
     factors.push({ item, basis: 'scope3', unit: 't', co2e: w.co2e, gases: [] });
+    // the same material and route for end-of-life of sold products (3.12): an item that points to this one
+    const eolSub = `e12_${sub.slice(7)}`, eolCode = `eol12:${itemCode.slice(7)}`;
+    if (subId.has(eolSub) && !itemIds.get(eolCode)) {
+      const e = await upsertItem(eolCode, eolSub, `${w.material} · ${WASTE_ROUTE_NAME[w.route]}`, { defaultUnit: 't', sort: WASTE_ROUTE_SORT[w.route],
+        note: 'Tonnes of the products (or packaging) of this material that end up by this route. DESNZ waste factor, as in Waste sent to others.' });
+      await c.query('UPDATE item SET attrs = $2 WHERE id = $1', [e, JSON.stringify({ via: itemCode })]);
+      itemIds.set(eolCode, e);
+    }
   }
 
   // ---- land travel by passengers (employee commuting, Scope 3.7) ----------------------

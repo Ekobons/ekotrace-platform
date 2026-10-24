@@ -122,6 +122,11 @@ They feed the Waste dashboard (GRI 306): waste generated, hazardous and non-haza
 **What:** freight and warehousing by others — paid by you (3.4) or after the sale, not paid by you (3.9); buildings and vehicles you lease that are not in your own Scope 1 and 2 (3.8), and those you lease out (3.13).
 **How:** tonne-km or vehicle-km (DESNZ freight factors), warehouse or building floor area × time (typical energy use of the building type × grid factor), the energy used (grid and fuel factors), leased vehicles' km or fuel, or the emissions reported by the carrier, landlord or tenant. See the chapter *Transport, storage and leased assets*.
 
+## Sold products — Scope 3.10, 3.11, 3.12
+
+**What:** what happens to your products after the sale — processing of intermediate products by others (3.10), energy, fuel and gases released while customers use them over their life (3.11), and their disposal, with their packaging, at the end of life (3.12).
+**How:** the processor's energy (grid and fuel factors) or reported emissions; lifetime electricity or fuel of the units sold, fuels sold to customers, refrigerant released × GWP, or a product study; tonnes by material and route × the DESNZ waste factors. See the chapter *Sold products: processing, use and end of life*.
+
 ## Purchased goods & services — Scope 3.1 (and 3.2, 3.4, 3.6, 3.8)
 
 **What:** everything the company buys that is not fuel or energy it uses itself: materials, equipment, IT, services, travel and freight paid for, rent.

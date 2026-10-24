@@ -39,12 +39,14 @@ const ICON: Record<string, string> = {
   stationary_combustion: 'flame', mobile_combustion: 'truck', purchased_electricity: 'bolt', fugitive: 'snow', waste: 'bin', water: 'drop',
   purchased_goods: 'cart', employee_commuting: 'bus', business_travel: 'plane',
   upstream_transport: 'truck', downstream_transport: 'truck', upstream_leased: 'building', downstream_leased: 'building',
+  processing_sold: 'gear', use_sold: 'plug', eol_sold: 'leaf',
 };
 
 const SHORT: Record<string, string> = {
   stationary_combustion: 'Fuels', mobile_combustion: 'Vehicles', fugitive: 'Refrigerants', waste: 'Waste', purchased_electricity: 'Electricity',
   purchased_goods: 'Purchases', employee_commuting: 'Commuting', water: 'Water',
   upstream_transport: 'Inbound freight', downstream_transport: 'Outbound freight', upstream_leased: 'Leased assets', downstream_leased: 'Leased-out assets',
+  processing_sold: 'Processing', use_sold: 'Use of products', eol_sold: 'End of life',
 };
 const catName = (c: Category) => (c.code.startsWith('waste_') ? 'Waste' : c.code.startsWith('water_') ? 'Water' : c.code === 'purchased_goods' ? 'Purchases' : c.name.replace(/\s*\(Scope [\d.]+\)$/, ''));
 type MState = 'approved' | 'review' | 'draft' | 'returned' | 'missing' | 'none' | 'open' | 'future';
@@ -307,7 +309,18 @@ const ASSET_HELP: Record<string, string> = {
   bld_area: 'Floor area × the time, when the energy is not known: estimated from a typical energy use of that kind of building.',
   veh_km: 'Distance driven by the leased vehicles, by vehicle class.',
   veh_fuel: 'Fuel bought for the leased vehicles.',
+  // sold products (3.10–3.12): looked up by the full subcategory code first
+  p10_energy: 'The processor’s electricity and fuel for processing your products: from their meters, or their energy per tonne × the tonnes you sold them.',
+  p10_reported: 'The processor’s Scope 1 and 2 for processing your products (or their emissions per tonne × tonnes sold), from their statement. Attach it as evidence.',
+  u11_electricity: 'The lifetime electricity of the units sold this year: units sold × years of life × kWh per year. Use the helper below.',
+  u11_fuel: 'The lifetime fuel of the units sold this year (engines, vehicles, generators, stoves): units sold × years of life × fuel per year.',
+  u11_fuels_sold: 'Fuel you sold to customers, who burn it: the quantity sold in the period.',
+  u11_gas: 'Refrigerant or gas the units sold release over their life: units × charge × annual leak rate × years, plus the charge not recovered at disposal.',
+  u11_reported: 'Lifetime use-phase emissions per unit from a product footprint, LCA or EPD × the units sold. Attach the study as evidence.',
+  e12_reported: 'End-of-life emissions per unit from a product footprint, LCA or EPD × the units sold. Attach the study as evidence.',
+  e12: 'Tonnes of your products and packaging of this material ending up by each route — product weight × units sold × the share by route (e.g. national waste statistics). One row per route.',
 };
+const assetHelp = (code: string) => ASSET_HELP[code] ?? (code.startsWith('e12_') ? ASSET_HELP.e12 : ASSET_HELP[code.replace(/^[a-z]+\d+_/, '')]);
 
 /** The entry form of the category: rows for the months picked, or one entry. */
 function CategoryForm({ cat, cats, facilityId, year, period, rows, picked, fac, way, onSaved }: {
@@ -443,7 +456,8 @@ function FuelForm({ cat, facilityId, year, period, rows, onSaved }: { cat: Categ
       </div>
       {fugitive && <div className="sub">{METHOD_HELP[method]}</div>}
       {!fugitive && sub?.is_bioenergy && <div className="sub">Bioenergy: CH₄ and N₂O count in Scope 1; the CO₂ is biogenic and reported separately.</div>}
-      {asset && sub && ASSET_HELP[sub.code.replace(/^[a-z]+\d+_/, '')] && <div className="sub">{ASSET_HELP[sub.code.replace(/^[a-z]+\d+_/, '')]}</div>}
+      {asset && sub && assetHelp(sub.code) && <div className="sub">{assetHelp(sub.code)}</div>}
+      {asset && sub && /^u11_(electricity|fuel|gas)$/.test(sub.code) && <LifetimeHelper gas={sub.code === 'u11_gas'} unit={unitName} onUse={rows ? undefined : (q) => setQuantity(q)} />}
       {item && (item.composition?.length || item.note) && (!rows || cv || asset) && <div className="sub">
         {item.composition?.length ? <>Composition: {item.composition.map((c) => `${c.gas} ${num(c.fraction * 100, 4)} %`).join(' · ')}. </> : null}{item.note}</div>}
 
@@ -611,4 +625,31 @@ function ApprovedStage({ facilityId, group, range, onChange, toast }: { facility
       : <div className="empty">Nothing approved yet for these months.</div>}
     <div className="muted small">Approved entries count in the dashboards and reports. <Link to="/dashboards">Dashboards →</Link></div>
   </>;
+}
+
+/** Use of sold products: the lifetime quantity of the units sold, worked out and copied for the quantity field. */
+function LifetimeHelper({ gas, unit, onUse }: { gas: boolean; unit: string; onUse?: (q: string) => void }) {
+  const { toast } = useApp();
+  const [v, setV] = useState<Record<string, string>>({});
+  const n = (k: string) => Number(v[k] || 0);
+  const total = gas
+    ? n('units') * n('charge') * ((n('leak') / 100) * n('years') + (1 - n('recovery') / 100))
+    : n('units') * n('years') * n('perYear');
+  const field = (k: string, label: string, w = 120) => (
+    <label className="field" style={{ width: w }}><span>{label}</span>
+      <input className="input num" inputMode="decimal" value={v[k] ?? ''} placeholder="0" onChange={(e) => setV({ ...v, [k]: e.target.value.replace(/[^0-9.]/g, '') })} /></label>);
+  const text = String(Math.round(total * 1000) / 1000);
+  return (
+    <fieldset className="box"><legend>Lifetime helper</legend>
+      <div className="row" style={{ gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+        {field('units', 'Units sold')}
+        {gas ? <>{field('charge', `Charge per unit (${unit})`, 150)}{field('leak', 'Leak rate % / year')}{field('years', 'Years of life')}{field('recovery', 'Recovered at disposal %', 160)}</>
+          : <>{field('years', 'Years of life')}{field('perYear', `${unit} per unit per year`, 170)}</>}
+        <div style={{ paddingBottom: 8 }}>= <b>{num(total)}</b> {unit}</div>
+        {onUse
+          ? <button className="btn sm" disabled={!total} onClick={() => onUse(text)}>Use as the quantity</button>
+          : <button className="btn sm" disabled={!total} onClick={() => { void navigator.clipboard?.writeText(text).then(() => toast(`Copied ${text}: paste it as the quantity of a month`), () => toast(text)); }}>Copy</button>}
+      </div>
+      <div className="sub">{gas ? 'Released over the life = units × charge × (leak rate × years + share not recovered at disposal).' : 'Lifetime use = units sold × years of life × use per unit per year.'} Enter the units sold in the period you pick (usually the whole year).</div>
+    </fieldset>);
 }
