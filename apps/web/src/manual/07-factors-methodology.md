@@ -13,6 +13,8 @@
 | Grid electricity — New Zealand, South Africa, Türkiye, Malaysia (Peninsular, Sabah, Sarawak), Hong Kong (CLP, HK Electric), South Korea, Taiwan, Brazil, Philippines | the government, regulator or utility that publishes it (MfE, DFFE, ETKB, Energy Commission, the two utilities, the ministries) | as published |
 | Grid electricity — UAE (national, Dubai, Abu Dhabi), Oman | MOCCAE (UAE NDC, 2019 base year); DEWA climate change report; EWEC decarbonisation report; Nama PWP 7-year statement | as published |
 | Grid electricity — Saudi Arabia, Qatar, Bahrain, Kuwait, Egypt, Jordan | no official average found: Saudi Arabia from Climate Transparency (Enerdata data); the others from the UNFCCC/IFI combined-margin dataset — **provisional** | as published |
+| Freight (Scope 3.4, 3.9) and leased vehicles (3.8, 3.13) | DESNZ *Freighting goods* and *Managed assets – vehicles*, with their well-to-tank | each June, with the DESNZ set |
+| Typical energy use of buildings and warehouses (floor-area method, 3.4, 3.8, 3.9, 3.13) | BCA Building Energy Benchmarking Report 2023 (Singapore); ENERGY STAR Portfolio Manager Technical Reference 2024 (US EPA) for types BCA does not cover | `data/buildings/energy-intensity.csv`, by the platform admin |
 | Grid electricity — Canada (national and provinces) | previous Ekotrace list, taken from Canada's National Inventory Report | when checked against the NIR |
 | Grid electricity — about 50 other countries (Africa, Latin America, South and South-East Asia) | IGES list of grid emission factors (government and UN CDM values) — **last resort** | as published |
 | Other grids, residual mixes, T&D losses | entered by the platform admin with their source (utility, national inventory) | as published |

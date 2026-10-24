@@ -149,7 +149,7 @@ export const calcInputSchema = z.object({
 export type CalcInput = z.infer<typeof calcInputSchema>;
 
 interface ItemRow {
-  id: number; name: string; active: boolean; category_id: number; category: string; calc_method: 'combustion' | 'fugitive' | 'vehicle' | 'electricity' | 'waste' | 'waste_disposal' | 'travel' | 'water' | 'trip';
+  id: number; name: string; active: boolean; category_id: number; category: string; calc_method: 'combustion' | 'fugitive' | 'vehicle' | 'electricity' | 'waste' | 'waste_disposal' | 'travel' | 'water' | 'trip' | 'asset';
   sub_units: string[]; gas_code: string | null; sub_active: boolean; code: string;
   attrs: { vehicle?: string; powertrain?: string; fuel?: string | null; electric?: boolean; phev?: boolean; distance?: boolean };
 }
@@ -339,6 +339,51 @@ export async function calculate(input: CalcInput, ctx: CalcContext): Promise<{ r
     if (input.quantity === undefined) throw new AppError('Enter the quantity of energy');
     const e = await energyCalc(input, item, ctx, ref.units, gwp, date, fdate);
     result = e.result; stored = e.stored;
+  } else if (item.calc_method === 'asset') {
+    // Transport & distribution (3.4, 3.9) and leased assets (3.8, 3.13): everything lands in the category's Scope 3.
+    if (input.quantity === undefined) throw new AppError('Enter the quantity');
+    const a = (item.attrs ?? {}) as { via?: string; eui?: number; euiSource?: string; reported?: boolean };
+    const zero = { direct: 0, wtt: 0, outside_scopes: 0, memo: 0, scope2: 0, scope2_market: 0, td_loss: 0, scope3: 0 };
+    const uName = (u: string) => ref.units.get(u)?.name ?? u;
+    if (a.reported) {
+      // emissions reported by the carrier, landlord or tenant
+      const kg = convert(ref.units, input.quantity, input.unit, 'kgco2e');
+      result = { totals: { ...zero, scope3: kg }, lines: [{ basis: 'scope3', gas: 'CO2e', kgGas: null, kgCo2e: kg, factorId: null, method: 'published' }], factors: [],
+        steps: [`Reported: ${fmtN(input.quantity)} ${uName(input.unit)} = ${fmtN(kg)} kg CO₂e`], warnings: [] } as unknown as CalcResult;
+    } else if (a.via || a.eui != null) {
+      // energy known (or estimated from the floor area): the platform's own grid or fuel factors
+      const pre: string[] = [];
+      let qty = input.quantity, unit = input.unit, via = a.via;
+      if (a.eui != null) {
+        const m2d = convert(ref.units, input.quantity, input.unit, 'm2_day');
+        qty = (m2d * a.eui) / 365.25; unit = 'kWh_e'; via = 'grid:electricity';
+        pre.push(`${fmtN(input.quantity)} ${uName(input.unit)} = ${fmtN(m2d)} m²·days × ${a.eui} kWh per m² per year ÷ 365.25 = ${fmtN(qty)} kWh of electricity (typical ${item.name.toLowerCase()}${a.euiSource ? `, ${a.euiSource}` : ''})`);
+      }
+      const [v] = await query<{ id: number }>('SELECT id FROM item WHERE code = $1 AND active', [via]);
+      if (!v) throw new AppError(`${item.name}: its factor (${via}) is not in the library`);
+      const sub = await calculate({ ...input, itemId: v.id, quantity: qty, unit, energy: undefined, cv: undefined, trip: undefined }, ctx);
+      const t = sub.result.totals;
+      const moved: Record<string, true> = { direct: true, scope2: true, td_loss: true, wtt: true, scope3: true };
+      result = {
+        totals: { ...zero, scope3: t.direct + t.scope2 + t.td_loss + t.wtt + t.scope3, outside_scopes: t.outside_scopes, memo: t.memo },
+        lines: sub.result.lines.filter((l) => l.basis !== 'scope2_market').map((l) => (moved[l.basis] ? { ...l, basis: 'scope3' as const } : l)),
+        factors: sub.result.factors.filter((f) => f.basis !== 'scope2_market'),
+        steps: [...pre, ...sub.result.steps.filter((x) => !/^Market-based/.test(x)), `All of it counted in ${item.category}: the energy of an asset you lease, or of transport and storage by others, is not your Scope 1 or 2. Grid losses and upstream fuel are included.`],
+        warnings: sub.result.warnings,
+      } as unknown as CalcResult;
+    } else {
+      // freight per tonne-km / km, leased vehicles per km: DESNZ factors; the well-to-tank goes with them
+      const factors = await loadFactors(item.id);
+      if (!factors.length) throw new AppError(`${item.name}: no factor loaded — restart the app to load the DESNZ files.`);
+      result = calcCombustion({ itemName: item.name, quantity: input.quantity, unit: input.unit, date: fdate, region, factors, gwp, units: ref.units });
+      if (result.totals.wtt || result.totals.direct) {
+        result.totals.scope3 += result.totals.wtt + result.totals.direct;
+        if (result.totals.wtt) result.steps.push(`Well-to-tank ${result.totals.wtt.toFixed(3)} kg CO2e counted in the same category`);
+        result.totals.wtt = 0; result.totals.direct = 0;
+        for (const l of result.lines) if (l.basis === 'wtt' || l.basis === 'direct') l.basis = 'scope3';
+      }
+    }
+    stored = { quantity: input.quantity, unit: input.unit, inputs: {} };
   } else if (item.calc_method === 'vehicle') {
     if (input.quantity === undefined && !input.vehicle?.spend) throw new AppError('Enter the distance, fuel, electricity or spend');
     const v = await vehicleCalc(input, item, ctx, ref.units, gwp, region, date, fdate);

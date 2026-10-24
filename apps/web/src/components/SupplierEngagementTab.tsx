@@ -15,7 +15,7 @@ const SBTI: Record<string, [string, string]> = { validated: ['Science-based targ
 const CDP_C: Record<string, string> = { A: '#0E7C66', 'A-': '#2BA38A', B: '#6B4FA8', 'B-': '#9C86CF', C: '#2E6FB0', 'C-': '#7FA7D6', D: '#E39A5A', 'D-': '#F0C29B', F: '#C2523C', unscored: '#C9D3CF' };
 const GRADE: Record<string, string> = { 'A+': '#0E7C66', A: '#2BA38A', B: '#7CC4A6', C: '#E9B44C', D: '#E39A5A', E: '#C2523C' };
 const STAGE: Record<string, [string, string]> = { finished: ['Finished', '#0E7C66'], submitted: ['Submitted', '#2BA38A'], started: ['Survey started', '#7CC4A6'], signed_in: ['Signed in', '#B6E36B'], invited: ['Invited', '#E9B44C'], not_engaged: ['Not engaged', '#C9D3CF'] };
-const CAT: Record<string, string> = { purchased_goods: '3.1 Purchased goods & services', capital_goods: '3.2 Capital goods', upstream_transport: '3.4 Upstream transport', business_travel: '3.6 Business travel', upstream_leased: '3.8 Upstream leased assets' };
+const CAT: Record<string, string> = { purchased_goods: '3.1 Purchased goods & services', capital_goods: '3.2 Capital goods', upstream_transport: '3.4 Upstream transport & distribution', business_travel: '3.6 Business travel', upstream_leased: '3.8 Upstream leased assets' };
 const CRED: Record<string, [string, string]> = { high: ['High — SBTi validated', '#0E7C66'], average: ['Average — committed or own target with numbers', '#E9B44C'], weak: ['Weak — no target (kept flat)', '#C2523C'] };
 const t = (kg: number) => kg / 1000;
 const pc = (x: number) => `${Math.round(x * 100)}%`;

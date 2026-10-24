@@ -24,8 +24,8 @@ const LINE_STATUS: Record<LineStatus, [string, string]> = {
 };
 const SOURCE: Record<string, string> = { upload: 'File', manual: 'Entered', api: 'ERP API' };
 const METHOD: Record<string, string> = { rule: 'remembered', text: 'description', ai: 'AI', manual: 'by hand', code: 'code in file', supplier: 'supplier default', gl: 'account default', category: 'category default', fallback: 'average factor (estimate)' };
-export const TARGETS: [string, string][] = [['business_travel', 'Business travel (3.6)'], ['upstream_transport', 'Upstream transport (3.4)'], ['upstream_leased', 'Upstream leased assets (3.8)'], ['capital_goods', 'Capital goods (3.2)']];
-const CAT_NAME: Record<string, string> = { purchased_goods: 'Purchased goods & services (3.1)', capital_goods: 'Capital goods (3.2)', upstream_transport: 'Upstream transport (3.4)', business_travel: 'Business travel (3.6)', upstream_leased: 'Upstream leased assets (3.8)' };
+export const TARGETS: [string, string][] = [['business_travel', 'Business travel (3.6)'], ['upstream_transport', 'Upstream transport & distribution (3.4)'], ['upstream_leased', 'Upstream leased assets (3.8)'], ['capital_goods', 'Capital goods (3.2)']];
+const CAT_NAME: Record<string, string> = { purchased_goods: 'Purchased goods & services (3.1)', capital_goods: 'Capital goods (3.2)', upstream_transport: 'Upstream transport & distribution (3.4)', business_travel: 'Business travel (3.6)', upstream_leased: 'Upstream leased assets (3.8)' };
 const usd = (v: number | null | undefined) => (v == null ? '—' : `$${Math.round(v).toLocaleString('en')}`);
 const running = (s: string) => ['queued', 'reading', 'mapping', 'publishing'].includes(s);
 

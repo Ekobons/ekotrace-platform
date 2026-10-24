@@ -166,6 +166,36 @@ export function gridSourceCodes(): string[] {
 }
 
 /**
+ * Typical energy intensity of building types (kWh per m² per year, data/buildings/energy-intensity.csv), for the
+ * floor-area method of warehousing (3.4, 3.9) and leased buildings (3.8, 3.13). One item per type in each of
+ * those subcategories; the value and its source are kept on the item and shown in each calculation.
+ */
+export const BUILDINGS_FILE = join(DATA, 'buildings', 'energy-intensity.csv');
+export async function seedBuildings(c: Tx) {
+  if (!existsSync(BUILDINGS_FILE)) return { items: 0 };
+  const rows = csvObjects(readFileSync(BUILDINGS_FILE, 'utf8'));
+  const subs = new Map<string, number>((await c.query(
+    `SELECT code, id FROM subcategory WHERE code IN ('t4_store_area','t9_store_area','l8_bld_area','l13_bld_area')`)).rows.map((r) => [r.code, r.id]));
+  let n = 0;
+  for (const [sub, sid] of subs) {
+    const storage = sub.startsWith('t');
+    for (const [i, r] of rows.entries()) {
+      if (storage ? r.use === 'building' : false) continue;
+      const eui = Number(r.kwh_per_m2_year);
+      if (!Number.isFinite(eui) || eui <= 0) throw new Error(`energy-intensity.csv: bad value for ${r.key}`);
+      const src = `${r.basis === 'electricity' ? 'electricity' : 'all energy'} ${eui} kWh/m²/yr — ${r.source}`;
+      const note = `Floor area × time × ${eui} kWh per m² per year (${r.basis === 'electricity' ? 'electricity' : 'all energy at site, counted as electricity'}) × the facility's grid factor. ${r.source}.${r.note ? ` ${r.note}.` : ''}`;
+      await c.query(
+        `INSERT INTO item (subcategory_id, code, name, default_unit, note, sort, attrs) VALUES ($1,$2,$3,'m2_month',$4,$5,$6)
+         ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name, note = EXCLUDED.note, sort = EXCLUDED.sort, attrs = EXCLUDED.attrs`,
+        [sid, `${sub}:${r.key}`, r.name, note, i, JSON.stringify({ eui, euiSource: src, basis: r.basis, url: r.url })]);
+      n++;
+    }
+  }
+  return { items: n };
+}
+
+/**
  * Grid factors of other countries. Safe to run again: a factor with the same value is kept,
  * a changed one is superseded (kept as history), regions are added or renamed.
  */
@@ -240,6 +270,8 @@ export async function seed(log = console.log) {
     const r = await platformTx((c) => importOldProducts(c, products, { createdBy: 'seed' }));
     log(`[seed] previous Ekotrace products: ${r.created} new, ${r.updated} updated${r.notFound.length ? `, ${r.notFound.length} without an EPA code` : ''}`);
   }
+  const bl = await platformTx((c) => seedBuildings(c));
+  log(`[seed] building energy intensities: ${bl.items} items`);
   const g = await platformTx((c) => seedGrid(c));
   log(`[seed] grid factors: ${g.regions} regions, ${g.added} added${g.superseded ? ` (${g.superseded} replaced)` : ''}, ${g.kept} unchanged`);
 }

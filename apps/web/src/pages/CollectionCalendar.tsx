@@ -13,7 +13,7 @@ import { Icon } from '../components/Icon';
 const MN = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const d8 = (x: string) => new Date(x.length === 10 ? `${x}T00:00:00` : x).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 const dm = (x: string) => new Date(`${x}T00:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
-const SPEND = ['purchased_goods', 'capital_goods', 'upstream_transport', 'upstream_leased'];
+const SPEND = ['purchased_goods', 'capital_goods'];
 /** Where to enter the data for an obligation. */
 export function entryLink(o: Pick<Obligation, 'facilityId' | 'period' | 'metricId' | 'level'>, cat: string) {
   const y = o.period.slice(0, 4), m = Number(o.period.slice(5, 7));

@@ -31,7 +31,7 @@ const ymd = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
  *  entry published from purchase files — capital goods (3.2), upstream transport (3.4), leased assets (3.8) and
  *  purchases moved to business travel (3.6, also shown in its own tab) — so nothing published is left without a place. */
 const CAT_SQL = `(cat.code = $X OR ($X IN ('waste', 'water') AND cat.code LIKE $X || '_%')
-  OR ($X = 'purchased_goods' AND (cat.code IN ('capital_goods', 'upstream_transport', 'upstream_leased') OR a.purchase_batch_id IS NOT NULL)))`;
+  OR ($X = 'purchased_goods' AND (cat.code = 'capital_goods' OR a.purchase_batch_id IS NOT NULL)))`;
 
 export async function reviewRoutes(app: FastifyInstance) {
   app.get('/api/data/status', async (req) => {

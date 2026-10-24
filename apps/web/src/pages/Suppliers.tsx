@@ -23,7 +23,7 @@ const MANAGE = ['super_admin', 'admin', 'manager'];
 const UNITS = ['kg', 't', 'L', 'm3', 'kWh', 'pcs', 'AED', 'USD', 'EUR', 'GBP', 'SAR', 'INR'];
 const usd = (v: number) => `$${Math.round(v).toLocaleString('en')}`;
 const TARGET_LABEL: Record<string, string> = { sbti_validated: 'SBTi target (validated)', sbti_committed: 'SBTi commitment', own: 'Own target', none: 'No target', unknown: 'Not known' };
-const SCOPE3_LABEL: Record<string, string> = { purchased_goods: '3.1 Purchased goods & services', capital_goods: '3.2 Capital goods', upstream_transport: '3.4 Upstream transport', business_travel: '3.6 Business travel', upstream_leased: '3.8 Upstream leased assets' };
+const SCOPE3_LABEL: Record<string, string> = { purchased_goods: '3.1 Purchased goods & services', capital_goods: '3.2 Capital goods', upstream_transport: '3.4 Upstream transport & distribution', business_travel: '3.6 Business travel', upstream_leased: '3.8 Upstream leased assets' };
 type Tab = 'list' | 'review' | 'analytics' | 'portal' | 'engagement';
 
 export function Suppliers() {

@@ -33,18 +33,20 @@ import { BRAND, productSlug } from '../lib/brand';
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const lastDay = (y: number, m: number) => new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
 const iso = (y: number, m: number, d: number) => `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-/** The Add data tab a category's entries show under (capital goods, upstream transport and leased assets come from purchase files). */
-const groupOf = (code: string) => (code.startsWith('waste_') ? 'waste' : code.startsWith('water_') ? 'water' : ['capital_goods', 'upstream_transport', 'upstream_leased'].includes(code) ? 'purchased_goods' : code);
+/** The Add data tab a category's entries show under (capital goods come from purchase files only). */
+const groupOf = (code: string) => (code.startsWith('waste_') ? 'waste' : code.startsWith('water_') ? 'water' : code === 'capital_goods' ? 'purchased_goods' : code);
 const ICON: Record<string, string> = {
   stationary_combustion: 'flame', mobile_combustion: 'truck', purchased_electricity: 'bolt', fugitive: 'snow', waste: 'bin', water: 'drop',
   purchased_goods: 'cart', employee_commuting: 'bus', business_travel: 'plane',
+  upstream_transport: 'truck', downstream_transport: 'truck', upstream_leased: 'building', downstream_leased: 'building',
 };
 
 const SHORT: Record<string, string> = {
   stationary_combustion: 'Fuels', mobile_combustion: 'Vehicles', fugitive: 'Refrigerants', waste: 'Waste', purchased_electricity: 'Electricity',
   purchased_goods: 'Purchases', employee_commuting: 'Commuting', water: 'Water',
+  upstream_transport: 'Inbound freight', downstream_transport: 'Outbound freight', upstream_leased: 'Leased assets', downstream_leased: 'Leased-out assets',
 };
-const catName = (c: Category) => (c.code.startsWith('waste_') ? 'Waste' : c.code.startsWith('water_') ? 'Water' : c.code === 'purchased_goods' ? 'Purchases' : c.name);
+const catName = (c: Category) => (c.code.startsWith('waste_') ? 'Waste' : c.code.startsWith('water_') ? 'Water' : c.code === 'purchased_goods' ? 'Purchases' : c.name.replace(/\s*\(Scope [\d.]+\)$/, ''));
 type MState = 'approved' | 'review' | 'draft' | 'returned' | 'missing' | 'none' | 'open' | 'future';
 const MSTYLE: Record<MState, [string, string]> = {
   approved: ['Approved', 'c-ok'], review: ['In review', 'c-warn'], draft: ['Draft', 'c-n'], returned: ['Sent back', 'c-bad'],
@@ -253,7 +255,7 @@ export function AddData() {
       <section className="card flush entrycard">
         <div className="entryhead">
           <span className="ic lg"><Icon name={ICON[group] ?? 'list'} size={20} /></span>
-          <div><div className="row" style={{ gap: 8 }}><h2>{catName(cat)}</h2><span className="chip c-n">S{group === 'waste' ? '1 / 3' : cat.scope}</span><span className={`chip ${{ ok: 'c-ok', warn: 'c-warn', bad: 'c-bad', muted: 'c-n' }[catState(group).cls] ?? 'c-n'}`}>{catState(group).label}</span></div><div className="sub">{fac?.name ?? '—'} · {periodLabel}</div></div>
+          <div><div className="row" style={{ gap: 8 }}><h2>{catName(cat)}</h2><span className="chip c-n">S{group === 'waste' ? '1 / 3' : cat.scope === 3 && cat.ghg_category ? `3.${cat.ghg_category}` : cat.scope}</span><span className={`chip ${{ ok: 'c-ok', warn: 'c-warn', bad: 'c-bad', muted: 'c-n' }[catState(group).cls] ?? 'c-n'}`}>{catState(group).label}</span></div><div className="sub">{fac?.name ?? '—'} · {periodLabel}</div></div>
           <span className="grow" />
           <div className="row" style={{ gap: 4 }}>
             {([['enter', '1', 'Enter'], ['review', '2', `Review${counts.open ? ` · ${counts.open}` : ''}`], ['approved', '3', `Approved${counts.approved ? ` · ${counts.approved}` : ''}`]] as const).map(([k, n, t], i) => (
@@ -294,6 +296,19 @@ export function AddData() {
   );
 }
 
+/** Transport & leased assets: what each way of entering needs (subcategory code without its category prefix). */
+const ASSET_HELP: Record<string, string> = {
+  road: 'Tonne-km = tonnes carried × km driven (best for shared loads and couriers). Hired a whole truck or van? Choose km or miles instead.',
+  other: 'Tonne-km = tonnes carried × km (port to port, airport to airport, by rail).',
+  store_area: 'Floor area you use × the time: e.g. 500 m² for one month = 500 m² × months. Estimated from a typical energy use of that kind of warehouse.',
+  store_kwh: 'The warehouse operator’s electricity or fuel for your space, if they can give it — better than the floor-area estimate.',
+  reported: 'Their emissions for your goods or your space (Scope 1 and 2), from their statement. Attach it as evidence.',
+  bld_kwh: 'Electricity and fuel of the building from its meters or bills (the landlord or tenant can provide them) — the best method.',
+  bld_area: 'Floor area × the time, when the energy is not known: estimated from a typical energy use of that kind of building.',
+  veh_km: 'Distance driven by the leased vehicles, by vehicle class.',
+  veh_fuel: 'Fuel bought for the leased vehicles.',
+};
+
 /** The entry form of the category: rows for the months picked, or one entry. */
 function CategoryForm({ cat, cats, facilityId, year, period, rows, picked, fac, way, onSaved }: {
   cat: Category; cats: Category[]; facilityId: string; year: number; period: { periodStart: string; periodEnd: string }; rows: boolean; picked: number[];
@@ -317,7 +332,7 @@ function CategoryForm({ cat, cats, facilityId, year, period, rows, picked, fac, 
 /** Stationary combustion and refrigerants: the type per row, or one entry with the full calculation. */
 function FuelForm({ cat, facilityId, year, period, rows, onSaved }: { cat: Category; facilityId: string; year: number; period: { periodStart: string; periodEnd: string }; rows: boolean; onSaved: () => void }) {
   const { tenant, toast } = useApp();
-  const fugitive = cat.calc_method === 'fugitive';
+  const fugitive = cat.calc_method === 'fugitive', asset = cat.calc_method === 'asset';
   const [subId, setSubId] = useState<number | null>(cat.subcategories[0]?.id ?? null);
   useEffect(() => { setSubId(cat.subcategories[0]?.id ?? null); }, [cat.id]); // eslint-disable-line react-hooks/exhaustive-deps
   const sub = cat.subcategories.find((s) => s.id === subId) ?? null;
@@ -405,7 +420,7 @@ function FuelForm({ cat, facilityId, year, period, rows, onSaved }: { cat: Categ
     try {
       const r = await api.saveActivity({ ...payload, facilityId, dataType, note: note || undefined });
       if (submit) await api.reviewAction([r.id], 'submit');
-      toast(`${submit ? 'Submitted' : 'Saved as draft'}: ${item?.name} · ${tco2e(r.totals.direct)} tCO₂e`);
+      toast(`${submit ? 'Submitted' : 'Saved as draft'}: ${item?.name} · ${tco2e(r.totals.direct + (r.totals.scope3 ?? 0))} tCO₂e`);
       setQuantity(''); setFug({}); setNote(''); onSaved();
     } catch (e) { setError((e as Error).message); } finally { setSaving(null); }
   }
@@ -414,10 +429,10 @@ function FuelForm({ cat, facilityId, year, period, rows, onSaved }: { cat: Categ
   return (
     <div style={{ display: 'grid', gap: 14 }}>
       <div className="row" style={{ alignItems: 'flex-end', gap: 12 }}>
-        <label className="field" style={{ minWidth: 220 }}><span>{fugitive ? 'Gas group' : 'Fuel class'}</span>
+        <label className="field" style={{ minWidth: 220 }}><span>{fugitive ? 'Gas group' : asset ? 'What you know' : 'Fuel class'}</span>
           <select className="input" value={subId ?? ''} onChange={(e) => setSubId(Number(e.target.value))}>
             {cat.subcategories.map((s) => <option key={s.id} value={s.id}>{s.name}{s.is_bioenergy ? ' (bioenergy)' : ''}</option>)}</select></label>
-        {(!rows || cv) && <label className="field grow" style={{ minWidth: 240 }}><span>{fugitive ? 'Gas or refrigerant' : 'Fuel'}</span>
+        {(!rows || cv) && <label className="field grow" style={{ minWidth: 240 }}><span>{fugitive ? 'Gas or refrigerant' : asset ? 'Type' : 'Fuel'}</span>
           <select className="input" value={itemId ?? ''} onChange={(e) => setItemId(Number(e.target.value))}>{sub?.items.map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}</select></label>}
         <label className="field" style={{ width: 170 }}><span>Unit</span>
           <select className="input" value={unit} onChange={(e) => setUnit(e.target.value)}>{units.map((u) => <option key={u.code} value={u.code}>{u.name}</option>)}</select></label>
@@ -428,7 +443,8 @@ function FuelForm({ cat, facilityId, year, period, rows, onSaved }: { cat: Categ
       </div>
       {fugitive && <div className="sub">{METHOD_HELP[method]}</div>}
       {!fugitive && sub?.is_bioenergy && <div className="sub">Bioenergy: CH₄ and N₂O count in Scope 1; the CO₂ is biogenic and reported separately.</div>}
-      {item && (item.composition?.length || item.note) && (!rows || cv) && <div className="sub">
+      {asset && sub && ASSET_HELP[sub.code.replace(/^[a-z]+\d+_/, '')] && <div className="sub">{ASSET_HELP[sub.code.replace(/^[a-z]+\d+_/, '')]}</div>}
+      {item && (item.composition?.length || item.note) && (!rows || cv || asset) && <div className="sub">
         {item.composition?.length ? <>Composition: {item.composition.map((c) => `${c.gas} ${num(c.fraction * 100, 4)} %`).join(' · ')}. </> : null}{item.note}</div>}
 
       {cvPossible && (

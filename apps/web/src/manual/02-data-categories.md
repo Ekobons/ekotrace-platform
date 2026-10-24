@@ -117,6 +117,11 @@ They feed the Waste dashboard (GRI 306): waste generated, hazardous and non-haza
 - **Certificates** (Setup → Energy & currency data → Energy certificates & suppliers): each MWh can be claimed once — the tool refuses a claim beyond what is held, also when two people save at the same moment.
 - **Cooling:** the supplier's factor per TRh, or the plant's efficiency (kWh per TRh, or COP) × the grid factor.
 
+## Transport, storage and leased assets — Scope 3.4, 3.9, 3.8, 3.13
+
+**What:** freight and warehousing by others — paid by you (3.4) or after the sale, not paid by you (3.9); buildings and vehicles you lease that are not in your own Scope 1 and 2 (3.8), and those you lease out (3.13).
+**How:** tonne-km or vehicle-km (DESNZ freight factors), warehouse or building floor area × time (typical energy use of the building type × grid factor), the energy used (grid and fuel factors), leased vehicles' km or fuel, or the emissions reported by the carrier, landlord or tenant. See the chapter *Transport, storage and leased assets*.
+
 ## Purchased goods & services — Scope 3.1 (and 3.2, 3.4, 3.6, 3.8)
 
 **What:** everything the company buys that is not fuel or energy it uses itself: materials, equipment, IT, services, travel and freight paid for, rent.

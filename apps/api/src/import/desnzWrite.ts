@@ -12,10 +12,10 @@
  */
 import type { Tx } from '../db/pool.js';
 import type { TravelMode } from './desnz.js';
-import { DESNZ_UNIT, slug, type DesnzParsed, type WasteRoute } from './desnz.js';
+import { DESNZ_UNIT, slug, type DesnzParsed, type FreightMode, type WasteRoute } from './desnz.js';
 
 /** Raise when the importer learns to read more of the file: editions already loaded are read again once. */
-export const IMPORTER_VERSION = 12;
+export const IMPORTER_VERSION = 13;
 
 export interface ImportSummary {
   source: string;
@@ -302,6 +302,48 @@ export async function importDesnz(c: Tx, p: DesnzParsed, opts: { createdBy?: str
     }
   }
 
+  // ---- freight (Scope 3.4 upstream and 3.9 downstream transport) ------------------------------
+  // The same DESNZ "Freighting goods" factors in both categories; the well-to-tank goes with each
+  // and is counted in the same category by the calculation.
+  for (const pre of ['t4', 't9'] as const) {
+    if (!subId.has(`${pre}_road`)) continue;
+    for (const r of p.freight) {
+      const f = freightItem(pre, r.mode, r.vehicle, r.size, r.variant);
+      let item = itemIds.get(f.code);
+      if (!item) {
+        item = await upsertItem(f.code, f.sub, f.name, { defaultUnit: 'tkm', sort: f.sort, note: f.note });
+        await c.query('UPDATE item SET attrs = $2, sort = $3, note = $4 WHERE id = $1', [item, JSON.stringify(f.attrs), f.sort, f.note]);
+      }
+      factors.push({ item, basis: r.basis, unit: r.unit, co2e: r.co2e, gases: r.basis === 'scope3' && r.gasCo2e.CO2 != null
+        ? [['CO2', r.gasCo2e.CO2], ...(r.gasCo2e.CH4 != null ? [['CH4_fossil', r.gasCo2e.CH4 / gwp.get('CH4_fossil')!] as [string, number]] : []), ...(r.gasCo2e.N2O != null ? [['N2O', r.gasCo2e.N2O / gwp.get('N2O')!] as [string, number]] : [])]
+        : [] });
+    }
+  }
+
+  // ---- leased vehicles (Scope 3.8 upstream and 3.13 downstream leased assets), per km / mile ----
+  // DESNZ "Managed assets- vehicles" (the fleet factors reported as Scope 3), with the fleet's well-to-tank.
+  const wttOf = new Map(p.vehicles.filter((v) => v.basis === 'wtt').map((v) => [`${v.group}|${v.vehicle}|${v.variant}|${v.unit}`, v.co2e]));
+  for (const pre of ['l8', 'l13'] as const) {
+    if (!subId.has(`${pre}_veh_km`)) continue;
+    let order2 = 0;
+    for (const r of p.managed) {
+      const v = vehicleItem(r.group, r.vehicle, r.variant);
+      if ((v.attrs as { electric?: boolean }).electric) continue; // DESNZ BEV values assume the UK grid
+      const code = `${pre}:${v.code}`;
+      let item = itemIds.get(code);
+      if (!item) {
+        const sort = (/^Average laden$/i.test(r.variant) || /^Average car$/.test(r.vehicle) ? 0 : 10000) + order2++;
+        item = await upsertItem(code, `${pre}_veh_km`, v.name, { defaultUnit: 'km', sort, note: 'Per vehicle-km (DESNZ managed assets), with upstream fuel (well-to-tank).' });
+        await c.query('UPDATE item SET attrs = $2 WHERE id = $1', [item, JSON.stringify({ ...v.attrs, group: r.group })]);
+      }
+      factors.push({ item, basis: 'scope3', unit: r.unit, co2e: r.co2e, gases: r.gasCo2e.CO2 != null
+        ? [['CO2', r.gasCo2e.CO2], ...(r.gasCo2e.CH4 != null ? [['CH4_fossil', r.gasCo2e.CH4 / gwp.get('CH4_fossil')!] as [string, number]] : []), ...(r.gasCo2e.N2O != null ? [['N2O', r.gasCo2e.N2O / gwp.get('N2O')!] as [string, number]] : [])]
+        : [] });
+      const w = wttOf.get(`${r.group}|${r.vehicle}|${r.variant}|${r.unit}`);
+      if (w != null) factors.push({ item, basis: 'wtt', unit: r.unit, co2e: w, gases: [] });
+    }
+  }
+
   // ---- home working (Scope 3.7, optional), per FTE working hour ------------------------
   if (subId.has('commute_home')) {
     for (const h of p.homeworking) {
@@ -439,3 +481,31 @@ const HOTEL_ISO: Record<string, string> = {
   'Russian Federation': 'RU', 'Saudi Arabia': 'SA', Singapore: 'SG', 'South Africa': 'ZA', Spain: 'ES', Switzerland: 'CH', 'Taiwan, China': 'TW', Thailand: 'TH', Turkey: 'TR',
   'United Arab Emirates': 'AE', 'United States': 'US', Vietnam: 'VN', Bahrain: 'BH', Kuwait: 'KW', Pakistan: 'PK', Bangladesh: 'BD', 'Sri Lanka': 'LK', Nepal: 'NP', Kenya: 'KE', Nigeria: 'NG', Morocco: 'MA',
 };
+
+// ---------------------------------------------------------------- freight --
+const SHIP_NAME: Record<string, string> = { ship: 'Cargo ship', tanker: 'Tanker' };
+const AIR_FREIGHT: Record<string, string> = {
+  'Domestic, to/from UK': 'domestic', 'Short-haul, to/from UK': 'short-haul (under 3,700 km)', 'Long-haul, to/from UK': 'long-haul (3,700 km or more)',
+  'International, to/from non-UK': 'international (average)',
+};
+/** Catalogue item of a freight row, in upstream (t4) or downstream (t9) transport. */
+export function freightItem(pre: 't4' | 't9', mode: FreightMode, vehicle: string, size: string, variant: string) {
+  const road = mode === 'hgv' || mode === 'hgv_refrigerated' || mode === 'van';
+  const code = `${pre}:${mode}:${slug(vehicle)}${size ? `:${slug(size)}` : ''}${variant ? `:${slug(variant)}` : ''}`;
+  const sub = `${pre}_${road ? 'road' : 'other'}`;
+  const avg = /^average/i.test(variant) || /^average/i.test(size) || /^All HGVs$/.test(vehicle);
+  if (road) {
+    const name = mode === 'van' ? `Van ${vehicle}${variant ? ` · ${variant}` : ''}` : `${mode === 'hgv_refrigerated' ? 'Refrigerated truck' : 'Truck'} · ${vehicle.replace(/^All /, 'all ')}${variant ? ` · ${variant.toLowerCase()}` : ''}`;
+    const sort = (mode === 'hgv' ? 0 : mode === 'hgv_refrigerated' ? 2000 : 4000) + (/^All HGVs$/.test(vehicle) ? 0 : 100) + (/^average laden$/i.test(variant) ? 0 : 10);
+    return { code, sub, name, road, sort: avg ? sort : sort + 1, attrs: { mode, vehicle, load: variant || null },
+      note: 'Per tonne-km (tonnes carried × km) for shared loads, or per vehicle-km/mile for a whole truck or van hired. DESNZ freighting goods, with upstream fuel (well-to-tank).' };
+  }
+  if (mode === 'air') {
+    const rf = !/without/i.test(variant);
+    return { code, sub, name: `Air freight · ${AIR_FREIGHT[vehicle] ?? vehicle}${rf ? '' : ' · without RF'}`, road, sort: 300 + (rf ? 0 : 50) + (/international/i.test(vehicle) ? 0 : 5),
+      attrs: { mode, haul: vehicle, rf }, note: 'Per tonne-km. With radiative forcing (RF) unless stated. DESNZ freighting goods, with upstream fuel.' };
+  }
+  if (mode === 'rail') return { code, sub, name: 'Rail freight', road, sort: 200, attrs: { mode }, note: 'Per tonne-km. DESNZ freight train, with upstream fuel.' };
+  return { code, sub, name: `${SHIP_NAME[mode]} · ${vehicle}${size ? ` · ${size}` : ''}`, road, sort: (mode === 'ship' ? 0 : 100) + (/^average$/i.test(size) ? 0 : 1),
+    attrs: { mode, vessel: vehicle, size: size || null }, note: 'Per tonne-km. DESNZ freighting goods, with upstream fuel.' };
+}

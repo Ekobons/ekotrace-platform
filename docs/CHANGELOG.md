@@ -2,6 +2,14 @@
 
 Newest first.
 
+## 2026-10-24 · Scope 3.4, 3.9, 3.8 and 3.13 with activity data
+
+- Migration 054: units `tkm`, `m2_day`/`m2_month`/`m2_year` (area_time), `kgco2e`/`tco2e` (emissions); calc method `asset`; `upstream_transport` → *Upstream transport & distribution (Scope 3.4)* and `upstream_leased` → *Upstream leased assets (Scope 3.8)* switched to `asset`; new `downstream_transport` (3.9) and `downstream_leased` (3.13). Subcategories per category: road freight, sea/air/rail freight, warehousing by floor area, warehousing energy used, reported (3.4/3.9); buildings energy used, buildings by floor area, reported, vehicles by distance, vehicles by fuel (3.8/3.13). Energy-used items carry `attrs.via` (grid or DESNZ fuel); reported items `attrs.reported`.
+- DESNZ importer (v13): *Freighting goods* (+ *WTT- delivery vehs & freight*) → items `t4:`/`t9:` per mode, vehicle, ship size and load (tkm, km, mi); *Managed assets- vehicles* → `l8:`/`l13:` items per class and fuel (km, mi) with the fleet's WTT. All editions re-imported on start.
+- `data/buildings/energy-intensity.csv` (`seedBuildings`, every start): typical kWh/m²/yr by building type — BCA Singapore 2023 (office 160, retail 331, mall 367, hotel 232, hospital 357, clinic 164, school 98, university 187; electricity) and ENERGY STAR 2024 (warehouse 72, cold store 265, self-storage 64, supermarket 618, restaurant 1,027, bank 279, residential 188; site energy, counted as electricity).
+- `calculate()` `asset`: reported → kg; via / floor area → the grid or fuel item calculated at the facility, every part (direct, Scope 2 location, T&D, WTT) counted as Scope 3 of the category, market-based dropped; DESNZ items → Scope 3 + WTT in the same category. `/api/items/:id/units` handles the new items. Purchases tab no longer swallows 3.4/3.8 entries (only purchase-file ones); Add data has their own tabs with guidance; purchase publish finds 3.4/3.8 again; dashboard quantities skip mixed-unit categories.
+- Manual: new chapter *Transport, storage and leased assets* (which category, ways of entering, building intensities, scenarios); getting started, data categories, purchases, factors & methodology updated. Test: tonne-km with WTT, ship, floor area = grid of the same kWh, energy used, reported tonnes, leased car and diesel, units, saved entry in Scope 3.
+
 ## 2026-10-24 · Entries & results: month and facility filters
 
 - One filter bar: month (an entry shows in every month its period covers), facility (with count), category, status, *Clear filters*. The totals and the list follow the filters; the gas table stays for the whole year and says so. Changing the year clears the month.

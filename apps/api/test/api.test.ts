@@ -2020,6 +2020,47 @@ test('grid factors of other countries: eGRID sub-region, EU country with year fa
   finally { c.release(); }
 });
 
+test('transport & distribution (3.4, 3.9) and leased assets (3.8, 3.13): tonne-km, floor area, energy used, reported emissions, leased vehicles — all in Scope 3', async () => {
+  const groupA = (await api('GET', '/api/org', undefined, tenantA)).body.nodes.find((n: { kind: string }) => n.kind === 'group').id;
+  const fac = (await api('POST', '/api/org/nodes', { parentId: groupA, kind: 'facility', name: 'Leeds depot', country: 'GB' }, tenantA)).body.id;
+  const calc = async (code: string, quantity: number, unit: string) => {
+    const r = await api('POST', '/api/calculate', { facilityId: fac, itemId: await itemId(code), quantity, unit, periodStart: '2025-06-01', periodEnd: '2025-06-30' }, tenantA);
+    assert.equal(r.status, 200, JSON.stringify(r.body));
+    assert.equal(r.body.totals.direct, 0); assert.equal(r.body.totals.scope2, 0); assert.equal(r.body.totals.wtt, 0);
+    return r.body;
+  };
+  const f = async (code: string, unit: string, basis: string) => Number((await pq(`SELECT f.co2e FROM factor f JOIN item i ON i.id = f.item_id WHERE i.code = $1 AND f.unit = $2 AND f.basis = $3 AND f.status = 'active' AND extract(year FROM f.valid_from) = 2025`, [code, unit, basis])).rows[0].co2e);
+  // freight: tonne-km × DESNZ freighting goods, with its well-to-tank, in 3.4 and in 3.9
+  const truck = 't4:hgv:all-rigids:average-laden';
+  const fr = await calc(truck, 1000, 'tkm');
+  assert.ok(Math.abs(fr.totals.scope3 - 1000 * ((await f(truck, 'tkm', 'scope3')) + (await f(truck, 'tkm', 'wtt')))) < 0.01, JSON.stringify(fr.totals));
+  assert.ok((await calc('t9:hgv:all-rigids:average-laden', 1000, 'tkm')).totals.scope3 > 0);
+  assert.ok((await calc('t4:ship:container-ship:average', 1000, 'tkm')).totals.scope3 > 0);
+  // warehousing by floor area: 1,000 m² for a month at 72 kWh/m²/yr = 6,000 kWh at the facility's grid factor (with losses and upstream)
+  const st = await calc('t4_store_area:warehouse', 1000, 'm2_month');
+  const grid = (await api('POST', '/api/calculate', { facilityId: fac, itemId: await itemId('grid:electricity'), quantity: 6000, unit: 'kWh_e', periodStart: '2025-06-01', periodEnd: '2025-06-30' }, tenantA)).body.totals;
+  assert.ok(Math.abs(st.totals.scope3 - (grid.scope2 + grid.td_loss + grid.wtt)) < 1e-6, JSON.stringify([st.totals, grid]));
+  assert.ok(st.steps[0].includes('72 kWh per m² per year'));
+  // leased building, energy used: the same as the grid; reported emissions in tonnes
+  const el = await calc('l8_bld_kwh:electricity', 6000, 'kWh_e');
+  assert.ok(Math.abs(el.totals.scope3 - st.totals.scope3) < 1e-6);
+  assert.equal((await calc('l13_reported:reported', 2, 'tco2e')).totals.scope3, 2000);
+  // leased vehicles by distance (DESNZ managed assets + upstream) and by fuel
+  const car = (await pq(`SELECT code FROM item WHERE code LIKE 'l8:veh:cars_by_size:average-car:%' ORDER BY code LIMIT 1`)).rows[0].code;
+  assert.ok((await calc(car, 500, 'km')).totals.scope3 > 0);
+  assert.ok((await calc('l8_veh_fuel:diesel', 100, 'L')).totals.scope3 > 250, 'about 2.5 kg CO2e per litre plus upstream');
+  // units offered follow what each way needs
+  const units = async (code: string) => (await api('GET', `/api/items/${await itemId(code)}/units`, undefined, tenantA)).body.units.map((u: { code: string }) => u.code);
+  assert.deepEqual((await units(truck)).sort(), ['km', 'mi', 'tkm']);
+  assert.ok((await units('l8_bld_kwh:electricity')).includes('kWh_e'));
+  assert.deepEqual((await units('t9_store_area:cold_store')).sort(), ['m2_day', 'm2_month', 'm2_year']);
+  // saved: the entry sits in its own category, all in Scope 3
+  const saved = await api('POST', '/api/activities', { facilityId: fac, itemId: await itemId(truck), quantity: 1000, unit: 'tkm', periodStart: '2025-06-01', periodEnd: '2025-06-30' }, tenantA);
+  assert.equal(saved.status, 200, JSON.stringify(saved.body));
+  const row = (await pq(`SELECT c.code, a.co2e_scope3::float8 AS s3, a.co2e_direct::float8 AS d FROM activity a JOIN category c ON c.id = a.category_id WHERE a.id = $1`, [saved.body.id])).rows[0];
+  assert.equal(row.code, 'upstream_transport'); assert.ok(Math.abs(row.s3 - fr.totals.scope3) < 1e-6); assert.equal(row.d, 0);
+});
+
 // --------------------------------------------------------- vault & messages --
 test('document vault: upload with details, evidence on entries, other screens\' files listed, access by facility, versions, archive rules, locked months keep evidence', async () => {
   const sa = await login(superA.email, superA.temporaryPassword);

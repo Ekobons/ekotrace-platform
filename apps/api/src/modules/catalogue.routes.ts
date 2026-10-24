@@ -59,7 +59,7 @@ export async function catalogueRoutes(app: FastifyInstance) {
   app.get('/api/items/:id/units', async (req) => {
     const id = z.coerce.number().int().parse((req.params as { id: string }).id);
     const [it] = await query(
-      `SELECT i.id, i.default_unit, s.units, s.default_unit AS sub_default, c.calc_method
+      `SELECT i.id, i.default_unit, s.units, s.default_unit AS sub_default, c.calc_method, i.attrs->>'via' AS via
          FROM item i JOIN subcategory s ON s.id = i.subcategory_id JOIN category c ON c.id = s.category_id WHERE i.id = $1`, [id]);
     if (!it) throw notFound('Item');
     const rows = await query(
@@ -67,8 +67,16 @@ export async function catalogueRoutes(app: FastifyInstance) {
         WHERE u.active AND (cardinality($2::text[]) = 0 OR u.code = ANY($2))
           AND ($3 = 'fugitive' AND u.dimension = 'mass'
                OR u.dimension IN (SELECT DISTINCT uu.dimension FROM factor f JOIN unit uu ON uu.code = f.unit
-                                   WHERE f.item_id = $1 AND f.status = 'active' AND f.basis = 'direct'))
-        ORDER BY u.sort, u.code`, [id, it.units, it.calc_method]);
+                                   WHERE f.item_id = $1 AND f.status = 'active' AND f.basis = 'direct')
+               -- transport & leased assets: the item's own factors (Scope 3), the factors of the grid or fuel it
+               -- stands for (energy used), or the subcategory's list (floor area, reported emissions)
+               OR $3 = 'asset' AND (
+                    u.dimension IN (SELECT DISTINCT uu.dimension FROM factor f JOIN unit uu ON uu.code = f.unit
+                                     WHERE f.item_id = $1 AND f.status = 'active' AND f.basis IN ('scope3', 'direct'))
+                 OR u.dimension IN (SELECT DISTINCT uu.dimension FROM factor f JOIN item vi ON vi.id = f.item_id JOIN unit uu ON uu.code = f.unit
+                                     WHERE vi.code = $4 AND f.status = 'active' AND f.basis IN ('direct', 'scope2'))
+                 OR $4::text IS NULL AND cardinality($2::text[]) > 0 AND NOT EXISTS (SELECT 1 FROM factor f WHERE f.item_id = $1 AND f.status = 'active')))
+        ORDER BY u.sort, u.code`, [id, it.units, it.calc_method, it.via]);
     const def = [it.default_unit, it.sub_default].find((d) => d && rows.some((r) => r.code === d)) ?? rows[0]?.code ?? null;
     return { units: rows, defaultUnit: def };
   });

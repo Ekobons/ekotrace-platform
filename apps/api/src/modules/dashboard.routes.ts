@@ -85,7 +85,7 @@ export async function dashboardRoutes(app: FastifyInstance) {
                 ${t1('a.co2e_direct')} AS s1, ${t1(S2)} AS s2, ${t1('a.co2e_scope3')} AS s3, ${t1('(a.co2e_wtt + a.co2e_td)')} AS s33,
                 ${t1('a.co2_biogenic')} AS bio, ${t1('a.co2e_memo')} AS memo, count(*)::int AS n, count(*) FILTER (WHERE a.status = 'approved')::int AS approved,
                 count(*) FILTER (WHERE a.data_type <> 'actual')::int AS estimated,
-                CASE WHEN cat.calc_method IN ('spend', 'trip') THEN 0 ELSE sum(a.quantity * ${W})::float8 END AS qty,
+                CASE WHEN cat.calc_method IN ('spend', 'trip', 'asset') THEN 0 ELSE sum(a.quantity * ${W})::float8 END AS qty,
                 CASE WHEN cat.calc_method = 'water' THEN sum(a.quantity * u.to_base / 1000 * ${W})::float8 END AS m3,
                 coalesce(i.attrs->>'route', '') AS route, coalesce(i.attrs->>'flow', '') AS flow, coalesce(i.attrs->>'gri', '') AS gri,
                 CASE WHEN cat.code = 'waste_generated' THEN coalesce((a.inputs->'wasteInfo'->>'hazardous')::boolean, false) END AS haz,

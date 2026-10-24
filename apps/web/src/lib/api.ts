@@ -8,7 +8,7 @@ export interface Item { id: number; subcategory_id: number; code: string; name: 
 /** Vehicle types: class, powertrain, the fuel it burns, electric / plug-in, distance factors or not. */
 export interface VehicleAttrs { vehicle?: string; powertrain?: string; load?: string; fuel?: string | null; electric?: boolean; phev?: boolean; distance?: boolean }
 export interface Subcategory { id: number; category_id: number; code: string; name: string; grp?: string | null; units: string[]; default_unit: string | null; is_bioenergy: boolean; sort: number; active: boolean; hiddenForClient?: boolean; items: Item[] }
-export interface Category { id: number; scope: number; code: string; name: string; calc_method: 'combustion' | 'fugitive' | 'vehicle' | 'electricity' | 'waste' | 'waste_disposal' | 'spend' | 'travel' | 'water' | 'trip'; ghg_category?: number | null; description: string | null; active: boolean; subcategories: Subcategory[] }
+export interface Category { id: number; scope: number; code: string; name: string; calc_method: 'combustion' | 'fugitive' | 'vehicle' | 'electricity' | 'waste' | 'waste_disposal' | 'spend' | 'travel' | 'water' | 'trip' | 'asset'; ghg_category?: number | null; description: string | null; active: boolean; subcategories: Subcategory[] }
 export interface Unit { code: string; name: string; dimension: string; to_base: number; is_base: boolean; aliases: string[]; active: boolean }
 export interface ResultLine { basis: Basis; gas: string; kgGas: number | null; kgCo2e: number; factorId: number | null; method: 'gas' | 'published' }
 /** CO2e emission factor behind one part of a result: quantity × perEnteredUnit = total. */
@@ -1057,7 +1057,7 @@ export async function download(path: string, filename: string) {
 }
 
 /** Unit code → short label for tables ("kWh_e" → "kWh", "TRh" → "TRh", "kWh_gcv" → "kWh gross"). */
-const UNIT_NAMES: Record<string, string> = { m3: 'm³', gal_uk: 'imperial gallons', kgal_uk: '000 imperial gallons', ML: 'megalitres', kL: 'kL', pkm: 'passenger-km', room_night: 'room-nights', sqm_hour: 'm²-hours', fte_h: 'FTE hours', tkm: 't-km', ton_us: 'short tons', gal_us: 'US gallons' };
+const UNIT_NAMES: Record<string, string> = { m3: 'm³', gal_uk: 'imperial gallons', kgal_uk: '000 imperial gallons', ML: 'megalitres', kL: 'kL', pkm: 'passenger-km', room_night: 'room-nights', sqm_hour: 'm²-hours', fte_h: 'FTE hours', tkm: 't-km', ton_us: 'short tons', gal_us: 'US gallons', m2_day: 'm² × days', m2_month: 'm² × months', m2_year: 'm² × years', kgco2e: 'kg CO₂e', tco2e: 't CO₂e' };
 export function unitLabel(code: string): string {
   if (UNIT_NAMES[code]) return UNIT_NAMES[code];
   return code.replace(/_e$/, '').replace(/_th$/, ' heat').replace(/_c$/, ' cooling').replace(/_gcv$/, ' gross');

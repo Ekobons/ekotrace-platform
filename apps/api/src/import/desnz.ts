@@ -107,8 +107,35 @@ const airClass = (l4: string): AirClass | null => (/^average/i.test(l4) ? 'avera
 
 export type VehicleGroup = 'cars_by_size' | 'cars_by_segment' | 'vans' | 'hgv' | 'hgv_refrigerated' | 'motorbikes';
 
+/**
+ * Freight (Scope 3 "Freighting goods", for upstream and downstream transport): road per tonne-km and per
+ * vehicle-km/mile, sea, air and rail per tonne-km; and the well-to-tank ("WTT- delivery vehs & freight").
+ */
+export type FreightMode = 'hgv' | 'hgv_refrigerated' | 'van' | 'rail' | 'ship' | 'tanker' | 'air';
+export interface DesnzFreightRow {
+  mode: FreightMode; vehicle: string; size: string; variant: string; unit: 'tkm' | 'km' | 'mi'; basis: 'scope3' | 'wtt';
+  co2e: number | null; gasCo2e: { CO2?: number; CH4?: number; N2O?: number };
+}
+export function freightMode(l2: string): FreightMode | null {
+  const x = l2.replace(/^WTT-\s*/i, '').toLowerCase();
+  if (/hgv/.test(x)) return /refrigerated/.test(x) && !/non-refrigerated/.test(x) ? 'hgv_refrigerated' : 'hgv';
+  if (/^vans?$/.test(x)) return 'van';
+  if (x === 'rail') return 'rail';
+  if (x === 'cargo ship') return 'ship';
+  if (x === 'sea tanker') return 'tanker';
+  if (x === 'freight flights') return 'air';
+  return null;
+}
+const FREIGHT_UNIT: Record<string, 'tkm' | 'km' | 'mi'> = { 'tonne.km': 'tkm', km: 'km', miles: 'mi' };
+/** Leased vehicles (Scope 3 "Managed assets- vehicles"): per km/mile, by class and fuel, as the fleet. */
+export interface DesnzManagedRow { group: VehicleGroup; vehicle: string; variant: string; unit: 'km' | 'mi'; co2e: number | null; gasCo2e: { CO2?: number; CH4?: number; N2O?: number } }
+
 export interface DesnzParsed {
   vehicles: DesnzVehicleRow[];
+  /** freight per tonne-km, km or mile, and its well-to-tank */
+  freight: DesnzFreightRow[];
+  /** leased vehicles per km or mile (Scope 3 managed assets) */
+  managed: DesnzManagedRow[];
   travel: DesnzTravelRow[];
   /** Scope 3 water supply and treatment, kg CO2e per m³ */
   water: { supply: number | null; treatment: number | null };
@@ -207,6 +234,8 @@ export async function parseDesnz(path: string): Promise<DesnzParsed> {
   const gases = new Map<string, DesnzGasRow>();
   const vehicles = new Map<string, DesnzVehicleRow>();
   const travel = new Map<string, DesnzTravelRow>();
+  const freight = new Map<string, DesnzFreightRow>();
+  const managed = new Map<string, DesnzManagedRow>();
   const water: DesnzParsed['water'] = { supply: null, treatment: null };
   const homeworking: DesnzParsed['homeworking'] = [];
   const air = new Map<string, DesnzAirRow>();
@@ -246,6 +275,32 @@ export async function parseDesnz(path: string): Promise<DesnzParsed> {
       const r = sea.get(key) ?? { kind: l3, basis, co2e: null, gasCo2e: {} };
       if (/of co2/.test(ghg)) r.gasCo2e.CO2 = v ?? undefined; else if (/of ch4/.test(ghg)) r.gasCo2e.CH4 = v ?? undefined; else if (/of n2o/.test(ghg)) r.gasCo2e.N2O = v ?? undefined; else if (ghg.startsWith('kg co2e')) r.co2e = v;
       sea.set(key, r);
+      return;
+    }
+    // Freight (upstream and downstream transport) and its well-to-tank. The WTT per km/mile of trucks and
+    // vans is also read below as a vehicle row (fleet), so only the Scope 3 rows stop here.
+    const fmode = scope === 'Scope 3' && (l1 === 'Freighting goods' || l1 === 'WTT- delivery vehs & freight') ? freightMode(l2) : null;
+    const funit = FREIGHT_UNIT[uom];
+    if (fmode && funit) {
+      const basis = l1 === 'Freighting goods' ? 'scope3' : 'wtt';
+      const l4 = col['Level 4'] ? text(g('Level 4')) : '';
+      const m = /^Average (?:non-)?refrigerated (HGVs|rigids|artics)$/i.exec(l3);
+      const vehicle = (m ? `All ${m[1]}` : l3).trim(), size = l4 === 'None' ? '' : l4.trim(), variant = colText === 'None' ? '' : colText.trim();
+      const key = `${fmode}|${vehicle}|${size}|${variant}|${funit}|${basis}`;
+      const r = freight.get(key) ?? { mode: fmode, vehicle, size, variant, unit: funit, basis, co2e: null, gasCo2e: {} };
+      if (/of co2/.test(ghg)) r.gasCo2e.CO2 = v ?? undefined; else if (/of ch4/.test(ghg)) r.gasCo2e.CH4 = v ?? undefined; else if (/of n2o/.test(ghg)) r.gasCo2e.N2O = v ?? undefined; else if (ghg.startsWith('kg co2e')) r.co2e = v;
+      freight.set(key, r);
+      if (basis === 'scope3' || funit === 'tkm') return;
+    }
+    if (scope === 'Scope 3' && l1 === 'Managed assets- vehicles' && VEH_UNIT[uom]) {
+      const grp = vehicleGroup(l2.replace(/^Managed\s+/i, ''));
+      if (grp) {
+        const variant = colText === 'None' ? '' : colText, unit = VEH_UNIT[uom]!;
+        const key = `${grp}|${l3}|${variant}|${unit}`;
+        const r = managed.get(key) ?? { group: grp, vehicle: l3, variant, unit, co2e: null, gasCo2e: {} };
+        if (/of co2/.test(ghg)) r.gasCo2e.CO2 = v ?? undefined; else if (/of ch4/.test(ghg)) r.gasCo2e.CH4 = v ?? undefined; else if (/of n2o/.test(ghg)) r.gasCo2e.N2O = v ?? undefined; else if (ghg.startsWith('kg co2e')) r.co2e = v;
+        managed.set(key, r);
+      }
       return;
     }
     if (scope === 'Scope 3' && l1 === 'Hotel stay' && /room per night/i.test(uom)) {
@@ -352,6 +407,8 @@ export async function parseDesnz(path: string): Promise<DesnzParsed> {
     fuels: [...fuels.values()].filter((r) => r.co2e != null || Object.keys(r.gasCo2e).length),
     gases: [...gases.values()],
     vehicles: [...vehicles.values()].filter((r) => r.co2e != null),
+    freight: [...freight.values()].filter((r) => r.co2e != null),
+    managed: [...managed.values()].filter((r) => r.co2e != null),
     travel: [...travel.values()].filter((r) => r.co2e != null),
     water, homeworking, hotels,
     air: [...air.values()].filter((r) => r.co2e != null), sea: [...sea.values()].filter((r) => r.co2e != null),

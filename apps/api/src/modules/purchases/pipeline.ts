@@ -602,7 +602,7 @@ export async function publishBatch(c: Tx, tenant: string, batchId: string, user:
   const keyOf = (r: { facility_id: string; ps: string; cat: string; item_id: number; method: string; base_unit: string }) => [r.facility_id, r.ps, r.cat, r.item_id, r.method, r.base_unit].join('|');
   const spendBy = new Map<string, Record<string, number>>();
   for (const r of spendRows) { const k = keyOf(r); const m = spendBy.get(k) ?? {}; m[r.currency] = (m[r.currency] ?? 0) + r.amount; spendBy.set(k, m); }
-  const cats = new Map((await c.query(`SELECT code, id FROM category WHERE calc_method = 'spend' OR code = 'business_travel'`)).rows.map((r) => [r.code, r.id]));
+  const cats = new Map((await c.query(`SELECT code, id FROM category WHERE calc_method = 'spend' OR code IN ('business_travel', 'upstream_transport', 'upstream_leased')`)).rows.map((r) => [r.code, r.id]));
   const fmt = (n: number) => n.toLocaleString('en', { maximumFractionDigits: 2 });
   let entries = 0, lines = 0, co2e = 0;
   for (let i = 0; i < agg.length; i += 1000) {

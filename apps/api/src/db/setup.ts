@@ -14,7 +14,7 @@ import { pool, platformTx } from './pool.js';
 import { config } from '../config.js';
 import { sealFile } from '../lib/secrets.js';
 import { migrate } from './migrate.js';
-import { seed, seedGrid, gridSourceCodes } from './seed.js';
+import { seed, seedBuildings, seedGrid, gridSourceCodes } from './seed.js';
 import { IMPORTER_VERSION } from '../import/desnzWrite.js';
 
 const DEFRA = join(dirname(fileURLToPath(import.meta.url)), '../../../../data/defra');
@@ -75,6 +75,8 @@ export async function autoSetup(log: (m: string) => void) {
     log('[setup] factors loaded');
   }
   await encryptStoredFiles(log);
+  // building energy intensities (warehousing and leased buildings by floor area): every start
+  await platformTx((c) => seedBuildings(c));
   // grid factors of other countries: every start (a second or two); a changed value is superseded, history kept
   if (gridSourceCodes().length) {
     const g = await platformTx((c) => seedGrid(c));
