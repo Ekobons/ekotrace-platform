@@ -23,6 +23,7 @@ import { AppError, notFound } from '../lib/errors.js';
 import { approvalSettings, needsL2, selfAllowed } from './approvals.routes.js';
 import { EVIDENCE_SQL, METRIC_JOIN } from '../lib/collection.js';
 import { notify } from '../lib/notify.js';
+import { APPLIES_SQL, notApplicable } from './facilityCategories.routes.js';
 
 const ymd = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 
@@ -50,12 +51,13 @@ export async function reviewRoutes(app: FastifyInstance) {
           WHERE a.facility_id = $1 AND extract(year FROM a.period_start) = $2 GROUP BY 1, 2 ORDER BY 1, 2`, [q.facilityId, q.year])).rows;
       // Categories the facility reports: anything entered this year or last year.
       const usual = (await c.query(`SELECT DISTINCT cat.code FROM activity a JOIN category cat ON cat.id = a.category_id
-                                     WHERE a.facility_id = $1 AND extract(year FROM a.period_start) IN ($2::int, $2::int - 1)`, [q.facilityId, q.year])).rows.map((r) => r.code as string);
+                                     WHERE a.facility_id = $1 AND extract(year FROM a.period_start) IN ($2::int, $2::int - 1) AND ${APPLIES_SQL}`, [q.facilityId, q.year])).rows.map((r) => r.code as string);
+      const na = [...(await notApplicable(c, q.facilityId))].map(([code, reason]) => ({ code, reason }));
       const mgrIsMe = f.manager_user_id && String(f.manager_user_id) === String(req.user.id);
       return {
         facility: { id: f.id, name: f.name, type: f.facility_type, manager: f.manager },
         approver: f.manager && !mgrIsMe ? f.manager : 'an admin or super admin',
-        canEnter: s.enter.has(q.facilityId), canApprove: s.approve.has(q.facilityId), usual, cells,
+        canEnter: s.enter.has(q.facilityId), canApprove: s.approve.has(q.facilityId), usual, cells, notApplicable: na,
       };
     });
   });

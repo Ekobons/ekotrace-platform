@@ -67,10 +67,25 @@ Everything that **describes** a facility — set up once, changed rarely — is 
 | Tab | What it holds |
 |---|---|
 | Profile | type, location, manager, floor area, employees, ownership and control, **grid region** (the country, state, province or grid sub-region it buys electricity from) |
+| Categories | which Scope 1, 2 and 3 categories apply to the facility — see *Categories that apply* below |
 | Meters | the facility's meters: what each measures, how often readings come, the utility account number; open one to see its months and readings |
 | Energy | the energy set-up at a glance: grid region and its factors, utility accounts that bills are matched to, certificates and contracts usable here |
 | Vehicle fleet | the vehicles based here, with in-service and retired dates |
 | Landfill sites | landfills the company operates here, with their history of waste placed |
+
+### Categories that apply
+
+Each facility starts with **every category ticked**. On its **Categories** tab, untick those that do not apply, for example an office with no company vehicles, no refrigerant equipment and no products sold, and give a reason for each.
+
+| | Ticked (applies) | Unticked (not applicable) |
+|---|---|---|
+| Add data | listed on the left | hidden; the list says how many are hidden, with a link to change it |
+| Missing months | shown when the facility reports the category | never shown; no reminders or escalations |
+| Collection calendar, Data progress, data-quality checks | counted | left out |
+| Entries made before | count | still count; a note in Add data says the category is marked not applicable |
+| Report | — | the reason supports the boundary note |
+
+Super admins, admins and the facility's manager change it; every change is in the audit log with who and when.
 
 What **arrives** month after month is under Add data, in the tab it belongs to: **Bills** (PDF bills, checked, previewed, then published) and **Meter readings** (batches sent by connected meters, previewed before they count). Certificates and supplier factors are kept for the whole company under Setup → Energy & currency data → Energy certificates & suppliers; the Energy tab shows the ones that apply to the facility.
 

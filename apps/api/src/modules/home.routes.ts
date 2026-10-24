@@ -20,6 +20,7 @@ import { scopeOf, subtreeFacilities } from '../lib/access.js';
 import { AppError } from '../lib/errors.js';
 import { SELF_ROLES, approvalSettings, checksFor, selfAllowed } from './approvals.routes.js';
 import { METRIC_JOIN } from '../lib/collection.js';
+import { APPLIES_SQL } from './facilityCategories.routes.js';
 
 export const KPI_IDS = ['tot', 's12', 's3', 'pemp', 'pm2', 'elec', 'ren', 'eui', 'cool', 'water', 'wemp', 'waste', 'div', 'fuel', 'fleet', 'travel', 'purch', 'supsp', 'refr'] as const;
 
@@ -50,7 +51,7 @@ export async function homeRoutes(app: FastifyInstance) {
         `SELECT DISTINCT a.facility_id AS f, CASE WHEN cat.code LIKE 'waste_%' THEN 'waste' WHEN cat.code LIKE 'water_%' THEN 'water' ELSE cat.code END AS cat
            FROM activity a JOIN category cat ON cat.id = a.category_id
           WHERE a.facility_id = ANY($1) AND extract(year FROM a.period_start) IN ($2::int, $2::int - 1) AND a.period_end - a.period_start < 366
-            AND cat.calc_method NOT IN ('spend', 'travel') AND a.purchase_batch_id IS NULL`, [facs, year])).rows;
+            AND cat.calc_method NOT IN ('spend', 'travel') AND a.purchase_batch_id IS NULL AND ${APPLIES_SQL}`, [facs, year])).rows;
       const cells = (await c.query(
         `SELECT a.facility_id AS f, CASE WHEN cat.code LIKE 'waste_%' THEN 'waste' WHEN cat.code LIKE 'water_%' THEN 'water' ELSE cat.code END AS cat,
                 extract(month FROM mo.d)::int AS m,

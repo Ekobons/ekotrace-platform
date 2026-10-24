@@ -433,7 +433,9 @@ export interface KpiConfig { list: string[]; targets: Record<string, Record<stri
 
 // ------------------------------------------------------------- review --
 export interface StatusCell { cat: string; m: number; draft: number; submitted: number; approved: number; rejected: number }
-export interface DataStatus { facility: { id: string; name: string; type: string | null; manager: string | null }; approver: string; canEnter: boolean; canApprove: boolean; usual: string[]; cells: StatusCell[] }
+export interface DataStatus { facility: { id: string; name: string; type: string | null; manager: string | null }; approver: string; canEnter: boolean; canApprove: boolean; usual: string[]; cells: StatusCell[]; notApplicable?: { code: string; reason: string }[] }
+/** A data category and whether it applies to a facility. */
+export interface FacilityCategory { code: string; name: string; scope: number; ghg_category: number | null; applicable: boolean; reason: string; updated_name: string | null; updated_at: string | null; has_data: boolean }
 export interface ReviewEntry {
   id: string; period_start: string; period_end: string; item: string; quantity: number; unit: string; data_type: string; note: string | null; status: 'draft' | 'submitted' | 'approved' | 'rejected';
   kg: number; scope: number; category: string; category_name?: string; ghg_category?: number | null; purchase?: boolean; review_note: string | null; submitted_at: string | null; reviewed_at: string | null; entered_by: string | null; reviewed_by_name: string | null;
@@ -643,6 +645,8 @@ export const api = {
   updateTenant: (b: { gwpSet?: string; country?: string; consolidation?: string; baseYear?: number }) => call<Tenant>('PATCH', '/api/tenant', b),
   boundaries: (year: number) => call<{ year: number; current: string; totals: Record<'operational' | 'financial' | 'equity', number>; facilities: { id: string; name: string; parent_name: string; ownership_pct: number; operational_control: boolean; financial_control: boolean; co2e_direct: number }[] }>('GET', `/api/boundaries?year=${year}`),
   facilities: () => call<{ facilities: Facility[] }>('GET', '/api/facilities'),
+  facilityCategories: (id: string) => call<{ facility: { id: string; name: string }; canEdit: boolean; categories: FacilityCategory[] }>('GET', `/api/facilities/${id}/categories`),
+  saveFacilityCategories: (id: string, categories: { code: string; applicable: boolean; reason?: string }[]) => call<{ ok: boolean; changed: number }>('PUT', `/api/facilities/${id}/categories`, { categories }),
   org: () => call<{ nodes: OrgNode[] }>('GET', '/api/org'),
   createNode: (b: Record<string, unknown>) => call<OrgNode>('POST', '/api/org/nodes', b),
   updateNode: (id: string, b: Record<string, unknown>) => call<OrgNode>('PATCH', `/api/org/nodes/${id}`, b),

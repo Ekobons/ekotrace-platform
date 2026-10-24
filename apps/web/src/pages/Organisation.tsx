@@ -9,7 +9,7 @@ import { CompanyDetails } from '../components/CompanyDetails';
 import { Fragment, useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useApp } from '../App';
-import { api, type Facility, type GridRegion, type OrgNode, type Person } from '../lib/api';
+import { api, type Facility, type FacilityCategory, type GridRegion, type OrgNode, type Person } from '../lib/api';
 import { Icon } from '../components/Icon';
 import { Fleet } from '../components/Fleet';
 import { WasteSites } from '../components/WasteSites';
@@ -238,7 +238,7 @@ function NodeForm({ f, setF, kind, managers, disabled }: { f: F; setF: (f: F) =>
 }
 
 function Profile({ node, initialTab, nodes, managers, onClose, onSaved }: { node: OrgNode; initialTab?: string; nodes: OrgNode[]; managers: Person[]; onClose: () => void; onSaved: (m: string) => void }) {
-  const [tab, setTab] = useState<'profile' | 'meters' | 'energy' | 'fleet' | 'waste'>((['meters', 'energy', 'fleet', 'waste'].includes(initialTab ?? '') ? initialTab : 'profile') as 'profile');
+  const [tab, setTab] = useState<'profile' | 'categories' | 'meters' | 'energy' | 'fleet' | 'waste'>((['categories', 'meters', 'energy', 'fleet', 'waste'].includes(initialTab ?? '') ? initialTab : 'profile') as 'profile');
   const [fleetCount, setFleetCount] = useState<number | null>(null);
   const [meterCount, setMeterCount] = useState<number | null>(null);
   const [facilities, setFacilities] = useState<Facility[]>([]);
@@ -257,12 +257,14 @@ function Profile({ node, initialTab, nodes, managers, onClose, onSaved }: { node
       {node.kind === 'facility' && (
         <div className="tabs">
           <button className={tab === 'profile' ? 'on' : ''} onClick={() => setTab('profile')}>Profile</button>
+          <button className={tab === 'categories' ? 'on' : ''} onClick={() => setTab('categories')}>Categories</button>
           <button className={tab === 'meters' ? 'on' : ''} onClick={() => setTab('meters')}>Meters{meterCount != null ? ` (${meterCount})` : ''}</button>
           <button className={tab === 'energy' ? 'on' : ''} onClick={() => setTab('energy')}>Energy</button>
           <button className={tab === 'fleet' ? 'on' : ''} onClick={() => setTab('fleet')}>Vehicle fleet{fleetCount != null ? ` (${fleetCount})` : ''}</button>
           <button className={tab === 'waste' ? 'on' : ''} onClick={() => setTab('waste')}>Landfill sites</button>
         </div>
       )}
+      {tab === 'categories' && node.kind === 'facility' && <FacilityCategories facilityId={node.id} active={node.active} />}
       {tab === 'meters' && node.kind === 'facility' && <MeterRegister embedded facilityId={node.id} facilities={facilities} canEditFacility={node.canEnter && node.active} onCount={setMeterCount} />}
       {tab === 'energy' && node.kind === 'facility' && <FacilityEnergy node={node} onProfile={() => setTab('profile')} />}
       {tab === 'waste' && node.kind === 'facility' && <WasteSites facilityId={node.id} canEdit={node.canEnter && node.active && canManageFleet} />}
@@ -322,5 +324,57 @@ function GridRegionField({ country, value, onChange }: { country: string; value:
         <option value="">{countryLabel(country) || 'Country'} — national average</option>
         {here.map((r) => <option key={r.code} value={r.code}>{r.name} ({r.code}){r.factors?.some((x) => x.basis === 'scope2') ? '' : ' — no factor yet, national used'}</option>)}
       </select></label>
+  );
+}
+
+/** Which Scope 1, 2 and 3 categories apply to the facility: the others are hidden in Add data and never "Missing". */
+function FacilityCategories({ facilityId, active }: { facilityId: string; active: boolean }) {
+  const { toast } = useApp();
+  const [d, setD] = useState<{ canEdit: boolean; categories: FacilityCategory[] } | null>(null);
+  const [edit, setEdit] = useState<Record<string, { applicable: boolean; reason: string }>>({});
+  const [err, setErr] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const load = () => api.facilityCategories(facilityId).then((r) => { setD(r); setEdit(Object.fromEntries(r.categories.map((c) => [c.code, { applicable: c.applicable, reason: c.reason }]))); }).catch((e) => setErr((e as Error).message));
+  useEffect(() => { void load(); }, [facilityId]); // eslint-disable-line react-hooks/exhaustive-deps
+  if (!d) return <div className="empty">{err ?? 'Loading…'}</div>;
+  const can = d.canEdit && active;
+  const changed = d.categories.filter((c) => edit[c.code] && (edit[c.code]!.applicable !== c.applicable || (!edit[c.code]!.applicable && edit[c.code]!.reason !== c.reason)));
+  const missingReason = changed.some((c) => !edit[c.code]!.applicable && !edit[c.code]!.reason.trim());
+  const set = (code: string, p: Partial<{ applicable: boolean; reason: string }>) => setEdit((x) => ({ ...x, [code]: { ...x[code]!, ...p } }));
+  const save = async () => {
+    setBusy(true); setErr(null);
+    try { const r = await api.saveFacilityCategories(facilityId, changed.map((c) => ({ code: c.code, applicable: edit[c.code]!.applicable, reason: edit[c.code]!.reason }))); toast(`${r.changed} categor${r.changed === 1 ? 'y' : 'ies'} updated`); await load(); }
+    catch (e) { setErr((e as Error).message); } finally { setBusy(false); }
+  };
+  const label = (c: FacilityCategory) => c.name.replace(/\s*\(Scope [\d.]+\)$/, '');
+  const scopes = [1, 2, 3].map((s) => [s, d.categories.filter((c) => c.scope === s)] as const).filter(([, cs]) => cs.length);
+  const off = d.categories.filter((c) => !c.applicable).length;
+  return (
+    <div style={{ display: 'grid', gap: 12 }}>
+      <div className="sub">Untick a category that does not apply to this facility — for example an office with no vehicles or refrigerants. It is then hidden in Add data and never shown as missing; its reason goes in the report&apos;s boundary note. Data entered before stays and counts. {off ? <b>{off} not applicable now.</b> : 'All apply now.'}</div>
+      {!can && <div className="note info">Read-only: super admins, admins and the facility&apos;s manager can change this.</div>}
+      {scopes.map(([s, cs]) => (
+        <fieldset key={s} className="box"><legend>Scope {s}</legend>
+          <div style={{ display: 'grid', gap: 6 }}>{cs.map((c) => {
+            const e = edit[c.code] ?? { applicable: true, reason: '' };
+            return (
+              <div key={c.code} className="row" style={{ gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+                <label className="row" style={{ gap: 8, minWidth: 320, fontWeight: 600 }}>
+                  <input type="checkbox" checked={e.applicable} disabled={!can} onChange={(x) => set(c.code, { applicable: x.target.checked })} />
+                  {label(c)}{c.scope === 3 && c.ghg_category ? <span className="chip c-n">3.{c.ghg_category}</span> : null}
+                </label>
+                {c.has_data && <span className="chip c-info" title="Entries this year or last">has data</span>}
+                {!e.applicable && <input className="input grow" style={{ minWidth: 260 }} disabled={!can} maxLength={300} placeholder="Why it does not apply (e.g. no company vehicles at this site)" value={e.reason} onChange={(x) => set(c.code, { reason: x.target.value })} />}
+                {!c.applicable && c.updated_name && <span className="muted small">by {c.updated_name}, {c.updated_at?.slice(0, 10)}</span>}
+              </div>);
+          })}</div>
+        </fieldset>))}
+      {err && <div className="note bad">{err}</div>}
+      {can && <div className="row" style={{ justifyContent: 'flex-end', gap: 8 }}>
+        {missingReason && <span className="sub bad-text">Give a reason for each category that does not apply.</span>}
+        <button className="btn ghost" disabled={!changed.length || busy} onClick={() => load()}>Undo</button>
+        <button className="btn p" disabled={!changed.length || missingReason || busy} onClick={() => void save()}>Save {changed.length || ''} change{changed.length === 1 ? '' : 's'}</button>
+      </div>}
+    </div>
   );
 }

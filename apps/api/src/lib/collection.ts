@@ -176,6 +176,8 @@ export async function obligations(c: Tx, tenant: string, opts: { years: number[]
        CROSS JOIN LATERAL generate_series(date_trunc('month', a.period_start), date_trunc('month', a.period_end), interval '1 month') AS mo(d)
       WHERE a.facility_id = ANY($1) AND extract(year FROM mo.d) BETWEEN $2 AND $3 AND a.period_end - a.period_start < 366
       GROUP BY 1, 2, 3, 4, 5, 6`, [ids, minY, maxY])).rows as { f: string; cat: string; item: number; y: number; m: number; dim: string | null; draft: number; submitted: number; approved: number; rejected: number; noev: number; sub: Date | null; qty_base: number | null }[];
+  // categories a facility marked not applicable: never owed there
+  const na = new Set((await c.query(`SELECT facility_id || ':' || category_code AS k FROM facility_category WHERE facility_id = ANY($1) AND NOT applicable`, [ids])).rows.map((r) => r.k as string));
   const unitMap = new Map((await c.query(`SELECT code, dimension, to_base::float8 AS to_base FROM unit`)).rows.map((r) => [r.code as string, { dim: r.dimension as string, k: r.to_base as number }]));
   const exc = (await c.query(`SELECT facility_id AS f, metric_id AS m, period::text AS p, reason, by_name, at FROM collection_exception WHERE facility_id = ANY($1)`, [own])).rows;
   const sent = (await c.query(`SELECT key, kind, at FROM reminder_log WHERE key LIKE ANY($1) ORDER BY at`, [own.map((f) => `${f}:%`)])).rows as { key: string; kind: string; at: Date }[];
@@ -192,6 +194,7 @@ export async function obligations(c: Tx, tenant: string, opts: { years: number[]
     for (const f of units) {
       const applies = company || (m.facility_ids.length ? m.facility_ids.includes(f.id) : !m.facility_types.length || (!!f.facility_type && m.facility_types.includes(f.facility_type)));
       if (!applies) continue;
+      if (!company && na.has(`${f.id}:${m.category_code}`)) continue;
       if (!m.required && !reported.some((r) => f.cellIds.has(r.f) && covers(m, r.cat, r.item))) continue;
       const mine = cells.filter((x) => f.cellIds.has(x.f) && covers(m, x.cat, x.item));
       for (const y of opts.years) {

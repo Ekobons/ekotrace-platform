@@ -19,6 +19,7 @@ import { scopeOf, subtreeFacilities } from '../lib/access.js';
 import { AppError } from '../lib/errors.js';
 import { approvalSettings, checksFor } from './approvals.routes.js';
 import { EVIDENCE_SQL, METRIC_JOIN } from '../lib/collection.js';
+import { APPLIES_SQL } from './facilityCategories.routes.js';
 
 const sel = z.object({ year: z.coerce.number().int().min(2000).max(2100), node: z.string().uuid().optional(), group: z.string().uuid().optional(), pend: z.enum(['0', '1']).optional() });
 
@@ -101,7 +102,7 @@ export async function reportsRoutes(app: FastifyInstance) {
                                 CASE WHEN cat.code LIKE 'waste_%' THEN 'Waste' WHEN cat.code LIKE 'water_%' THEN 'Water' ELSE cat.name END AS name
                                FROM activity a JOIN org_node f ON f.id = a.facility_id JOIN category cat ON cat.id = a.category_id
                               WHERE a.facility_id = ANY($1) AND extract(year FROM a.period_start) IN ($2::int, $2::int - 1) AND a.period_end - a.period_start < 366
-                                AND cat.calc_method NOT IN ('spend', 'travel') AND a.purchase_batch_id IS NULL`);
+                                AND cat.calc_method NOT IN ('spend', 'travel') AND a.purchase_batch_id IS NULL AND ${APPLIES_SQL}`);
       const have = new Set((await q2(`SELECT DISTINCT a.facility_id AS fid, CASE WHEN cat.code LIKE 'waste_%' THEN 'waste' WHEN cat.code LIKE 'water_%' THEN 'water' ELSE cat.code END AS cat, extract(month FROM mo.d)::int AS m
                                         FROM activity a JOIN category cat ON cat.id = a.category_id CROSS JOIN LATERAL generate_series(date_trunc('month', a.period_start), date_trunc('month', a.period_end), interval '1 month') AS mo(d)
                                        WHERE a.facility_id = ANY($1) AND extract(year FROM mo.d) = $2 AND a.status <> 'rejected'`)).map((r) => `${r.fid}|${r.cat}|${r.m}`));

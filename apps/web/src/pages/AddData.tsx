@@ -35,6 +35,11 @@ const lastDay = (y: number, m: number) => new Date(Date.UTC(y, m + 1, 0)).getUTC
 const iso = (y: number, m: number, d: number) => `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
 /** The Add data tab a category's entries show under (capital goods come from purchase files only). */
 const groupOf = (code: string) => (code.startsWith('waste_') ? 'waste' : code.startsWith('water_') ? 'water' : code === 'capital_goods' ? 'purchased_goods' : code);
+/** Scroll the category list (not the page) so the open category is visible. */
+const keepInView = (el: HTMLElement | null) => {
+  const p = el?.parentElement; if (!el || !p) return;
+  if (el.offsetTop < p.scrollTop || el.offsetTop + el.offsetHeight > p.scrollTop + p.clientHeight) p.scrollTop = Math.max(0, el.offsetTop - p.clientHeight / 3);
+};
 const ICON: Record<string, string> = {
   stationary_combustion: 'flame', mobile_combustion: 'truck', purchased_electricity: 'bolt', fugitive: 'snow', waste: 'bin', water: 'drop',
   purchased_goods: 'cart', employee_commuting: 'bus', business_travel: 'plane',
@@ -167,7 +172,12 @@ export function AddData() {
     if (dr) return { label: 'Draft · not submitted', cls: 'muted', k: 'review' };
     return { label: 'Approved', cls: 'ok', k: 'approved' };
   };
-  const tabs = cats.filter((c) => c.code !== 'waste_generated' && c.code !== 'water_discharge' && (c.calc_method !== 'spend' || c.code === 'purchased_goods'));
+  // categories the facility marked not applicable are hidden (a group — waste, water — when all of its categories are)
+  const na = new Map((status?.notApplicable ?? []).map((x) => [x.code, x.reason]));
+  const groupOff = (g: string) => { const cs = cats.filter((c) => groupOf(c.code) === g); return cs.length > 0 && cs.every((c) => na.has(c.code)); };
+  const allTabs = cats.filter((c) => c.code !== 'waste_generated' && c.code !== 'water_discharge' && (c.calc_method !== 'spend' || c.code === 'purchased_goods'));
+  const tabs = allTabs.filter((c) => !groupOff(groupOf(c.code)) || groupOf(c.code) === group);
+  const hidden = allTabs.length - tabs.length;
   const expected = tabs.filter((c) => (status?.usual ?? []).some((u) => groupOf(u) === groupOf(c.code)));
   const summary = expected.map((c) => catState(groupOf(c.code)).k);
   const counts = useMemo(() => {
@@ -242,17 +252,20 @@ export function AddData() {
       <div className="entrylayout">
       <nav className="card catrail" aria-label="Data categories">
         <div className="lbl" style={{ padding: '6px 10px 8px' }}>Data categories · {yearly || whole ? year : picked.length ? picked.map((m) => MONTHS[m]).join(', ') : 'pick months'}</div>
+        <div className="catlist">
         {tabs.map((c) => {
           const g = groupOf(c.code), st = catState(g), on = g === group;
           return (
-            <button key={c.code} className={`catbtn${on ? ' on' : ''}`} aria-current={on ? 'page' : undefined}
+            <button key={c.code} className={`catbtn${on ? ' on' : ''}`} aria-current={on ? 'page' : undefined} ref={on ? keepInView : undefined}
               onClick={() => navigate(`/data/${c.code}${sp.get('stage') ? `?stage=${sp.get('stage')}` : ''}`)}>
               <span className="ic"><Icon name={ICON[g] ?? 'list'} /></span>
               <span className="grow" style={{ minWidth: 0 }}><b>{catName(c)}</b><small className={st.cls}>{st.label}</small></span>
               <span className="chip c-n">S{g === 'waste' ? '1/3' : c.scope}</span>
             </button>);
         })}
-        <div className="muted small" style={{ padding: '10px 10px 4px', lineHeight: 1.5 }}>Missing = a past month with nothing, for a category this facility reports.</div>
+        </div>
+        <div className="muted small catfoot">Missing = a past month with nothing, for a category this facility reports.
+          {hidden > 0 && <> {hidden} not applicable here — <Link to={`/organisation?open=${facilityId}&tab=categories`}>change</Link>.</>}</div>
       </nav>
       <section className="card flush entrycard">
         <div className="entryhead">
@@ -268,6 +281,7 @@ export function AddData() {
           </div>
         </div>
         <div className="entrybody">
+          {groupOff(group) && <div className="note warn">Marked <b>not applicable</b> for this facility{na.get(cat.code) ? `: ${na.get(cat.code)}` : ''}. You can still enter data; to show it again, tick it on the facility's <Link to={`/organisation?open=${facilityId}&tab=categories`}>Categories</Link> tab.</div>}
           {stage === 'review' ? <ReviewStage facilityId={facilityId} group={group} range={reviewRange} approver={status?.approver ?? ''} onChange={refresh} toast={toast} />
             : stage === 'approved' ? <ApprovedStage facilityId={facilityId} group={group} range={reviewRange} onChange={refresh} toast={toast} />
             : <>

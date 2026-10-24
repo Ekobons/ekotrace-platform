@@ -2108,6 +2108,43 @@ test('sold products (3.10, 3.11, 3.12): processing energy, lifetime electricity 
   assert.equal(row.code, 'use_sold'); assert.equal(row.ghg_category, 11); assert.ok(Math.abs(row.s3 - r32.totals.scope3) < 1e-6); assert.equal(row.d, 0);
 });
 
+test('categories per facility: not applicable is hidden from the expected list, needs a reason, only managers and admins change it, data stays', async () => {
+  const sa = await login(superA.email, superA.temporaryPassword);
+  const group = (await call(sa, 'GET', '/api/org')).body.nodes.find((n: { kind: string }) => n.kind === 'group').id;
+  const fac = (await call(sa, 'POST', '/api/org/nodes', { parentId: group, kind: 'facility', name: 'Category office', facilityType: 'Office' })).body.id as string;
+  const mk = async (email: string, role: string, extra: object = {}) => {
+    const r = await call(sa, 'POST', '/api/users', { name: email, email, role, ...extra });
+    const ck = await login(email, r.body.temporaryPassword);
+    await call(ck, 'POST', '/api/auth/password', { current: r.body.temporaryPassword, next: 'a long enough pass' });
+    return ck;
+  };
+  const prep = await mk('fcprep@a.test', 'preparer', { facilityIds: [fac] });
+  const mgr = await mk('fcmgr@a.test', 'manager', { facilityIds: [fac] });
+  await call(sa, 'POST', '/api/activities', { facilityId: fac, itemId: await diesel(), quantity: 10, unit: 'L', periodStart: '2025-03-01', periodEnd: '2025-03-31' });
+  // all apply by default; the diesel shows as data
+  const g0 = await call(prep, 'GET', `/api/facilities/${fac}/categories`); assert.equal(g0.status, 200, JSON.stringify(g0.body));
+  let l = g0.body;
+  assert.equal(l.canEdit, false);
+  assert.ok(l.categories.every((c: { applicable: boolean }) => c.applicable));
+  assert.equal(l.categories.find((c: { code: string }) => c.code === 'stationary_combustion').has_data, true);
+  // a preparer cannot change it; a reason is required
+  assert.equal((await call(prep, 'PUT', `/api/facilities/${fac}/categories`, { categories: [{ code: 'mobile_combustion', applicable: false, reason: 'x' }] })).status, 403);
+  assert.equal((await call(mgr, 'PUT', `/api/facilities/${fac}/categories`, { categories: [{ code: 'mobile_combustion', applicable: false }] })).status, 400);
+  const ok = await call(mgr, 'PUT', `/api/facilities/${fac}/categories`, { categories: [{ code: 'mobile_combustion', applicable: false, reason: 'No company vehicles' }, { code: 'stationary_combustion', applicable: false, reason: 'Generator removed' }] });
+  assert.equal(ok.status, 200, JSON.stringify(ok.body)); assert.equal(ok.body.changed, 2);
+  // the status lists them; stationary combustion is no longer expected (never "Missing"), but its entry stays
+  const st = (await call(prep, 'GET', `/api/data/status?facilityId=${fac}&year=2025`)).body;
+  assert.deepEqual(st.notApplicable.map((x: { code: string }) => x.code).sort(), ['mobile_combustion', 'stationary_combustion']);
+  assert.deepEqual(st.usual, []);
+  assert.equal(st.cells.length, 1);
+  l = (await call(sa, 'GET', `/api/facilities/${fac}/categories`)).body;
+  const sc = l.categories.find((c: { code: string }) => c.code === 'stationary_combustion');
+  assert.equal(sc.applicable, false); assert.equal(sc.reason, 'Generator removed'); assert.equal(sc.updated_name, 'fcmgr@a.test');
+  // back on: expected again
+  await call(sa, 'PUT', `/api/facilities/${fac}/categories`, { categories: [{ code: 'stationary_combustion', applicable: true }] });
+  assert.deepEqual((await call(prep, 'GET', `/api/data/status?facilityId=${fac}&year=2025`)).body.usual, ['stationary_combustion']);
+});
+
 // --------------------------------------------------------- vault & messages --
 test('document vault: upload with details, evidence on entries, other screens\' files listed, access by facility, versions, archive rules, locked months keep evidence', async () => {
   const sa = await login(superA.email, superA.temporaryPassword);

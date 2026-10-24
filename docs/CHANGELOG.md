@@ -2,6 +2,13 @@
 
 Newest first.
 
+## 2026-10-24 · Categories per facility; scrolling category list in Add data
+
+- Migration 057: `facility_category` (facility × category code: applicable, reason, who / when; RLS). No row = applies.
+- `GET/PUT /api/facilities/:id/categories` (super admin, admin, the facility's manager; a reason is required to switch one off; audit `facility.categories`). `/api/data/status` returns `notApplicable`; not-applicable categories are left out of “usual” / Missing in Add data, Home / Data progress, the data-quality checks (reports) and the collection calendar (`APPLIES_SQL`).
+- Facility profile: new **Categories** tab (Scope 1 / 2 / 3, tick, reason, has-data chip). Add data: hidden categories (a group when all its categories are off; the open one stays), a count with a link, a note when a not-applicable category is opened. The category list scrolls on its own with a visible bar and keeps the open category in view; the footer note stays.
+- Manual: getting started (facility tabs, *Categories that apply*), entering data. Test: defaults, permissions, reason, status / usual, data kept, switching back on.
+
 ## 2026-10-24 · 3.10 average data: typical processing energy per tonne
 
 - `data/processing/process-energy.csv` (26 processes: plastics, steel, aluminium, corrugated, food, textiles, glass, cement, asphalt, tyres) — electricity and heat kWh per tonne, each with its source, URL and note (US DOE bandwidth studies, LBNL world best practice, EU BAT conclusions, FEFCO, UNEP, JRC, WBCSD-CSI/ECRA, NAPA, PBL/TNO, peer-reviewed papers). `seedProcessing` writes `p10_average:*` items every start; a process removed from the file is switched off.

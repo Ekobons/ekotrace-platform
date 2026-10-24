@@ -7,7 +7,7 @@
 ```flow
 > Facility and year | at the top: the facility (with its type and manager) and how its categories stand for the months picked — approved, in review, missing
 > Months | the twelve months with their status for the category open (Approved, In review, Draft, Sent back, Missing, Open, Future). Pick one or several; they are entered side by side
-> Category | the list on the left of the entry, each with its status for the months picked and its scope; sub-groups (vehicle group, fuel class, energy bought) are dropdowns in the form
+> Category | the list on the left of the entry — it scrolls on its own and keeps the open category in view — each with its status for the months picked and its scope; categories the facility marked not applicable are hidden (facility → Categories); sub-groups (vehicle group, fuel class, energy bought) are dropdowns in the form
 > Enter → Review → Approved | the three steps of the category, with how many entries wait and how many are approved
 ```
 
