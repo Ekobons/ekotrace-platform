@@ -4,6 +4,7 @@
  * book, holdings added by hand, a layer chosen with a reason, lock / unlock, export.
  */
 import { useEffect, useMemo, useState } from 'react';
+import { productName } from '../../lib/brand';
 import { Link } from 'react-router-dom';
 import { useApp } from '../../App';
 import { fin, fullAmount, money, parseAmount, pct, SCORE_SHORT, tco2, type AssetClass, type Counterparty, type FinLine, type FinMeta, type FinPeriodData, type FinPortfolio, type ImportResult, type Score } from '../../lib/ekofin';
@@ -30,7 +31,7 @@ export function FinPortfolios() {
   return (
     <div className="page">
       <div className="row tahead" style={{ flexWrap: 'wrap', alignItems: 'flex-end' }}>
-        <div className="grow"><span className="lbl">EKOFIN</span><h1>Portfolios & holdings</h1>
+        <div className="grow"><span className="lbl">{productName('ekofin')}</span><h1>Portfolios & holdings</h1>
           <div className="muted">Each portfolio has reporting dates; the holdings at a date are the outstanding amounts on that day. Upload the loan book or positions file, or add holdings one by one.</div></div>
         {P && <PeriodPicker portfolios={pc.portfolios} portfolio={P} period={D} choose={pc.choose} />}
         {meta.canManage && <button className="btn" onClick={() => setDrawer('portfolio-new')}>+ Portfolio</button>}
@@ -111,7 +112,7 @@ function PortfolioDrawer({ meta, p, onClose, onDone }: { meta: FinMeta; p: FinPo
     } catch (e) { toast((e as Error).message); }
   };
   return (
-    <Drawer eyebrow="EKOFIN" title={p ? 'Portfolio settings' : 'New portfolio'} onClose={onClose} foot={(close) => <>
+    <Drawer eyebrow={productName('ekofin')} title={p ? 'Portfolio settings' : 'New portfolio'} onClose={onClose} foot={(close) => <>
       {p && meta.canManage && <button className="btn ghost danger" onClick={() => confirm(`Delete ${p.name} with all its reporting dates and holdings?`) && fin.deletePortfolio(p.id).then(() => { toast('Deleted'); close(); onDone(); }).catch((e) => toast((e as Error).message))}>Delete</button>}
       <span className="grow" /><button className="btn" onClick={close}>Cancel</button><button className="btn p" disabled={f.name.trim().length < 2 || !/^[A-Za-z]{3}$/.test(f.currency)} onClick={() => save(close)}>{p ? 'Save' : 'Create'}</button></>}>
       <div className="vform">
@@ -166,7 +167,7 @@ function ImportDrawer({ periodId, has, onClose, onDone }: { periodId: string; ha
     catch (e) { toast((e as Error).message); } finally { setBusy(false); }
   };
   return (
-    <Drawer eyebrow="EKOFIN" title="Upload holdings" wide onClose={onClose} foot={(close) => <><button className="btn" onClick={() => fin.template()}>Download the template</button><span className="grow" /><button className="btn" onClick={close}>Cancel</button>
+    <Drawer eyebrow={productName('ekofin')} title="Upload holdings" wide onClose={onClose} foot={(close) => <><button className="btn" onClick={() => fin.template()}>Download the template</button><span className="grow" /><button className="btn" onClick={close}>Cancel</button>
       <button className="btn p" disabled={busy || !r || r.totals.error > 0 || !r.totals.rows} onClick={() => commit(close)}>{busy ? 'Working…' : `Save ${r?.totals.rows ?? ''} holdings`}</button></>}>
       <div className="muted small">Excel (.xlsx) or CSV from your loan or positions system. Columns are found by their headings: counterparty name and outstanding amount are needed; LEI, ISIN, customer ID, country, sector code, asset class, currency, and the company's financials and reported emissions are used when present.</div>
       <div className="row">
@@ -205,7 +206,7 @@ function HoldingDrawer({ meta, periodId, cur, line, editable, onClose, onDone }:
   };
   const R = line?.result;
   return (
-    <Drawer eyebrow={line ? ASSET_SHORT[line.assetClass] : 'EKOFIN'} title={line ? line.name : 'Add a holding'} wide onClose={onClose} foot={(close) => <>
+    <Drawer eyebrow={line ? ASSET_SHORT[line.assetClass] : productName('ekofin')} title={line ? line.name : 'Add a holding'} wide onClose={onClose} foot={(close) => <>
       {line && editable && <button className="btn ghost danger" onClick={() => confirm('Remove this holding?') && fin.deleteHolding(line.id).then(() => { toast('Removed'); close(); onDone(); }).catch((e) => toast((e as Error).message))}>Remove</button>}
       {line && <Link className="btn" to={`/fin/counterparties/${line.counterpartyId}`}>Counterparty profile</Link>}
       <span className="grow" /><button className="btn" onClick={close}>Close</button>{editable && <button className="btn p" disabled={!valid} onClick={() => save(close)}>{line ? 'Save' : 'Add holding'}</button>}</>}>

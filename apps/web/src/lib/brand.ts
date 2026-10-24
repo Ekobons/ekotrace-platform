@@ -14,3 +14,6 @@ export async function loadBrand(): Promise<void> {
     document.title = BRAND.name;
   } catch { /* keep the default */ }
 }
+
+/** The two products' names: EKOTRACE / EKOFIN under the Ekotrace brand; elsewhere the brand's name and "Financed emissions" (a module). */
+export const productName = (p: 'ekotrace' | 'ekofin') => (BRAND.name.toLowerCase() === 'ekotrace' ? (p === 'ekofin' ? 'EKOFIN' : 'EKOTRACE') : p === 'ekofin' ? 'Financed emissions' : BRAND.name);

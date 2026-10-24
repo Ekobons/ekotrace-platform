@@ -4,6 +4,7 @@
  * with their PCAF score, the sector factors that apply, and where the company is held.
  */
 import { useEffect, useState } from 'react';
+import { productName } from '../../lib/brand';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useApp } from '../../App';
 import { CountrySelect } from '../../components/CountrySelect';
@@ -22,7 +23,7 @@ export function FinCounterparties() {
   return (
     <div className="page">
       <div className="row tahead" style={{ alignItems: 'flex-end' }}>
-        <div className="grow"><span className="lbl">EKOFIN</span><h1>Counterparties</h1>
+        <div className="grow"><span className="lbl">{productName('ekofin')}</span><h1>Counterparties</h1>
           <div className="muted">Every company lent to or invested in, once, whatever the portfolio. Its financials and reported emissions are used by every holding in it.</div></div>
         {meta?.canEdit && <button className="btn p" onClick={() => setAdding(true)}>+ Counterparty</button>}
       </div>

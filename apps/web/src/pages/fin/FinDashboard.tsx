@@ -4,6 +4,7 @@
  * emissions sit (asset class, sector, top counterparties) and which counterparties to ask for data first.
  */
 import { useEffect, useState } from 'react';
+import { productName } from '../../lib/brand';
 import { Link, useNavigate } from 'react-router-dom';
 import { BarList } from '../../components/Charts';
 import { fin, money, pct, SCORE_C, SCORE_SHORT, tco2, type FinPeriodData, type Score } from '../../lib/ekofin';
@@ -23,7 +24,7 @@ export function FinDashboard() {
   if (!pc.portfolios) return <div className="page"><div className="card empty">Loading…</div></div>;
   if (!pc.portfolios.length || !pc.portfolio) return (
     <div className="page">
-      <div><span className="lbl">EKOFIN</span><h1>Financed emissions</h1></div>
+      <div><span className="lbl">{productName('ekofin')}</span><h1>Financed emissions</h1></div>
       <div className="card empty"><h2>No portfolio yet</h2>
         <p className="sub">Create a portfolio (a loan book, a fund or a mandate), add a reporting date and upload the holdings. Financed emissions are calculated straight away.</p>
         <p><Link className="btn p" to="/fin/portfolios">Go to portfolios</Link></p></div>
@@ -38,7 +39,7 @@ export function FinDashboard() {
   return (
     <div className="page">
       <div className="row tahead" style={{ flexWrap: 'wrap', alignItems: 'flex-end' }}>
-        <div className="grow"><span className="lbl">EKOFIN · {pc.portfolio.name}</span><h1>Financed emissions</h1>
+        <div className="grow"><span className="lbl">{productName('ekofin')} · {pc.portfolio.name}</span><h1>Financed emissions</h1>
           <div className="muted">PCAF Global GHG Accounting and Reporting Standard, Part A. Scope 1 and 2 of the companies financed, attributed by outstanding amount; Scope 3 shown separately.</div></div>
         <PeriodPicker portfolios={pc.portfolios} portfolio={pc.portfolio} period={pc.period} choose={pc.choose} />
       </div>

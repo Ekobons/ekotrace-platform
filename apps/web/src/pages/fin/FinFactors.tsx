@@ -3,6 +3,7 @@
  * by sector code, region and year. Shared by every company; loaded and removed by Ekobon staff.
  */
 import { useEffect, useState } from 'react';
+import { productName } from '../../lib/brand';
 import { useApp } from '../../App';
 import { fin, tco2, type FactorRow, type FinLibrary } from '../../lib/ekofin';
 import { dateLabel, Drawer } from './common';
@@ -20,7 +21,7 @@ export function FinFactors() {
   return (
     <div className="page">
       <div className="row tahead" style={{ alignItems: 'flex-end' }}>
-        <div className="grow"><span className="lbl">EKOFIN · setup</span><h1>Sector factor library</h1>
+        <div className="grow"><span className="lbl">{productName('ekofin')} · setup</span><h1>Sector factor library</h1>
           <div className="muted">Estimates for companies without reported emissions: tCO₂e per million of revenue (PCAF score 4) or of total assets (score 5). A shorter sector code covers every longer one that starts with it. Each portfolio chooses its library in its settings.</div></div>
         {d.canEdit && <><button className="btn" onClick={() => fin.factorTemplate().catch((e) => toast((e as Error).message))}>Template</button><button className="btn p" onClick={() => setLoading(true)}>Load factors</button></>}
       </div>

@@ -11,7 +11,7 @@ import { useApp } from '../App';
 import { api, setTenant, type Company, type DestructionCertificate, type PlanLimits } from '../lib/api';
 import { AlertList, PlatformAudit } from './AuditLog';
 import { Icon } from '../components/Icon';
-import { BRAND, productSlug } from '../lib/brand';
+import { BRAND, productName, productSlug } from '../lib/brand';
 
 const lim = (n: number | null) => (n == null ? 'unlimited' : String(n));
 export const planLine = (p: PlanLimits) => `${lim(p.facilities)} facilities · ${lim(p.users)} people · Eko AI ${p.ai ? 'on' : 'off'} · export ${p.export ? 'on' : 'off'} · dashboard groups ${p.groups ? 'on' : 'off'}`;
@@ -86,7 +86,7 @@ export function Console() {
   );
 }
 
-const PRODUCT_LABEL: Record<'ekotrace' | 'ekofin', string> = { ekotrace: 'EKOTRACE', ekofin: 'EKOFIN' };
+const PRODUCT_LABEL: Record<'ekotrace' | 'ekofin', string> = { get ekotrace() { return productName('ekotrace'); }, get ekofin() { return productName('ekofin'); } };
 type Prod = 'ekotrace' | 'ekofin';
 /** Which products the company has: EKOTRACE (own GHG inventory), EKOFIN (financed emissions), or both. */
 function ProductBoxes({ value, onChange }: { value: Prod[]; onChange: (v: Prod[]) => void }) {
@@ -95,7 +95,7 @@ function ProductBoxes({ value, onChange }: { value: Prod[]; onChange: (v: Prod[]
     <div className="field"><span>Products</span>
       <div className="row" style={{ gap: 18 }}>
         <label className="row chkline" style={{ gap: 6 }}><input type="checkbox" checked={value.includes('ekotrace')} onChange={() => flip('ekotrace')} />EKOTRACE · own GHG inventory</label>
-        <label className="row chkline" style={{ gap: 6 }}><input type="checkbox" checked={value.includes('ekofin')} onChange={() => flip('ekofin')} />EKOFIN · financed emissions (banks, investors)</label>
+        <label className="row chkline" style={{ gap: 6 }}><input type="checkbox" checked={value.includes('ekofin')} onChange={() => flip('ekofin')} />{productName('ekofin') === 'EKOFIN' ? 'EKOFIN · financed emissions' : 'Financed emissions'} (banks, investors)</label>
       </div>
       {!value.length && <small className="bad">Choose at least one</small>}
     </div>);

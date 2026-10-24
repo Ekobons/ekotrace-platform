@@ -2,6 +2,10 @@
 
 Newest first.
 
+## 2026-10-24 · Product names follow the brand
+
+- `productName()` in `lib/brand.ts`: EKOTRACE / EKOFIN under the Ekotrace brand; under other brands (Carbontek) the brand's name and “Financed emissions”, shown as a module. Used by the product switch, the EKOFIN screens' labels, the platform console and the “not switched on” page.
+
 ## 2026-10-24 · Categories per facility; scrolling category list in Add data
 
 - Migration 057: `facility_category` (facility × category code: applicable, reason, who / when; RLS). No row = applies.

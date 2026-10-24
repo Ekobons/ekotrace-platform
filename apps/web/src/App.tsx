@@ -51,7 +51,7 @@ import { SupplierPortal } from './pages/SupplierPortal';
 import { CollectionCalendar } from './pages/CollectionCalendar';
 import { Inbox } from './pages/Inbox';
 import { BrandMark } from './components/BrandMark';
-import { BRAND } from './lib/brand';
+import { BRAND, productName } from './lib/brand';
 import { FinDashboard } from './pages/fin/FinDashboard';
 import { FinPortfolios } from './pages/fin/FinPortfolios';
 import { FinCounterparties, FinCounterpartyProfile } from './pages/fin/FinCounterparties';
@@ -90,7 +90,7 @@ const FIN_NAV: { group?: string; items: NavItem[] }[] = [
   { group: 'Help', items: [{ to: '/help', label: 'User manual', icon: 'book' }] },
 ];
 type Product = 'ekotrace' | 'ekofin';
-const PRODUCT_NAME: Record<Product, string> = { ekotrace: 'EKOTRACE', ekofin: 'EKOFIN' };
+const PRODUCT_NAME: Record<Product, string> = new Proxy({} as Record<Product, string>, { get: (_t, p) => productName(p as Product) });
 const EKO_NAV: { group?: string; items: NavItem[] }[] = [
   { items: [
     { to: '/home', label: 'Home', icon: 'home' },
@@ -245,7 +245,7 @@ function Shell() {
         {tenant && !mini && <div className="navtools"><button type="button" onClick={foldAll} title={allClosed ? 'Expand all sections' : 'Collapse all sections'}>{allClosed ? '▸▸ Expand all' : '▾▾ Collapse all'}</button></div>}
         <nav className="nav">
           {role === 'platform_admin' && <NavLink to="/console" title={mini ? 'Platform console' : undefined}><Icon name="gear" /><span className="nl">Platform console</span>{!tenant && alertN > 0 && <span className="navb red" title="Platform security alerts">{alertN}</span>}</NavLink>}
-          {role === 'platform_admin' && !tenant && <NavLink to="/fin/factors" title={mini ? 'EKOFIN sector factors' : undefined}><Icon name="book" /><span className="nl">EKOFIN sector factors</span></NavLink>}
+          {role === 'platform_admin' && !tenant && <NavLink to="/fin/factors" title={mini ? `${productName('ekofin')} sector factors` : undefined}><Icon name="book" /><span className="nl">{productName('ekofin')} sector factors</span></NavLink>}
           {role === 'platform_admin' && <NavLink to="/messages" title={mini ? 'Messages' : undefined}><Icon name="chat" /><span className="nl">Messages</span>{msgN > 0 && <span className="navb amber">{msgN}</span>}</NavLink>}
           {tenant && NAV.map((g, gi) => {
             const items = g.items.filter(visible);
@@ -347,7 +347,7 @@ function NeedFin({ children }: { children: ReactNode }) {
   const { tenant } = useApp();
   if (!tenant) return <NeedCo>{children}</NeedCo>;
   if (tenant.products?.includes('ekofin')) return <>{children}</>;
-  return <div className="page"><div className="card empty"><h2>EKOFIN is not switched on</h2><p className="sub">Financed emissions for banks and investors is a separate product. Contact the Ekobon team to add it to this company.</p></div></div>;
+  return <div className="page"><div className="card empty"><h2>{productName('ekofin')} is not switched on</h2><p className="sub">Financed emissions for banks and investors is a separate product. Contact the Ekobon team to add it to this company.</p></div></div>;
 }
 function Gate({ ok, children }: { ok: boolean; children: ReactNode }) {
   return ok ? <>{children}</> : <div className="page"><div className="card empty">You do not have access to this page.</div></div>;
