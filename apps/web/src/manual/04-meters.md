@@ -4,6 +4,10 @@ A meter brings readings from another system — a building management system (BM
 
 ## From readings to monthly entries
 
+```video data-entry-meters
+Meter readings | 0:48
+```
+
 ```flow
 > Readings arrive | through the API (hourly, daily, weekly, monthly or irregular), pasted on the meter's page, or from a booked bill
 ! Each reading checked | known meter of this company, valid time, not in the future, no negative consumption — refused readings are listed with the reason

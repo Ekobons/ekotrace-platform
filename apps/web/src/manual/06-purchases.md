@@ -14,6 +14,10 @@ All three go through the same steps; an upload or API batch is reviewed before p
 
 ## From a file to entries
 
+```video data-entry-purchases
+Upload a purchase file | 0:57
+```
+
 ```flow
 * Upload the file | Add data → Purchases → Upload Excel / CSV — any column names, title rows above the header are fine
 * Say which column is which | best guess shown (including vendor number, supplier country and account); the layout is remembered for the next file with the same columns

@@ -2,6 +2,12 @@
 
 Newest first.
 
+## 2026-10-24 · Help videos for data entry
+
+- `tools/help-videos/`: Playwright recorder (`lib.mjs` `film()` + helpers: captions, visible cursor, title cards, an Excel overlay, paste, API setup step, PDFs shown as images in headless Chromium, en-GB locale) → H.264 MP4 + VP9 WebM + JPG poster in `apps/web/public/help/` (served with the app, `video/mp4`, same-origin under the CSP). `record.mjs [name…]`, `make-files.mjs` (specimen files: fictional utility *Harbourline Power & Water*, fictional suppliers, all marked DEMO), README.
+- Nine videos (0:39–1:07, ~1–2 MB per format): months side by side, paste a column from Excel, upload bills, meter readings, the vehicle fleet grid, vehicle rows pasted in everyday words, a purchase file, smart import, submit → approve / send back.
+- Manual: ```` ```video <name> ```` block (`Video` in ManualBlocks: poster + play button, plays in place, MP4 then WebM, hidden in print); placed in Entering data, Approvals, Meters, Bills, Purchases and Smart import.
+
 ## 2026-10-24 · Scope 3.4, 3.9, 3.8 and 3.13 with activity data
 
 - Migration 054: units `tkm`, `m2_day`/`m2_month`/`m2_year` (area_time), `kgco2e`/`tco2e` (emissions); calc method `asset`; `upstream_transport` → *Upstream transport & distribution (Scope 3.4)* and `upstream_leased` → *Upstream leased assets (Scope 3.8)* switched to `asset`; new `downstream_transport` (3.9) and `downstream_leased` (3.13). Subcategories per category: road freight, sea/air/rail freight, warehousing by floor area, warehousing energy used, reported (3.4/3.9); buildings energy used, buildings by floor area, reported, vehicles by distance, vehicles by fuel (3.8/3.13). Energy-used items carry `attrs.via` (grid or DESNZ fuel); reported items `attrs.reported`.

@@ -1473,3 +1473,13 @@ ul.plain { list-style: none; margin: 0; padding: 0; }
 /* holdings: denser rows for long loan books */
 .ftable td { padding: 7px 12px; }
 .ftable td.ctr, .ftable th.ctr { text-align: center; }
+
+/* help videos in the manual */
+.mvideo { margin: 14px 0 18px; max-width: 640px; }
+.mvideo video, .mvideo-poster { display: block; width: 100%; aspect-ratio: 1280 / 760; border-radius: 12px; border: 1px solid var(--line, #dfe5e2); background: #0b2a25; overflow: hidden; }
+.mvideo-poster { position: relative; padding: 0; cursor: pointer; }
+.mvideo-poster img { width: 100%; height: 100%; object-fit: cover; display: block; opacity: .9; transition: opacity .2s; }
+.mvideo-poster:hover img, .mvideo-poster:focus-visible img { opacity: 1; }
+.mvideo-play { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 68px; height: 68px; border-radius: 50%; background: rgba(14, 124, 102, .92); color: #fff; font-size: 26px; display: grid; place-items: center; padding-left: 5px; box-shadow: 0 6px 22px rgba(0, 0, 0, .3); }
+.mvideo figcaption { margin-top: 6px; font-size: 13.5px; }
+@media print { .mvideo { display: none; } }

@@ -13,6 +13,10 @@ Capture → **Smart import** takes a spreadsheet of emissions data in the compan
 
 ## What it reads
 
+```video data-entry-smart-import
+Smart import | 0:55
+```
+
 Fuels (stationary and vehicles), electricity, heat and cooling, refrigerants, water and waste sent out. Business travel, employee commuting and purchases have their own screens (Add data → Business travel and Employee commuting; Purchases for finance exports).
 
 Layouts it handles:

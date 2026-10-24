@@ -6,7 +6,7 @@
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { marked } from 'marked';
-import { Diagram, Flow, Layers } from '../components/ManualBlocks';
+import { Diagram, Flow, Layers, Video } from '../components/ManualBlocks';
 import { Icon } from '../components/Icon';
 import { BRAND, productSlug } from '../lib/brand';
 
@@ -27,12 +27,12 @@ const CH = (): Chapter[] => (chapters ??= Object.entries(files).sort(([a], [b]) 
 /** Markdown with ```flow / ```layers / ```diagram blocks turned into pictures. */
 function Rendered({ src }: { src: string }) {
   const parts = useMemo(() => {
-    const out: { kind: 'md' | 'flow' | 'layers' | 'diagram'; body: string }[] = [];
-    const re = /```(flow|layers|diagram)([^\n]*)\n([\s\S]*?)```/g;
+    const out: { kind: 'md' | 'flow' | 'layers' | 'diagram' | 'video'; body: string; arg?: string }[] = [];
+    const re = /```(flow|layers|diagram|video)([^\n]*)\n([\s\S]*?)```/g;
     let last = 0, m: RegExpExecArray | null;
     while ((m = re.exec(src))) {
       out.push({ kind: 'md', body: src.slice(last, m.index) });
-      out.push({ kind: m[1] as 'flow', body: m[1] === 'diagram' ? m[2]!.trim() : m[3]! });
+      out.push({ kind: m[1] as 'flow', body: m[1] === 'diagram' ? m[2]!.trim() : m[3]!, arg: m[2]!.trim() });
       last = m.index + m[0].length;
     }
     out.push({ kind: 'md', body: src.slice(last) });
@@ -44,6 +44,7 @@ function Rendered({ src }: { src: string }) {
       {p.kind === 'flow' && <Flow src={p.body} />}
       {p.kind === 'layers' && <Layers src={p.body} />}
       {p.kind === 'diagram' && <Diagram name={p.body} />}
+      {p.kind === 'video' && <Video name={p.arg!} src={p.body} />}
     </Fragment>
   ))}</>;
 }

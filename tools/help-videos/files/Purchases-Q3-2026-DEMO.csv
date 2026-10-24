@@ -1,0 +1,29 @@
+Invoice date,Supplier,Description,Category,GL account,Amount,Currency,Facility
+03/07/2026,Gulfcrest Packaging LLC,Corrugated cartons 5-ply 600x400,Packaging materials,510300 Materials,84500,AED,Al Qusais Packaging Plant
+06/07/2026,Polymera Trading FZE,PET resin granules 25 kg bags,Raw materials - polymers,510100 Raw materials,162000,AED,Al Qusais Packaging Plant
+09/07/2026,Gulfcrest Packaging LLC,Stretch film 23 micron rolls,Packaging materials,510300 Materials,18400,AED,Al Qusais Packaging Plant
+12/07/2026,Inkwell Industrial Supplies,Flexo printing inks,Chemicals,510200 Consumables,22600,AED,Al Qusais Packaging Plant
+15/07/2026,Palmwood Pallets,Wooden pallets 1200x1000,Packaging materials,510300 Materials,31500,AED,Al Qusais Packaging Plant
+18/07/2026,Deskline Office Co.,Office stationery,Office supplies,620100 Office,3900,AED,Al Qusais Packaging Plant
+21/07/2026,Sandline Freight,Inbound freight Jebel Ali to Al Qusais,Logistics,540200 Freight,12800,AED,Al Qusais Packaging Plant
+24/07/2026,Watchpoint Security Services,Security guarding services,Facility services,560100 Services,21000,AED,Al Qusais Packaging Plant
+27/07/2026,Saffron Catering,Staff canteen catering,Facility services,560100 Services,17500,AED,Al Qusais Packaging Plant
+03/08/2026,Gulfcrest Packaging LLC,Corrugated cartons 5-ply 600x400,Packaging materials,510300 Materials,89570,AED,Al Qusais Packaging Plant
+06/08/2026,Polymera Trading FZE,PET resin granules 25 kg bags,Raw materials - polymers,510100 Raw materials,171720,AED,Al Qusais Packaging Plant
+09/08/2026,Gulfcrest Packaging LLC,Stretch film 23 micron rolls,Packaging materials,510300 Materials,19504,AED,Al Qusais Packaging Plant
+12/08/2026,Inkwell Industrial Supplies,Flexo printing inks,Chemicals,510200 Consumables,23956,AED,Al Qusais Packaging Plant
+15/08/2026,Palmwood Pallets,Wooden pallets 1200x1000,Packaging materials,510300 Materials,33390,AED,Al Qusais Packaging Plant
+18/08/2026,Deskline Office Co.,Office stationery,Office supplies,620100 Office,4134,AED,Al Qusais Packaging Plant
+21/08/2026,Sandline Freight,Inbound freight Jebel Ali to Al Qusais,Logistics,540200 Freight,13568,AED,Al Qusais Packaging Plant
+24/08/2026,Watchpoint Security Services,Security guarding services,Facility services,560100 Services,22260,AED,Al Qusais Packaging Plant
+27/08/2026,Saffron Catering,Staff canteen catering,Facility services,560100 Services,18550,AED,Al Qusais Packaging Plant
+03/09/2026,Gulfcrest Packaging LLC,Corrugated cartons 5-ply 600x400,Packaging materials,510300 Materials,81965,AED,Al Qusais Packaging Plant
+06/09/2026,Polymera Trading FZE,PET resin granules 25 kg bags,Raw materials - polymers,510100 Raw materials,157140,AED,Al Qusais Packaging Plant
+09/09/2026,Gulfcrest Packaging LLC,Stretch film 23 micron rolls,Packaging materials,510300 Materials,17848,AED,Al Qusais Packaging Plant
+12/09/2026,Inkwell Industrial Supplies,Flexo printing inks,Chemicals,510200 Consumables,21922,AED,Al Qusais Packaging Plant
+15/09/2026,Palmwood Pallets,Wooden pallets 1200x1000,Packaging materials,510300 Materials,30555,AED,Al Qusais Packaging Plant
+18/09/2026,Deskline Office Co.,Office stationery,Office supplies,620100 Office,3783,AED,Al Qusais Packaging Plant
+21/09/2026,Sandline Freight,Inbound freight Jebel Ali to Al Qusais,Logistics,540200 Freight,12416,AED,Al Qusais Packaging Plant
+24/09/2026,Watchpoint Security Services,Security guarding services,Facility services,560100 Services,20370,AED,Al Qusais Packaging Plant
+27/09/2026,Saffron Catering,Staff canteen catering,Facility services,560100 Services,16975,AED,Al Qusais Packaging Plant
+28/09/2026,Lumenbyte IT Solutions,Laptops for production planning team (6 units),IT equipment,150200 Fixed assets - IT,46000,AED,Al Qusais Packaging Plant

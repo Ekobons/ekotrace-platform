@@ -6,6 +6,10 @@ The same tabs have **Meter readings**: readings that connected meters send throu
 
 ## The life of a bill
 
+```video data-entry-bills
+Upload utility bills | 1:03
+```
+
 ```flow
 > Upload | drop many PDFs at once in the category's Bills tab (up to 15 MB each)
 ! The same file | a file uploaded before is recognised and not stored again (the upload list says so)

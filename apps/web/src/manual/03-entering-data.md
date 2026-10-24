@@ -1,5 +1,7 @@
 # Entering data
 
+**Short videos** (no sound, captions on screen) show each way of entering data on the sample company: several months side by side, pasting from Excel, bills, meter readings, the vehicle fleet, pasted vehicle rows, a purchase file, smart import, and submitting and approving. Each is in its section below or in its chapter (Meters, Bills, Purchases, Smart import).
+
 ## The Add data screen
 
 ```flow
@@ -28,6 +30,14 @@ The **ways in** are shown as cards: *Type it in*, *Upload bills* and *Meter read
 > + line | a second row for the same month (e.g. two fuels)
 ```
 
+```video data-entry-months
+Enter several months at once | 0:45
+```
+
+```video data-entry-paste
+Paste a column from Excel | 0:39
+```
+
 Then **Save as draft** (to finish later) or **Submit for approval** — the line above the buttons says who approves. A row with a problem stays on screen; the others are saved. Electricity for **one** month opens the full form, so certificates and contracts can be claimed; picking several months gives the rows.
 
 From the rows, **“Set up a meter with these inputs”** turns the same set-up into a meter, so readings can arrive automatically instead.
@@ -35,6 +45,10 @@ From the rows, **“Set up a meter with these inputs”** turns the same set-up 
 ## Step 2 · Review
 
 Everything not yet approved for the category and months picked, with who entered it and its status.
+
+```video data-entry-submit-approve
+Submit, approve or send back | 1:07
+```
 
 | Who | Can |
 |---|---|
@@ -58,6 +72,16 @@ What counts in the dashboards and reports for these months, by scope. An approve
 | Bills | Add data → Electricity, Stationary combustion or Waste → **Bills** | PDF bills and invoices: checked, previewed, then published |
 | Surveys | Capture → **Surveys** | employee commuting asked of employees with personal codes, scaled up and published into Add data → Employee commuting |
 | Meter readings | Add data → the same tabs → **Meter readings**; meters themselves on the facility's Meters tab | batches sent by another system (hourly to monthly), previewed before they count |
+
+**Vehicles** — the whole fleet month by month, or rows pasted in everyday words:
+
+```video data-entry-fleet
+Vehicles: the whole fleet | 0:40
+```
+
+```video data-entry-vehicle-paste
+Vehicles: paste a table | 0:43
+```
 
 ## What is saved with an entry
 

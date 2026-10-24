@@ -7,8 +7,10 @@
  *   ```
  *   ```layers                   one layer per line: Title | what protects it
  *   ```diagram scopes           ready-made pictures: scopes, month-split, entry-life
+ *   ```video data-entry-months  a short help video (public/help/<name>.mp4, .jpg poster):
+ *   Title | length              the next line: its title and length
  */
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Icon } from './Icon';
 
 type Step = { kind: 'step' | 'person' | 'check' | 'decision'; title: string; detail: string; no?: string };
@@ -161,4 +163,21 @@ export function Diagram({ name }: { name: string }) {
   if (name === 'month-split') return <MonthSplit />;
   if (name === 'entry-life') return <EntryLife />;
   return <div className="note warn">Unknown diagram “{name}”.</div>;
+}
+
+/** A short help video: a poster with a play button; plays in place (MP4, else WebM, from /help — recorded by tools/help-videos). */
+export function Video({ name, src }: { name: string; src: string }) {
+  const [title = 'Watch', length = ''] = src.trim().split('|').map((x) => x.trim());
+  const [on, setOn] = useState(false);
+  const file = `/help/${encodeURIComponent(name)}`;
+  return (
+    <figure className="mvideo">
+      {on
+        ? <video poster={`${file}.jpg`} controls autoPlay playsInline preload="metadata" aria-label={title}>
+            <source src={`${file}.mp4`} type="video/mp4" /><source src={`${file}.webm`} type="video/webm" /></video>
+        : <button type="button" className="mvideo-poster" onClick={() => setOn(true)} aria-label={`Play the video: ${title}`}>
+            <img src={`${file}.jpg`} alt="" loading="lazy" /><span className="mvideo-play">▶</span></button>}
+      <figcaption><b>▶ {title}</b>{length && <span className="muted"> · {length}</span>} <span className="muted small">— no sound; captions on screen</span></figcaption>
+    </figure>
+  );
 }

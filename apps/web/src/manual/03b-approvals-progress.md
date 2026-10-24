@@ -128,6 +128,10 @@ The same entries can be looked at in two places; they answer different questions
 
 ## Approvals
 
+```video data-entry-submit-approve
+Submit, approve or send back | 1:07
+```
+
 **Approvals** (menu → Capture → Entries & approvals) lists the entries submitted for the facilities you look after.
 
 - **Waiting for you** — entries you can approve. For each: facility and month, category and item (with the note), quantity, tCO₂e (**How calculated** shows the factors and steps), the **check**, and who entered it and when.
