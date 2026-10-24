@@ -27,6 +27,31 @@ All three go through the same steps; an upload or API batch is reviewed before p
 ? Publish | ready lines become entries | the rest wait in the batch
 ```
 
+## The file — which column is which
+
+After the upload Ekotrace shows the first rows and its best guess for each field; check them and press **Read the whole file**. Only the description and the amount are needed — every other column makes the result better.
+
+| Field | Needed? | Example | What it is used for |
+|---|---|---|---|
+| **Description** (one or two columns) | yes | “Ready mix concrete C40 – 25 m3” + “Construction materials” | what was bought: cleaned, grouped and matched to a spend category. A second column (item group, long text) is joined to it |
+| **Amount (spend)** | yes (or a quantity with a supplier factor) | 180,000 | the spend × the spend factor |
+| Date (purchase / invoice / posting) | no — else the year of the file | 31/03/2026 | the month of the entry, the exchange rate and the price index of that month. Choose how dates are written (day/month/year …) |
+| Currency | no — else one currency for the file (or for empty cells) | AED | converted to US dollars at the month's rate |
+| Supplier / vendor | no, but strongly advised | Unibeton Ready Mix | linked to the supplier list; supplier defaults and supplier factors; vague descriptions are split by supplier |
+| Vendor number (ERP) | no | V-10234 | recognises the same supplier however its name is written |
+| Supplier country | no | AE | kept on the supplier's profile |
+| Category (as in your system) | no | Construction materials | helps the match (half weight) and can carry a default: “IT consumables” → Computer supplies |
+| GL account / account name | no | 510200 Materials | account defaults and account **type**: purchase, capital (3.2) or not a purchase (VAT, salaries…) — remembered for every upload |
+| Facility / site / cost centre | no — else one facility for the file | Ajman plant | which facility the entry belongs to. Values not recognised are matched by hand once and remembered |
+| Quantity, Unit of quantity | no | 25, m3 | used with a supplier factor per unit (kg, t, L, m³, kWh, piece) |
+| PO / invoice number | no | PO 4500123 | shown on the line; part of the duplicate check |
+| Supplier emission factor, its unit | no | 0.12 kg CO₂e per kg | a factor for that line (supplier-specific — the best method) |
+| Capital goods (yes / no) | no | yes | sends the line to Scope 3.2 |
+
+- **Header row** — pick the row with the column names if titles sit above it.
+- **Remember this layout** — the next file with the same columns is set up by itself.
+- A line is a **duplicate** when date, amount, currency, supplier, description and PO number all match a line from an earlier upload; it is left out unless the file is uploaded again on purpose.
+
 ## How purchases are mapped — the whole flow
 
 A year of purchases can be 50,000 lines but only a few thousand *kinds* of purchase. Ekotrace decides once per kind, spends a person's time only where the emissions are, and never leaves a line without a factor.
@@ -147,6 +172,38 @@ An account can also move its lines (e.g. account “Travel” → business trave
 - **Publish** creates one entry per facility, month, Scope 3 category, spend category and method, each with its lines behind it, and **submits them for approval**: the review of the file is the maker's check, the facility's approver is the checker (Entries & approvals, or Add data → Purchases → Review). **Reopen** takes back the entries not yet approved (approved ones stay).
 - **Where the entries show:** Add data → **Purchases** holds every entry published from purchase files — purchased goods (3.1), capital goods (3.2), upstream transport (3.4), leased assets (3.8) and purchases moved to business travel (3.6), each marked *From purchases → category*. Those moved to business travel also show under Add data → **Business travel**, in the months of the purchases.
 
+## The batch screen, tab by tab
+
+| Tab | What it shows |
+|---|---|
+| **Purchases** (kinds of purchase) | one row per kind: lines, spend, spend category (with how it was found and how sure), Scope 3 category and the decision, tCO₂e and its share. Change the category, the decision or confirm here |
+| **Accounts** | each GL account with its lines and spend, and its type (purchase / capital / not a purchase) — remembered |
+| **Lines** | every line with its status and problems; open one to see its calculation (rate, price index, factor) |
+| **Summary** | tCO₂e by Scope 3 category, and how much is supplier-specific vs spend-based |
+
+**Filters on the Purchases tab**
+
+| Filter | Shows |
+|---|---|
+| To confirm | the large kinds (the top 95 % of emissions) a person has not confirmed yet — publishing waits for them |
+| Other category | kinds that look like travel, freight, rent (moved) or fuel, energy, waste (excluded) |
+| Capital goods | kinds that are, or may be, capital goods (3.2) |
+| Excluded | kinds left out: fuel, electricity, water, waste (counted from activity data), or accounts that are not purchases |
+| Average factor | kinds nothing identified — the goods/services average is used |
+| Small, accepted | the small tail accepted as it is |
+| No category | kinds without a category or a supplier factor — they cannot publish until one is chosen |
+
+**On each row**
+
+- **How the category was found:** *remembered*, *code in file* (NAICS), *description* with **% sure**, *supplier default*, *account default*, *category default*, *AI*, *by hand*, *average factor (estimate)*.
+- **Scope 3 category:** 3.1 unless moved or excluded. A proposal shows a question mark (“Upstream leased assets (3.8)?”) with the reason (“Office rent” in the description) and buttons: **Keep in 3.1** (nothing decided yet) or **Back to 3.1** (undo a move, exclusion or capital mark), **Exclude**.
+- **Right-hand mark:** **Confirm** = a large kind waiting for a person; **✓** = settled by a person or a remembered choice — this confirms the *decision*, whatever it is, including *excluded* (an excluded kind never becomes an entry); **small** = accepted as it is.
+- **3 with problems** — lines of that kind with a missing date, amount, facility…: open the lines to see why.
+
+**Line statuses** (Lines tab): *Ready* — will publish; *To confirm*; *Problem* — something missing; *No category*; *Other category?* — a move or exclusion not yet decided; *Excluded*; *Published*; *Duplicate*.
+
+**Batch states** (Add data → Purchases, list of batches): *Setup* (columns being chosen) → *Reading* → *Mapping* → *Review* (your turn) → *Publishing* → *Published*. *Failed* says why.
+
 ## Factors
 
 ```flow
@@ -179,6 +236,25 @@ Spend-based factors are per US dollar of 2022. Each line is converted in one or 
 | Exchange rate only | currency → US dollars, used as they are | simpler, no price index needed; emissions rise with prices (about 7 % more for 2024 spend on 2022 factors) |
 
 A change applies to new calculations: use **Recalculate** on open batches; published entries keep their figures until the batch is reopened. Supplier factors per kg, litre or unit are not affected.
+
+## Scenarios
+
+| Situation | What to do / what happens |
+|---|---|
+| The file has **no facility column** | choose the facility for the whole file before reading it |
+| Some **facility names are not recognised** | the review asks once which facility each stands for; remembered for later files. Lines for facilities you cannot enter data for are left out and listed |
+| The **same file is uploaded again** | refused, unless uploaded on purpose; its lines are then duplicates and left out unless counted on purpose |
+| Next month's file **overlaps** this one | lines already uploaded (same date, amount, supplier, description, PO) are marked duplicates and left out |
+| A line is **electricity, fuel, water or waste** (e.g. “Electricity DEWA”) | excluded: it is counted from kWh, litres or tonnes under its own category. Enter the kWh under Electricity (or upload the bills). **Back to 3.1** counts it as a spend-based purchase instead — only if there is no activity data, and never both |
+| **Flights, hotels** in the file | moved to Business travel (3.6), spend-based, shown under Purchases and Business travel. Replace them with trip data for a better figure |
+| **Rent** | moved to Upstream leased assets (3.8); **Exclude** if the building's energy is already in your own Scope 1 and 2 (you run it), **Keep in 3.1** only on purpose |
+| A **laptop or machine** | capital goods (3.2) by the capital-goods list, the account or a capex column; **Back to 3.1** if it is a consumable |
+| **Nothing matches** a description | the average goods/services factor; if it is large it waits under *To confirm* — pick the category from the candidates or the full list (*Browse the Ekotrace list*) |
+| You chose a category and want it next time | tick **Remember my choices** — for this description, everything from this supplier, or everything in this account |
+| A supplier gave you **its own factor** | add it under Value chain → Suppliers (for everything bought from it, or one category); open lines are recalculated |
+| A **mistake after publishing** | **Reopen** the batch: entries not yet approved are taken back; fix and publish again. Approved entries stay — ask the approver to send them back first |
+| Factors or the **exchange-rate method changed** | **Recalculate** open batches; published entries keep their figures until the batch is reopened |
+| **Where did my published purchases go?** | entries per facility × month × category × spend category, **submitted for approval**; see *The life of an entry* in Approvals and data progress. Lines: Purchases → **Published lines** |
 
 ## Safety checks
 

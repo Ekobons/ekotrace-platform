@@ -74,6 +74,38 @@ Switched on under **Methodology & boundaries → Approval levels**: for entries 
 
 Purchase files: one entry per facility, month, Scope 3 category and spend category, shown under Add data → **Purchases** (those moved to business travel also under Business travel); the lines behind them under Purchases → **Published lines**.
 
+### Add data or Approvals — who sees what, and the months
+
+The same entries can be looked at in two places; they answer different questions.
+
+| | **Add data** (category → step 2 *Review*, step 3 *Approved*) | **Approvals** (Entries & approvals) |
+|---|---|---|
+| Question it answers | “What is the state of *this* facility's data for *these* months?” | “What is waiting for *me* to approve, anywhere?” |
+| Scope | one facility, one category, the months picked at the top | every facility you approve, every category, every month |
+| Statuses | *Review*: draft, waiting, sent back. *Approved*: approved | waiting only (approved ones leave the list) |
+| Whose entries | everyone's — whoever entered them and from whatever source (typed, meter, bill, purchase file, import) | everyone's, split into *Waiting for you* and *Waiting for someone else* |
+| What you can do | submit, withdraw, approve, send back (also an approved entry) | approve, approve all without warnings, send back |
+
+**Who sees which facilities**
+
+| Role | Add data (facilities offered) | Approvals: *Waiting for you* | Approvals: *Waiting for someone else* |
+|---|---|---|---|
+| Super admin | all | everything waiting, except own entries (unless self-approval) | own entries, level 2 the super admin cannot take |
+| Admin | the facilities of their sub-group | entries of those facilities | own entries in them |
+| Manager | facilities they manage or are assigned to | entries of those facilities | own entries, and level 2 entries |
+| Data preparer | facilities assigned to them (enter, not approve) | — | what they and others submitted for their facilities, and who it waits for |
+| Verifier | read-only, all facilities (no Add data actions) | — | — (sees approved data in dashboards, reports and the verifier pack) |
+
+**Why pick months in Add data**
+
+- The month buttons at the top decide **what you enter** (one row per month picked) **and what steps 2 and 3 list**: every entry of that facility and category that falls in, or overlaps, the months from the **first to the last month picked**. Pick March only → March. Pick January and June → January to June. Pick nothing, or *Whole year* → the whole year.
+- Each month button shows that month's status (approved, in review, missing…), so picking the *open* ones (**All open months**) is the quick way to finish a facility.
+- A whole-year or quarterly entry (a landfill model, a commuting survey, an annual refrigerant check) shows in every month it covers.
+- Step 3 *Approved* adds up Scope 1, 2 and 3 for those months: the facility's approved total for the period, the same figure the dashboards show.
+- The **year** selector changes the year; future months cannot be picked (the current month can).
+
+**Months in Approvals** are a filter, not a period: *All months* by default, or one month to work through them in order. Approvals is a to-do list across the whole company; Add data is the picture of one facility.
+
 ### Scenarios
 
 | Situation | What happens |

@@ -75,7 +75,9 @@ export async function reviewRoutes(app: FastifyInstance) {
            FROM activity a JOIN category cat ON cat.id = a.category_id JOIN item i ON i.id = a.item_id
            LEFT JOIN app_user ue ON ue.id::text = a.created_by LEFT JOIN app_user ur ON ur.id::text = a.reviewed_by
            LEFT JOIN vehicle v ON v.id = a.vehicle_id LEFT JOIN meter mt ON mt.id = a.meter_id LEFT JOIN waste_site ws ON ws.id = a.waste_site_id
-          WHERE a.facility_id = $1 AND ${CAT_SQL.replaceAll('$X', '$2')} AND a.period_start >= $3 AND a.period_start <= $4
+          WHERE a.facility_id = $1 AND ${CAT_SQL.replaceAll('$X', '$2')}
+            -- every entry that overlaps the months shown (a whole-year or quarterly entry shows in each of its months)
+            AND a.period_end >= $3::date AND a.period_start < ($4::date + interval '1 month')
             AND (CASE WHEN $5 = 'approved' THEN a.status = 'approved' ELSE a.status <> 'approved' END)
           ORDER BY a.period_start, cat.code, i.name LIMIT 2000`, [q.facilityId, q.category, q.from, q.to, q.stage])).rows;
       const canEnter = s.enter.has(q.facilityId), canApprove = s.approve.has(q.facilityId) && req.user.role !== 'platform_admin';

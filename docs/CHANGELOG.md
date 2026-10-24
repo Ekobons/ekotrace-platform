@@ -2,6 +2,12 @@
 
 Newest first.
 
+## 2026-10-24 · Manual: purchase files explained; Add data vs Approvals
+
+- Purchases chapter: *The file — which column is which* (every field, needed or not, example, what it is used for; header row, remembered layouts, duplicate rule), *The batch screen, tab by tab* (tabs, filters, row labels, the ✓ on excluded kinds, line statuses, batch states) and *Scenarios* (no facility column, unknown facilities, re-uploads and overlaps, electricity in the file, travel, rent, capital goods, nothing matches, remembering choices, supplier factors, mistakes after publishing, recalculation, where published entries go).
+- Approvals chapter: *Add data or Approvals — who sees what, and the months* (purpose of each, role table, why months are picked, Approvals month filter).
+- `GET /api/review`: entries that **overlap** the months shown are listed (a whole-year or quarterly entry shows in each month it covers); before, only entries starting in the range.
+
 ## 2026-10-24 · Security updates
 
 - Newly published advisories failed the CI dependency audit: zod 4.6.5 → 4.6.7 (high: memory exhaustion on oversized constrained collections), fastify 5.12.5 → 5.12.7 (header validation bypass), nodemailer 10.0.12 → 10.2.1 (address parser), fast-uri (transitive, `npm audit fix`). `npm audit` now reports 0; tests pass.
