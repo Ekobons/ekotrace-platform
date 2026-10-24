@@ -1729,7 +1729,15 @@ test('approvals: waiting for me vs someone else, 6-month check; level 2 for larg
   assert.equal(live.checks[0].ok, false); assert.match(live.checks[0].txt, /6-month average/); assert.equal(live.checks[1].ok, true);
   assert.equal(live.checks[2], null); assert.equal(live.checks[3], null);
   assert.equal(live.method, 'smart', 'seasonal band by default (falls back to the 6-month average without a year of history)');
-  assert.ok((await call(prep, 'GET', '/api/approvals')).body.others.some((x: { id: string; waitingFor: string }) => x.id === big && x.waitingFor === 'rmgr@a.test'));
+  // a second manager of the same facility: both see it waiting for them; "waiting for" names both
+  const r2 = await call(sa, 'POST', '/api/users', { name: 'rmgr2@a.test', email: 'rmgr2@a.test', role: 'manager', facilityIds: [fac] });
+  let mgr2 = await login('rmgr2@a.test', r2.body.temporaryPassword);
+  await call(mgr2, 'POST', '/api/auth/password', { current: r2.body.temporaryPassword, next: 'a long enough pass' });
+  mgr2 = await login('rmgr2@a.test', 'a long enough pass');
+  assert.ok((await call(mgr2, 'GET', '/api/approvals')).body.mine.some((x: { id: string }) => x.id === big));
+  const wf = (await call(prep, 'GET', '/api/approvals')).body.others.find((x: { id: string }) => x.id === big).waitingFor;
+  assert.match(wf, /rmgr@a\.test/); assert.match(wf, /rmgr2@a\.test/);
+  await call(sa, 'PATCH', `/api/users/${r2.body.id ?? r2.body.user?.id}`, { disabled: true });
   // level 2 for every entry from 0 t: the manager's approval moves it to level 2
   assert.equal((await call(mgr, 'PUT', '/api/approvals/settings', { l2: true, minT: 0, cats: [], checkPct: 35 })).status, 403);
   assert.equal((await call(sa, 'PUT', '/api/approvals/settings', { l2: true, minT: 0, cats: [], checkPct: 35 })).status, 200);

@@ -9,6 +9,8 @@
 - **Approve** — the entry counts in the dashboards and reports. **Send back** — write what needs fixing; the person who entered it sees it on Home and in Add data.
 - **Approve all N without warnings** — approves every entry in its usual range in one go; flagged ones stay for a closer look.
 - **Waiting for someone else** — entries in your facilities waiting for another approver, and who (your own entries, which you never approve yourself).
+- **Several approvers.** An entry waits for *everyone* who may approve its facility: each of its managers (the facility's manager and anyone assigned as manager), the admin of its sub-group and the super admin. It appears in each of their lists, and the **first** to approve or send it back decides — it then leaves everyone's list. One approval is enough at level 1; it is not approved once per manager. *Waiting for* names all the managers.
+- **Sent by** — who submitted it and when, who entered it if someone else, and whether it came from a purchase file or a meter.
 
 The number next to **Entries & approvals** in the menu (and on its Approvals tab) is what waits for you.
 

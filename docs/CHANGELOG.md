@@ -2,6 +2,10 @@
 
 Newest first.
 
+## 2026-10-24 · Approvals: every manager named
+
+- `GET /api/approvals`: *waiting for* lists every active manager of the facility (its manager and managers assigned to it), not the first one alphabetically. Test: a second manager sees the entry; both are named. Manual: several approvers — first decision wins.
+
 ## 2026-10-24 · Self-approval in Add data; who sent each entry
 
 - `GET /api/review`: own entries get `canApprove`/`canReturn` when the company allows self-approval for the role and size (or the super admin is the only user), with `selfApprove` (note required); before, Add data → Review never offered it, only the Approvals page did. Add data: *Approve my own…* asks for the note; *Approve all* leaves own entries out.
