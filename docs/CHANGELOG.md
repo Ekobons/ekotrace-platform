@@ -2,6 +2,10 @@
 
 Newest first.
 
+## 2026-10-24 · Entries & results: month and facility filters
+
+- One filter bar: month (an entry shows in every month its period covers), facility (with count), category, status, *Clear filters*. The totals and the list follow the filters; the gas table stays for the whole year and says so. Changing the year clears the month.
+
 ## 2026-10-24 · Manual: purchase files explained; Add data vs Approvals
 
 - Purchases chapter: *The file — which column is which* (every field, needed or not, example, what it is used for; header row, remembered layouts, duplicate rule), *The batch screen, tab by tab* (tabs, filters, row labels, the ✓ on excluded kinds, line statuses, batch states) and *Scenarios* (no facility column, unknown facilities, re-uploads and overlaps, electricity in the file, travel, rent, capital goods, nothing matches, remembering choices, supplier factors, mistakes after publishing, recalculation, where published entries go).
