@@ -2078,6 +2078,12 @@ test('sold products (3.10, 3.11, 3.12): processing energy, lifetime electricity 
   const p = await calc('p10_energy:electricity', 10000, 'kWh_e');
   assert.ok(Math.abs(p.totals.scope3 - (await same('grid:electricity', 10000, 'kWh_e'))) < 1e-6, JSON.stringify(p.totals));
   assert.ok(p.steps.at(-1).includes('after the sale'));
+  // average data: 100 t of aluminium extrusion = 196 kWh electricity + 1,709 kWh heat (natural gas) per tonne
+  const av = await calc('p10_average:al_extrusion', 100, 't');
+  const avWant = (await same('grid:electricity', 19600, 'kWh_e')) + (await same('desnz:natural-gas', 170900, 'kWh'));
+  assert.ok(Math.abs(av.totals.scope3 - avWant) < 1e-6, JSON.stringify([av.totals, avWant]));
+  assert.ok(av.steps[0].includes('US DOE Aluminum Bandwidth Study'));
+  assert.ok((await calc('p10_average:plastic_injection', 1000, 'kg')).totals.scope3 > 0, 'electricity-only process, in kg');
   // use: lifetime electricity and fuel; fuels sold to customers
   assert.ok(Math.abs((await calc('u11_electricity:electricity', 50000, 'kWh_e')).totals.scope3 - (await same('grid:electricity', 50000, 'kWh_e'))) < 1e-6);
   assert.ok(Math.abs((await calc('u11_fuel:petrol', 1000, 'L')).totals.scope3 - (await same('desnz:petrol-100-mineral-petrol', 1000, 'L'))) < 1e-6);

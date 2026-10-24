@@ -21,6 +21,7 @@ Use-phase and end-of-life figures cover the units **sold in the reporting year**
 | Category | What you know | Unit | How it is calculated |
 |---|---|---|---|
 | 3.10 | **Energy used by the processor** — electricity, natural gas, diesel, fuel oil, LPG | kWh, m³, litres, kg | the platform's grid factor (with grid losses and upstream) or the DESNZ fuel factor (with upstream) |
+| 3.10 | **Typical processing energy (average data)** — 26 processes: plastics, steel, aluminium, corrugated boxes, food, textiles, glass, cement, asphalt, tyres | tonnes, kg sold for that processing | tonnes × the process's typical electricity (× grid factor) and heat (× DESNZ natural gas) per tonne — see the table below |
 | 3.10 | **Emissions reported by the processor** | kg or t CO₂e | the reported figure, as it is — attach their statement |
 | 3.11 | **Products that use electricity** | kWh over the products' life | the grid factor of the facility's grid region, with losses and upstream |
 | 3.11 | **Products that burn fuel** — diesel, petrol, natural gas, LPG, kerosene | litres, m³, kg over their life | DESNZ fuel factor, with upstream |
@@ -36,6 +37,43 @@ Use-phase and end-of-life figures cover the units **sold in the reporting year**
 - Gas released = units × charge × (annual leak rate × years + share **not** recovered at disposal).
 
 **Where the products are used:** the electricity of products is calculated with the grid factor of the facility the entry is made for. When most products are used in another country, make the entry for a facility in that country, or say so in the methodology note.
+
+## Typical processing energy per tonne (3.10, average data)
+
+Use these when the processor cannot give their own energy (their energy is better: *Energy used by the processor*). Electricity is calculated with the facility's grid factor; heat as natural gas. Each value is from a published source; the calculation of every entry shows it.
+
+| Process | Electricity kWh/t | Heat kWh/t | Source |
+|---|---|---|---|
+| Plastics: Injection moulding | 1,470 | — | ecoinvent average, in Elduque et al., Materials 11:1740 (2018) |
+| Plastics: Film and sheet extrusion | 500 | — | R. Kent, Plastics Technology (2009), typical extrusion plant process load |
+| Plastics: Pipe and profile extrusion | 500 | — | R. Kent, Plastics Technology (2009), typical extrusion plant process load |
+| Plastics: Extrusion blow moulding (bottles, containers) | 1,950 | — | R. Kent, Plastics Technology (2009), typical blow moulding site |
+| Plastics: Sheet extrusion and thermoforming (trays, cups) | 1,250 | — | R. Kent, Plastics Technology (2009), inline sheet extrusion + thermoforming |
+| Plastics: Mechanical recycling to pellets (shred, wash, extrude) | 300 | — | Sevigné-Itoiz et al., Waste Management 46 (2015), Europe |
+| Steel: Hot rolling (strip, plate, bars) | 154 | 679 | US DOE Iron & Steel Bandwidth Study (2015): typical 3.00 GJ/t; split 19 % electricity as LBNL world best practice (2007) |
+| Steel: Cold rolling and annealing | 87 | 303 | LBNL-62806 world best practice (2007) + EU BAT conclusions FMP 2022/2110 (annealing) |
+| Steel: Batch hot-dip galvanising | — | 550 | EU BAT conclusions, Ferrous Metals Processing (2022/2110) |
+| Aluminium: Extrusion (incl. billet heating) | 196 | 1,709 | US DOE Aluminum Bandwidth Study (2016), typical on-site 2,948 Btu/lb |
+| Aluminium: Hot rolling | 114 | 1,058 | US DOE Aluminum Bandwidth Study (2016), typical on-site 1,814 Btu/lb |
+| Aluminium: Cold rolling (sheet, foil) | 366 | 610 | US DOE Aluminum Bandwidth Study (2016), typical on-site 1,511 Btu/lb |
+| Aluminium: Remelting and casting (from ingot or scrap) | 109 | 1,331 | US DOE Aluminum Bandwidth Study (2016), typical on-site 2,229 Btu/lb |
+| Paper: Corrugated board and box making (from containerboard) | 122 | 250 | FEFCO / Cepi ContainerBoard, European Database for Corrugated Board Life Cycle Studies (2023 edition, 2022 data) |
+| Food: Wheat flour milling | 90 | — | EU BAT conclusions, Food, Drink and Milk (2019/2031) |
+| Food: Edible oil refining | — | 275 | EU BAT conclusions, Food, Drink and Milk (2019/2031), stand-alone refining |
+| Food: Dairy: market milk (pasteurised, packed) | 56 | 128 | UNEP / Danish EPA, Cleaner Production Assessment in Dairy Processing (2000) |
+| Food: Dairy: cheese making | 211 | 1,206 | UNEP / Danish EPA, Cleaner Production Assessment in Dairy Processing (2000) |
+| Food: Bread baking (oven) | — | 1,486 | EU JRC, Best Environmental Management Practice – food and beverage, baking (citing Purlis 2012) |
+| Textiles: Yarn spinning | 4,700 | 2,250 | Hasanbeigi et al., LBNL-5753E (2012) |
+| Textiles: Weaving | 1,700 | 3,889 | Hasanbeigi et al., LBNL-5753E (2012) |
+| Textiles: Dyeing and finishing (wet processing) | 2,100 | 23,361 | Hasanbeigi et al., LBNL-5753E (2012) |
+| Glass: Container glass melting and forming (from cullet and batch) | 81 | 1,932 | US DOE Glass Bandwidth Study (2017), container glass typical 6.91 MMBtu/ton |
+| Minerals: Cement grinding (clinker and additives to cement) | 45 | — | WBCSD-CSI / ECRA Technology Papers (2017) |
+| Minerals: Hot mix asphalt production | 3.1 | 85 | NAPA / Mukherjee, Update to the LCA for Asphalt Mixtures (2021) |
+| Rubber: Tyre manufacturing (mixing, building, curing) | 1,083 | 1,500 | PBL / TNO, Decarbonisation options for the Dutch tyre industry (2019) |
+
+- **Not included** for lack of a credible public figure: PET stretch blow moulding, polymer compounding, sheet-metal stamping, machining, offset printing, ready-mix concrete, meat processing. Use the processor's energy or reported emissions for these.
+- Several values are best practice or small samples (see the item note); typical plants may use more. The old Ekotrace list of processing factors is not used: its values could not be traced to a source and its units were inconsistent.
+- The values live in `data/processing/process-energy.csv`; the platform admin can update them.
 
 ## Examples
 

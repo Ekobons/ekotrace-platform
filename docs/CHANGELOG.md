@@ -2,6 +2,13 @@
 
 Newest first.
 
+## 2026-10-24 · 3.10 average data: typical processing energy per tonne
+
+- `data/processing/process-energy.csv` (26 processes: plastics, steel, aluminium, corrugated, food, textiles, glass, cement, asphalt, tyres) — electricity and heat kWh per tonne, each with its source, URL and note (US DOE bandwidth studies, LBNL world best practice, EU BAT conclusions, FEFCO, UNEP, JRC, WBCSD-CSI/ECRA, NAPA, PBL/TNO, peer-reviewed papers). `seedProcessing` writes `p10_average:*` items every start; a process removed from the file is switched off.
+- Migration 056: subcategory `p10_average` *Typical processing energy (average data)* (t, kg). `calculate()`: attrs `pe {e, th}` → tonnes × e at the facility's grid + tonnes × th as DESNZ natural gas (kWh), all in 3.10, the benchmark and source in the steps.
+- The old Ekotrace `processing_of_sold_products_ef` and `sold_product_category_ef` are not imported: labelled “Defra 4.0” but DESNZ has no such factors; per-litre = per-kg in every row, per-tonne = per-kg ÷ 1,000 in 192 of 349 rows; implausible values.
+- Manual: the processes table with sources and what is not covered. Test: aluminium extrusion = grid + natural gas of the benchmark energy.
+
 ## 2026-10-24 · Scope 3.10, 3.11 and 3.12: sold products
 
 - Migration 055: categories `processing_sold` (3.10), `use_sold` (3.11), `eol_sold` (3.12), calc method `asset`. Subcategories: `p10_energy` (electricity, natural gas, diesel, fuel oil, LPG via grid / DESNZ), `p10_reported`; `u11_electricity`, `u11_fuel`, `u11_fuels_sold` (incl. jet, marine gas oil, fuel oil, coal), `u11_gas` (R-410A, R-32, R-134a, R-404A, R-407C, R-1234yf, R-290, R-600a, CO₂ → `via` to the fugitive gas or blend), `u11_reported`; `e12_<material>` mirroring the *Waste sent to others* materials (items `eol12:*` with `via` to the `waste3:*` item), `e12_reported`. Downstream leased assets re-sorted after 3.12.
