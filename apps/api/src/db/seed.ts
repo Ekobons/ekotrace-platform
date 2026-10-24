@@ -195,6 +195,34 @@ export async function seedBuildings(c: Tx) {
   return { items: n };
 }
 
+export const PROCESSING_FILE = join(DATA, 'processing', 'process-energy.csv');
+
+/**
+ * 3.10 average data: typical energy per tonne of downstream processes (electricity and heat), from
+ * data/processing/process-energy.csv. One item per process; a process removed from the file is switched off.
+ */
+export async function seedProcessing(c: Tx) {
+  if (!existsSync(PROCESSING_FILE)) return { items: 0 };
+  const sid = (await c.query(`SELECT id FROM subcategory WHERE code = 'p10_average'`)).rows[0]?.id;
+  if (!sid) return { items: 0 };
+  const rows = csvObjects(readFileSync(PROCESSING_FILE, 'utf8'));
+  const keep: string[] = [];
+  for (const [i, r] of rows.entries()) {
+    const e = Number(r.kwh_e_per_t || 0), th = Number(r.kwh_th_per_t || 0);
+    if (!Number.isFinite(e) || !Number.isFinite(th) || e < 0 || th < 0 || e + th <= 0) throw new Error(`process-energy.csv: bad values for ${r.key}`);
+    const code = `p10_average:${r.key}`; keep.push(code);
+    const parts = [e ? `${e} kWh of electricity` : '', th ? `${th} kWh of heat (counted as natural gas)` : ''].filter(Boolean).join(' and ');
+    const src = `${parts} per tonne — ${r.source}`;
+    const note = `Tonnes sold for this processing × ${parts} per tonne, × the facility's grid factor${th ? ' and the DESNZ natural gas factor' : ''}. ${r.source}.${r.note ? ` ${r.note}.` : ''}`;
+    await c.query(
+      `INSERT INTO item (subcategory_id, code, name, default_unit, note, sort, attrs, active) VALUES ($1,$2,$3,'t',$4,$5,$6,true)
+       ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name, note = EXCLUDED.note, sort = EXCLUDED.sort, attrs = EXCLUDED.attrs, active = true`,
+      [sid, code, `${r.industry}: ${r.name}`, note, i, JSON.stringify({ pe: { e, th }, peSource: src, url: r.url })]);
+  }
+  await c.query(`UPDATE item SET active = false WHERE subcategory_id = $1 AND NOT (code = ANY($2))`, [sid, keep]);
+  return { items: keep.length };
+}
+
 /**
  * Grid factors of other countries. Safe to run again: a factor with the same value is kept,
  * a changed one is superseded (kept as history), regions are added or renamed.
@@ -272,6 +300,8 @@ export async function seed(log = console.log) {
   }
   const bl = await platformTx((c) => seedBuildings(c));
   log(`[seed] building energy intensities: ${bl.items} items`);
+  const pr = await platformTx((c) => seedProcessing(c));
+  log(`[seed] processing energy per tonne: ${pr.items} items`);
   const g = await platformTx((c) => seedGrid(c));
   log(`[seed] grid factors: ${g.regions} regions, ${g.added} added${g.superseded ? ` (${g.superseded} replaced)` : ''}, ${g.kept} unchanged`);
 }

@@ -342,7 +342,7 @@ export async function calculate(input: CalcInput, ctx: CalcContext): Promise<{ r
   } else if (item.calc_method === 'asset') {
     // Transport & distribution (3.4, 3.9), leased assets (3.8, 3.13) and sold products (3.10–3.12): everything lands in the category's Scope 3.
     if (input.quantity === undefined) throw new AppError('Enter the quantity');
-    const a = (item.attrs ?? {}) as { via?: string; eui?: number; euiSource?: string; reported?: boolean };
+    const a = (item.attrs ?? {}) as { via?: string; eui?: number; euiSource?: string; reported?: boolean; pe?: { e: number; th: number }; peSource?: string };
     const zero = { direct: 0, wtt: 0, outside_scopes: 0, memo: 0, scope2: 0, scope2_market: 0, td_loss: 0, scope3: 0 };
     const uName = (u: string) => ref.units.get(u)?.name ?? u;
     if (a.reported) {
@@ -350,6 +350,28 @@ export async function calculate(input: CalcInput, ctx: CalcContext): Promise<{ r
       const kg = convert(ref.units, input.quantity, input.unit, 'kgco2e');
       result = { totals: { ...zero, scope3: kg }, lines: [{ basis: 'scope3', gas: 'CO2e', kgGas: null, kgCo2e: kg, factorId: null, method: 'published' }], factors: [],
         steps: [`Reported: ${fmtN(input.quantity)} ${uName(input.unit)} = ${fmtN(kg)} kg CO₂e`], warnings: [] } as unknown as CalcResult;
+    } else if (a.pe) {
+      // typical processing energy per tonne (3.10 average data): electricity at the facility's grid, heat as natural gas
+      const t = convert(ref.units, input.quantity, input.unit, 't');
+      const parts: { via: string; qty: number; unit: string; what: string }[] = [];
+      if (a.pe.e > 0) parts.push({ via: 'grid:electricity', qty: t * a.pe.e, unit: 'kWh_e', what: `${fmtN(t)} t × ${fmtN(a.pe.e)} kWh of electricity per tonne` });
+      if (a.pe.th > 0) parts.push({ via: 'desnz:natural-gas', qty: t * a.pe.th, unit: 'kWh', what: `${fmtN(t)} t × ${fmtN(a.pe.th)} kWh of heat per tonne (as natural gas)` });
+      const totals = { ...zero };
+      const lines: CalcResult['lines'] = [], factorsUsed: CalcResult['factors'] = [], warnings: string[] = [];
+      const steps = [`Typical energy of ${item.name.toLowerCase()}: ${a.peSource ?? 'see the item note'}`];
+      for (const pt of parts) {
+        const [v] = await query<{ id: number }>('SELECT id FROM item WHERE code = $1 AND active', [pt.via]);
+        if (!v) throw new AppError(`${item.name}: its factor (${pt.via}) is not in the library`);
+        const sub = await calculate({ ...input, itemId: v.id, quantity: pt.qty, unit: pt.unit, energy: undefined, cv: undefined, trip: undefined }, ctx);
+        const x = sub.result.totals;
+        totals.scope3 += x.direct + x.scope2 + x.td_loss + x.wtt + x.scope3; totals.outside_scopes += x.outside_scopes; totals.memo += x.memo;
+        lines.push(...sub.result.lines.filter((l) => l.basis !== 'scope2_market').map((l) => (['direct', 'scope2', 'td_loss', 'wtt'].includes(l.basis) ? { ...l, basis: 'scope3' as const } : l)));
+        factorsUsed.push(...sub.result.factors.filter((f) => f.basis !== 'scope2_market'));
+        steps.push(`${pt.what} = ${fmtN(pt.qty)} ${uName(pt.unit)}`, ...sub.result.steps.filter((x) => !/^Market-based/.test(x)));
+        warnings.push(...sub.result.warnings);
+      }
+      steps.push(`All of it counted in ${item.category}: processing of your products by others is not your Scope 1 or 2. Average data — the processor's own energy is better when they can give it.`);
+      result = { totals, lines, factors: factorsUsed, steps, warnings } as unknown as CalcResult;
     } else if (a.via || a.eui != null) {
       // energy known (or estimated from the floor area): the platform's own grid or fuel factors
       const pre: string[] = [];

@@ -311,6 +311,7 @@ const ASSET_HELP: Record<string, string> = {
   veh_fuel: 'Fuel bought for the leased vehicles.',
   // sold products (3.10–3.12): looked up by the full subcategory code first
   p10_energy: 'The processor’s electricity and fuel for processing your products: from their meters, or their energy per tonne × the tonnes you sold them.',
+  p10_average: 'Tonnes you sold for this kind of processing × its typical energy per tonne (published benchmarks, source in the note and the calculation). Use it when the processor cannot give their own energy.',
   p10_reported: 'The processor’s Scope 1 and 2 for processing your products (or their emissions per tonne × tonnes sold), from their statement. Attach it as evidence.',
   u11_electricity: 'The lifetime electricity of the units sold this year: units sold × years of life × kWh per year. Use the helper below.',
   u11_fuel: 'The lifetime fuel of the units sold this year (engines, vehicles, generators, stoves): units sold × years of life × fuel per year.',
