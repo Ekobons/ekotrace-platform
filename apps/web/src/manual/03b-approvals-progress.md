@@ -1,5 +1,99 @@
 # Approvals and data progress
 
+## The life of an entry
+
+Every figure in Ekotrace is an **entry**: one facility, one period (usually a month), one thing (diesel, grid electricity, a spend category…), with its quantity, its factors and its result. It moves through four statuses (plus an optional second approval); only **Approved** counts in dashboards and reports.
+
+```diagram entry-life
+```
+
+| Status | What it means | Who can change it | Counts in dashboards and reports |
+|---|---|---|---|
+| **Draft** | saved, not yet sent for approval | whoever can enter data for the facility: edit, delete, submit | no |
+| **Waiting approval** | submitted; in the approvers' lists | the approvers: approve or send back. The person who submitted it (or another data entrant of the facility): withdraw it to draft | only with *Include waiting* ticked on the dashboard (a preview) |
+| **Level 2** (optional) | level 1 approved; a large entry or a chosen category waits for a second approver | an admin or the super admin, not the level-1 person | as *waiting* |
+| **Approved** | checked and accepted | nobody edits it. An approver can **send it back** for a correction | **yes** |
+| **Sent back** | returned with the approver's note | the people who enter data: fix and submit again, or delete | no |
+
+### Where entries come from, and how they start
+
+| Source | Starts as |
+|---|---|
+| Add data — typed in, pasted rows, Excel templates | Draft, or Waiting approval with **Submit for approval** |
+| Meters and bills (readings split by month) | Draft — submit from Add data; later readings update the month until it is approved |
+| Smart import, purchase files (on **Publish**), waste contractor collections | Waiting approval — the person who reviewed the file is the maker, the facility's approver the checker |
+| Employee commuting (typed in or from a survey) | Draft |
+
+### The normal path
+
+```flow
+* Enter | Add data → the category → months; or a meter, bill, purchase file, smart import
+> Saved as draft | editable; Home lists My drafts
+* Submit for approval | Add data → step 2 Review → Submit (or Submit all drafts); the line above the button says who approves
+> Waiting approval | in the Approvals list of every approver of the facility, with the quantity check
+? Approver decides | Approve: the entry is approved (or goes on to level 2) | Send back: with a note; the person who entered it sees it on Home, in Add data and in the Inbox
+> Approved | Add data → step 3 Approved, Entries & results (status Approved), Data progress, dashboards, reports
+```
+
+### Who approves — several approvers
+
+An entry waits for **everyone** who may approve its facility, and the **first** one to act decides; it then leaves every list. One approval is enough.
+
+| Role | Approves entries of |
+|---|---|
+| Manager | the facilities they manage or are assigned to — a facility can have several managers |
+| Admin | every facility in their sub-group |
+| Super admin | every facility |
+| Data preparer, verifier, platform staff | none |
+
+Nobody approves their **own** entry (entered or submitted by them) unless self-approval is on — see the scenarios below. *Waiting for* on the Approvals page names all the facility's managers.
+
+### Level 2 (optional)
+
+Switched on under **Methodology & boundaries → Approval levels**: for entries of at least a set tCO₂e, or always for chosen categories.
+
+```flow
+> Waiting approval | level 1: a manager, admin or super admin of the facility
+* Level 1 approves | the entry shows “Level 2 · Level 1 approved by …”
+> Waiting at level 2 | an admin or the super admin, never the level-1 person
+* Level 2 approves | approved
+! Sent back at either level | both levels are cleared; on resubmission it starts again at level 1
+```
+
+### Where to see entries
+
+| Place | Shows |
+|---|---|
+| **Add data** → category → step 2 *Review* | drafts, waiting and sent back for the facility, category and months chosen — submit, withdraw, approve |
+| **Add data** → step 3 *Approved* | every approved entry of that facility, category and months, whoever entered it and from whatever source |
+| **Entries & approvals → Approvals** | what waits for you, and what waits for someone else (with *Sent by*) |
+| **Entries & approvals → Entries & results** | every entry of a year — filter by status and category; click one to see how it was calculated |
+| **Home** | my drafts, sent back to me, waiting for my approval, data due |
+| **Data progress** | each facility × month: approved, in review, partial, missing |
+| **Dashboards, reports, verifier pack** | approved entries only (dashboards can preview waiting ones) |
+
+Purchase files: one entry per facility, month, Scope 3 category and spend category, shown under Add data → **Purchases** (those moved to business travel also under Business travel); the lines behind them under Purchases → **Published lines**.
+
+### Scenarios
+
+| Situation | What happens |
+|---|---|
+| **Self-approval off** (default) and you submit your own entry | it waits for another approver of the facility; you see it under *Waiting for someone else* |
+| **Self-approval on**, you are a super admin, admin or manager | your entry also appears under *Waiting for you*, marked **Your entry**; **Approve my own…** (on the Approvals page or in Add data → Review) asks what you checked it against; it is marked **self-reviewed** and listed in the data-quality report and the verifier pack. Others can still approve it instead |
+| Self-approval on **with a size limit** | below the limit as above; above it someone else approves |
+| Self-approval on, you are a **data preparer** | no change — preparers never approve |
+| **Self-approval switched off again** | entries already self-approved stay approved and marked; your entries still waiting go back to needing someone else |
+| The **super admin is the company's only user** | approves their own entries without the setting (marked self-reviewed); level 2 does not apply |
+| A facility has **two managers** | both see it; the first to act decides |
+| You entered it and are the **only manager** | it waits for the sub-group admin or the super admin |
+| **Withdraw** | a waiting entry goes back to draft (for example to fix a typo before anyone looks) |
+| An **approved entry is wrong** | an approver sends it back with a note → it can be edited and resubmitted; the change is in the audit log |
+| **New factors loaded / recalculation** | the figures of saved entries (any status) are recalculated; the status stays; each change is logged with old and new totals |
+| A **meter reading** arrives for an approved month | the approved entry is not changed; the difference is listed for the approver to decide (send back to update) |
+| A **purchase file is reopened** | its entries not yet approved are taken back; approved ones stay |
+| The **month is locked** for audit | nothing in it can be entered, edited, approved, sent back or recalculated until unlocked with a reason |
+
+
 ## Approvals
 
 **Approvals** (menu → Capture → Entries & approvals) lists the entries submitted for the facilities you look after.
@@ -41,7 +135,7 @@ When it is on:
 - **Approve all without warnings** never includes your own entries.
 - Data preparers never approve. Level 2, when it applies, is always someone else.
 
-Verifiers and most frameworks expect an independent check; the BEEAH RFP asks for one. Leave it off where that applies. A company whose only user is its super admin approves its own entries anyway, marked self-reviewed.
+Verifiers, most frameworks and many tenders expect an independent check. Leave it off where that applies. A company whose only user is its super admin approves its own entries anyway, marked self-reviewed.
 
 ## Data progress
 

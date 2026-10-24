@@ -2,6 +2,10 @@
 
 Newest first.
 
+## 2026-10-24 · Manual: the life of an entry
+
+- Approvals chapter, new first section: status diagram (`diagram entry-life` in ManualBlocks: draft → waiting → optional level 2 → approved; withdraw, send back, resubmit), status table, how each source starts (typed, meters/bills, smart import, purchase files, contractor collections, commuting), the normal path, several approvers, level 2, where entries show, and scenarios (self-approval on/off/size limit/switched off again, sole super admin, two managers, only manager, withdraw, corrections, recalculation, meter reading after approval, purchase reopen, locked month). A client name removed from the self-approval paragraph.
+
 ## 2026-10-24 · Approvals: every manager named
 
 - `GET /api/approvals`: *waiting for* lists every active manager of the facility (its manager and managers assigned to it), not the first one alphabetically. Test: a second manager sees the entry; both are named. Manual: several approvers — first decision wins.

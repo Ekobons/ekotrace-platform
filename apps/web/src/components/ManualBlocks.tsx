@@ -6,7 +6,7 @@
  *   ! Checks | PDF only                   !  safety check     ?  decision: Title | yes … | no …
  *   ```
  *   ```layers                   one layer per line: Title | what protects it
- *   ```diagram scopes           ready-made pictures: scopes, month-split
+ *   ```diagram scopes           ready-made pictures: scopes, month-split, entry-life
  */
 import type { ReactNode } from 'react';
 import { Icon } from './Icon';
@@ -120,8 +120,45 @@ function MonthSplit() {
   );
 }
 
+
+/** The life of an entry: its statuses and who moves it from one to the next. */
+function EntryLife() {
+  const box = (x: number, y: number, w: number, cls: string, t: string, sub: string, dashed = false) => (
+    <g>
+      <rect x={x} y={y} width={w} height={56} rx={12} className={`el-box ${cls}`} strokeDasharray={dashed ? '6 5' : undefined} />
+      <text x={x + w / 2} y={y + 24} textAnchor="middle" className="el-t">{t}</text>
+      <text x={x + w / 2} y={y + 42} textAnchor="middle" className="el-s">{sub}</text>
+    </g>);
+  return (
+    <figure className="mentry">
+      <svg viewBox="0 0 800 312" role="img" aria-label="Draft, then submit to waiting approval, then approve (optionally a level-2 approval) to approved; send back returns it to the person who entered it, withdraw takes it back to draft">
+        <defs>
+          <marker id="el-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" className="el-head" /></marker>
+          <marker id="el-b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" className="el-headb" /></marker>
+        </defs>
+        {box(10, 92, 140, 'draft', 'Draft', 'editable · not counted')}
+        {box(215, 92, 160, 'wait', 'Waiting approval', 'in approvers\' lists')}
+        {box(440, 92, 140, 'l2', 'Level 2', 'optional: large entries', true)}
+        {box(645, 92, 145, 'ok', 'Approved', 'counts in dashboards')}
+        {box(300, 222, 200, 'back', 'Sent back', 'with the approver\'s note')}
+        {/* forward */}
+        <path d="M150 120 H213" className="el-line" markerEnd="url(#el-a)" /><text x={182} y={112} textAnchor="middle" className="el-l">Submit</text>
+        <path d="M375 120 H438" className="el-line" markerEnd="url(#el-a)" /><text x={407} y={112} textAnchor="middle" className="el-l">Approve</text>
+        <path d="M580 120 H643" className="el-line" markerEnd="url(#el-a)" /><text x={612} y={112} textAnchor="middle" className="el-l">Approve</text>
+        <path d="M295 92 C 295 30, 717 30, 717 90" className="el-line" markerEnd="url(#el-a)" /><text x={506} y={40} textAnchor="middle" className="el-l">Approve — no level 2 needed (most entries)</text>
+        {/* back */}
+        <path d="M260 148 C 260 200, 150 205, 90 150" className="el-lineb" markerEnd="url(#el-b)" /><text x={150} y={196} textAnchor="middle" className="el-lb">Withdraw</text>
+        <path d="M330 148 V220" className="el-lineb" markerEnd="url(#el-b)" /><text x={322} y={190} textAnchor="end" className="el-lb">Send back</text>
+        <path d="M717 148 C 717 250, 600 252, 502 250" className="el-lineb" markerEnd="url(#el-b)" /><text x={610} y={274} textAnchor="middle" className="el-lb">Send back (a correction)</text>
+        <path d="M400 220 C 400 185, 372 170, 360 150" className="el-line" markerEnd="url(#el-a)" /><text x={412} y={192} className="el-l">Fix, submit again</text>
+        <text x={10} y={304} className="el-n">Only Approved counts in dashboards and reports (tick “Include waiting” there to preview). A month locked for audit cannot change in any status.</text>
+      </svg>
+    </figure>);
+}
+
 export function Diagram({ name }: { name: string }) {
   if (name === 'scopes') return <Scopes />;
   if (name === 'month-split') return <MonthSplit />;
+  if (name === 'entry-life') return <EntryLife />;
   return <div className="note warn">Unknown diagram “{name}”.</div>;
 }

@@ -272,6 +272,15 @@ pre.code { background: #F4F7F5; border: 1px solid var(--line); border-radius: 10
 .msplit .bill { fill: var(--s2); opacity: .9; } .msplit .billtxt { font-size: 12px; fill: #fff; font-weight: 600; }
 .msplit .mon { fill: #EEF2EF; } .msplit .cov { fill: var(--primary); opacity: .55; } .msplit .montxt { font-size: 12px; font-weight: 600; fill: var(--fg); }
 .msplit .cut { stroke: var(--muted); stroke-dasharray: 4 4; }
+.mentry { margin: 14px 0 18px; } .mentry svg { width: 100%; height: auto; max-width: 800px; }
+.mentry .el-box { fill: var(--surface); stroke: var(--line2); stroke-width: 2; }
+.mentry .el-box.draft { fill: #F4F1EA; } .mentry .el-box.wait { fill: var(--warn-bg); stroke: #E8C98A; } .mentry .el-box.l2 { fill: var(--info-bg); stroke: #9CC3DA; }
+.mentry .el-box.ok { fill: var(--ok-bg); stroke: #8CCBB4; } .mentry .el-box.back { fill: var(--bad-bg); stroke: #E7AFA3; }
+.mentry .el-t { font-size: 14px; font-weight: 700; fill: var(--fg); } .mentry .el-s { font-size: 11.5px; fill: var(--fg2); }
+.mentry .el-line { fill: none; stroke: var(--primary); stroke-width: 2; } .mentry .el-head { fill: var(--primary); }
+.mentry .el-lineb { fill: none; stroke: var(--bad); stroke-width: 2; stroke-dasharray: 5 4; } .mentry .el-headb { fill: var(--bad); }
+.mentry .el-l { font-size: 12px; font-weight: 600; fill: var(--primary); } .mentry .el-lb { font-size: 12px; font-weight: 600; fill: var(--bad); }
+.mentry .el-n { font-size: 11.5px; fill: var(--muted); }
 
 @media print {
   .side, .no-print, .toast { display: none !important; }
