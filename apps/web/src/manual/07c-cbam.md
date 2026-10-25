@@ -32,6 +32,10 @@ A company with the full product has the same pages under Disclose → CBAM; a co
 
 The CBAM package also works as a tool in its own right, under its own name (for example *Carbontek CBAM*), with its own sign-in page at **/cbam**. It serves both sides and links them: an EU importer asks its suppliers for data, and the suppliers answer in the same tool.
 
+### Trying it
+
+On a test laptop, `npm run demo:cbam` creates two CBAM-only companies with invented data — an EU importer (*Nordhafen Metall Handel GmbH*) and its Turkish supplier (*Anatolia Steel*) — and prints their sign-ins: `importer@nordhafen.demo`, `analyst@nordhafen.demo` and `exporter@anatolia.demo`, with one password shown once, and an access code for the supplier page. `npm run demo:cbam -- --reset` creates them again. Never run it on a server with real clients.
+
 ### Signing in and signing up
 
 - **/cbam** shows the CBAM sign-in page. People sign in with their usual account; after sign-in a CBAM-only company lands on **CBAM home**.

@@ -2,6 +2,11 @@
 
 Newest first.
 
+## 2026-10-25 · CBAM demo: two CBAM-only companies
+
+- `npm run demo:cbam` (`cli/demoCbamTool.ts`; `-- --reset` to recreate): **Nordhafen Metall Handel GmbH (demo)** (DE, importer: 12 customs lines 2026, 6 suppliers, 5 data requests — accepted with actual values applied, waiting for review with a message, overdue, answered from the supplier's account, open) and **Anatolia Steel (demo)** (TR, exporter: Q1 2026 communication filled and sent, used to answer Nordhafen's Q1 request). Both have only the `cbam` product. Logins `importer@nordhafen.demo`, `analyst@nordhafen.demo`, `exporter@anatolia.demo`, one random password printed once, plus the access code of the open Q2 request. Built through the API (`buildApp` + inject), so the data follows the tool's own rules; official values loaded first if missing.
+- Manual: CBAM → Trying it.
+
 ## 2026-10-25 · CBAM: the Commission's default values and benchmarks, loaded as published
 
 - `data/cbam/official/`: the Commission's files — default values v2 of 6 Aug 2026 (IR (EU) 2025/2621 as corrected by 2026/1740; 121 country sheets, "Other countries and territories", Annex IV) and benchmarks v1 (IR (EU) 2025/2620; columns A and B with production routes).

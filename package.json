@@ -24,7 +24,8 @@
     "admin:list": "npm run admin:list -w @ekotrace/api --",
     "admin:reset": "npm run admin:reset -w @ekotrace/api --",
     "demo": "npm run migrate -w @ekotrace/api && npm run demo -w @ekotrace/api --",
-    "demo:fin": "npm run migrate -w @ekotrace/api && npm run demo:fin -w @ekotrace/api --"
+    "demo:fin": "npm run migrate -w @ekotrace/api && npm run demo:fin -w @ekotrace/api --",
+    "demo:cbam": "npm run migrate -w @ekotrace/api && npm run demo:cbam -w @ekotrace/api --"
   },
   "devDependencies": {
     "@types/node": "22.20.5",
