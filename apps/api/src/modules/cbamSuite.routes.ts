@@ -87,7 +87,7 @@ async function overview(c: Tx, year: number) {
   if (totals.mass && totals.defaultMass / totals.mass > 0.5 && markupCost > 0) alerts.push({ level: 'info', msg: `${Math.round(totals.defaultMass / totals.mass * 100)}% of the tonnes use default values; the mark-up alone costs about EUR ${Math.round(markupCost).toLocaleString('en-GB')} — ask those suppliers for actual data`, link: '/cbam/suppliers' });
   // unusual supplier values (actual lines far from the default)
   for (const x of L.filter((l) => l.source === 'actual')) {
-    const dv = pick(R, 'default', x.cn, x.origin, year)?.value ?? null;
+    const dv = x.defaultUsed ?? null;
     const cr = credibility(x.see_direct == null ? null : Number(x.see_direct) + (countsIndirect(x.sector as Sector) ? Number(x.see_indirect ?? 0) : 0), dv);
     if (cr.level === 'low' || cr.level === 'high') { alerts.push({ level: 'warn', msg: `CN ${x.cn} from ${lineSupplier(x, names)}: ${cr.msg}`, link: '/cbam/imports' }); if (alerts.length > 12) break; }
   }
@@ -111,8 +111,9 @@ const supplierBody = z.object({
 async function requestView(c: Tx, id: string) {
   const r = (await c.query(`SELECT q.*, s.name AS supplier, s.country AS supplier_country, s.installation AS supplier_installation FROM cbam_request q JOIN cbam_supplier s ON s.id = q.supplier_id WHERE q.id = $1`, [id])).rows[0];
   if (!r) throw notFound('Data request');
-  const R = await refs(c);
-  const responses = (await c.query(`SELECT * FROM cbam_response WHERE request_id = $1 ORDER BY submitted_at DESC`, [id])).rows.map((x) => {
+  const raw = (await c.query(`SELECT * FROM cbam_response WHERE request_id = $1 ORDER BY submitted_at DESC`, [id])).rows;
+  const R = await refs(c, [r.supplier_country, ...raw.map((x) => (x.data as SharedGoods).installation?.country ?? null)]);
+  const responses = raw.map((x) => {
     const d = x.data as SharedGoods;
     const country = d.installation?.country || r.supplier_country || null;
     return { ...x, goods: (d.goods ?? []).map((g) => {

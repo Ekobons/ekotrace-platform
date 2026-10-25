@@ -5,7 +5,8 @@
  *   2. loads the factor files (DESNZ 2022–2026, EPA, IPCC) when the database does not have them
  *      yet, or has them from an older version of the importer (e.g. before business travel was added);
  *   3. loads the grid factors of other countries (data/grid) when a source in that file is missing;
- *   4. loads the weekly update files (data/updates) that are new or changed.
+ *   4. loads the weekly update files (data/updates) that are new or changed;
+ *   5. loads the Commission's CBAM default values and benchmarks (data/cbam/official) not loaded yet.
  * Quick when nothing is missing (one query). Switch off with AUTO_SETUP=false.
  */
 import { readdirSync } from 'node:fs';
@@ -18,6 +19,7 @@ import { migrate } from './migrate.js';
 import { seed, seedBuildings, seedGrid, seedProcessing, gridSourceCodes } from './seed.js';
 import { IMPORTER_VERSION } from '../import/desnzWrite.js';
 import { loadUpdates } from '../modules/updates.routes.js';
+import { loadShippedOfficial } from '../lib/cbamOfficial.js';
 
 const DEFRA = join(dirname(fileURLToPath(import.meta.url)), '../../../../data/defra');
 
@@ -87,4 +89,6 @@ export async function autoSetup(log: (m: string) => void) {
   }
   // weekly updates found by the research run (shown under Weekly updates; nothing applied by itself)
   await platformTx((c) => loadUpdates(c, log));
+  // the Commission's CBAM default values and benchmarks shipped with the code (each file once, by content)
+  await platformTx((c) => loadShippedOfficial(c, log));
 }

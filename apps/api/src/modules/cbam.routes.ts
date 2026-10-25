@@ -33,12 +33,13 @@ import { sendWorkbook, styleHeader, toIsoDate } from '../lib/xlsx.js';
 import { measured } from '../lib/restate.js';
 import { PRODUCT } from '../lib/brand.js';
 import { airports } from '../lib/airports.js';
+import { benchmarkFor, defaultFor, loadRefs, routeLetters, type Ref } from '../lib/cbamValues.js';
 
 const EDIT = ['super_admin', 'admin', 'manager'] as const;
 const uuid = z.string().uuid();
 const idOf = (req: FastifyRequest) => uuid.parse((req.params as { id: string }).id);
 const canEdit = (req: FastifyRequest) => ['super_admin', 'admin', 'manager', 'platform_admin'].includes(req.user.role);
-const cnCode = z.string().trim().transform((s) => s.replace(/\D/g, '')).refine((s) => /^[0-9]{4,8}$/.test(s), 'A CN code of 4 to 8 digits');
+const cnCode = z.string().trim().transform((s) => s.replace(/\D/g, '')).refine((s) => /^[0-9]{4,10}$/.test(s), 'A CN code of 4 to 8 digits (or a 10-digit TARIC code)');
 const country = z.string().trim().regex(/^[A-Za-z]{2}$/, 'A country').transform((s) => s.toUpperCase());
 const opt = <T extends z.ZodTypeAny>(s: T) => s.nullable().optional().transform((v) => (v === '' || v === undefined ? null : v) as z.infer<T> | null);
 const n0 = z.number().finite().min(0);
@@ -64,32 +65,41 @@ async function report(c: Tx, id: string) {
   return { report: r, lines: out };
 }
 
-export async function refs(c: Tx) {
-  return (await c.query(`SELECT id, kind, cn, country, route, year, quarter, value::float8 AS value, source, indicative, tenant_id IS NOT NULL AS own FROM cbam_reference ORDER BY kind, year DESC, quarter, cn`)).rows as
-    { id: string; kind: string; cn: string | null; country: string | null; route: string | null; year: number; quarter: number | null; value: number; source: string; indicative: boolean; own: boolean }[];
+/** Reference rows (see lib/cbamValues): shared default values only for the given countries of origin. */
+export const refs = (c: Tx, countries?: (string | null)[]) => loadRefs(c, countries ?? []);
+/** The default value or benchmark for a code (kept for callers that need only the value). */
+export function pick(R: Ref[], kind: 'default' | 'benchmark', cn: string, ctry: string | null, year: number) {
+  return kind === 'default' ? defaultFor(R, cn, ctry, year) : benchmarkFor(R, cn, year, []);
 }
-/** The best reference value: same kind and year (or the latest before), longest CN prefix, same country first. */
-export function pick(R: Awaited<ReturnType<typeof refs>>, kind: string, cn: string, ctry: string | null, year: number) {
-  const c = R.filter((r) => r.kind === kind && r.cn && cn.startsWith(r.cn) && (!r.country || r.country === ctry) && r.year <= year)
-    .sort((a, b) => (b.cn!.length - a.cn!.length) || (Number(!!b.country) - Number(!!a.country)) || (b.year - a.year) || (Number(b.own) - Number(a.own)));
-  return c[0] ?? null;
+/** The Commission's tables loaded for everyone: what they are and how many values. */
+export async function officialSets(c: Tx) {
+  return (await c.query(`SELECT kind, source, indicative, count(*)::int AS rows, count(DISTINCT country)::int AS countries, max(created_at) AS loaded
+                           FROM cbam_reference WHERE tenant_id IS NULL AND kind <> 'price' GROUP BY kind, source, indicative ORDER BY kind, max(created_at) DESC`)).rows as
+    { kind: string; source: string; indicative: boolean; rows: number; countries: number; loaded: string }[];
 }
 export const priceOf = (R: Awaited<ReturnType<typeof refs>>, year: number, q: number) => R.find((r) => r.kind === 'price' && r.year === year && r.quarter === q && r.own) ?? R.find((r) => r.kind === 'price' && r.year === year && r.quarter === q) ?? null;
 
 export async function imports(c: Tx, year: number) {
-  const R = await refs(c);
+  const origins = (await c.query(`SELECT DISTINCT origin FROM cbam_import WHERE year = $1`, [year])).rows.map((r) => r.origin as string);
+  const R = await refs(c, origins);
   const rows = (await c.query(`SELECT *, mass::float8 AS mass, see_direct::float8 AS see_direct, see_indirect::float8 AS see_indirect, default_value::float8 AS default_value, benchmark::float8 AS benchmark,
                                       carbon_price_eur::float8 AS carbon_price_eur FROM cbam_import WHERE year = $1 ORDER BY quarter, import_date NULLS LAST, cn`, [year])).rows;
   return rows.map((x) => {
     const info = cnInfo(x.cn);
     const sector = (info?.sector ?? 'iron_steel') as Sector;
-    const dv = x.default_value ?? pick(R, 'default', x.cn, x.origin, year)?.value ?? null;
-    const bm = x.benchmark ?? pick(R, 'benchmark', x.cn, null, year)?.value ?? null;
+    const D = x.default_value == null ? defaultFor(R, x.cn, x.origin, year) : null;
+    const dv = x.default_value ?? D?.value ?? null;
+    // column B with default values (route behind the default value), and for actual emissions too: column B on the
+    // installation's route stands for the process benchmark plus its precursors when their masses are not known
+    const routeD = defaultFor(R, x.cn, x.origin, year)?.route ?? null;
+    const B = x.benchmark == null ? benchmarkFor(R, x.cn, year, routeLetters(routeD), 'B', x.source === 'actual' ? x.route : null) : null;
+    const bm = x.benchmark ?? B?.value ?? null;
+    const valueNotes = [x.source === 'default' ? D?.note : null, B?.note].filter((n): n is string => !!n);
     const pr = priceOf(R, year, x.quarter);
     const calc = importCalc({ year, quarter: x.quarter, mass: x.mass, sector, source: x.source, see_direct: x.see_direct, see_indirect: x.see_indirect, default_value: dv, benchmark: bm, carbon_price_eur: x.carbon_price_eur }, pr?.value ?? null);
     if (!info) calc.problems.unshift(`CN ${x.cn} is not a CBAM good (Annex I)`);
     if (!pr) calc.problems.push(`No certificate price for Q${x.quarter} ${year} yet`);
-    return { ...x, sector, category: info?.category ?? null, categoryName: info ? CATEGORIES[info.category]!.name : null, defaultUsed: dv, defaultFromLibrary: x.default_value == null && dv != null, benchmarkUsed: bm, benchmarkFromLibrary: x.benchmark == null && bm != null, calc };
+    return { ...x, sector, category: info?.category ?? null, categoryName: info ? CATEGORIES[info.category]!.name : null, defaultUsed: dv, defaultFromLibrary: x.default_value == null && dv != null, defaultTier: D?.tier ?? null, defaultSource: D?.source ?? null, benchmarkUsed: bm, benchmarkFromLibrary: x.benchmark == null && bm != null, benchmarkRoute: B?.route ?? null, valueNotes, calc };
   });
 }
 
@@ -143,7 +153,7 @@ export async function cbamRoutes(app: FastifyInstance) {
         year, installations: inst.map((i) => ({ ...i, processes: procs.filter((p) => p.installation_id === i.id), reports: reps.filter((r) => r.installation_id === i.id) })),
         reports: thisYear, facilities,
         imports: { lines: imp.length, mass: sum((x) => x.mass), embedded: sum((x) => x.calc.embedded), certificates: sum((x) => x.calc.certificates), cost: sum((x) => x.calc.cost), problems: imp.filter((x) => x.calc.problems.length).length },
-        categories: CATEGORIES, sectors: SECTORS, cn: CN, references: await refs(c), cbamFactor: cbamFactor(year), markup: { other: markup(year, 'iron_steel'), fertilisers: markup(year, 'fertilisers') },
+        categories: CATEGORIES, sectors: SECTORS, cn: CN, references: (await refs(c)).filter((r) => r.own || r.kind === 'price'), official: await officialSets(c), cbamFactor: cbamFactor(year), markup: { other: markup(year, 'iron_steel'), fertilisers: markup(year, 'fertilisers') },
         can: { edit: canEdit(req) },
       };
     });
@@ -680,6 +690,45 @@ export async function cbamRoutes(app: FastifyInstance) {
   });
 
   // ------------------------------------------------------------- references --
+  /** One code: the default value that applies for a country (and why), the default in every country, the highest value, the benchmarks. */
+  app.get('/api/cbam/reference/lookup', async (req) => {
+    const tenant = requireTenant(req);
+    const q = z.object({ cn: cnCode, country: z.string().trim().regex(/^[A-Za-z]{2}$/).transform((s) => s.toUpperCase()).optional(), year: z.coerce.number().int().min(2026).max(2100).default(Math.max(2026, new Date().getUTCFullYear())) }).parse(req.query);
+    const info = cnInfo(q.cn);
+    if (!info) throw new AppError(`CN ${q.cn} is not a CBAM good`);
+    return tenantTx(tenant, async (c) => {
+      const R = await refs(c, [q.country ?? null]);
+      const D = q.country ? defaultFor(R, q.cn, q.country, q.year) : null;
+      const H = R.filter((r) => r.kind === 'highest' && r.cn && (q.cn.startsWith(r.cn) || r.cn.startsWith(q.cn))).sort((a, b) => b.cn!.length - a.cn!.length);
+      const bm = (basis: 'A' | 'B') => {
+        const xs = R.filter((r) => r.kind === 'benchmark' && (r.basis ?? 'B') === basis && r.cn && q.cn.startsWith(r.cn) && r.year <= q.year);
+        const len = Math.max(0, ...xs.map((r) => r.cn!.length));
+        return xs.filter((r) => r.cn!.length === len).map((r) => ({ cn: r.cn, route: r.route, value: r.value, own: r.own, source: r.source }));
+      };
+      // every country's value for this code (the most specific row per country)
+      const rows = (await c.query(`SELECT country, cn, value::float8 AS value, direct::float8 AS direct, indirect::float8 AS indirect, route FROM cbam_reference
+                                     WHERE kind = 'default' AND tenant_id IS NULL AND country IS NOT NULL AND year <= $3 AND ($1 LIKE cn || '%' OR cn LIKE $2)`, [q.cn, `${q.cn}%`, q.year])).rows as
+        { country: string; cn: string; value: number; direct: number | null; indirect: number | null; route: string | null }[];
+      const per = new Map<string, typeof rows>();
+      for (const r of rows) per.set(r.country, [...(per.get(r.country) ?? []), r]);
+      const names = airports().countries;
+      const byCountry = [...per.entries()].map(([cc, xs]) => {
+        const exact = xs.filter((x) => q.cn.startsWith(x.cn)).sort((a, b) => b.cn.length - a.cn.length)[0];
+        const r = exact ?? xs.sort((a, b) => b.value - a.value)[0]!;
+        return { country: cc, name: names.get(cc) ?? cc, cn: r.cn, value: r.value, direct: r.direct, indirect: r.indirect, route: r.route, taric: !exact };
+      }).sort((a, b) => a.value - b.value);
+      const mk = (y: number) => markup(y, info.sector);
+      return {
+        cn: q.cn, category: CATEGORIES[info.category]!.name, sector: info.sector, indirectCounts: countsIndirect(info.sector), year: q.year,
+        default: D ? { value: D.value, direct: D.direct, indirect: D.indirect, route: D.route, cn: D.cn, country: D.country, tier: D.tier, note: D.note, source: D.source, indicative: D.indicative,
+          withMarkup: [2026, 2027, 2028].map((y) => ({ year: y, markup: mk(y), value: D.value * (1 + mk(y)) })) } : null,
+        other: ((o) => o && { value: o.value, direct: o.direct, indirect: o.indirect, route: o.route, cn: o.cn, note: o.note })(defaultFor(R.filter((r) => !r.own && !r.country), q.cn, '__', q.year)),
+        highest: H.map((r) => ({ cn: r.cn, value: r.value, route: r.route })),
+        benchmarks: { A: bm('A'), B: bm('B') }, byCountry,
+      };
+    });
+  });
+
   app.post('/api/cbam/reference', async (req) => {
     const tenant = requireTenant(req); requireRole(req, 'super_admin', 'admin');
     const b = z.object({ kind: z.enum(['default', 'benchmark', 'price']), cn: opt(cnCode), country: opt(country), route: opt(z.string().trim().max(120)), year: z.number().int().min(2023).max(2100),

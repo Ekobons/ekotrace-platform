@@ -2,6 +2,19 @@
 
 Newest first.
 
+## 2026-10-25 · CBAM: the Commission's default values and benchmarks, loaded as published
+
+- `data/cbam/official/`: the Commission's files — default values v2 of 6 Aug 2026 (IR (EU) 2025/2621 as corrected by 2026/1740; 121 country sheets, "Other countries and territories", Annex IV) and benchmarks v1 (IR (EU) 2025/2620; columns A and B with production routes).
+- Migration 062: `cbam_reference.direct`, `indirect`, `basis` (A/B), `description`; kind `highest` (Annex IV); `cbam_import.cn` may be a 10-digit TARIC code. Migration 063: `cbam_official_file` (shipped files loaded, by SHA-256).
+- `lib/cbamOfficial.ts`: recognises and reads both workbooks (decimal commas, "-", "N/A", "see below", merged cells, country names → ISO codes), `storeOfficial()` (replaces the shared rows of those kinds), `loadShippedOfficial()` — start-up step 5 in `db/setup.ts`, each file once.
+- `lib/cbamValues.ts`: `defaultFor()` — own value, then the country's, then "Other countries and territories" (Annex IV when the origin is unknown); 8-digit code with different TARIC values → the highest, with a note; illustrative (demo) own values only when nothing official applies. `benchmarkFor()` — column B on the route behind the default value; actual lines on the installation's route read from the line (BF/BOF, DRI, scrap/EAF, primary/secondary…), else the lowest with a note. `loadRefs()` loads shared default values only for the countries needed.
+- Import lines: `defaultTier`, `defaultSource`, `benchmarkRoute`, `valueNotes`. Free calculator: route, direct/indirect, notes. Supplier request credibility and communication comparisons use the same rules.
+- `GET /api/cbam/reference/lookup?cn&country&year`: value that applies (and why), with mark-up by year; every country's value; Annex IV; benchmarks A and B by route. `/api/cbam` returns own values and prices only, plus `official` (sets loaded).
+- `POST /api/platform/cbam/reference/official`; the preview recognises the Commission's files.
+- Web: `pages/CbamValues.tsx` (lookup) on Default values & benchmarks and in CN codes & rules; official-file preview and load; import table shows the source of the default, the benchmark route and notes.
+- Demo: illustrative reference values removed; CN codes updated (urea 3102 10 19, clinker TARIC 2523 10 00 90, aluminium 7601 20 30).
+- Manual: CBAM → Default values & benchmarks, Official default values. Test: both files recognised and loaded, country / other countries / TARIC, route-based benchmarks for default and actual lines, calculator, start-up loads once. 109 tests pass.
+
 ## 2026-10-25 · Dedicated CBAM tool: own sign-in and sign-up, importer side, supplier requests, forecast, free calculator
 
 - Migration 061: `cbam_settings` (role importer / exporter / both, EORI, authorised declarant number, price assumption), `cbam_supplier`, `cbam_import.supplier_id`, `cbam_request` (access code as sha256, 60 days; due date; reminders), `cbam_response` (form or EU template; review accept / return), `cbam_request_message`, `cbam_supplier_value`, `cbam_supplier_session` (8 h, header `x-cbam-supplier`), `cbam_signup` (platform-only). Tenant RLS on the rest; `purge.ts` covers them and `cbam_communication`.

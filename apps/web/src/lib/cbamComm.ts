@@ -90,4 +90,19 @@ export interface ForecastGroup { key: string; label: string; cn: string; origin:
 export interface ForecastResult { years: { year: number; cbamFactor: number; price: number; mass: number; embedded: number; faa: number; certificates: number; cost: number; missing: number }[]; groups: { key: string; label: string; cost: number[]; certificates: number[]; see: number[]; total: number }[]; total: number }
 export interface CbamCnRow { cn: string; name: string; category: string; sector: string }
 export interface CbamCalcResult { cn: string; name: string; category: string; sector: string; indirectCounts: boolean; country: string; tonnes: number; price: N; priceSource: string | null; thresholdNote: string; indicative: boolean; note: string;
-  years: { year: number; cbamFactor: number; markup: number; defaultValue: N; defaultIndicative: boolean | null; benchmark: N; seeDefault: N; seeActual: N; certDefault: N; certActual: N; costDefault: N; costActual: N }[] }
+  years: { year: number; cbamFactor: number; markup: number; defaultValue: N; defaultDirect: N; defaultIndirect: N; defaultIndicative: boolean | null; route: string | null; benchmark: N; notes: string[]; seeDefault: N; seeActual: N; certDefault: N; certActual: N; costDefault: N; costActual: N }[] }
+
+/** One CN code in the reference library: the value that applies for a country, every country's value, benchmarks. */
+export interface CbamLookup {
+  cn: string; category: string; sector: string; indirectCounts: boolean; year: number;
+  default: { value: number; direct: N; indirect: N; route: string | null; cn: string; country: string | null; tier: string; note: string | null; source: string; indicative: boolean; withMarkup: { year: number; markup: number; value: number }[] } | null;
+  other: { value: number; direct: N; indirect: N; route: string | null; cn: string } | null;
+  highest: { cn: string; value: number; route: string | null }[];
+  benchmarks: { A: { cn: string; route: string | null; value: number; own: boolean; source: string }[]; B: { cn: string; route: string | null; value: number; own: boolean; source: string }[] };
+  byCountry: { country: string; name: string; cn: string; value: number; direct: N; indirect: N; route: string | null; taric: boolean }[];
+}
+export interface CbamOfficialSummary {
+  kind: 'defaults' | 'benchmarks'; source: string; version: string | null; legal: string[]; total: number; defaults: number; highest: number; benchmarksA: number; benchmarksB: number;
+  countries: number; other: boolean; unknown: string[]; skipped: number; problems: { sheet: string; row: number; why: string }[];
+  sample: { kind: string; cn: string; country: string | null; value: number; direct: N; indirect: N; route: string | null; basis: string | null; description: string }[];
+}

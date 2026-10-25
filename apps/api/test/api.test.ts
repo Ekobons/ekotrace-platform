@@ -3507,6 +3507,52 @@ test('CBAM tool: importer overview and threshold, suppliers and data requests an
   } finally { delete process.env.CBAM_SIGNUP; }
 });
 
+test("CBAM official values: the Commission's default-values and benchmark workbooks recognised and loaded whole; country, other countries, TARIC codes, production route picks the benchmark; start-up loads each shipped file once", async () => {
+  const { readFileSync } = await import('node:fs');
+  const dir = new URL('../../../data/cbam/official/', import.meta.url);
+  const dvFile = readFileSync(new URL('cbam-default-values-v2-2026-08-06.xlsx', dir)), bmFile = readFileSync(new URL('cbam-benchmarks-v1-2026-02-06.xlsx', dir));
+  const post = (url: string, body: Buffer, name: string) => app.inject({ method: 'POST', url, payload: body, headers: { cookie: adminCookie, 'content-type': 'application/octet-stream', 'x-filename': name } });
+  const pv = (await post('/api/platform/cbam/reference/preview', dvFile, 'DV correcting act.xlsx')).json();
+  assert.equal(pv.official.kind, 'defaults'); assert.ok(pv.official.countries > 100, 'one sheet per country'); assert.deepEqual(pv.official.unknown, []);
+  assert.ok(pv.official.legal.includes('2026/1740')); assert.ok(pv.official.highest > 200, 'Annex IV');
+  const a = await post('/api/platform/cbam/reference/official', dvFile, 'dv.xlsx'); assert.equal(a.statusCode, 200, a.body);
+  const b = await post('/api/platform/cbam/reference/official', bmFile, 'bm.xlsx'); assert.equal(b.statusCode, 200, b.body);
+  assert.equal(b.json().kind, 'benchmarks'); assert.ok(b.json().benchmarksA > 500 && b.json().benchmarksB > 1500);
+  assert.equal((await post('/api/platform/cbam/reference/official', Buffer.from('a;b\n1;2\n'), 'x.csv')).statusCode, 400, 'not a Commission file');
+  const co = await api('POST', '/api/platform/companies', { name: 'Official Values Importer', country: 'DE', gwpSet: 'AR6', products: ['cbam'], superAdmin: { name: 'Olaf', email: 'super@official.test' } });
+  const T = co.body.company.id as string;
+  const look = async (cn: string, c: string) => (await api('GET', `/api/cbam/reference/lookup?cn=${cn}&country=${c}`, undefined, T)).body;
+  // China, hot-rolled coil: the country's value (route C = BF/BOF) and the column B benchmark of that route
+  const hr = await look('72083900', 'CN');
+  assert.equal(hr.default.tier, 'country'); assert.equal(hr.default.route, 'C'); assert.ok(Math.abs(hr.default.value - 3.187) < 1e-9);
+  assert.deepEqual(hr.benchmarks.B.map((x: { route: string }) => x.route).sort(), ['C', 'D', 'E']); assert.ok(hr.byCountry.length > 20);
+  assert.ok(Math.abs(hr.default.withMarkup[0].value - 3.187 * 1.1) < 1e-9);
+  // grey Portland cement from Türkiye: "-" in the Turkish table → other countries and territories
+  const pc = await look('25232900', 'TR'); assert.equal(pc.default.tier, 'other'); assert.ok(pc.default.note.includes('Other countries'));
+  // clinker: values per TARIC code
+  const ck8 = await look('25231000', 'CN'); assert.ok(ck8.default.note.includes('TARIC'));
+  const ck10 = await look('2523100090', 'CN'); assert.equal(ck10.default.note, null); assert.ok(Math.abs(ck10.default.value - 1.39) < 1e-9);
+  // import lines: default line priced with the country value + mark-up and the route's benchmark; actual line on its own route
+  assert.equal((await api('POST', '/api/cbam/imports', { year: 2026, importDate: '2026-03-01', cn: '72083900', origin: 'CN', mass: 100, source: 'default' }, T)).status, 200);
+  assert.equal((await api('POST', '/api/cbam/imports', { year: 2026, importDate: '2026-03-02', cn: '72083900', origin: 'IN', mass: 100, source: 'actual', seeDirect: 0.5, route: 'Scrap-based EAF' }, T)).status, 200);
+  assert.equal((await api('POST', '/api/cbam/imports', { year: 2026, importDate: '2026-03-03', cn: '2523100090', origin: 'CN', mass: 10, source: 'default' }, T)).status, 200, 'a 10-digit TARIC code');
+  const L = (await api('GET', '/api/cbam/imports?year=2026', undefined, T)).body.lines as { cn: string; origin: string; calc: { see: number; sefa: number }; benchmarkUsed: number; benchmarkRoute: string; defaultTier: string; valueNotes: string[] }[];
+  const def = L.find((x) => x.origin === 'CN' && x.cn === '72083900')!, act = L.find((x) => x.origin === 'IN')!;
+  assert.ok(Math.abs(def.calc.see - 3.187 * 1.1) < 1e-9); assert.equal(def.benchmarkRoute, 'C'); assert.ok(Math.abs(def.calc.sefa - 1.37 * 0.975) < 1e-9); assert.equal(def.defaultTier, 'country');
+  assert.equal(act.benchmarkRoute, 'E', 'scrap/EAF route from the line'); assert.ok(Math.abs(act.benchmarkUsed - 0.072) < 1e-9);
+  // the free calculator uses them too
+  const calc = (await app.inject({ method: 'POST', url: '/api/public/cbam/calc', payload: { cn: '72083900', country: 'CN', tonnes: 1000, price: 80 } })).json();
+  assert.equal(calc.years[0].route, 'C'); assert.ok(Math.abs(calc.years[0].certDefault - (3.187 * 1.1 - 1.37 * 0.975) * 1000) < 1e-6);
+  // start-up: shipped files loaded once (by content), then skipped
+  const { loadShippedOfficial } = await import('../src/lib/cbamOfficial.js');
+  const { platformTx } = await import('../src/db/pool.js');
+  const logs: string[] = [];
+  await platformTx((c) => loadShippedOfficial(c, (m) => logs.push(m)));
+  assert.equal(logs.length, 2, logs.join('\n'));
+  logs.length = 0; await platformTx((c) => loadShippedOfficial(c, (m) => logs.push(m)));
+  assert.equal(logs.length, 0, 'already loaded');
+});
+
 test('ESG: frameworks decide the materiality needed, double materiality scoring (actual, potential, human rights), decisions need a reason, second-person approval, industry questions with answers checked, export; companies kept apart', async () => {
   const T = tenantA, Y = 2023;
   let d = (await api('GET', `/api/esg?year=${Y}`, undefined, T)).body;

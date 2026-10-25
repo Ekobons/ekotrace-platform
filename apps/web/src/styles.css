@@ -1600,3 +1600,12 @@ ul.plain { list-style: none; margin: 0; padding: 0; }
 .cbdoc { display: grid; gap: 10px; max-width: 1100px; }
 .cbdoc h1 { margin: 2px 0; } .cbdoc h2 { font-size: 15px; margin: 10px 0 0; color: var(--ink); }
 @media print { .cbprint { padding: 0; } .cbdoc { border: 0; box-shadow: none; padding: 0; } .cbdoc table { break-inside: auto; } .cbdoc tr { break-inside: avoid; } }
+
+/* CBAM official values lookup */
+.cvl-box { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 300px); gap: 16px; align-items: start; padding: 14px 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--ok-bg); }
+.cvl-big { font-size: 28px; font-weight: 700; letter-spacing: -.01em; margin: 2px 0; }
+.cvl-big small { font-size: 13px; font-weight: 500; color: var(--muted, #5b6b66); }
+.cvl-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+.warn-t { color: var(--warn); }
+table.t tr.on td { background: var(--ok-bg); }
+@media (max-width: 720px) { .cvl-box { grid-template-columns: 1fr; } }

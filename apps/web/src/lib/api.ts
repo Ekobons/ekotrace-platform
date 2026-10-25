@@ -2,7 +2,7 @@
  * Talking to the API. One function per call, typed results.
  * The chosen company travels in the x-tenant-id header (temporary, until login exists).
  */
-import type { CbamCalcResult, CbamCnRow, CbamRequestRow, CbamRequestView, CbamSettings, CbamSummary, CbamSupplierRow, CommData, CommListItem, CommLists, CommView, ForecastAssumptions, ForecastGroup, ForecastResult, ImporterOverview } from './cbamComm';
+import type { CbamCalcResult, CbamCnRow, CbamLookup, CbamOfficialSummary, CbamRequestRow, CbamRequestView, CbamSettings, CbamSummary, CbamSupplierRow, CommData, CommListItem, CommLists, CommView, ForecastAssumptions, ForecastGroup, ForecastResult, ImporterOverview } from './cbamComm';
 export type Basis = 'direct' | 'wtt' | 'outside_scopes' | 'memo' | 'scope2' | 'scope2_market' | 'td_loss' | 'scope3';
 
 export interface Item { id: number; subcategory_id: number; code: string; name: string; aliases: string[]; default_unit: string | null; gas_code: string | null; note: string | null; sort: number; active: boolean; composition: { gas: string; fraction: number }[] | null; hiddenForClient?: boolean; attrs?: VehicleAttrs }
@@ -541,12 +541,12 @@ export interface CbamInstallation {
   lat: number | null; lon: number | null; operator_name: string | null; operator_reg: string | null; operator_address: string | null; operator_country: string | null; contact_name: string | null; contact_email: string | null; contact_phone: string | null; notes: string;
   processes: { id: string; category: string; route: string; name: string }[]; reports: { id: string; year: number; status: string; verifier_name: string | null; verification_date: string | null }[];
 }
-export interface CbamRef { id: string; kind: 'default' | 'benchmark' | 'price'; cn: string | null; country: string | null; route: string | null; year: number; quarter: number | null; value: number; source: string; indicative: boolean; own: boolean }
+export interface CbamRef { id: string; kind: 'default' | 'benchmark' | 'price' | 'highest'; cn: string | null; country: string | null; route: string | null; year: number; quarter: number | null; value: number; source: string; indicative: boolean; own: boolean }
 export interface CbamData {
   year: number; installations: CbamInstallation[]; facilities: { id: string; name: string; country: string }[];
   reports: { id: string; installation_id: string; year: number; status: string; lines: { id: string; process: string; category: string; categoryName: string; route: string; activity_t: number | null; goods: string[]; see: CbamSee }[] }[];
   imports: { lines: number; mass: number; embedded: number; certificates: number; cost: number; problems: number };
-  categories: Record<string, CbamCategory>; sectors: Record<string, string>; cn: [string, string, string][]; references: CbamRef[]; cbamFactor: number; markup: { other: number; fertilisers: number }; can: { edit: boolean };
+  categories: Record<string, CbamCategory>; sectors: Record<string, string>; cn: [string, string, string][]; references: CbamRef[]; official: { kind: string; source: string; indicative: boolean; rows: number; countries: number; loaded: string }[]; cbamFactor: number; markup: { other: number; fertilisers: number }; can: { edit: boolean };
 }
 export interface CbamPrecursor { id: string; category: string; cn: string | null; origin: string | null; quantity_t: number; see_direct: number; see_indirect: number; source: string; supplier: string | null; installation_ref: string | null; period: string | null }
 export interface CbamLine { id: string; process_id: string; process: string; category: string; categoryName: string; sector: string; route: string; activity_t: number | null; direct_t: number | null; elec_mwh: number | null; default_share: number; params: Record<string, string>; precursors: CbamPrecursor[]; goods: { id: string; cn: string; description: string; quantity_t: number | null }[]; see: CbamSee }
@@ -559,7 +559,7 @@ export interface CbamReport {
 export interface CbamImport {
   id: string; year: number; import_date: string | null; quarter: number; cn: string; description: string; origin: string; mass: number; procedure: string | null; customs_ref: string | null; supplier: string | null;
   installation: string | null; installation_id_reg: string | null; route: string | null; report_id: string | null; source: 'actual' | 'default'; see_direct: number | null; see_indirect: number | null; default_value: number | null; benchmark: number | null;
-  carbon_price_eur: number | null; verifier_ref: string | null; notes: string; sector: string; category: string | null; categoryName: string | null; defaultUsed: number | null; defaultFromLibrary: boolean; benchmarkUsed: number | null; benchmarkFromLibrary: boolean;
+  carbon_price_eur: number | null; verifier_ref: string | null; notes: string; sector: string; category: string | null; categoryName: string | null; defaultUsed: number | null; defaultFromLibrary: boolean; defaultTier: string | null; defaultSource: string | null; benchmarkUsed: number | null; benchmarkFromLibrary: boolean; benchmarkRoute: string | null; valueNotes: string[];
   calc: { see: number | null; markup: number; embedded: number | null; sefa: number; faa: number; priceDeduct: number; certificates: number | null; price: number | null; cost: number | null; problems: string[] };
 }
 
@@ -968,7 +968,9 @@ export const api = {
   cbamCalc: (b: { cn: string; country: string; tonnes: number; seeDirect?: number | null; seeIndirect?: number | null; price?: number | null }) => call<CbamCalcResult>('POST', '/api/public/cbam/calc', b),
   cbamSignup: (b: { company: string; country: string; role: string; name: string; email: string; accept: boolean }) => call<{ ok: true; message: string }>('POST', '/api/public/cbam/signup', b),
   cbamSignupConfirm: (token: string, password: string) => call<{ ok: true; email: string }>('POST', '/api/public/cbam/signup/confirm', { token, password }),
-  cbamRefPreview: (f: File) => call<{ header: string[]; sample: string[][]; total: number; guess: { cn: number; country: number; value: number } }>('POST', '/api/platform/cbam/reference/preview', undefined, f, { 'x-filename': encodeURIComponent(f.name) }),
+  cbamRefLookup: (cn: string, country: string, year?: number) => call<CbamLookup>('GET', `/api/cbam/reference/lookup?cn=${encodeURIComponent(cn)}${country ? `&country=${country}` : ''}${year ? `&year=${year}` : ''}`),
+  cbamRefOfficial: (f: File) => call<CbamOfficialSummary & { imported: number; replaced: number }>('POST', '/api/platform/cbam/reference/official', undefined, f, { 'x-filename': encodeURIComponent(f.name) }),
+  cbamRefPreview: (f: File) => call<{ official: CbamOfficialSummary | null; header: string[]; sample: string[][]; total: number; guess: { cn: number; country: number; value: number } }>('POST', '/api/platform/cbam/reference/preview', undefined, f, { 'x-filename': encodeURIComponent(f.name) }),
   cbamRefImport: (f: File, q: Record<string, string | number>) => call<{ imported: number; replaced: number; skipped: number; problems: { row: number; why: string }[] }>('POST', `/api/platform/cbam/reference/import?${new URLSearchParams(Object.entries(q).map(([k, v]) => [k, String(v)])).toString()}`, undefined, f, { 'x-filename': encodeURIComponent(f.name) }),
   cbamRefSets: () => call<{ sets: { kind: string; year: number; source: string; indicative: boolean; rows: number; loaded: string }[] }>('GET', '/api/platform/cbam/reference/sets'),
   cbamRefRemove: (kind: string, year: number, source: string) => call<{ removed: number }>('DELETE', `/api/platform/cbam/reference?kind=${kind}&year=${year}&source=${encodeURIComponent(source)}`),

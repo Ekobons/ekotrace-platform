@@ -95,7 +95,7 @@ async function yearSummary(c: Tx, year: number) {
 
 /** Per product: the EU default value for its CN code and the installation's country, and what the actual value saves the importer. */
 async function vsDefaults(c: Tx, v: ReturnType<typeof view>) {
-  const R = await refs(c);
+  const R = await refs(c, [v.data.installation.country || null]);
   const year = Number((v.data.period.start ?? new Date().toISOString()).slice(0, 4));
   const yr = Math.max(2026, year);
   const price = [4, 3, 2, 1].map((q) => priceOf(R, yr, q)?.value).find((x) => x != null) ?? [4, 3, 2, 1].map((q) => priceOf(R, yr - 1, q)?.value).find((x) => x != null) ?? null;

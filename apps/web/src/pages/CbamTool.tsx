@@ -17,6 +17,7 @@ import { Icon } from '../components/Icon';
 import { BarList, countryName } from '../components/Charts';
 import { CountrySelect } from '../components/CountrySelect';
 import { CbamHome } from './CbamPackage';
+import { CbamValueLookup } from './CbamValues';
 
 const f = (x: number | null | undefined, d = 2) => (x == null || !Number.isFinite(x) ? '—' : x.toLocaleString('en-GB', { maximumFractionDigits: d }));
 const f0 = (x: number | null | undefined) => (x == null || !Number.isFinite(x) ? '—' : Math.round(x).toLocaleString('en-GB'));
@@ -423,12 +424,10 @@ export function CbamLibrary() {
   const [res, setRes] = useState<{ total: number; codes: CbamCnRow[] } | null>(null);
   const [lists, setLists] = useState<CommLists | null>(null);
   const [sel, setSel] = useState<CbamCnRow | null>(null);
-  const [refs, setRefs] = useState<{ kind: string; cn: string | null; country: string | null; year: number; value: number; source: string; indicative: boolean }[]>([]);
   const [rule, setRule] = useState('');
-  useEffect(() => { api.cbamCommLists().then(setLists).catch(() => {}); api.cbam(Math.max(2026, thisYear)).then((d) => setRefs(d.references as typeof refs)).catch(() => {}); }, []);
+  useEffect(() => { api.cbamCommLists().then(setLists).catch(() => {}); }, []);
   useEffect(() => { const t = window.setTimeout(() => { api.cbamCn(q).then(setRes).catch((e) => toast((e as Error).message)); }, 200); return () => window.clearTimeout(t); }, [q]); // eslint-disable-line react-hooks/exhaustive-deps
   const g = sel && lists ? lists.goods.find((x) => x.name.trim() === sel.category) : null;
-  const rs = sel ? refs.filter((r) => r.cn && sel.cn.startsWith(r.cn) && r.kind !== 'price') : [];
   const rules = RULES.filter((r) => !rule || `${r.t} ${r.d}`.toLowerCase().includes(rule.toLowerCase()));
   return <div className="page">
     <Head eyebrow="CBAM" title="CN codes & rules" sub="Which goods are covered, how their emissions are counted, and the main rules — with the official texts." />
@@ -451,10 +450,8 @@ export function CbamLibrary() {
             {g && g.chain.length > 1 && <tr><td>Relevant precursors</td><td>{g.chain.slice(1).join(', ')}</td></tr>}
             {g && <tr><td>Unit</td><td>{g.unit === 'MWh' ? 'MWh' : 'tonnes'}</td></tr>}
           </tbody></table>
-          <span className="lbl">Default values and benchmarks in the tool</span>
-          {rs.length ? <table className="t"><thead><tr><th>Kind</th><th>Country</th><th>Year</th><th className="num">Value</th><th>Source</th></tr></thead>
-            <tbody>{rs.slice(0, 12).map((r, i) => <tr key={i}><td>{r.kind === 'default' ? 'Default value' : 'CBAM benchmark'}</td><td>{r.country ?? 'all'}</td><td>{r.year}</td><td className="num">{f(r.value, 3)}</td><td className="small">{r.source}{r.indicative && <span className="chip warn" style={{ marginLeft: 4 }}>illustrative</span>}</td></tr>)}</tbody></table>
-            : <div className="muted small">None loaded for this code yet.</div>}
+          <span className="lbl">Default values and benchmarks</span>
+          <CbamValueLookup initialCn={sel.cn} fixedCn />
           <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}><Link className="btn sm" to={`/cbam-calculator?cn=${sel.cn}`}>Cost calculator →</Link></div>
         </>}
       </section>

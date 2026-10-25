@@ -15,6 +15,7 @@ import { Icon } from '../components/Icon';
 import { CountrySelect, CityInput } from '../components/CountrySelect';
 import { countryLabel } from '../lib/countries';
 import { CbamComms } from './CbamComm';
+import { CbamValueLookup } from './CbamValues';
 
 type Tab = 'overview' | 'comms' | 'installations' | 'reports' | 'imports' | 'reference';
 const TABS: [Tab, string][] = [['overview', 'Overview'], ['comms', 'Exporter portal'], ['installations', 'Installations'], ['reports', 'Emissions reports'], ['imports', 'Imports & declaration'], ['reference', 'Default values & benchmarks']];
@@ -22,7 +23,7 @@ const f = (x: number | null | undefined, d = 3) => (x == null ? '—' : x.toLoca
 const f0 = (x: number | null | undefined) => (x == null ? '—' : Math.round(x).toLocaleString('en-GB'));
 const d8 = (x: string | null) => (x ? new Date(x).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '—');
 const STATUS: Record<string, [string, string]> = { draft: ['Draft', 'grey'], verified: ['Verified', ''], shared: ['Verified · shared', 'info'] };
-const cnFmt = (c: string) => c.replace(/^(\d{4})(\d{2})?(\d{2})?$/, (_, a, b, cc) => [a, b, cc].filter(Boolean).join(' '));
+const cnFmt = (c: string) => c.replace(/^(\d{4})(\d{2})?(\d{2})?(\d{2})?$/, (_, a, b, cc, dd) => [a, b, cc, dd].filter(Boolean).join(' '));
 const numOrNull = (s: string) => (s.trim() === '' ? null : Number(s));
 type Act = (fn: () => Promise<unknown>, msg: string) => Promise<void>;
 
@@ -381,8 +382,8 @@ function Imports({ year, d }: { year: number; d: CbamData }) {
           <td>{countryLabel(l.origin)}<div className="muted small">{[l.installation ?? l.supplier, l.installation_id_reg].filter(Boolean).join(' · ')}</div></td>
           <td className="num">{f(l.mass, 1)}</td>
           <td className="ctr"><span className={`chip ${l.source === 'default' ? 'warn' : ''}`}>{l.source}</span>{l.source === 'default' && l.calc.markup ? <div className="muted small">+{Math.round(l.calc.markup * 100)}% mark-up</div> : null}</td>
-          <td className="num">{f(l.calc.see, 4)}{l.source === 'default' && l.defaultFromLibrary && <div className="muted small">library</div>}</td>
-          <td className="num">{f(l.calc.sefa, 4)}{l.benchmarkUsed != null && <div className="muted small">bm {f(l.benchmarkUsed, 3)}</div>}</td>
+          <td className="num">{f(l.calc.see, 4)}{l.source === 'default' && l.defaultFromLibrary && <div className="muted small" title={l.defaultSource ?? ''}>{l.defaultTier === 'other' ? 'EU · other countries' : l.defaultTier === 'own' ? 'your value' : 'EU default'}</div>}</td>
+          <td className="num">{f(l.calc.sefa, 4)}{l.benchmarkUsed != null && <div className="muted small">bm {f(l.benchmarkUsed, 3)}{l.benchmarkRoute ? ` (${l.benchmarkRoute})` : ''}</div>}{l.valueNotes.length > 0 && <div className="small warn-t" title={l.valueNotes.join('\n')}>ⓘ {l.valueNotes.length === 1 && l.valueNotes[0]!.length < 60 ? l.valueNotes[0] : 'see note'}</div>}</td>
           <td className="num"><b>{f(l.calc.certificates, 1)}</b></td>
           <td className="num">{f0(l.calc.cost)}{l.calc.problems.length > 0 && <div className="small bad" title={l.calc.problems.join('\n')}>! {l.calc.problems[0]}</div>}</td>
           {x.can.edit && <td className="num" style={{ whiteSpace: 'nowrap' }}><button className="btn sm ghost" aria-label="Edit" onClick={() => setEdit(l)}><Icon name="edit" size={15} /></button>
@@ -473,9 +474,20 @@ function OfficialLoader({ reload }: { reload: () => void }) {
   const col = (k: 'cnCol' | 'countryCol' | 'valueCol', l: string, none?: boolean) => <label className="field"><span>{l}</span><select className="input" value={m[k]} onChange={(e) => setM({ ...m, [k]: Number(e.target.value) })}>{none && <option value={-1}>— none (all countries)</option>}{pv!.header.map((h, i) => <option key={i} value={i}>{h || `Column ${i + 1}`}</option>)}</select></label>;
   return <div className="card" style={{ display: 'grid', gap: 10 }}>
     <div><span className="lbl">Platform · all companies</span><h3 style={{ margin: '2px 0 0' }}>Load official default values or benchmarks</h3>
-      <div className="muted small">Upload the Commission's spreadsheet as published (Excel or CSV), map its columns, and the values are used by every company and by the free calculator. Loading the same kind, year and source again replaces the earlier set.</div></div>
+      <div className="muted small">Upload the Commission's workbook as published: the default-values file (one sheet per country) and the benchmarks file are recognised and loaded whole, replacing the earlier official values. Any other spreadsheet (Excel or CSV): map its columns. The values are used by every company and by the free calculator.</div></div>
     <div><input type="file" accept=".xlsx,.csv" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) void pick(f); }} /></div>
-    {pv && <>
+    {pv?.official && <div style={{ display: 'grid', gap: 8 }}>
+      <div className="note ok small"><b>Recognised: the Commission's {pv.official.kind === 'defaults' ? 'default values' : 'benchmarks'} file</b> — {pv.official.source}.
+        {pv.official.kind === 'defaults' ? ` ${pv.official.defaults.toLocaleString('en-GB')} values for ${pv.official.countries} countries${pv.official.other ? ', “Other countries and territories”' : ''}, ${pv.official.highest} highest values (Annex IV).`
+          : ` ${pv.official.benchmarksB.toLocaleString('en-GB')} benchmarks for default values (column B) and ${pv.official.benchmarksA.toLocaleString('en-GB')} for actual emissions (column A), with their production routes.`}
+        {' '}Values are stored before the mark-up; the tool adds each year's mark-up.</div>
+      {pv.official.unknown.length > 0 && <div className="note bad small">Countries not recognised: {pv.official.unknown.join(', ')}</div>}
+      <div className="scroll"><table className="t"><thead><tr><th>Kind</th><th>Code</th><th>Country</th><th>Description</th><th className="num">Direct</th><th className="num">Indirect</th><th className="num">Value</th><th>Route</th></tr></thead>
+        <tbody>{pv.official.sample.map((r, i) => <tr key={i}><td className="small">{r.kind === 'benchmark' ? `Benchmark ${r.basis}` : r.kind === 'highest' ? 'Highest' : 'Default'}</td><td className="mono">{cnFmt(r.cn)}</td><td>{r.country ? countryLabel(r.country) : '—'}</td><td className="small">{r.description}</td><td className="num">{r.direct ?? ''}</td><td className="num">{r.indirect ?? ''}</td><td className="num">{r.value}</td><td>{r.route ?? ''}</td></tr>)}</tbody></table></div>
+      <div className="row" style={{ gap: 8 }}><button className="btn p" disabled={pv.official.unknown.length > 0} onClick={() => void api.cbamRefOfficial(file!).then((r) => { toast(`${r.imported.toLocaleString('en-GB')} values loaded${r.replaced ? `, ${r.replaced.toLocaleString('en-GB')} replaced` : ''}`); setPv(null); setFile(null); void load(); reload(); }).catch((e) => toast((e as Error).message))}>Load {pv.official.total.toLocaleString('en-GB')} values for every company</button>
+        <button className="btn ghost" onClick={() => { setPv(null); setFile(null); }}>Cancel</button></div>
+    </div>}
+    {pv && !pv.official && <>
       <div className="scroll"><table className="t"><thead><tr>{pv.header.map((h, i) => <th key={i}>{h || `Column ${i + 1}`}</th>)}</tr></thead><tbody>{pv.sample.slice(0, 6).map((r, i) => <tr key={i}>{r.map((c, j) => <td key={j} className="small">{c}</td>)}</tr>)}</tbody></table></div>
       <div className="muted small">{pv.total} rows in the file.</div>
       <div className="row" style={{ gap: 10, flexWrap: 'wrap', alignItems: 'end' }}>
@@ -491,7 +503,7 @@ function OfficialLoader({ reload }: { reload: () => void }) {
       <div><button className="btn p" disabled={m.source.trim().length < 3} onClick={() => void api.cbamRefImport(file!, m).then((r) => { toast(`${r.imported} values loaded${r.replaced ? `, ${r.replaced} replaced` : ''}${r.skipped ? `, ${r.skipped} rows skipped` : ''}`); setPv(null); setFile(null); void load(); reload(); }).catch((e) => toast((e as Error).message))}>Load {pv.total} rows</button></div>
     </>}
     {sets.length > 0 && <table className="t"><thead><tr><th>Loaded set</th><th>Kind</th><th>Year</th><th className="num">Values</th><th>Loaded</th><th /></tr></thead>
-      <tbody>{sets.map((x) => <tr key={`${x.kind}|${x.year}|${x.source}`}><td className="small">{x.source}{x.indicative && <span className="chip warn" style={{ marginLeft: 4 }}>illustrative</span>}</td><td>{x.kind === 'default' ? 'Default values' : 'Benchmarks'}</td><td>{x.year}</td><td className="num">{x.rows}</td><td className="small">{d8(x.loaded)}</td>
+      <tbody>{sets.map((x) => <tr key={`${x.kind}|${x.year}|${x.source}`}><td className="small">{x.source}{x.indicative && <span className="chip warn" style={{ marginLeft: 4 }}>illustrative</span>}</td><td>{x.kind === 'default' ? 'Default values' : x.kind === 'highest' ? 'Highest values (Annex IV)' : 'Benchmarks'}</td><td>{x.year}</td><td className="num">{x.rows}</td><td className="small">{d8(x.loaded)}</td>
         <td><button className="btn sm ghost" onClick={() => { if (confirm(`Remove ${x.rows} values of "${x.source}" for every company?`)) void api.cbamRefRemove(x.kind, x.year, x.source).then(() => { void load(); reload(); }).catch((e) => toast((e as Error).message)); }}>Remove</button></td></tr>)}</tbody></table>}
   </div>;
 }
@@ -503,11 +515,17 @@ function References({ d, act }: { d: CbamData; act: Act }) {
   const rows = d.references;
   return <>
     {role === 'platform_admin' && <OfficialLoader reload={() => void act(async () => {}, 'Library updated')} />}
-    <div className="note warn small">Use the official values: default values from the Annex of Implementing Regulation (EU) 2025/2621 (per CN code and country of origin) and CBAM benchmarks from Implementing Regulation (EU) 2025/2620. Values marked <b>illustrative</b> are for the demo only. When a line has its own value, that one is used; otherwise the most specific value here (longest CN code, same country first).</div>
+    <div className="card" style={{ display: 'grid', gap: 8 }}>
+      <div><span className="lbl">Official values</span><h3 style={{ margin: '2px 0 0' }}>Default values and benchmarks of the Commission</h3></div>
+      {d.official.length ? <ul className="steps small">{d.official.map((o) => <li key={`${o.kind}|${o.source}`}><b>{o.kind === 'default' ? `Default values — ${o.countries} countries and “other countries”` : o.kind === 'highest' ? 'Highest default values (Annex IV)' : 'Benchmarks (columns A and B)'}</b>: {o.rows.toLocaleString('en-GB')} values · {o.source}{o.indicative && <span className="chip warn" style={{ marginLeft: 4 }}>illustrative</span>}</li>)}</ul>
+        : <div className="note warn small">No official values loaded yet: lines need their own default value and benchmark.</div>}
+      <div className="muted small">How a value is chosen: a line's own value first; then your company's values below; then the value for the country of origin (or “Other countries and territories” when the country has none); the benchmark of column B on the production route behind the default value — or the installation's route for actual emissions. Default values are stored before the mark-up, which is added for each year.</div>
+      <CbamValueLookup />
+    </div>
     {can && <div className="card"><h3 style={{ marginTop: 0 }}>Add a value for your company</h3>
       <div className="row" style={{ gap: 8, flexWrap: 'wrap', alignItems: 'flex-end' }}>
         <label className="field"><span>Kind</span><select className="input" value={v.kind} onChange={(e) => setV({ ...v, kind: e.target.value })}><option value="default">Default value (tCO₂e/t)</option><option value="benchmark">CBAM benchmark (tCO₂e/t)</option><option value="price">Certificate price (EUR)</option></select></label>
-        {v.kind !== 'price' && <label className="field"><span>CN code (4–8 digits)</span><input className="input mono" style={{ width: 130 }} value={v.cn} onChange={(e) => setV({ ...v, cn: e.target.value })} /></label>}
+        {v.kind !== 'price' && <label className="field"><span>CN code (4–8 digits, or TARIC)</span><input className="input mono" style={{ width: 130 }} value={v.cn} onChange={(e) => setV({ ...v, cn: e.target.value })} /></label>}
         {v.kind === 'default' && <label className="field" style={{ minWidth: 200 }}><span>Country of origin</span><CountrySelect value={v.country} empty="All countries" onChange={(c) => setV({ ...v, country: c })} /></label>}
         <label className="field"><span>Year</span><input className="input num" style={{ width: 80 }} value={v.year} onChange={(e) => setV({ ...v, year: e.target.value })} /></label>
         {v.kind === 'price' && <label className="field"><span>Quarter</span><select className="input" value={v.quarter} onChange={(e) => setV({ ...v, quarter: e.target.value })}><option value="">—</option>{[1, 2, 3, 4].map((q) => <option key={q} value={q}>Q{q}</option>)}</select></label>}
@@ -516,7 +534,7 @@ function References({ d, act }: { d: CbamData; act: Act }) {
         <button className="btn p" disabled={!v.value || v.source.trim().length < 2} onClick={() => void act(async () => { await api.cbamReferenceAdd({ kind: v.kind, cn: v.cn.trim() || null, country: v.country || null, year: Number(v.year), quarter: v.quarter ? Number(v.quarter) : null, value: Number(v.value), source: v.source.trim() }); setV({ ...v, cn: '', value: '' }); }, 'Added')}>Add</button>
       </div></div>}
     <div className="card"><div className="scroll"><table className="t">
-      <thead><tr><th>Kind</th><th>CN code</th><th>Country</th><th>Year</th><th className="num">Value</th><th>Source</th>{can && <th />}</tr></thead>
+      <thead><tr><th>Your values and certificate prices</th><th>CN code</th><th>Country</th><th>Year</th><th className="num">Value</th><th>Source</th>{can && <th />}</tr></thead>
       <tbody>{rows.map((r) => <tr key={r.id}><td>{r.kind === 'default' ? 'Default value' : r.kind === 'benchmark' ? 'CBAM benchmark' : 'Certificate price'}</td><td className="mono">{r.cn ? cnFmt(r.cn) : '—'}</td><td>{r.country ? countryLabel(r.country) : r.kind === 'price' ? '—' : 'All'}</td>
         <td>{r.year}{r.quarter ? ` Q${r.quarter}` : ''}</td><td className="num">{r.kind === 'price' ? `EUR ${r.value.toFixed(2)}` : f(r.value, 4)}</td>
         <td className="small">{r.indicative && <span className="chip warn" style={{ marginRight: 4 }}>illustrative</span>}{r.source}</td>

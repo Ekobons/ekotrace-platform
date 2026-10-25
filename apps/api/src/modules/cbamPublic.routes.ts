@@ -23,6 +23,7 @@ import { PRODUCT, brandPack } from '../lib/brand.js';
 import { hashPassword, passwordProblem } from '../lib/password.js';
 import { localeOf } from '../lib/locale.js';
 import { cleanCode } from './cbamSuite.routes.js';
+import { benchmarkFor, defaultFor, loadRefs, routeLetters } from '../lib/cbamValues.js';
 
 const sha = (s: string) => createHash('sha256').update(s).digest('hex');
 const SESSION_H = 8;
@@ -44,15 +45,6 @@ function cnAll(): CnRow[] {
   const L = commLists();
   cnList = L.goods.flatMap((g) => g.cn.map((cn) => ({ cn, name: L.cnNames[cn] ?? '', category: g.name.trim(), sector: cnInfo(cn)?.sector ?? '' })));
   return cnList;
-}
-
-async function sharedRefs(c: Tx) {
-  return (await c.query(`SELECT kind, cn, country, year, quarter, value::float8 AS value, source, indicative FROM cbam_reference WHERE tenant_id IS NULL ORDER BY year DESC, quarter DESC NULLS LAST`)).rows as
-    { kind: string; cn: string | null; country: string | null; year: number; quarter: number | null; value: number; source: string; indicative: boolean }[];
-}
-function best(R: Awaited<ReturnType<typeof sharedRefs>>, kind: string, cn: string, country: string | null, year: number) {
-  return R.filter((r) => r.kind === kind && r.cn && cn.startsWith(r.cn) && (!r.country || r.country === country) && r.year <= year)
-    .sort((a, b) => (b.cn!.length - a.cn!.length) || (Number(!!b.country) - Number(!!a.country)) || (b.year - a.year))[0] ?? null;
 }
 
 // ------------------------------------------------------------------ supplier session --
@@ -99,26 +91,27 @@ export async function cbamPublicRoutes(app: FastifyInstance) {
   app.post('/api/public/cbam/calc', async (req) => {
     limit(`calc:${req.ip}`, 60);
     const b = z.object({
-      cn: z.string().trim().transform((s) => s.replace(/\D/g, '')).refine((s) => /^\d{4,8}$/.test(s), 'A CN code'), country: z.string().trim().regex(/^[A-Za-z]{2}$/).transform((s) => s.toUpperCase()),
+      cn: z.string().trim().transform((s) => s.replace(/\D/g, '')).refine((s) => /^\d{4,10}$/.test(s), 'A CN code'), country: z.string().trim().regex(/^[A-Za-z]{2}$/).transform((s) => s.toUpperCase()),
       tonnes: z.number().positive().max(1e9), seeDirect: z.number().min(0).max(100).nullable().optional(), seeIndirect: z.number().min(0).max(100).nullable().optional(),
       price: z.number().min(0).max(10000).nullable().optional(), from: z.number().int().min(2026).max(2034).default(2026),
     }).parse(req.body);
     const info = cnInfo(b.cn);
     if (!info) throw new AppError(`CN ${b.cn} is not a CBAM good`);
-    const R = await platformTx((c) => sharedRefs(c));
-    const latestPrice = R.find((r) => r.kind === 'price') ?? null;
+    const R = await platformTx((c) => loadRefs(c, [b.country], true));
+    const latestPrice = R.filter((r) => r.kind === 'price').sort((x, y) => (y.year - x.year) || ((y.quarter ?? 0) - (x.quarter ?? 0)))[0] ?? null;
     const price = b.price ?? latestPrice?.value ?? null;
     const counts = countsIndirect(info.sector);
     const actual = b.seeDirect == null ? null : b.seeDirect + (counts ? b.seeIndirect ?? 0 : 0);
     const years = [];
     for (let y = b.from; y <= 2034; y++) {
-      const dv = best(R, 'default', b.cn, b.country, y);
-      const bm = best(R, 'benchmark', b.cn, null, y);
+      const dv = defaultFor(R, b.cn, b.country, y);
+      const bm = benchmarkFor(R, b.cn, y, routeLetters(dv?.route));
       const sefa = (bm?.value ?? 0) * cbamFactor(y);
       const defSee = dv ? dv.value * (1 + markup(y, info.sector)) : null;
       const certDefault = defSee == null ? null : Math.max(0, defSee - sefa) * b.tonnes;
       const certActual = actual == null ? null : Math.max(0, actual - sefa) * b.tonnes;
-      years.push({ year: y, cbamFactor: cbamFactor(y), markup: markup(y, info.sector), defaultValue: dv?.value ?? null, defaultIndicative: dv?.indicative ?? null, benchmark: bm?.value ?? null,
+      years.push({ year: y, cbamFactor: cbamFactor(y), markup: markup(y, info.sector), defaultValue: dv?.value ?? null, defaultDirect: dv?.direct ?? null, defaultIndirect: dv?.indirect ?? null, defaultIndicative: dv?.indicative ?? null, route: dv?.route ?? null, benchmark: bm?.value ?? null,
+        notes: [dv?.note, bm?.note].filter((n): n is string => !!n),
         seeDefault: defSee, seeActual: actual, certDefault, certActual, costDefault: certDefault == null || price == null ? null : certDefault * price, costActual: certActual == null || price == null ? null : certActual * price });
     }
     return {

@@ -23,16 +23,12 @@ export async function demoCbam(c: Tx, t: string) {
     (await c.query(`INSERT INTO cbam_report_line (tenant_id, report_id, process_id, activity_t, direct_t, elec_mwh, default_share, params) VALUES ($1,$2,$3,$4,$5,$6,0,$7) RETURNING id`, [t, rep, p, a, d, e, JSON.stringify(params)])).rows[0].id as string;
   const l1 = await line(p1, 12000, 2400, 9600, { scrap_t: '1.05', pre_consumer_scrap: '35', alloys: '' });
   const l2 = await line(p2, 5000, 450, 4000, { scrap_t: '0', pre_consumer_scrap: '0', alloys: '' });
-  await c.query(`INSERT INTO cbam_good (tenant_id, line_id, cn, description, quantity_t) VALUES ($1,$2,'76012000','Unwrought aluminium alloys',6900),($1,$3,'76042100','Hollow profiles of aluminium alloys',5000)`, [t, l1, l2]);
+  await c.query(`INSERT INTO cbam_good (tenant_id, line_id, cn, description, quantity_t) VALUES ($1,$2,'76012030','Unwrought aluminium alloys',6900),($1,$3,'76042100','Hollow profiles of aluminium alloys',5000)`, [t, l1, l2]);
   // the extrusion press uses the remelt's own billets: their embedded emissions are added (direct 0.20, indirect 0.32 t/t)
   await c.query(`INSERT INTO cbam_precursor (tenant_id, line_id, category, cn, origin, quantity_t, see_direct, see_indirect, source, supplier, installation_ref, period)
-                 VALUES ($1,$2,'unwrought_aluminium','76012000','AE',5100,0.20,0.3233,'actual','Own remelt (DEMO)','DEMO-AE-0001','2026')`, [t, l2]);
+                 VALUES ($1,$2,'unwrought_aluminium','76012030','AE',5100,0.20,0.3233,'actual','Own remelt (DEMO)','DEMO-AE-0001','2026')`, [t, l2]);
 
-  // illustrative references for the demo company (not the official values)
-  const src = 'DEMO — illustrative value, replace with the official value (IR (EU) 2025/2621 defaults, IR (EU) 2025/2620 benchmarks)';
-  for (const [kind, cn, ctry, v] of [['default', '7207', 'TR', 2.31], ['default', '25231000', 'TR', 1.41], ['default', '310210', 'EG', 1.25], ['default', '7601', null, 8.2],
-    ['benchmark', '7207', null, 1.364], ['benchmark', '25231000', null, 0.693], ['benchmark', '310210', null, 0.548], ['benchmark', '7601', null, 1.464], ['benchmark', '7604', null, 1.464]] as [string, string, string | null, number][])
-    await c.query(`INSERT INTO cbam_reference (tenant_id, kind, cn, country, year, value, source, indicative, created_name) VALUES ($1,$2,$3,$4,2026,$5,$6,true,'demo')`, [t, kind, cn, ctry, v, src]);
+  // default values and benchmarks: the Commission's, loaded at start-up from data/cbam/official
 
   const imp = async (d: string, cn: string, desc: string, origin: string, mass: number, sup: string, src2: string, extra: Record<string, unknown> = {}) =>
     c.query(`INSERT INTO cbam_import (tenant_id, year, import_date, quarter, cn, description, origin, mass, procedure, supplier, installation, installation_id_reg, route, source, see_direct, see_indirect, verifier_ref, report_id, created_name)
@@ -40,8 +36,8 @@ export async function demoCbam(c: Tx, t: string) {
       [t, d, Math.floor((Number(d.slice(5, 7)) - 1) / 3) + 1, cn, desc, origin, mass, sup, extra.installation ?? null, extra.reg ?? null, extra.route ?? null, src2, extra.dir ?? null, extra.ind ?? null, extra.ver ?? null, extra.report ?? null]);
   await imp('2026-02-11', '72071114', 'Billets of non-alloy steel (DEMO)', 'TR', 1200, 'Anatolia Steel (DEMO, not real)', 'default');
   await imp('2026-05-20', '72071114', 'Billets of non-alloy steel (DEMO)', 'TR', 800, 'Anatolia Steel (DEMO, not real)', 'actual', { installation: 'Anatolia mill (DEMO)', reg: 'DEMO-TR-0042', route: 'Electric arc furnace', dir: 0.62, ind: 0.21, ver: 'DEMO Verification (not real), 2026-04-30' });
-  await imp('2026-03-03', '25231000', 'Grey cement clinker (DEMO)', 'TR', 5000, 'Marmara Cement (DEMO, not real)', 'default');
-  await imp('2026-07-15', '31021010', 'Urea (DEMO)', 'EG', 2500, 'Nile Fertilisers (DEMO, not real)', 'default');
-  await imp('2026-08-28', '76012000', 'Unwrought aluminium alloys — from our own line (DEMO)', 'AE', 900, co, 'actual', { installation: 'Aluminium recovery line (DEMO)', reg: 'DEMO-AE-0001 (not real)', route: 'Secondary melting (recycling)', dir: 0.2, ind: 0.3233, report: rep });
+  await imp('2026-03-03', '2523100090', 'Grey cement clinker (DEMO)', 'TR', 5000, 'Marmara Cement (DEMO, not real)', 'default');
+  await imp('2026-07-15', '31021019', 'Urea (DEMO)', 'EG', 2500, 'Nile Fertilisers (DEMO, not real)', 'default');
+  await imp('2026-08-28', '76012030', 'Unwrought aluminium alloys — from our own line (DEMO)', 'AE', 900, co, 'actual', { installation: 'Aluminium recovery line (DEMO)', reg: 'DEMO-AE-0001 (not real)', route: 'Secondary melting (recycling)', dir: 0.2, ind: 0.3233, report: rep });
   console.log('CBAM: 1 DEMO installation with a 2026 report in draft, 5 DEMO import lines for 2026, illustrative default values and benchmarks (DEMO, not official).');
 }

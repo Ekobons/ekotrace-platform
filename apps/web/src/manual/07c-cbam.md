@@ -85,7 +85,9 @@ In a communication, **PDF summary** opens a one-page summary of the goods and th
 
 ### Official default values (platform staff)
 
-The platform team loads the Commission's default values and benchmarks under Default values & benchmarks → **Load official values**: upload the Excel or CSV, check the columns the tool guessed (CN code, country, value), say whether the values already include the year's mark-up, and import. A new load replaces the set with the same kind, year and source. Every company and the free calculator use these values.
+The Commission's own files come with the tool and load by themselves when the server starts: the **default values** (Implementing Regulation (EU) 2025/2621 as corrected by (EU) 2026/1740, file of 6 August 2026) and the **CBAM benchmarks** (Implementing Regulation (EU) 2025/2620). Each file loads once.
+
+When the Commission publishes a new file, the platform team uploads it under Default values & benchmarks → **Load official values**. The tool recognises the Commission's workbooks — one sheet per country, "Other countries and territories", Annex IV, the benchmarks sheet — shows what it found, and loads them whole, replacing the earlier official values. Any other spreadsheet (Excel or CSV) is loaded by mapping its columns. Every company and the free calculator use these values.
 
 ## Exporter portal — communication to your importers
 
@@ -220,14 +222,24 @@ For 2026 imports, the certificate price is the quarterly average of EU ETS aucti
 
 ### Default values & benchmarks
 
-The library holds:
-- **default values**, per CN code and country of origin, from Implementing Regulation (EU) 2025/2621;
-- **CBAM benchmarks**, per CN code (and route), from Implementing Regulation (EU) 2025/2620;
+The library holds the Commission's values, loaded with the tool:
+- **default values** per CN (or TARIC) code and country of origin — direct, indirect and total, and the production route behind them (Implementing Regulation (EU) 2025/2621, corrected by (EU) 2026/1740);
+- the **highest default value** of each good (Annex IV), used when the country of origin is not known;
+- **CBAM benchmarks** per CN code and production route: column B goes with default values, column A with actual emissions (Implementing Regulation (EU) 2025/2620);
 - the **certificate prices** per quarter.
 
-A value typed on a line is used first. Otherwise the most specific library value is taken: the longest CN code, and the same country before "all countries". Super admins and admins add their company's values with the source.
+Type a code and a country to see the value that applies, why (the country's own value, or "Other countries and territories" when the country has none or shows "–"), the value with each year's mark-up, the benchmarks by route, and the same code in every country, lowest first.
 
-Values marked **illustrative** come with the demo only: they are not the official figures. Replace them with the values of the regulations before any declaration.
+How a line is priced:
+
+What | Rule
+---|---
+Default value | The line's own value; else your company's value; else the country of origin's value; else "Other countries and territories". Stored before the mark-up; the total is priced (direct + indirect for cement and fertilisers, direct for the others)
+Mark-up | 10% in 2026, 20% in 2027, 30% from 2028; 1% for fertilisers
+TARIC codes | Clinker and calcined clay have values per 10-digit TARIC code. Enter the TARIC code on the line; with the 8-digit code the higher value is used and the line says so
+Benchmark | Column B on the production route behind the default value (e.g. (C) BF/BOF). For actual emissions, column B on the installation's route given on the line (BF/BOF, DRI, scrap/EAF, primary or secondary aluminium); without a route, the lowest benchmark with a note. Type the benchmark on the line when the supplier gives it
+
+Super admins and admins add their company's own values with the source; these come before the Commission's.
 
 ## Good to know
 
