@@ -3327,6 +3327,55 @@ test('CBAM: installation, processes, yearly report with precursors and goods, sp
   assert.ok(!(await api('GET', '/api/cbam?year=2026', undefined, tenantB)).body.references.some((r: { source: string }) => r.source === 'test'));
 });
 
+test('CBAM communication to importers: create from an installation, save with live results, final needs a complete file, official template filled and read back, copy to the next quarter; companies kept apart', async () => {
+  const T = tenantA;
+  const inst = (await api('POST', '/api/cbam/installations', { name: 'Comm works', country: 'AE', unlocode: 'AE SHJ', city: 'Sharjah', contactName: 'Rana', contactEmail: 'rana@example.test' }, T)).body.id as string;
+  const lists = (await api('GET', '/api/cbam/comm/lists', undefined, T)).body;
+  assert.ok(lists.goods.some((g: { name: string }) => g.name === 'Crude steel'));
+  assert.ok(lists.cnNames['72081000']);
+  const id = (await api('POST', '/api/cbam/comms', { installationId: inst, period: { start: '2026-01-01', end: '2026-03-31' } }, T)).body.id as string;
+  let v = (await api('GET', `/api/cbam/comms/${id}`, undefined, T)).body;
+  assert.equal(v.data.installation.name, 'Comm works'); assert.equal(v.data.installation.repName, 'Rana');
+  assert.equal(v.comm.period, 'Q1 2026');
+  assert.ok(v.result.checks.some((c: { level: string }) => c.level === 'error'), 'empty communication has problems');
+  assert.equal((await api('PUT', `/api/cbam/comms/${id}`, { status: 'final' }, T)).status, 400, 'cannot be final while incomplete');
+  const data = { ...v.data,
+    goods: [{ category: 'Iron or steel products', routes: [] }, { category: 'Crude steel', routes: ['Basic oxygen steelmaking'] }],
+    processes: [{ id: 'p1', name: 'Bar mill', category: 'Iron or steel products', includes: ['Only direct production'], production: [100], market: 100, consumedIn: {}, nonCbam: 0, dirEm: 10, elecMwh: 20, elecEf: 0.5, elecSource: 'Mix', elecExported: 0 }],
+    precursors: [{ id: 'pp1', name: 'Billets', category: 'Crude steel', country: 'IN', routes: ['Basic oxygen steelmaking'], purchased: [110], consumedIn: { p1: 110 }, other: 0, seeDirect: 2, seeDirectSource: 'Default', elecPerT: 0.1, elecPerTSource: 'Default', elecEf: 0.8, elecEfSource: 'Mix', justification: 'Data gaps' }],
+    streams: [{ method: 'Combustion', name: 'Diesel', ad: 3, unit: 't', ncv: 43, ef: 74.1, efUnit: 'tCO2/TJ' }],
+    ghg: { indirect: 10 }, quality: { general: 'Mostly measurements & analyses', justification: '', assurance: 'None' },
+    products: [{ processId: 'p1', cn: '72142000', name: 'Rebar 12 mm' }] };
+  v = (await api('PUT', `/api/cbam/comms/${id}`, { data }, T)).body;
+  assert.deepEqual(v.result.checks.filter((c: { level: string }) => c.level === 'error'), []);
+  const p = v.result.products[0];
+  assert.ok(Math.abs(p.seeDirect - (10 + 110 * 2) / 100) < 1e-9, 'SEE direct includes the purchased billets');
+  assert.ok(Math.abs(p.seeIndirect - (20 * 0.5 + 110 * 0.1 * 0.8) / 100) < 1e-9);
+  assert.ok(Math.abs(p.defaultShare - 220 / 230) < 1e-9);
+  assert.equal((await api('PUT', `/api/cbam/comms/${id}`, { status: 'final' }, T)).status, 200);
+  const x = await app.inject({ method: 'GET', url: `/api/cbam/comms/${id}/export`, headers: { cookie: adminCookie, 'x-tenant-id': T } });
+  assert.equal(x.statusCode, 200);
+  assert.match(String(x.headers['content-disposition']), /CBAM_Communication_Comm_works_Q1_2026\.xlsx/);
+  const { readWorkbook } = await import('../src/lib/xlsxTemplate.js');
+  const wb = readWorkbook(x.rawPayload);
+  assert.equal(wb.get('A_InstData', 'L83'), 'Bar mill'); assert.equal(wb.get('Summary_Products', 'F10'), '72142000'); assert.equal(wb.get('E_PurchPrec', 'L49'), 2);
+  // the filled file imports as a new communication with the same data
+  const imp = await app.inject({ method: 'POST', url: '/api/cbam/comms/import', payload: x.rawPayload, headers: { cookie: adminCookie, 'x-tenant-id': T, 'content-type': 'application/octet-stream', 'x-filename': 'q1.xlsx' } });
+  assert.equal(imp.statusCode, 200);
+  const back = (await api('GET', `/api/cbam/comms/${imp.json().id}`, undefined, T)).body;
+  assert.deepEqual(back.data.products, v.data.products); assert.deepEqual(back.data.precursors, v.data.precursors);
+  assert.equal((await app.inject({ method: 'POST', url: '/api/cbam/comms/import', payload: Buffer.from('not a workbook'), headers: { cookie: adminCookie, 'x-tenant-id': T, 'content-type': 'application/octet-stream' } })).statusCode, 400);
+  // next quarter: copy keeps the set-up, moves the period
+  const next = (await api('POST', '/api/cbam/comms', { copyFrom: id }, T)).body.id as string;
+  const n = (await api('GET', `/api/cbam/comms/${next}`, undefined, T)).body;
+  assert.equal(n.comm.period, 'Q2 2026'); assert.equal(n.comm.status, 'draft'); assert.equal(n.data.processes[0].name, 'Bar mill');
+  const list = (await api('GET', '/api/cbam/comms', undefined, T)).body;
+  assert.equal(list.comms.length, 3);
+  assert.equal((await api('GET', `/api/cbam/comms/${id}`, undefined, tenantB)).status, 404, 'another company cannot see it');
+  assert.equal((await api('GET', '/api/cbam/comms', undefined, tenantB)).body.comms.length, 0);
+  assert.equal((await api('DELETE', `/api/cbam/comms/${imp.json().id}`, undefined, T)).status, 200);
+});
+
 test('ESG: frameworks decide the materiality needed, double materiality scoring (actual, potential, human rights), decisions need a reason, second-person approval, industry questions with answers checked, export; companies kept apart', async () => {
   const T = tenantA, Y = 2023;
   let d = (await api('GET', `/api/esg?year=${Y}`, undefined, T)).body;

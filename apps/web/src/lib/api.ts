@@ -2,6 +2,7 @@
  * Talking to the API. One function per call, typed results.
  * The chosen company travels in the x-tenant-id header (temporary, until login exists).
  */
+import type { CommData, CommListItem, CommLists, CommView } from './cbamComm';
 export type Basis = 'direct' | 'wtt' | 'outside_scopes' | 'memo' | 'scope2' | 'scope2_market' | 'td_loss' | 'scope3';
 
 export interface Item { id: number; subcategory_id: number; code: string; name: string; aliases: string[]; default_unit: string | null; gas_code: string | null; note: string | null; sort: number; active: boolean; composition: { gas: string; fraction: number }[] | null; hiddenForClient?: boolean; attrs?: VehicleAttrs }
@@ -942,6 +943,13 @@ export const api = {
   cbamImportUpload: (f: File, year: number, commit: boolean) => call<{ lines?: { row: number; cn: string; origin: string; mass: number | null; ok: boolean; problems: string[] }[]; ok?: number; problems?: number; imported?: number; skipped?: number }>('POST', `/api/cbam/imports/upload?year=${year}&commit=${commit ? 1 : 0}`, undefined, f, { 'x-filename': encodeURIComponent(f.name) }),
   cbamReferenceAdd: (b: Record<string, unknown>) => call<{ id: string }>('POST', '/api/cbam/reference', b),
   cbamReferenceDelete: (id: string) => call<{ ok: true }>('DELETE', `/api/cbam/reference/${id}`),
+  cbamCommLists: () => call<CommLists>('GET', '/api/cbam/comm/lists'),
+  cbamComms: () => call<{ comms: CommListItem[]; installations: { id: string; name: string; country: string }[]; can: { edit: boolean } }>('GET', '/api/cbam/comms'),
+  cbamCommCreate: (b: { title?: string; installationId?: string | null; copyFrom?: string | null; period?: { start: string; end: string } }) => call<{ id: string }>('POST', '/api/cbam/comms', b),
+  cbamComm: (id: string) => call<CommView>('GET', `/api/cbam/comms/${id}`),
+  cbamCommSave: (id: string, b: { title?: string; status?: string; sentTo?: string; installationId?: string | null; data?: CommData }) => call<CommView>('PUT', `/api/cbam/comms/${id}`, b),
+  cbamCommDelete: (id: string) => call<{ ok: true }>('DELETE', `/api/cbam/comms/${id}`),
+  cbamCommImport: (f: File, into?: string) => call<{ id: string }>('POST', `/api/cbam/comms/import${into ? `?into=${into}` : ''}`, undefined, f, { 'x-filename': encodeURIComponent(f.name) }),
   // product LCA
   lca: () => call<LcaData>('GET', '/api/lca'),
   lcaProduct: (id: string) => call<LcaDetail>('GET', `/api/lca/products/${id}`),

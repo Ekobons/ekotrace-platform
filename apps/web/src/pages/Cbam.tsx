@@ -14,9 +14,10 @@ import { api, download, type CbamData, type CbamImport, type CbamInstallation, t
 import { Icon } from '../components/Icon';
 import { CountrySelect, CityInput } from '../components/CountrySelect';
 import { countryLabel } from '../lib/countries';
+import { CbamComms } from './CbamComm';
 
-type Tab = 'overview' | 'installations' | 'reports' | 'imports' | 'reference';
-const TABS: [Tab, string][] = [['overview', 'Overview'], ['installations', 'Installations'], ['reports', 'Emissions reports'], ['imports', 'Imports & declaration'], ['reference', 'Default values & benchmarks']];
+type Tab = 'overview' | 'comms' | 'installations' | 'reports' | 'imports' | 'reference';
+const TABS: [Tab, string][] = [['overview', 'Overview'], ['comms', 'Exporter portal'], ['installations', 'Installations'], ['reports', 'Emissions reports'], ['imports', 'Imports & declaration'], ['reference', 'Default values & benchmarks']];
 const f = (x: number | null | undefined, d = 3) => (x == null ? '—' : x.toLocaleString('en-GB', { maximumFractionDigits: d }));
 const f0 = (x: number | null | undefined) => (x == null ? '—' : Math.round(x).toLocaleString('en-GB'));
 const d8 = (x: string | null) => (x ? new Date(x).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '—');
@@ -47,6 +48,7 @@ export function Cbam() {
       </div>
       <div className="tabs">{TABS.map(([k, l]) => <button key={k} className={tab === k ? 'on' : ''} onClick={() => set({ tab: k })}>{l}</button>)}</div>
       {tab === 'overview' && <Overview d={d} go={(t) => set({ tab: t })} />}
+      {tab === 'comms' && <CbamComms commId={sp.get('comm')} open={(id) => set({ comm: id })} />}
       {tab === 'installations' && <Installations d={d} act={act} openReport={(id) => set({ tab: 'reports', report: id })} />}
       {tab === 'reports' && <Reports d={d} reportId={sp.get('report')} pick={(id) => set({ report: id })} reloadAll={reload} />}
       {tab === 'imports' && <Imports year={year} d={d} />}
@@ -74,6 +76,7 @@ function Overview({ d, go }: { d: CbamData; go: (t: Tab) => void }) {
           <li><b>Verify:</b> an accredited verifier checks the report (site visit required for 2026). Record the verifier and the opinion.</li>
           <li><b>Share:</b> download the summary emissions report and the O3CI entry sheet, enter the values in the Registry and disclose them to your EU buyers by their EORI numbers. The “For EU importers” sheet goes to buyers by e-mail.</li>
         </ol>
+        <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}><button className="btn p" onClick={() => go('comms')}>Exporter portal →</button><span className="muted small" style={{ alignSelf: 'center' }}>Fill the Commission's communication template for your importers each quarter and download it as Excel.</span></div>
       </section>
       <section className="card">
         <span className="lbl">If you import into the EU</span><h3 style={{ margin: '4px 0 8px' }}>Importer: declare and surrender certificates</h3>

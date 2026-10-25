@@ -12,6 +12,36 @@ The goods covered (Annex I) are cement and clinker, fertilisers and ammonia, nit
 > Importer | import lines by CN code and origin → actual or default emissions → free allocation adjustment → certificates → declaration
 ```
 
+## Exporter portal — communication to your importers
+
+Your EU importers need the embedded emissions of the goods you sell them, in the European Commission's **CBAM Communication template for installations** (version 2.1). The **Exporter portal** tab fills that template with you, one communication per installation and reporting period (usually a quarter), and downloads the official Excel ready to send.
+
+```flow
+> Exporter | period and installation → goods and processes → fuels and emissions → energy and data quality → production processes → purchased precursors → products and carbon price → review and download
+```
+
+Each step matches a sheet of the template:
+
+Step | Template sheet | What you enter
+---|---|---
+1 · Installation & period | A_InstData (1–3) | Reporting period (pick the quarter), installation name, address, UN/LOCODE, coordinates, contact; the verifier if there was one
+2 · Goods & processes | A_InstData (4–5) | Aggregated goods categories and routes; production processes (name, category, what they include); precursors you buy in, with the country of production
+3 · Fuels & emissions | B_EmInst | Source streams (combustion, process emissions, mass balance) with activity data, NCV, emission factor, oxidation/conversion factor and biomass share; PFC emissions (aluminium smelters); measured sources (CEMS)
+4 · Energy & data quality | C_Emissions&Energy | Fuel balance, totals by gas (calculated, or entered by hand), **total indirect emissions** (always entered), data quality and quality assurance
+5 · Production processes | D_Processes | Production per route, where it went (market, other processes, non-CBAM), directly attributable emissions, measurable heat, waste gases, electricity consumed and exported
+6 · Purchased precursors | E_PurchPrec | Amounts bought, where they were used, and their SEE (direct), electricity per tonne and its factor — measured or default
+7 · Products & carbon price | Summary_Products, F_Tools | CN codes and product names, qualifying parameters, carbon price due and rebates (with the template's carbon price calculator)
+8 · Review & download | Summary_Processes, Summary_Communication | Results, checks, status, the Excel file
+
+Good to know:
+
+- **Calculated as you type.** Every change is saved and recalculated with the template's own formulas: emissions of each source stream, attributed emissions of each process, and the specific embedded emissions (SEE) of each good through the whole supply chain — precursors made in the installation and precursors bought in. Results show beside each product and in the left rail.
+- **Checks.** The template's completeness and control rules are applied (production = market + used + non-CBAM; purchased = consumed + other uses; units consistent; justification when default values are used). A communication can be marked **final** only when nothing is left to fix; then **sent**, with a note of the importers it went to.
+- **The download is the official file.** All 19 sheets, formulas, drop-downs, protection and guidance are kept; only the input cells are filled. Excel recalculates when the file opens, so Summary_Communication shows the results your importers copy into their CBAM report.
+- **Fuel defaults.** Fuels can be added with IPCC 2006 default NCV and emission factors (diesel, LPG, natural gas, heavy fuel oil and others), and amounts entered in litres are converted with the fuel's density. Replace defaults with your own analyses where you have them.
+- **Next quarter.** **Copy to the next period** keeps the installation, goods, processes, precursors, fuels and products and moves the dates on; update the amounts.
+- **Import a filled template.** An Excel template you filled before (version 2.x) can be imported as a new communication, or loaded into an open one.
+
 ## Producer side
 
 ### 1 · Installations

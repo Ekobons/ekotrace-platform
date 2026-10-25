@@ -2,6 +2,16 @@
 
 Newest first.
 
+## 2026-10-25 · CBAM exporter portal: the Commission's communication template, filled in
+
+- Migration 059: `cbam_communication` (one per installation and reporting period; the template's inputs kept as `data` jsonb; status draft / final / sent; `sent_to`; RLS).
+- `lib/cbamComm.ts`: data model following the "CBAM Communication template for installations" v2.1 (sheets A–F and Summary_Products), `normalise()`, `calculate()` (source streams, PFC slope/overvoltage, CEMS, fuel and GHG balances, attributed emissions per process, SEE through the supply chain with the Leontief inverse as the template's `CNTR_Matrix_Inv`, default-value share, embedded electricity, carbon price tool), the template's completeness/control checks, `toCells()` (input cell map), `buildWorkbook()`, `fromWorkbook()` (import a filled template).
+- `lib/xlsxTemplate.ts`: fills an .xlsx in place (unzip, edit only the input cells' XML, `fullCalcOnLoad`), so formulas, named ranges, validation, conditional formats, protection and hidden sheets are kept; reads cached values for import.
+- `data/cbam/`: the official blank template (v2.1, 5 June 2024) and its code lists (goods, routes, precursors, CN codes per good, countries, currencies, drop-downs) as JSON.
+- Routes `cbamComm.routes.ts`: lists, list/create (from an installation, or copy to the next period), import (new or `?into=`), get, save (returns results; final needs no errors), delete, export.
+- Web: CBAM → **Exporter portal** tab (`pages/CbamComm.tsx`): eight steps with live results and per-step problems, IPCC fuel defaults and a litres converter, per-process and per-precursor views, products with CN codes, qualifying parameters and carbon price; review and download.
+- Checked against the template: a three-process scenario (own and purchased precursors, heat, waste gases, exported electricity, PFC, CEMS, carbon price) filled by `buildWorkbook()` and fully recalculated in LibreOffice gives the same values as `calculate()` (test `cbamComm.test.ts`); the user's filled example gives SEE 2.8158 / 1.6180 tCO₂e/t as its own workbook. API test for the whole flow. 107 tests pass.
+
 ## 2026-10-25 · Weekly updates screen; emission factors in the side menu
 
 - Migration 058: `platform_update` (item per week: stream factors / cbam / cpi / fx / tech / market / regulation, sources, optional `apply` {fx rows | cpi rows}, where to act, status new / applied / done / dismissed, who / when), `platform_update_post` (LinkedIn drafts: draft / approved / rejected / posted), `platform_update_file` (loaded files + SHA-256).

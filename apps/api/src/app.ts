@@ -51,6 +51,7 @@ import { restatementRoutes } from './modules/restatement.routes.js';
 import { creditRoutes } from './modules/credits.routes.js';
 import { lcaRoutes } from './modules/lca.routes.js';
 import { cbamRoutes } from './modules/cbam.routes.js';
+import { cbamCommRoutes } from './modules/cbamComm.routes.js';
 import { esgRoutes } from './modules/esg.routes.js';
 import { aiRoutes } from './modules/ai.routes.js';
 import { smartImportRoutes } from './modules/smartImport.routes.js';
@@ -133,6 +134,7 @@ export async function buildApp(opts: { logger?: boolean; rateLimit?: Limits | nu
     await secured.register(creditRoutes);
     await secured.register(lcaRoutes);
     await secured.register(cbamRoutes);
+    await secured.register(cbamCommRoutes);
     await secured.register(esgRoutes);
     await secured.register(aiRoutes);
     await secured.register(smartImportRoutes);
