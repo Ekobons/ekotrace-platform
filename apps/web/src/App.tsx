@@ -13,6 +13,7 @@ import { Login, ChangePassword } from './pages/Login';
 import { AddData } from './pages/AddData';
 import { Entries } from './pages/Entries';
 import { Library } from './pages/Library';
+import { Updates } from './pages/Updates';
 import { Organisation } from './pages/Organisation';
 import { People } from './pages/People';
 import { Methodology } from './pages/Methodology';
@@ -90,6 +91,8 @@ const FIN_NAV: { group?: string; items: NavItem[] }[] = [
   { group: 'Help', items: [{ to: '/help', label: 'User manual', icon: 'book' }] },
 ];
 type Product = 'ekotrace' | 'ekofin';
+/** Short side-menu name of the financed-emissions factor library (EKOFIN EFs / Financed EFs). */
+const FIN_EF = productName('ekofin') === 'EKOFIN' ? 'EKOFIN EFs' : 'Financed EFs';
 const PRODUCT_NAME: Record<Product, string> = new Proxy({} as Record<Product, string>, { get: (_t, p) => productName(p as Product) });
 const EKO_NAV: { group?: string; items: NavItem[] }[] = [
   { items: [
@@ -202,6 +205,13 @@ function Shell() {
     get(); window.addEventListener('eko-inbox', get); const t = window.setInterval(get, 180000);
     return () => { window.removeEventListener('eko-inbox', get); window.clearInterval(t); };
   }, [path, tenant?.id, role]); // eslint-disable-line react-hooks/exhaustive-deps
+  // weekly updates waiting for a decision (platform admin)
+  const [updN, setUpdN] = useState(0);
+  useEffect(() => {
+    const get = () => { if (role !== 'platform_admin') { setUpdN(0); return; } api.updateCount().then((c) => setUpdN(c.open)).catch(() => {}); };
+    get(); window.addEventListener('eko-updates', get); const t = window.setInterval(get, 300000);
+    return () => { window.removeEventListener('eko-updates', get); window.clearInterval(t); };
+  }, [role]); // eslint-disable-line react-hooks/exhaustive-deps
   // security alerts to review (super admin, admin; platform admin: platform alerts)
   const [alertN, setAlertN] = useState(0);
   useEffect(() => {
@@ -245,7 +255,9 @@ function Shell() {
         {tenant && !mini && <div className="navtools"><button type="button" onClick={foldAll} title={allClosed ? 'Expand all sections' : 'Collapse all sections'}>{allClosed ? '▸▸ Expand all' : '▾▾ Collapse all'}</button></div>}
         <nav className="nav">
           {role === 'platform_admin' && <NavLink to="/console" title={mini ? 'Platform console' : undefined}><Icon name="gear" /><span className="nl">Platform console</span>{!tenant && alertN > 0 && <span className="navb red" title="Platform security alerts">{alertN}</span>}</NavLink>}
-          {role === 'platform_admin' && !tenant && <NavLink to="/fin/factors" title={mini ? `${productName('ekofin')} sector factors` : undefined}><Icon name="book" /><span className="nl">{productName('ekofin')} sector factors</span></NavLink>}
+          {role === 'platform_admin' && <NavLink to="/updates" title={mini ? 'Weekly updates' : undefined}><Icon name="feed" /><span className="nl">Weekly updates</span>{updN > 0 && <span className="navb amber" title="Updates and drafts to review">{updN}</span>}</NavLink>}
+          {role === 'platform_admin' && <NavLink to="/library" title={mini ? 'Emission factors' : undefined}><Icon name="book" /><span className="nl">Emission factors</span></NavLink>}
+          {role === 'platform_admin' && !tenant && <NavLink to="/fin/factors" title={mini ? FIN_EF : undefined}><Icon name="book" /><span className="nl">{FIN_EF}</span></NavLink>}
           {role === 'platform_admin' && <NavLink to="/messages" title={mini ? 'Messages' : undefined}><Icon name="chat" /><span className="nl">Messages</span>{msgN > 0 && <span className="navb amber">{msgN}</span>}</NavLink>}
           {tenant && NAV.map((g, gi) => {
             const items = g.items.filter(visible);
@@ -288,6 +300,7 @@ function Shell() {
           <Route path="/fin/counterparties/:id" element={<NeedFin><FinCounterpartyProfile /></NeedFin>} />
           <Route path="/fin/factors" element={role === 'platform_admin' && !tenant ? <FinFactors /> : <NeedFin><FinFactors /></NeedFin>} />
           <Route path="/console" element={<Gate ok={role === 'platform_admin'}><Console /></Gate>} />
+          <Route path="/updates" element={<Gate ok={role === 'platform_admin'}><Updates /></Gate>} />
           <Route path="/messages" element={role === 'platform_admin' ? <Messages /> : <NeedCo><Messages /></NeedCo>} />
           <Route path="/vault" element={<NeedCo><Vault /></NeedCo>} />
           <Route path="/metrics" element={<NeedCo><MetricRegistry /></NeedCo>} />

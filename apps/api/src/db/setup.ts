@@ -4,7 +4,8 @@
  *   1. runs the migrations that have not run yet;
  *   2. loads the factor files (DESNZ 2022–2026, EPA, IPCC) when the database does not have them
  *      yet, or has them from an older version of the importer (e.g. before business travel was added);
- *   3. loads the grid factors of other countries (data/grid) when a source in that file is missing.
+ *   3. loads the grid factors of other countries (data/grid) when a source in that file is missing;
+ *   4. loads the weekly update files (data/updates) that are new or changed.
  * Quick when nothing is missing (one query). Switch off with AUTO_SETUP=false.
  */
 import { readdirSync } from 'node:fs';
@@ -16,6 +17,7 @@ import { sealFile } from '../lib/secrets.js';
 import { migrate } from './migrate.js';
 import { seed, seedBuildings, seedGrid, seedProcessing, gridSourceCodes } from './seed.js';
 import { IMPORTER_VERSION } from '../import/desnzWrite.js';
+import { loadUpdates } from '../modules/updates.routes.js';
 
 const DEFRA = join(dirname(fileURLToPath(import.meta.url)), '../../../../data/defra');
 
@@ -83,4 +85,6 @@ export async function autoSetup(log: (m: string) => void) {
     const g = await platformTx((c) => seedGrid(c));
     if (g.added) log(`[setup] grid factors of other countries: ${g.regions} regions, ${g.added} added${g.superseded ? ` (${g.superseded} replaced)` : ''}`);
   }
+  // weekly updates found by the research run (shown under Weekly updates; nothing applied by itself)
+  await platformTx((c) => loadUpdates(c, log));
 }

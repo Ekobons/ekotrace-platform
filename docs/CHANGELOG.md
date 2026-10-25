@@ -2,6 +2,15 @@
 
 Newest first.
 
+## 2026-10-25 · Weekly updates screen; emission factors in the side menu
+
+- Migration 058: `platform_update` (item per week: stream factors / cbam / cpi / fx / tech / market / regulation, sources, optional `apply` {fx rows | cpi rows}, where to act, status new / applied / done / dismissed, who / when), `platform_update_post` (LinkedIn drafts: draft / approved / rejected / posted), `platform_update_file` (loaded files + SHA-256).
+- `data/updates/<YYYY-MM-DD>.json` (written by the weekly research run) loaded at every start by `loadUpdates` (`autoSetup` step 4): new or changed files only; a bad file is logged and skipped; a re-loaded file updates wording but keeps decisions (and the edited text of a decided post).
+- API (platform admin): `GET /api/platform/updates`, `GET /api/platform/updates/count`, `POST /api/platform/updates/:key/decide {apply|done|dismiss|reopen}` (apply writes shared `fx_rate` month rows or `price_index`; manual items refuse apply; applied items cannot be reopened), `PATCH /api/platform/updates/posts/:key {status, body}` (only drafts are edited). Audit `update.*`.
+- Web: **Weekly updates** page (To review / By week; Apply, Mark done, Dismiss, Reopen; LinkedIn drafts with Edit, Approve, Copy text, Mark posted) and a side-menu entry with the open count (platform admin).
+- Side menu (platform admin): **Emission factors** opens the factor library (the button on the Platform console is removed); the financed-emissions factor library is shortened to **Financed EFs** (Carbontek) / **EKOFIN EFs** (Ekotrace).
+- Manual: Factors & methodology → Weekly updates. Test: `updates.test.ts` (load once, bad file skipped, apply FX and CPI, manual items, final decisions, posts, re-load keeps decisions, companies refused).
+
 ## 2026-10-24 · Product names follow the brand
 
 - `productName()` in `lib/brand.ts`: EKOTRACE / EKOFIN under the Ekotrace brand; under other brands (Carbontek) the brand's name and “Financed emissions”, shown as a module. Used by the product switch, the EKOFIN screens' labels, the platform console and the “not switched on” page.

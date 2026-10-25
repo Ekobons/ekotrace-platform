@@ -34,6 +34,15 @@ export interface Facility { id: string; name: string; country: string; grid_regi
 export interface Factor { id: number; item_id: number; item: string; subcategory: string; basis: Basis; unit: string; co2e: number | null; region: string; valid_from: string; valid_to: string; status: string; version: number; supersedes_id: number | null; note: string | null; source: string; gwp_set: string | null; gases: { gas: string; kgPerUnit: number }[] | null }
 export interface Activity { id: string; period_start: string; period_end: string; facility: string; category: string; item: string; quantity: number; unit: string; data_type: string; gwp_set: string; co2e_direct: number; co2e_wtt: number; co2_biogenic: number; co2e_memo: number; co2e_scope2?: number; co2e_scope2_market?: number; co2e_td?: number; co2e_scope3?: number; scope?: number; ghg_category?: number | null; waste_site?: string | null; meter?: string | null; meter_id?: string | null; status: string; created_at: string; vehicle?: string | null; vehicle_id?: string | null; category_code?: string; purchase_batch_id?: string | null }
 
+// -------------------------------------------------------------- weekly updates (platform admin) --
+export interface UpdateItem {
+  key: string; week: string; stream: 'factors' | 'cbam' | 'cpi' | 'fx' | 'tech' | 'market' | 'regulation'; title: string; detail: string; impact: string; published: string | null;
+  sources: { title: string; url: string }[]; whereTo: string; status: 'new' | 'applied' | 'done' | 'dismissed'; decidedName: string | null; decidedAt: string | null; note: string;
+  apply: { kind: 'fx'; rows: { currency: string; month: string; perUsd: number; source: string }[] } | { kind: 'cpi'; rows: { region: string; year: number; value: number; source: string }[] } | null;
+}
+export interface UpdatePost { key: string; week: string; title: string; body: string; status: 'draft' | 'approved' | 'rejected' | 'posted'; decidedName: string | null; decidedAt: string | null }
+export interface UpdatesData { weeks: { week: string; summary: string; name: string; loaded_at: string }[]; items: UpdateItem[]; posts: UpdatePost[] }
+
 // ------------------------------------------------------------- purchases --
 export type PurchaseField = 'date' | 'description' | 'amount' | 'currency' | 'quantity' | 'unit' | 'supplier' | 'category' | 'gl' | 'po' | 'facility' | 'supplierEf' | 'supplierEfUnit' | 'capital' | 'supplierRef' | 'supplierCountry';
 export type Columns = Partial<Record<PurchaseField, string | string[]>>;
@@ -1019,6 +1028,10 @@ export const api = {
   commuteSave: (b: CommuteBody) => call<CommuteResult & { id: string; entries: number }>('PUT', '/api/commuting', b),
   commuteDelete: (id: string) => call<{ ok: true; entries: number }>('DELETE', `/api/commuting/${id}`),
   addPriceIndex: (b: { region: string; year: number; value: number; source: string }) => call('POST', '/api/admin/price-index', b),
+  updates: () => call<UpdatesData>('GET', '/api/platform/updates'),
+  updateCount: () => call<{ open: number }>('GET', '/api/platform/updates/count'),
+  decideUpdate: (key: string, action: 'apply' | 'done' | 'dismiss' | 'reopen', note = '') => call<{ key: string; status: string; rows: number }>('POST', `/api/platform/updates/${encodeURIComponent(key)}/decide`, { action, note }),
+  updatePost: (key: string, b: { status?: UpdatePost['status']; body?: string }) => call<{ key: string; status: string }>('PATCH', `/api/platform/updates/posts/${encodeURIComponent(key)}`, b),
 };
 
 /** kg → tonnes, shown with sensible precision. */

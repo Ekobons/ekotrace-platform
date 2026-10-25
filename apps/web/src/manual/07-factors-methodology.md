@@ -129,3 +129,20 @@ The figures as first measured are always kept, and every step is in the audit lo
 **Views.** A change for a facility counts in every view that includes that facility. A change for the whole company, such as an acquisition or a method change, counts in whole-company views only.
 
 A facility that has been switched off is already left out of every view, including the base year. Recording its sale documents the change and counts towards the threshold, but is not subtracted a second time.
+
+## Weekly updates (platform admin)
+
+Every Monday a research run checks the official sources and lists what changed under **Weekly updates** in the side menu (platform admin only; the count beside it is what still needs a decision). Nothing changes in the tool until the platform admin decides.
+
+| What the run checks | What you do with it |
+| --- | --- |
+| Emission factor releases: DESNZ, US EPA (Hub, eGRID, spend factors), IPCC, national grid factors, PCAF and others | Open **Emission factors** (side menu) and load the file under Sources & import, or add the factor; then **Mark done** |
+| CBAM: implementing acts, default values, deadlines | Open **CBAM**; then **Mark done** |
+| Exchange rates: monthly averages once a month closes | **Apply**: saved as shared rates for every company (Currencies & price index shows them) |
+| US CPI-U: the annual average when BLS publishes it | **Apply**: saved as that year's price index |
+| Tech, regulation and market news | Read; **Mark done** or **Dismiss** |
+| Two LinkedIn drafts for the Ekobon page | **Edit**, **Approve**, **Copy text**, post on LinkedIn yourself, then **Mark posted** |
+
+**To review** shows everything waiting; **By week** shows each week with its summary. Each decision records who took it and is in the audit log. Applied rates and indices are corrected in Currencies & price index, not reopened here.
+
+How the updates arrive: the run adds one file per week to `data/updates` in the code. After `git pull`, restarting the server loads it (a corrected file is loaded again; decisions already taken are kept).

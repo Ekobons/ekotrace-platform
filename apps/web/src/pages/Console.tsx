@@ -6,7 +6,6 @@
 import { CountrySelect } from '../components/CountrySelect';
 import { countryLabel } from '../lib/countries';
 import { useEffect, useRef, useState } from 'react';
-import { NavLink } from 'react-router-dom';
 import { useApp } from '../App';
 import { api, setTenant, type Company, type DestructionCertificate, type PlanLimits } from '../lib/api';
 import { AlertList, PlatformAudit } from './AuditLog';
@@ -37,8 +36,8 @@ export function Console() {
   return (
     <div className="page">
       <div className="head">
-        <div><div className="eyebrow">Ekobon · platform</div><h1>Platform console</h1><p className="sub">Companies on this installation, their plans, subscription and access. The shared factor library is managed here too.</p></div>
-        <div className="row"><NavLink to="/library" className="btn"><Icon name="book" size={16} />Factor library</NavLink><button className="btn p" onClick={() => setAdding(true)}><Icon name="plus" size={16} />New company</button></div>
+        <div><div className="eyebrow">Ekobon · platform</div><h1>Platform console</h1><p className="sub">Companies on this installation, their plans, subscription and access. The shared emission factors are under Emission factors in the side menu.</p></div>
+        <div className="row"><button className="btn p" onClick={() => setAdding(true)}><Icon name="plus" size={16} />New company</button></div>
       </div>
       <div className="tabs"><button className={tab === 'companies' ? 'on' : ''} onClick={() => setTab('companies')}>Companies ({list.length})</button><button className={tab === 'plans' ? 'on' : ''} onClick={() => setTab('plans')}>Plans</button><button className={tab === 'security' ? 'on' : ''} onClick={() => setTab('security')}>Security & deletions</button></div>
       {err && <div className="note bad">{err}</div>}

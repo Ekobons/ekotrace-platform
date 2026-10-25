@@ -18,6 +18,7 @@ import { authRoutes } from './modules/auth.routes.js';
 import { orgRoutes } from './modules/org.routes.js';
 import { peopleRoutes } from './modules/people.routes.js';
 import { platformRoutes } from './modules/platform.routes.js';
+import { updatesRoutes } from './modules/updates.routes.js';
 import { vehicleRoutes, vehicleUploadRoutes } from './modules/vehicles.routes.js';
 import { priceRoutes } from './modules/prices.routes.js';
 import { energyRoutes } from './modules/energy.routes.js';
@@ -148,6 +149,7 @@ export async function buildApp(opts: { logger?: boolean; rateLimit?: Limits | nu
     await secured.register(orgRoutes);
     await secured.register(peopleRoutes);
     await secured.register(platformRoutes);
+    await secured.register(updatesRoutes);
     await secured.register(catalogueRoutes);
     await secured.register(referenceRoutes);
     await secured.register(factorRoutes);
