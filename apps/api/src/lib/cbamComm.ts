@@ -561,3 +561,20 @@ export function fromWorkbook(buf: Buffer): CommData {
   }
   return normalise(d);
 }
+
+/** What an importer needs from a communication: installation and, per good, the specific embedded emissions. */
+export interface SharedGoods {
+  period: { start: string | null; end: string | null };
+  installation: { name: string; country: string; registryId: string; unlocode: string; city: string };
+  verified: boolean;
+  goods: { cn: string; name: string; seeDirect: number | null; seeIndirect: number | null; defaultShare: number | null; embeddedElec: number | null; elecSource: string; category: string; cpDue: number | null; rebate: number | null; currency: string }[];
+}
+export function sharedGoods(d: CommData): SharedGoods {
+  const r = calculate(d);
+  return {
+    period: d.period,
+    installation: { name: d.installation.name, country: d.installation.country, registryId: '', unlocode: d.installation.unlocode, city: d.installation.city },
+    verified: !!d.verifier.company,
+    goods: r.products.map((p) => { const x = d.products[p.i]!; return { cn: x.cn, name: x.name, seeDirect: p.seeDirect, seeIndirect: p.seeIndirect, defaultShare: p.defaultShare, embeddedElec: p.embeddedElec, elecSource: p.elecSource, category: p.category, cpDue: x.cpDue, rebate: x.rebate, currency: x.currency }; }).filter((g) => g.cn),
+  };
+}

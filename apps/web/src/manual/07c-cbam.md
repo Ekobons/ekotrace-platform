@@ -28,6 +28,65 @@ Setup | People & access, document vault, security & audit log
 
 A company with the full product has the same pages under Disclose → CBAM; a company with both can switch between them at the top of the menu.
 
+## The dedicated CBAM tool
+
+The CBAM package also works as a tool in its own right, under its own name (for example *Carbontek CBAM*), with its own sign-in page at **/cbam**. It serves both sides and links them: an EU importer asks its suppliers for data, and the suppliers answer in the same tool.
+
+### Signing in and signing up
+
+- **/cbam** shows the CBAM sign-in page. People sign in with their usual account; after sign-in a CBAM-only company lands on **CBAM home**.
+- **/cbam-signup** lets a new company open a 30-day trial on its own: company name, its role (importer, exporter or both), name and e-mail. A link by e-mail confirms the address and sets the password. The page only opens when the server runs with `CBAM_SIGNUP=on` and e-mail is set up.
+- **/cbam-calculator** is a free calculator anyone can use without an account: CN code, country of origin, tonnes and year → the default embedded emissions, the mark-up, the free allocation adjustment and the estimated cost.
+
+### Role and menu
+
+Setup → **CBAM settings** sets the company's role — *importer*, *exporter* or *both* — and the declarant details (EORI, authorised declarant number, the carbon price assumption). The menu follows the role:
+
+Group | Pages
+---|---
+Importing | CBAM home (importer dashboard), Imports & declaration, Suppliers & requests, Cost forecast
+Exporting | Communications to importers, Answer a request, Installations, Precursor suppliers, Reports, Annual emissions report
+Knowledge | CN codes & rules, Cost calculator, Default values & benchmarks
+Setup | CBAM settings, people & access, document vault, audit log
+
+### Importer dashboard
+
+CBAM home for an importer shows the year at a glance:
+
+- **Tonnes imported, embedded emissions, certificates and estimated cost**, with the part of the cost caused by default-value mark-ups.
+- **Things to do**: supplier answers to review, requests past their due date, a high share of default values, values that look unusually low or high against the default (below 30% or above 200%).
+- **De minimis threshold**: tonnes against the 50 t a year (electricity and hydrogen always count). Above 90% the tool warns; above 50 t every import of the year counts and you need authorised declarant status.
+- **Certificates per quarter**: at the end of each quarter you must hold certificates for at least 50% of the embedded emissions of the year so far. Certificates for 2026 imports are sold from 1 February 2027; the declaration and surrender are due by 30 September of the following year.
+- **Where it comes from**: cost, tCO₂e or tonnes by CN code, product, country or supplier.
+
+### Suppliers and data requests
+
+Suppliers & requests holds the producers you buy from. Import lines are linked to a supplier automatically by name.
+
+1. **New request** — pick a supplier, the period and a due date, and add a note. The tool makes a one-time **access code** (shown once) and e-mails the supplier a link to **/cbam-supplier**.
+2. The supplier signs in with the e-mail and code — no account needed — and either **uploads the EU communication template** or **fills a short form** (installation, country, and per good the direct and indirect SEE and the share from default values). Supplier and importer can write to each other on the request.
+3. Suppliers with their own account in the tool answer under Exporting → **Answer a request**, straight from a communication they already filled in.
+4. You **review** the answer: the tool compares each value with the default. **Accept** stores the values for that supplier and applies them to the matching import lines; **Return** sends it back with a comment.
+5. Reminders go out by themselves once a request is overdue — at most once a week and three times in all. You can also send one by hand, issue a new code or withdraw the request.
+
+An exporter can turn an accepted answer from its own precursor supplier into a purchased precursor in its communication (**Use in a communication**).
+
+### Cost forecast
+
+Cost forecast projects the certificate cost to 2034: the price path, volumes per CN code, the phase-out of free allocation (CBAM factor from 97.5% in 2026 to 0 from 2034), and *what if* scenarios such as moving a share of suppliers from default to actual values. Save several forecasts and export them to Excel.
+
+### Declaration data
+
+Imports & declaration → **Declaration data (JSON)** exports the year's goods by CN code and origin, with the installation, emissions, the source of each value and the declarant's EORI, ready to bring into the CBAM Registry. The Registry's own XML format will be added once the Commission's schema is available.
+
+### Printable summary
+
+In a communication, **PDF summary** opens a one-page summary of the goods and their SEE to print or save as PDF — useful for a customer who does not want the Excel. The review step also shows, for each good, the default value and how much an importer saves per tonne by using your actual values.
+
+### Official default values (platform staff)
+
+The platform team loads the Commission's default values and benchmarks under Default values & benchmarks → **Load official values**: upload the Excel or CSV, check the columns the tool guessed (CN code, country, value), say whether the values already include the year's mark-up, and import. A new load replaces the set with the same kind, year and source. Every company and the free calculator use these values.
+
 ## Exporter portal — communication to your importers
 
 Your EU importers need the embedded emissions of the goods you sell them, in the European Commission's **CBAM Communication template for installations** (version 2.1). The **Exporter portal** tab fills that template with you, one communication per installation and reporting period (usually a quarter), and downloads the official Excel ready to send.

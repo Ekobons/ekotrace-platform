@@ -17,6 +17,8 @@ import type { FastifyInstance, FastifyRequest } from 'fastify';
 import ExcelJS from 'exceljs';
 import { z } from 'zod';
 import { cbamOnly } from '../lib/cbamAccess.js';
+import { cnInfo, countsIndirect, markup } from '../lib/cbam.js';
+import { pick, priceOf, refs } from './cbam.routes.js';
 import { tenantTx, type Tx } from '../db/pool.js';
 import { audit, requireRole, requireTenant } from '../lib/auth.js';
 import { sendWorkbook, styleHeader } from '../lib/xlsx.js';
@@ -89,6 +91,23 @@ async function yearSummary(c: Tx, year: number) {
   }
   const latest = all[0] ? { id: all[0].id, title: all[0].title, status: all[0].status, period: quarterLabel(iso(all[0].period_start), iso(all[0].period_end)), updatedAt: all[0].updated_at } : null;
   return { year, installations: [...inst.values()], goods: [...goods.values()].sort((a, b) => a.cn.localeCompare(b.cn) || a.name.localeCompare(b.name)), comms, latest };
+}
+
+/** Per product: the EU default value for its CN code and the installation's country, and what the actual value saves the importer. */
+async function vsDefaults(c: Tx, v: ReturnType<typeof view>) {
+  const R = await refs(c);
+  const year = Number((v.data.period.start ?? new Date().toISOString()).slice(0, 4));
+  const yr = Math.max(2026, year);
+  const price = [4, 3, 2, 1].map((q) => priceOf(R, yr, q)?.value).find((x) => x != null) ?? [4, 3, 2, 1].map((q) => priceOf(R, yr - 1, q)?.value).find((x) => x != null) ?? null;
+  return v.result.products.map((p) => {
+    const x = v.data.products[p.i];
+    const info = x?.cn ? cnInfo(x.cn) : null;
+    const dv = info && x ? pick(R, 'default', x.cn, v.data.installation.country || null, yr) : null;
+    const rel = p.seeDirect == null || !info ? null : p.seeDirect + (countsIndirect(info.sector) ? p.seeIndirect ?? 0 : 0);
+    const withMarkup = dv && info ? dv.value * (1 + markup(yr, info.sector)) : null;
+    return { i: p.i, defaultValue: dv?.value ?? null, indicative: dv?.indicative ?? null, year: yr, markup: info ? markup(yr, info.sector) : null, defaultWithMarkup: withMarkup, relevant: rel,
+      price, savingPerT: withMarkup != null && rel != null && price != null ? Math.max(0, withMarkup - rel) * price : null, ratio: withMarkup != null && rel != null && withMarkup > 0 ? rel / withMarkup : null };
+  });
 }
 
 export async function cbamCommRoutes(app: FastifyInstance) {
@@ -221,7 +240,8 @@ export async function cbamCommRoutes(app: FastifyInstance) {
     const id = idOf(req);
     return tenantTx(tenant, async (c) => {
       const installations = (await c.query(`SELECT id, name, country FROM cbam_installation ORDER BY name`)).rows;
-      return { ...view(await load(c, id)), can: { edit: canEdit(req) }, installations };
+      const v = view(await load(c, id));
+      return { ...v, defaults: await vsDefaults(c, v), can: { edit: canEdit(req) }, installations };
     });
   });
 
@@ -250,7 +270,8 @@ export async function cbamCommRoutes(app: FastifyInstance) {
                        installation_id = CASE WHEN $5::boolean THEN $6::uuid ELSE installation_id END, data = $7, period_start = $8, period_end = $9, updated_name = $10, updated_at = now() WHERE id = $1`,
         [id, b.title ?? null, b.status ?? null, b.sentTo ?? null, b.installationId !== undefined, b.installationId ?? null, JSON.stringify(data), data.period.start, data.period.end, req.user.name]);
       if (b.status && b.status !== cur.status) await audit(c, req, 'cbam.communication.status', 'cbam_communication', id, { from: cur.status, to: b.status });
-      return view(await load(c, id));
+      const v = view(await load(c, id));
+      return { ...v, defaults: await vsDefaults(c, v) };
     });
   });
 

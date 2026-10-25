@@ -52,6 +52,9 @@ import { creditRoutes } from './modules/credits.routes.js';
 import { lcaRoutes } from './modules/lca.routes.js';
 import { cbamRoutes } from './modules/cbam.routes.js';
 import { cbamCommRoutes } from './modules/cbamComm.routes.js';
+import { cbamSuiteRoutes } from './modules/cbamSuite.routes.js';
+import { cbamPublicRoutes } from './modules/cbamPublic.routes.js';
+import { cbamAdminRoutes } from './modules/cbamAdmin.routes.js';
 import { esgRoutes } from './modules/esg.routes.js';
 import { aiRoutes } from './modules/ai.routes.js';
 import { smartImportRoutes } from './modules/smartImport.routes.js';
@@ -118,6 +121,7 @@ export async function buildApp(opts: { logger?: boolean; rateLimit?: Limits | nu
   await app.register(surveyPublicRoutes);
   await app.register(contractorPublicRoutes);
   await app.register(supplierPublicRoutes);
+  await app.register(cbamPublicRoutes);
   await app.register(auditApiRoutes);
   await app.register(scimRoutes);
   await app.register(async (secured) => {
@@ -135,6 +139,8 @@ export async function buildApp(opts: { logger?: boolean; rateLimit?: Limits | nu
     await secured.register(lcaRoutes);
     await secured.register(cbamRoutes);
     await secured.register(cbamCommRoutes);
+    await secured.register(cbamSuiteRoutes);
+    await secured.register(cbamAdminRoutes);
     await secured.register(esgRoutes);
     await secured.register(aiRoutes);
     await secured.register(smartImportRoutes);

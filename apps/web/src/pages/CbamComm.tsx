@@ -7,7 +7,7 @@
  * → review. Every change is saved and recalculated by the API with the template's formulas; the download is the
  * official workbook with every input cell filled.
  */
-import { useEffect, useRef, useState } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
 import { useApp } from '../App';
 import { api, download } from '../lib/api';
 import type { CommData, CommLists, CommListItem, CommPrecursor, CommProcess, CommProduct, CommResult, CommStream, CommView, Step } from '../lib/cbamComm';
@@ -181,7 +181,7 @@ function Editor({ id, lists, back, open }: { id: string; lists: CommLists; back:
     if (timer.current) { window.clearTimeout(timer.current); timer.current = null; }
     const data = pending.current; if (!data) return;
     pending.current = null; setSave('saving');
-    try { const x = await api.cbamCommSave(id, { data }); setV((o) => (o ? { ...o, comm: x.comm, result: x.result } : x)); setSave(pending.current ? 'dirty' : 'saved'); }
+    try { const x = await api.cbamCommSave(id, { data }); setV((o) => (o ? { ...o, comm: x.comm, result: x.result, defaults: x.defaults ?? o.defaults } : x)); setSave(pending.current ? 'dirty' : 'saved'); }
     catch (e) { setSave('error'); toast((e as Error).message); }
   };
   useEffect(() => () => { if (pending.current) void flush(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -215,6 +215,7 @@ function Editor({ id, lists, back, open }: { id: string; lists: CommLists; back:
         </div>
       </div>
       {ed && <button className="btn sm" title="Replace the data with a filled template" onClick={() => file.current?.click()}><Icon name="upload" size={15} /> Load from Excel</button>}
+      <a className="btn sm" href={`/cbam/print/${id}`} onClick={(e) => { e.preventDefault(); void flush().then(() => { window.location.href = `/cbam/print/${id}`; }); }}><Icon name="doc" size={15} /> PDF summary</a>
       <button className="btn p" onClick={() => void dl()}><Icon name="download" size={16} /> Download Excel</button>
       <input ref={file} type="file" accept=".xlsx" hidden onChange={(e) => { const x = e.target.files?.[0]; e.target.value = ''; if (x && confirm('Replace everything in this communication with the contents of the file?')) void api.cbamCommImport(x, id).then(() => api.cbamComm(id)).then((y) => { setV(y); setD(y.data); toast('Loaded from the file'); }).catch((er) => toast((er as Error).message)); }} />
     </div>
@@ -675,10 +676,12 @@ function StepReview({ d, R, v, go, setStatus, dl, copyNext, sentTo }: SP & { v: 
     <h4 className="cmh">What your importers receive (Summary_Products)</h4>
     <div className="scroll"><table className="t">
       <thead><tr><th>CN code</th><th>Product</th><th>Process</th><th className="num">SEE direct</th><th className="num">SEE indirect</th><th className="num">SEE total</th><th>Unit</th><th className="num">Default values</th><th className="num">Electricity MWh/t</th><th className="num">Effective carbon price</th></tr></thead>
-      <tbody>{R.products.map((p) => { const x = d.products[p.i]!; return <tr key={p.i}>
+      <tbody>{R.products.map((p) => { const x = d.products[p.i]!; const dv = v.defaults?.find((y) => y.i === p.i); return <Fragment key={p.i}><tr>
         <td className="mono">{x.cn || '—'}</td><td><b>{x.name || '—'}</b><div className="muted small cmclip" title={p.cnName}>{p.cnName}</div></td><td>{p.processName}</td>
         <td className="num">{f(p.seeDirect, 4)}</td><td className="num">{f(p.seeIndirect, 4)}</td><td className="num"><b>{f(p.seeTotal, 4)}</b></td><td>{p.unit}</td>
-        <td className="num">{pct(p.defaultShare)}</td><td className="num">{f(p.embeddedElec, 4)}</td><td className="num">{p.effectiveCp ? `${f(p.effectiveCp, 2)} ${x.currency}` : '—'}</td></tr>; })}
+        <td className="num">{pct(p.defaultShare)}</td><td className="num">{f(p.embeddedElec, 4)}</td><td className="num">{p.effectiveCp ? `${f(p.effectiveCp, 2)} ${x.currency}` : '—'}</td></tr>
+        {dv && dv.defaultWithMarkup != null && dv.relevant != null && <tr className="sub-row"><td /><td colSpan={9} className="small">
+          Against the EU default value for {x.cn} from {d.installation.country || 'this country'} ({f(dv.defaultWithMarkup, 3)} tCO₂e/t in {dv.year} with the {pct(dv.markup)} mark-up{dv.indicative ? ', sample value' : ''}): yours is <b>{pct(dv.ratio)}</b> of it{dv.savingPerT != null && dv.savingPerT > 0 ? <> — your importer saves about <b>EUR {f(dv.savingPerT, 2)} per tonne</b> in certificates by using your data (at EUR {f(dv.price, 2)})</> : dv.ratio != null && dv.ratio > 1 ? ' — above the default: your importer may prefer the default value; check your figures' : ''}.</td></tr>}</Fragment>; })}
         {!R.products.length && <tr><td colSpan={10} className="muted small">No product yet — add them in step 7.</td></tr>}</tbody></table></div>
 
     <h4 className="cmh">Production processes and precursors (Summary_Processes)</h4>
@@ -704,4 +707,47 @@ function StepReview({ d, R, v, go, setStatus, dl, copyNext, sentTo }: SP & { v: 
       <button className="btn" onClick={() => void copyNext()}><Icon name="paste" size={15} /> Copy to the next period</button>
     </div>
   </>;
+}
+
+// ------------------------------------------------------------------ printable summary --
+/** A one-document summary of a communication for importers and verifiers: print or save as PDF. */
+export function CbamPrint({ id }: { id: string }) {
+  const { toast } = useApp();
+  const [v, setV] = useState<CommView | null>(null);
+  useEffect(() => { api.cbamComm(id).then(setV).catch((e) => toast((e as Error).message)); }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
+  if (!v) return <div className="page"><div className="card empty">Loading…</div></div>;
+  const d = v.data, R = v.result, I = d.installation;
+  const errors = R.checks.filter((c) => c.level === 'error');
+  return <div className="page cbprint">
+    <div className="row no-print" style={{ gap: 8 }}><button className="btn ghost" onClick={() => history.back()}>← Back</button><span className="grow" /><button className="btn p" onClick={() => window.print()}><Icon name="download" size={15} /> Print / save as PDF</button></div>
+    <article className="card cbdoc">
+      <header><span className="lbl">CBAM · communication to EU importers</span><h1>{I.name || v.comm.title}</h1>
+        <div className="muted">{v.comm.period || `${d.period.start ?? '…'} to ${d.period.end ?? '…'}`} · {STATUS[v.comm.status]?.[0]} · prepared {d8(v.comm.updatedAt)} · {v.comm.template}</div></header>
+      {errors.length > 0 && <div className="note warn small">Incomplete: {errors.length} item{errors.length === 1 ? '' : 's'} still to fix — figures may change.</div>}
+      <h2>Installation</h2>
+      <table className="t"><tbody>
+        <tr><td>Name</td><td>{I.name}{I.nameLocal ? ` (${I.nameLocal})` : ''}</td><td>UN/LOCODE</td><td>{I.unlocode || '—'}</td></tr>
+        <tr><td>Address</td><td>{[I.street, I.postcode, I.city, I.country].filter(Boolean).join(', ') || '—'}</td><td>Coordinates</td><td>{I.lat || I.lon ? `${I.lat}, ${I.lon}` : '—'}</td></tr>
+        <tr><td>Economic activity</td><td>{I.economicActivity || '—'}</td><td>Contact</td><td>{[I.repName, I.email, I.phone].filter(Boolean).join(' · ') || '—'}</td></tr>
+        <tr><td>Verifier</td><td colSpan={3}>{d.verifier.company ? `${d.verifier.company}${d.verifier.accreditationBody ? `, accredited by ${d.verifier.accreditationBody}` : ''}${d.verifier.registration ? ` (${d.verifier.registration})` : ''}` : 'Not verified'}</td></tr>
+      </tbody></table>
+      <h2>Goods and their specific embedded emissions</h2>
+      <table className="t"><thead><tr><th>CN code</th><th>Product</th><th className="num">SEE direct</th><th className="num">SEE indirect</th><th className="num">SEE total</th><th>Unit</th><th className="num">From default values</th><th className="num">Electricity MWh/t</th><th>EF source</th><th>Carbon price</th></tr></thead>
+        <tbody>{R.products.map((p) => { const x = d.products[p.i]!; return <tr key={p.i}><td className="mono">{x.cn}</td><td><b>{x.name}</b><div className="small muted">{p.cnName}</div></td>
+          <td className="num">{f(p.seeDirect, 4)}</td><td className="num">{f(p.seeIndirect, 4)}</td><td className="num"><b>{f(p.seeTotal, 4)}</b></td><td>{p.unit}</td><td className="num">{pct(p.defaultShare)}</td><td className="num">{f(p.embeddedElec, 4)}</td><td>{p.elecSource || '—'}</td>
+          <td className="small">{x.cpType && x.cpType !== 'None' ? `${x.cpType}: ${f(x.cpDue, 2)} ${x.currency}/t${x.rebate ? `, rebate ${f(x.rebate, 2)}` : ''}` : '—'}</td></tr>; })}</tbody></table>
+      <h2>Installation emissions in the period</h2>
+      <table className="t"><tbody>
+        <tr><td>Direct emissions (CO₂ {f(R.ghg.co2, 3)}, N₂O {f(R.ghg.n2o, 3)}, PFC {f(R.ghg.pfc, 3)})</td><td className="num"><b>{f(R.ghg.direct, 3)}</b> tCO₂e</td></tr>
+        <tr><td>Indirect emissions</td><td className="num">{f(R.ghg.indirect, 3)} tCO₂e</td></tr>
+        <tr><td>Biomass emissions (not counted)</td><td className="num">{f(R.ghg.biomass, 3)} tCO₂e</td></tr>
+        <tr><td>Data quality · quality assurance</td><td>{d.quality.general || '—'} · {d.quality.assurance || '—'}</td></tr>
+      </tbody></table>
+      <h2>Production processes and precursors</h2>
+      <table className="t"><thead><tr><th>Process / precursor</th><th>Category</th><th className="num">Amount</th><th className="num">SEE direct</th><th className="num">SEE indirect</th><th>Source</th></tr></thead>
+        <tbody>{R.nodes.map((n) => { const pr = d.precursors.find((x) => x.id === n.id); return <tr key={n.id}><td><b>{n.name}</b><div className="small muted">{n.kind === 'process' ? 'production process' : `purchased precursor${pr?.country ? `, ${pr.country}` : ''}`}</div></td><td>{n.category}</td>
+          <td className="num">{f(n.total, 3)} {n.unit}</td><td className="num">{f(n.seeDirect, 4)}</td><td className="num">{f(n.seeIndirect, 4)}</td><td className="small">{pr ? `${pr.seeDirectSource || '—'}${pr.justification ? ` (${pr.justification})` : ''}` : 'own monitoring'}</td></tr>; })}</tbody></table>
+      <footer className="muted small">Specific embedded emissions in tCO₂e per tonne of good (MWh for electricity), calculated as in the European Commission's CBAM Communication template for installations; the full template (Excel) accompanies this summary.</footer>
+    </article>
+  </div>;
 }

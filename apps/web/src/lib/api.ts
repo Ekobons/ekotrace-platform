@@ -2,7 +2,7 @@
  * Talking to the API. One function per call, typed results.
  * The chosen company travels in the x-tenant-id header (temporary, until login exists).
  */
-import type { CbamSummary, CommData, CommListItem, CommLists, CommView } from './cbamComm';
+import type { CbamCalcResult, CbamCnRow, CbamRequestRow, CbamRequestView, CbamSettings, CbamSummary, CbamSupplierRow, CommData, CommListItem, CommLists, CommView, ForecastAssumptions, ForecastGroup, ForecastResult, ImporterOverview } from './cbamComm';
 export type Basis = 'direct' | 'wtt' | 'outside_scopes' | 'memo' | 'scope2' | 'scope2_market' | 'td_loss' | 'scope3';
 
 export interface Item { id: number; subcategory_id: number; code: string; name: string; aliases: string[]; default_unit: string | null; gas_code: string | null; note: string | null; sort: number; active: boolean; composition: { gas: string; fraction: number }[] | null; hiddenForClient?: boolean; attrs?: VehicleAttrs }
@@ -943,6 +943,35 @@ export const api = {
   cbamImportUpload: (f: File, year: number, commit: boolean) => call<{ lines?: { row: number; cn: string; origin: string; mass: number | null; ok: boolean; problems: string[] }[]; ok?: number; problems?: number; imported?: number; skipped?: number }>('POST', `/api/cbam/imports/upload?year=${year}&commit=${commit ? 1 : 0}`, undefined, f, { 'x-filename': encodeURIComponent(f.name) }),
   cbamReferenceAdd: (b: Record<string, unknown>) => call<{ id: string }>('POST', '/api/cbam/reference', b),
   cbamReferenceDelete: (id: string) => call<{ ok: true }>('DELETE', `/api/cbam/reference/${id}`),
+  cbamSettings: () => call<CbamSettings>('GET', '/api/cbam/settings'),
+  cbamSettingsSave: (b: { role: string; eori: string | null }) => call<CbamSettings>('PUT', '/api/cbam/settings', b),
+  cbamImporter: (year: number) => call<ImporterOverview>('GET', `/api/cbam/importer/overview?year=${year}`),
+  cbamSuppliers: (year: number) => call<{ year: number; suppliers: CbamSupplierRow[]; loose: { name: string; country: string; mass: number; lines: number }[]; can: { edit: boolean } }>('GET', `/api/cbam/suppliers?year=${year}`),
+  cbamSupplierSave: (b: Record<string, unknown>, id?: string) => call<{ id?: string; linked?: number; ok?: true }>(id ? 'PUT' : 'POST', id ? `/api/cbam/suppliers/${id}` : '/api/cbam/suppliers', b),
+  cbamSupplierDelete: (id: string) => call<{ ok: true }>('DELETE', `/api/cbam/suppliers/${id}`),
+  cbamRequests: (q: { year?: number; purpose?: string } = {}) => call<{ requests: CbamRequestRow[]; can: { edit: boolean } }>('GET', `/api/cbam/requests?${new URLSearchParams(Object.entries(q).filter(([, v]) => v != null).map(([k, v]) => [k, String(v)])).toString()}`),
+  cbamRequestCreate: (b: { supplierId: string; purpose?: string; year: number; quarter: number | null; cnCodes?: string[]; message?: string; dueDate?: string | null; contactEmail?: string; sendEmail?: boolean }) => call<{ id: string; code: string; email: string; page: string; emailed: boolean }>('POST', '/api/cbam/requests', b),
+  cbamRequest: (id: string) => call<CbamRequestView>('GET', `/api/cbam/requests/${id}`),
+  cbamRequestCode: (id: string, sendEmail: boolean) => call<{ code: string; email: string }>('POST', `/api/cbam/requests/${id}/code`, { sendEmail }),
+  cbamRequestRemind: (id: string) => call<{ ok: true; reminders: number }>('POST', `/api/cbam/requests/${id}/remind`),
+  cbamRequestWithdraw: (id: string) => call<{ ok: true }>('POST', `/api/cbam/requests/${id}/withdraw`),
+  cbamRequestMessage: (id: string, body: string) => call<{ ok: true }>('POST', `/api/cbam/requests/${id}/message`, { body }),
+  cbamResponseReview: (id: string, b: { decision: 'accept' | 'reject'; note?: string; apply?: boolean }) => call<{ ok: true; values: number; lines: number }>('POST', `/api/cbam/responses/${id}/review`, b),
+  cbamResponseToComm: (id: string, b: { commId: string; precursorId: string; cn?: string }) => call<{ ok: true; precursor: string }>('POST', `/api/cbam/responses/${id}/to-communication`, b),
+  cbamAnswerLookup: (email: string, code: string) => call<{ company: string; year: number; quarter: number | null; cnCodes: string[]; message: string; dueDate: string | null; purpose: string }>('POST', '/api/cbam/answer/lookup', { email, code }),
+  cbamAnswer: (email: string, code: string, commId: string) => call<{ id: string; company: string }>('POST', '/api/cbam/answer', { email, code, commId }),
+  cbamForecast: (year: number) => call<{ year: number; groups: ForecastGroup[]; assumptions: ForecastAssumptions; lastPrice: number | null; result: ForecastResult; can: { edit: boolean } }>('GET', `/api/cbam/forecast?year=${year}`),
+  cbamForecastRun: (year: number, assumptions: ForecastAssumptions) => call<{ result: ForecastResult }>('POST', '/api/cbam/forecast', { year, assumptions }),
+  cbamForecastSave: (a: ForecastAssumptions) => call<{ ok: true }>('PUT', '/api/cbam/forecast/assumptions', a),
+  cbamPublicInfo: () => call<{ name: string; product: string; signup: boolean }>('GET', '/api/public/cbam/info'),
+  cbamCn: (q: string) => call<{ total: number; codes: CbamCnRow[] }>('GET', `/api/public/cbam/cn?q=${encodeURIComponent(q)}`),
+  cbamCalc: (b: { cn: string; country: string; tonnes: number; seeDirect?: number | null; seeIndirect?: number | null; price?: number | null }) => call<CbamCalcResult>('POST', '/api/public/cbam/calc', b),
+  cbamSignup: (b: { company: string; country: string; role: string; name: string; email: string; accept: boolean }) => call<{ ok: true; message: string }>('POST', '/api/public/cbam/signup', b),
+  cbamSignupConfirm: (token: string, password: string) => call<{ ok: true; email: string }>('POST', '/api/public/cbam/signup/confirm', { token, password }),
+  cbamRefPreview: (f: File) => call<{ header: string[]; sample: string[][]; total: number; guess: { cn: number; country: number; value: number } }>('POST', '/api/platform/cbam/reference/preview', undefined, f, { 'x-filename': encodeURIComponent(f.name) }),
+  cbamRefImport: (f: File, q: Record<string, string | number>) => call<{ imported: number; replaced: number; skipped: number; problems: { row: number; why: string }[] }>('POST', `/api/platform/cbam/reference/import?${new URLSearchParams(Object.entries(q).map(([k, v]) => [k, String(v)])).toString()}`, undefined, f, { 'x-filename': encodeURIComponent(f.name) }),
+  cbamRefSets: () => call<{ sets: { kind: string; year: number; source: string; indicative: boolean; rows: number; loaded: string }[] }>('GET', '/api/platform/cbam/reference/sets'),
+  cbamRefRemove: (kind: string, year: number, source: string) => call<{ removed: number }>('DELETE', `/api/platform/cbam/reference?kind=${kind}&year=${year}&source=${encodeURIComponent(source)}`),
   cbamSummary: (year: number) => call<CbamSummary>('GET', `/api/cbam/comms/summary?year=${year}`),
   cbamCommLists: () => call<CommLists>('GET', '/api/cbam/comm/lists'),
   cbamComms: () => call<{ comms: CommListItem[]; installations: { id: string; name: string; country: string }[]; can: { edit: boolean } }>('GET', '/api/cbam/comms'),
@@ -1071,6 +1100,17 @@ export async function blobUrl(path: string) {
   return URL.createObjectURL(await r.blob());
 }
 
+/** A download that needs a JSON body (e.g. a forecast with its assumptions). */
+export async function downloadPost(path: string, body: unknown, filename: string) {
+  const headers: Record<string, string> = { 'content-type': 'application/json' };
+  if (tenantId) headers['x-tenant-id'] = tenantId;
+  const r = await fetch(path, { method: 'POST', headers, body: JSON.stringify(body) });
+  if (!r.ok) { const d = await r.json().catch(() => ({})); throw new ApiError(d.message ?? `Download failed (${r.status})`, r.status); }
+  const url = URL.createObjectURL(await r.blob());
+  const a = document.createElement('a');
+  a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+}
 export async function download(path: string, filename: string) {
   const headers: Record<string, string> = {};
   if (tenantId) headers['x-tenant-id'] = tenantId;

@@ -30,6 +30,7 @@ type Act = (fn: () => Promise<unknown>, msg: string) => Promise<void>;
 const ONLY: Partial<Record<Tab, [string, string]>> = {
   comms: ['Communications to importers', 'Each quarter, the embedded emissions of the goods you sell to the EU, in the Commission\'s communication template — filled in step by step and downloaded as Excel.'],
   installations: ['Installations', 'Your plants as registered in the CBAM Registry, with their production processes.'],
+  imports: ['Imports & declaration', 'Goods you import into the EU by customs line: CN code, origin, tonnes, supplier, actual or default emissions — with the certificates and the declaration workbook.'],
   reports: ['Annual emissions report', 'The installation\'s report for the year: activity, attributed emissions, precursors, goods and verification — with the summary for the CBAM Registry.'],
   reference: ['Default values & benchmarks', 'The Commission\'s default values and CBAM benchmarks, to compare with your own embedded emissions.'],
 };
@@ -50,7 +51,7 @@ export function Cbam({ only }: { only?: Tab } = {}) {
     <div className="page">
       {only ? <div className="row tahead" style={{ flexWrap: 'wrap' }}>
         <div className="grow"><span className="lbl">CBAM</span><h1>{ONLY[only]?.[0]}</h1><div className="muted">{ONLY[only]?.[1]}</div></div>
-        {(only === 'reports' || only === 'reference') && <label className="field" style={{ minWidth: 110 }}><span>Year</span>
+        {(only === 'reports' || only === 'reference' || only === 'imports') && <label className="field" style={{ minWidth: 110 }}><span>Year</span>
           <select className="input" value={year} onChange={(e) => set({ year: e.target.value })}>{[2025, 2026, 2027, 2028].map((y) => <option key={y}>{y}</option>)}</select></label>}
       </div> : <>
       <div className="row tahead" style={{ flexWrap: 'wrap' }}>
@@ -59,7 +60,8 @@ export function Cbam({ only }: { only?: Tab } = {}) {
         <label className="field" style={{ minWidth: 110 }}><span>Year</span>
           <select className="input" value={year} onChange={(e) => set({ year: e.target.value })}>{[2025, 2026, 2027, 2028].map((y) => <option key={y}>{y}</option>)}</select></label>
       </div>
-      <div className="tabs">{TABS.map(([k, l]) => <button key={k} className={tab === k ? 'on' : ''} onClick={() => set({ tab: k })}>{l}</button>)}</div>
+      <div className="tabs">{TABS.map(([k, l]) => <button key={k} className={tab === k ? 'on' : ''} onClick={() => set({ tab: k })}>{l}</button>)}
+        {([['suppliers', 'Suppliers & requests'], ['forecast', 'Cost forecast'], ['library', 'CN codes & rules']] as const).map(([k, l]) => <button key={k} onClick={() => navTo(`/cbam/${k}`)}>{l} ↗</button>)}</div>
       </>}
       {tab === 'overview' && <Overview d={d} go={(t) => set({ tab: t })} />}
       {tab === 'comms' && <CbamComms commId={sp.get('comm')} open={(id) => set({ comm: id })} compact={!!only} />}
@@ -362,6 +364,7 @@ function Imports({ year, d }: { year: number; d: CbamData }) {
       {x.can.edit && <button className="btn" onClick={() => setUpload(true)}><Icon name="upload" size={15} /> Upload customs file</button>}
       {x.can.edit && <button className="btn" onClick={() => setEdit('new')}>+ Import line</button>}
       <button className="btn p" onClick={() => download(`/api/cbam/declaration?year=${year}`, `CBAM declaration ${year}.xlsx`).catch((e) => toast((e as Error).message))}><Icon name="download" size={15} /> Declaration workbook</button>
+      <button className="btn" onClick={() => download(`/api/cbam/declaration.json?year=${year}`, `CBAM declaration ${year}.json`).catch((e) => toast((e as Error).message))}><Icon name="download" size={15} /> JSON</button>
     </div>
     <div className="kgrid4">
       <div className="card kpi"><span className="muted small">Net mass imported</span><b>{f0(sum((l) => l.mass))} <small className="muted">t</small></b><span className="muted small">{L.length} lines · {new Set(L.map((l) => `${l.cn}${l.origin}`)).size} CN × origin</span></div>
@@ -457,11 +460,49 @@ function UploadDrawer({ year, onClose, done }: { year: number; onClose: () => vo
 }
 
 // --------------------------------------------------------------- references --
+/** Platform staff: load the Commission's default values or benchmarks for every company (any spreadsheet layout). */
+function OfficialLoader({ reload }: { reload: () => void }) {
+  const { toast } = useApp();
+  const [file, setFile] = useState<File | null>(null);
+  const [pv, setPv] = useState<Awaited<ReturnType<typeof api.cbamRefPreview>> | null>(null);
+  const [m, setM] = useState({ kind: 'default', year: 2026, source: '', cnCol: 0, countryCol: -1, valueCol: 0, includesMarkup: '0', indicative: '0' });
+  const [sets, setSets] = useState<Awaited<ReturnType<typeof api.cbamRefSets>>['sets']>([]);
+  const load = () => api.cbamRefSets().then((x) => setSets(x.sets)).catch(() => {});
+  useEffect(() => { void load(); }, []);
+  const pick = async (f: File) => { try { const p = await api.cbamRefPreview(f); setFile(f); setPv(p); setM((o) => ({ ...o, cnCol: Math.max(0, p.guess.cn), countryCol: p.guess.country, valueCol: Math.max(0, p.guess.value), source: o.source || f.name.replace(/\.[a-z]+$/i, '') })); } catch (e) { toast((e as Error).message); } };
+  const col = (k: 'cnCol' | 'countryCol' | 'valueCol', l: string, none?: boolean) => <label className="field"><span>{l}</span><select className="input" value={m[k]} onChange={(e) => setM({ ...m, [k]: Number(e.target.value) })}>{none && <option value={-1}>— none (all countries)</option>}{pv!.header.map((h, i) => <option key={i} value={i}>{h || `Column ${i + 1}`}</option>)}</select></label>;
+  return <div className="card" style={{ display: 'grid', gap: 10 }}>
+    <div><span className="lbl">Platform · all companies</span><h3 style={{ margin: '2px 0 0' }}>Load official default values or benchmarks</h3>
+      <div className="muted small">Upload the Commission's spreadsheet as published (Excel or CSV), map its columns, and the values are used by every company and by the free calculator. Loading the same kind, year and source again replaces the earlier set.</div></div>
+    <div><input type="file" accept=".xlsx,.csv" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) void pick(f); }} /></div>
+    {pv && <>
+      <div className="scroll"><table className="t"><thead><tr>{pv.header.map((h, i) => <th key={i}>{h || `Column ${i + 1}`}</th>)}</tr></thead><tbody>{pv.sample.slice(0, 6).map((r, i) => <tr key={i}>{r.map((c, j) => <td key={j} className="small">{c}</td>)}</tr>)}</tbody></table></div>
+      <div className="muted small">{pv.total} rows in the file.</div>
+      <div className="row" style={{ gap: 10, flexWrap: 'wrap', alignItems: 'end' }}>
+        <label className="field"><span>Kind</span><select className="input" value={m.kind} onChange={(e) => setM({ ...m, kind: e.target.value })}><option value="default">Default values (tCO₂e/t)</option><option value="benchmark">CBAM benchmarks</option></select></label>
+        <label className="field"><span>Year</span><input className="input num" style={{ width: 90 }} type="number" value={m.year} onChange={(e) => setM({ ...m, year: Number(e.target.value) })} /></label>
+        {col('cnCol', 'CN code column')}{m.kind === 'default' && col('countryCol', 'Country column', true)}{col('valueCol', 'Value column')}
+        <label className="field grow"><span>Source (shown with every value)</span><input className="input" value={m.source} onChange={(e) => setM({ ...m, source: e.target.value })} placeholder="e.g. Implementing Regulation (EU) 2025/2621, Annex" /></label>
+      </div>
+      <div className="row small" style={{ gap: 16, flexWrap: 'wrap' }}>
+        {m.kind === 'default' && <label className="row" style={{ gap: 6 }}><input type="checkbox" checked={m.includesMarkup === '1'} onChange={(e) => setM({ ...m, includesMarkup: e.target.checked ? '1' : '0' })} /> The values already include the year's mark-up (the tool stores them without it and adds each year's mark-up)</label>}
+        <label className="row" style={{ gap: 6 }}><input type="checkbox" checked={m.indicative === '1'} onChange={(e) => setM({ ...m, indicative: e.target.checked ? '1' : '0' })} /> Not official (marked "illustrative")</label>
+      </div>
+      <div><button className="btn p" disabled={m.source.trim().length < 3} onClick={() => void api.cbamRefImport(file!, m).then((r) => { toast(`${r.imported} values loaded${r.replaced ? `, ${r.replaced} replaced` : ''}${r.skipped ? `, ${r.skipped} rows skipped` : ''}`); setPv(null); setFile(null); void load(); reload(); }).catch((e) => toast((e as Error).message))}>Load {pv.total} rows</button></div>
+    </>}
+    {sets.length > 0 && <table className="t"><thead><tr><th>Loaded set</th><th>Kind</th><th>Year</th><th className="num">Values</th><th>Loaded</th><th /></tr></thead>
+      <tbody>{sets.map((x) => <tr key={`${x.kind}|${x.year}|${x.source}`}><td className="small">{x.source}{x.indicative && <span className="chip warn" style={{ marginLeft: 4 }}>illustrative</span>}</td><td>{x.kind === 'default' ? 'Default values' : 'Benchmarks'}</td><td>{x.year}</td><td className="num">{x.rows}</td><td className="small">{d8(x.loaded)}</td>
+        <td><button className="btn sm ghost" onClick={() => { if (confirm(`Remove ${x.rows} values of "${x.source}" for every company?`)) void api.cbamRefRemove(x.kind, x.year, x.source).then(() => { void load(); reload(); }).catch((e) => toast((e as Error).message)); }}>Remove</button></td></tr>)}</tbody></table>}
+  </div>;
+}
+
 function References({ d, act }: { d: CbamData; act: Act }) {
+  const { role } = useApp();
   const [v, setV] = useState({ kind: 'default', cn: '', country: '', year: String(d.year), quarter: '', value: '', source: '' });
   const can = d.can.edit;
   const rows = d.references;
   return <>
+    {role === 'platform_admin' && <OfficialLoader reload={() => void act(async () => {}, 'Library updated')} />}
     <div className="note warn small">Use the official values: default values from the Annex of Implementing Regulation (EU) 2025/2621 (per CN code and country of origin) and CBAM benchmarks from Implementing Regulation (EU) 2025/2620. Values marked <b>illustrative</b> are for the demo only. When a line has its own value, that one is used; otherwise the most specific value here (longest CN code, same country first).</div>
     {can && <div className="card"><h3 style={{ marginTop: 0 }}>Add a value for your company</h3>
       <div className="row" style={{ gap: 8, flexWrap: 'wrap', alignItems: 'flex-end' }}>

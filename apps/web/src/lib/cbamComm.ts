@@ -50,7 +50,8 @@ export interface CommResult {
   checks: { level: 'error' | 'warn'; step: Step; msg: string }[];
 }
 export interface CommMeta { id: string; title: string; status: 'draft' | 'final' | 'sent'; sentTo: string; installationId: string | null; installation: string | null; periodStart: string | null; periodEnd: string | null; period: string; template: string; createdName: string; createdAt: string; updatedName: string; updatedAt: string }
-export interface CommView { comm: CommMeta; data: CommData; result: CommResult; can?: { edit: boolean }; installations?: { id: string; name: string; country: string }[] }
+export interface CommDefault { i: number; defaultValue: N; indicative: boolean | null; year: number; markup: N; defaultWithMarkup: N; relevant: N; price: N; savingPerT: N; ratio: N }
+export interface CommView { comm: CommMeta; data: CommData; result: CommResult; defaults?: CommDefault[]; can?: { edit: boolean }; installations?: { id: string; name: string; country: string }[] }
 export interface CommListItem extends CommMeta { products: number; processes: number; errors: number; warnings: number; goods: { cn: string; name: string; seeTotal: N; unit: string }[] }
 export interface CbamSummary {
   year: number; registered: number; can: { edit: boolean };
@@ -59,3 +60,34 @@ export interface CbamSummary {
   comms: { id: string; title: string; installation: string; period: string; quarter: number; status: string; sentTo: string; errors: number; updatedAt: string; updatedName: string }[];
   latest: { id: string; title: string; status: string; period: string; updatedAt: string } | null;
 }
+
+// ------------------------------------------------------------------ the dedicated CBAM tool --
+export type CbamRole = 'importer' | 'exporter' | 'both';
+export interface CbamSettings { role: CbamRole; eori: string | null; can: { edit: boolean } }
+export interface CbamAgg { key: string; label: string; sub?: string; lines: number; mass: number; embedded: number; certificates: number; cost: number; defaultMass: number; actualMass: number; problems: number }
+export interface ImporterOverview {
+  year: number; can: { edit: boolean };
+  totals: { lines: number; mass: number; embedded: number; faa: number; certificates: number; cost: number; defaultMass: number; problems: number; markupCost: number };
+  threshold: { limit: number; mass: number; share: number; byQuarter: number[]; status: 'under' | 'near' | 'over'; exempt: boolean; alwaysCovered: number; message: string };
+  holding: { quarter: number; certificatesSoFar: number; toHold: number; price: N; value: N }[]; holdingShare: number; prices: N[];
+  deadlines: { salesStart: string; declarationDue: string };
+  byCn: CbamAgg[]; byCategory: CbamAgg[]; byOrigin: CbamAgg[]; bySupplier: CbamAgg[];
+  byQuarter: { quarter: number; mass: number; embedded: number; cost: number }[];
+  alerts: { level: 'bad' | 'warn' | 'info'; msg: string; link?: string }[];
+  requests: { open: number; answered: number; overdue: number };
+}
+export interface CbamSupplierRow {
+  id: string; kind: 'import' | 'precursor'; name: string; country: string | null; installation: string | null; registry_id: string | null; contact_name: string | null; contact_email: string | null; notes: string;
+  mass: number; lines: number; default_lines: number; values: number; last_request: { id: string; status: string; quarter: number | null; year: number; due: string | null } | null;
+}
+export interface CbamRequestRow { id: string; supplier_id: string; supplier: string; country: string | null; purpose: 'import' | 'precursor'; year: number; quarter: number | null; cn_codes: string[]; due_date: string | null; status: string; contact_email: string; reminders: number; reminded_at: string | null; created_at: string; created_name: string; has_code: boolean; code_expires: string | null; responses: number; to_review: number }
+export interface CbamResponseGood { cn: string; name: string; seeDirect: N; seeIndirect: N; defaultShare: N; embeddedElec: N; elecSource: string; category: string; inRequest: boolean; relevant: N; defaultValue: N; check: { level: 'ok' | 'low' | 'high' | 'nodefault' | 'missing'; ratio: N; msg: string } }
+export interface CbamResponse { id: string; via: 'template' | 'form' | 'account'; from_name: string | null; from_email: string | null; filename: string | null; status: 'submitted' | 'accepted' | 'rejected'; review_note: string | null; reviewed_name: string | null; reviewed_at: string | null; submitted_at: string;
+  data: { period?: { start: string | null; end: string | null }; installation?: { name: string; country: string; registryId: string }; verified?: boolean }; goods: CbamResponseGood[] }
+export interface CbamRequestView { request: CbamRequestRow & { message: string; supplier_country: string | null; supplier_installation: string | null; hasCode: boolean }; responses: CbamResponse[]; messages: { side: 'requester' | 'supplier'; author: string; body: string; at: string }[]; can: { edit: boolean } }
+export interface ForecastAssumptions { from: number; to: number; price: number; priceGrowth: number; volumeGrowth: number; basis: 'actual' | 'default'; switches: { key: string; see: number }[] }
+export interface ForecastGroup { key: string; label: string; cn: string; origin: string; supplier: string; sector: string; mass: number; seeActual: N; defaultValue: N; benchmark: N; carbonPriceEur: N }
+export interface ForecastResult { years: { year: number; cbamFactor: number; price: number; mass: number; embedded: number; faa: number; certificates: number; cost: number; missing: number }[]; groups: { key: string; label: string; cost: number[]; certificates: number[]; see: number[]; total: number }[]; total: number }
+export interface CbamCnRow { cn: string; name: string; category: string; sector: string }
+export interface CbamCalcResult { cn: string; name: string; category: string; sector: string; indirectCounts: boolean; country: string; tonnes: number; price: N; priceSource: string | null; thresholdNote: string; indicative: boolean; note: string;
+  years: { year: number; cbamFactor: number; markup: number; defaultValue: N; defaultIndicative: boolean | null; benchmark: N; seeDefault: N; seeActual: N; certDefault: N; certActual: N; costDefault: N; costActual: N }[] }

@@ -30,7 +30,7 @@ const YearPick = ({ year, set }: { year: number; set: (y: number) => void }) => 
   <select className="input" value={year} onChange={(e) => set(Number(e.target.value))}>{[thisYear - 2, thisYear - 1, thisYear, thisYear + 1].map((y) => <option key={y}>{y}</option>)}</select></label>;
 
 // ------------------------------------------------------------------ home --
-export function CbamHome() {
+export function CbamHome({ embedded }: { embedded?: boolean } = {}) {
   const { toast, tenant } = useApp();
   const nav = useNavigate();
   const [year, setYear] = useState(thisYear);
@@ -49,12 +49,13 @@ export function CbamHome() {
   const sent = s.comms.filter((c) => c.status === 'sent').length;
   const toFix = s.comms.filter((c) => c.status === 'draft').length;
   const fresh = !s.registered && !s.comms.length && !s.latest;
-  return <div className="page">
-    <div className="row tahead" style={{ flexWrap: 'wrap' }}>
-      <div className="grow"><span className="lbl">CBAM Exporter</span><h1>{tenant?.name ?? 'CBAM'}</h1>
+  return <div className={embedded ? 'page cmembed' : 'page'}>
+    {embedded ? <div className="row" style={{ gap: 12, alignItems: 'end' }}><div className="grow"><span className="lbl">CBAM · exporter</span><h2 style={{ margin: '2px 0 0' }}>Your communications to EU customers</h2></div><YearPick year={year} set={setYear} /></div>
+      : <div className="row tahead" style={{ flexWrap: 'wrap' }}>
+      <div className="grow"><span className="lbl">CBAM · exporter</span><h1>{tenant?.name ?? 'CBAM'}</h1>
         <div className="muted">Embedded emissions of the goods you sell to the EU, quarter by quarter, in the format your importers need.</div></div>
       <YearPick year={year} set={setYear} />
-    </div>
+    </div>}
 
     {fresh && <section className="card cmstart">
       <span className="lbl">Get started</span><h3 style={{ margin: '4px 0 10px' }}>Three steps to your first communication</h3>

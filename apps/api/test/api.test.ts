@@ -3394,6 +3394,119 @@ test('CBAM communication to importers: create from an installation, save with li
   assert.equal((await api('POST', '/api/platform/companies', { name: 'Bad', country: 'AE', gwpSet: 'AR6', products: ['other'], superAdmin: { name: 'X', email: 'x@bad.test' } })).status, 400);
 });
 
+test('CBAM tool: importer overview and threshold, suppliers and data requests answered by form, EU template and another account, credibility, accept applies to imports, forecast, free calculator, self-service sign-up', async () => {
+  const co = await api('POST', '/api/platform/companies', { name: 'EU Importer GmbH', country: 'DE', gwpSet: 'AR6', products: ['cbam'], superAdmin: { name: 'Ina Importer', email: 'super@importer.test' } });
+  const T = co.body.company.id as string;
+  assert.equal((await api('PUT', '/api/cbam/settings', { role: 'importer', eori: 'DE123456789012' }, T)).body.role, 'importer');
+  // own reference values (the shared library has only samples)
+  await api('POST', '/api/cbam/reference', { kind: 'default', cn: '7208', country: 'TR', year: 2026, value: 2, source: 'test default' }, T);
+  await api('POST', '/api/cbam/reference', { kind: 'benchmark', cn: '7208', year: 2026, value: 1.2, source: 'test benchmark' }, T);
+  for (const [d, m] of [['2026-02-10', 30], ['2026-05-03', 25]] as const) {
+    assert.equal((await api('POST', '/api/cbam/imports', { year: 2026, importDate: d, cn: '72081000', origin: 'TR', mass: m, supplier: 'Anatolia Steel', source: 'default' }, T)).status, 200);
+  }
+  let ov = (await api('GET', '/api/cbam/importer/overview?year=2026', undefined, T)).body;
+  assert.equal(ov.totals.mass, 55); assert.equal(ov.threshold.status, 'over'); assert.ok(ov.alerts.some((a: { msg: string }) => /authorised declarant/.test(a.msg)));
+  assert.equal(ov.bySupplier[0].label, 'Anatolia Steel'); assert.equal(ov.holding.length, 4);
+  const certDefault = ov.totals.certificates;
+  assert.ok(Math.abs(certDefault - 55 * (2 * 1.1 - 1.2 * 0.975)) < 1e-6, 'default value with the 2026 mark-up, minus benchmark × CBAM factor');
+  // supplier: links the typed lines
+  const sup = (await api('POST', '/api/cbam/suppliers', { name: 'Anatolia Steel', country: 'TR', contactEmail: 'cbam@anatolia.example', installation: 'Iskenderun works' }, T)).body;
+  assert.equal(sup.linked, 2);
+  // request for Q1, access code once; supplier signs in and answers with the short form
+  const rq = (await api('POST', '/api/cbam/requests', { supplierId: sup.id, year: 2026, quarter: 1, dueDate: '2026-04-15', message: 'Please send Q1 values' }, T)).body;
+  assert.match(rq.code, /^[A-Z2-9]{10}$/); assert.deepEqual((await tenantRow(T, `SELECT cn_codes FROM cbam_request WHERE id = $1`, [rq.id])).cn_codes, ['72081000']);
+  assert.equal((await app.inject({ method: 'POST', url: '/api/public/cbam/supplier/login', payload: { email: 'cbam@anatolia.example', code: 'WRONGCODE1' } })).statusCode, 401);
+  const lg = (await app.inject({ method: 'POST', url: '/api/public/cbam/supplier/login', payload: { email: 'CBAM@anatolia.example', code: rq.code.toLowerCase() } })).json();
+  const H = { 'x-cbam-supplier': lg.token };
+  const me = (await app.inject({ method: 'GET', url: '/api/public/cbam/supplier/me', headers: H })).json();
+  assert.equal(me.company, 'EU Importer GmbH'); assert.equal(me.quarter, 1); assert.ok(me.cnNames['72081000']);
+  const form = await app.inject({ method: 'POST', url: '/api/public/cbam/supplier/form', headers: H, payload: { installation: { name: 'Iskenderun works', country: 'TR' }, verified: true, goods: [{ cn: '72081000', name: 'HR coil', seeDirect: 0.4, seeIndirect: 0.1 }] } });
+  assert.equal(form.statusCode, 200);
+  await app.inject({ method: 'POST', url: '/api/public/cbam/supplier/message', headers: H, payload: { body: 'Values are from our verified 2025 report.' } });
+  let rv = (await api('GET', `/api/cbam/requests/${rq.id}`, undefined, T)).body;
+  assert.equal(rv.request.status, 'answered'); assert.equal(rv.messages.length, 1);
+  const g = rv.responses[0].goods[0];
+  assert.equal(g.check.level, 'low', '0.4 against a default of 2 is flagged'); assert.equal(g.defaultValue, 2);
+  // sent back, then answered again with the EU template
+  assert.equal((await api('POST', `/api/cbam/responses/${rv.responses[0].id}/review`, { decision: 'reject' }, T)).status, 400, 'a reason is needed');
+  await api('POST', `/api/cbam/responses/${rv.responses[0].id}/review`, { decision: 'reject', note: 'Too low: send the template with the calculation' }, T);
+  const { buildWorkbook, normalise } = await import('../src/lib/cbamComm.js');
+  const comm = normalise({ period: { start: '2026-01-01', end: '2026-03-31' }, installation: { name: 'Iskenderun works', country: 'TR', unlocode: 'TR ISK' }, goods: [{ category: 'Iron or steel products' }],
+    processes: [{ id: 'p1', name: 'Hot strip mill', category: 'Iron or steel products', includes: ['Only direct production'], production: [1000], market: 1000, nonCbam: 0, dirEm: 1800, elecMwh: 400, elecEf: 0.5, elecSource: 'Mix', elecExported: 0 }],
+    ghg: { indirect: 200 }, products: [{ processId: 'p1', cn: '72081000', name: 'HR coil' }] });
+  const tpl = await app.inject({ method: 'POST', url: '/api/public/cbam/supplier/template', headers: { ...H, 'content-type': 'application/octet-stream', 'x-filename': 'q1.xlsx' }, payload: buildWorkbook(comm) });
+  assert.equal(tpl.statusCode, 200, tpl.body);
+  rv = (await api('GET', `/api/cbam/requests/${rq.id}`, undefined, T)).body;
+  const t0 = rv.responses[0];
+  assert.equal(t0.via, 'template'); assert.ok(Math.abs(t0.goods[0].seeDirect - 1.8) < 1e-9); assert.ok(Math.abs(t0.goods[0].seeIndirect - 0.2) < 1e-9); assert.equal(t0.goods[0].check.level, 'ok');
+  const acc = (await api('POST', `/api/cbam/responses/${t0.id}/review`, { decision: 'accept', apply: true }, T)).body;
+  assert.equal(acc.values, 1); assert.equal(acc.lines, 1, 'only the Q1 line');
+  ov = (await api('GET', '/api/cbam/importer/overview?year=2026', undefined, T)).body;
+  assert.ok(Math.abs(ov.totals.certificates - (30 * (1.8 - 1.2 * 0.975) + 25 * (2 * 1.1 - 1.2 * 0.975))) < 1e-6, 'Q1 on actual direct emissions (steel: indirect not counted)');
+  assert.equal((await app.inject({ method: 'POST', url: '/api/public/cbam/supplier/template', headers: { ...H, 'content-type': 'application/octet-stream' }, payload: buildWorkbook(comm) })).statusCode, 400, 'accepted: closed');
+  // Q2: answered from the supplier's own account with its communication
+  const exp = (await api('POST', '/api/platform/companies', { name: 'Anatolia Steel AS', country: 'TR', gwpSet: 'AR6', products: ['cbam'], superAdmin: { name: 'Ali', email: 'super@anatolia.test' } })).body.company.id as string;
+  const cid = (await api('POST', '/api/cbam/comms', { period: { start: '2026-04-01', end: '2026-06-30' } }, exp)).body.id as string;
+  await api('PUT', `/api/cbam/comms/${cid}`, { data: { ...comm, period: { start: '2026-04-01', end: '2026-06-30' } } }, exp);
+  const rq2 = (await api('POST', '/api/cbam/requests', { supplierId: sup.id, year: 2026, quarter: 2 }, T)).body;
+  assert.equal((await api('POST', '/api/cbam/answer/lookup', { email: 'cbam@anatolia.example', code: rq2.code }, exp)).body.company, 'EU Importer GmbH');
+  assert.equal((await api('POST', '/api/cbam/answer', { email: 'cbam@anatolia.example', code: rq2.code, commId: cid }, exp)).status, 200);
+  assert.equal((await api('POST', '/api/cbam/answer', { email: 'cbam@anatolia.example', code: rq2.code, commId: cid }, T)).status, 400, 'not to yourself');
+  const r2 = (await api('GET', `/api/cbam/requests/${rq2.id}`, undefined, T)).body;
+  assert.equal(r2.responses[0].via, 'account'); assert.match(r2.responses[0].from_name, /Anatolia Steel AS/);
+  assert.equal((await api('GET', `/api/cbam/requests/${rq2.id}`, undefined, exp)).status, 404, 'the supplier does not see the importer\'s request');
+  const js = await app.inject({ method: 'GET', url: '/api/cbam/declaration.json?year=2026', headers: { cookie: adminCookie, 'x-tenant-id': T } });
+  assert.equal(js.statusCode, 200); assert.equal(js.json().declarant.eori, 'DE123456789012'); assert.equal(js.json().goods.length, 2, 'Q1 actual and Q2 default are separate groups');
+  // automatic reminder once the due date has passed (Q1 request is accepted; an open overdue one gets it once)
+  const od = (await api('POST', '/api/cbam/requests', { supplierId: sup.id, year: 2026, quarter: 3, dueDate: '2026-01-01', sendEmail: false }, T)).body;
+  const { cbamAutoRemind } = await import('../src/lib/cbamReminders.js');
+  assert.ok(await cbamAutoRemind() >= 1); assert.equal(await cbamAutoRemind(), 0, 'not again within a week');
+  assert.equal((await tenantRow(T, `SELECT reminders FROM cbam_request WHERE id = $1`, [od.id])).reminders, 1);
+  // forecast to 2034
+  const fc = (await api('GET', '/api/cbam/forecast?year=2026', undefined, T)).body;
+  assert.equal(fc.groups.length, 1); assert.equal(fc.result.years.at(-1).year, 2034); assert.equal(fc.result.years.at(-1).cbamFactor, 0);
+  const sw = (await api('POST', '/api/cbam/forecast', { year: 2026, assumptions: { ...fc.assumptions, switches: [{ key: fc.groups[0].key, see: 0.5 }] } }, T)).body;
+  assert.ok(sw.result.total < fc.result.total, 'a cleaner supplier costs less');
+  const fx = await app.inject({ method: 'POST', url: '/api/cbam/forecast/export', payload: { year: 2026, assumptions: fc.assumptions }, headers: { cookie: adminCookie, 'x-tenant-id': T } });
+  assert.equal(fx.statusCode, 200);
+  // free calculator and CN search (no account)
+  const cn = (await app.inject({ method: 'GET', url: '/api/public/cbam/cn?q=7208' })).json();
+  assert.ok(cn.codes.length > 3 && cn.codes.every((x: { cn: string }) => x.cn.startsWith('7208')));
+  assert.ok((await app.inject({ method: 'GET', url: '/api/public/cbam/cn?q=urea' })).json().codes.length >= 1);
+  const calc = (await app.inject({ method: 'POST', url: '/api/public/cbam/calc', payload: { cn: '72081000', country: 'TR', tonnes: 100, seeDirect: 1.5, price: 80 } })).json();
+  assert.equal(calc.years.length, 9); assert.equal(calc.years[0].seeActual, 1.5); assert.equal(calc.years.at(-1).cbamFactor, 0);
+  assert.ok(Math.abs(calc.years.at(-1).costActual - 1.5 * 100 * 80) < 1e-6, '2034: no free allocation left');
+  assert.equal((await app.inject({ method: 'POST', url: '/api/public/cbam/calc', payload: { cn: '84714100', country: 'TR', tonnes: 1 } })).statusCode, 400);
+  // platform staff load official values (any layout) into the shared library; the free calculator uses them
+  const csv = Buffer.from('Product CN code;Country of origin;Default value 2026 (incl. mark-up)\n72081000;Turkey;2.42\n7208 10 00;IN;3.3\n84714100;TR;1\n;;\n', 'utf8');
+  const pv = await app.inject({ method: 'POST', url: '/api/platform/cbam/reference/preview', payload: csv, headers: { cookie: adminCookie, 'content-type': 'application/octet-stream', 'x-filename': 'dv.csv' } });
+  assert.equal(pv.statusCode, 200, pv.body); assert.equal(pv.json().guess.cn, 0); assert.equal(pv.json().guess.country, 1);
+  const im = await app.inject({ method: 'POST', url: '/api/platform/cbam/reference/import?kind=default&year=2026&source=Test%20official%20set&cnCol=0&countryCol=1&valueCol=2&includesMarkup=1', payload: csv, headers: { cookie: adminCookie, 'content-type': 'application/octet-stream', 'x-filename': 'dv.csv' } });
+  assert.equal(im.statusCode, 200, im.body); assert.equal(im.json().imported, 2); assert.equal(im.json().skipped, 1, 'not a CBAM good');
+  const calc2 = (await app.inject({ method: 'POST', url: '/api/public/cbam/calc', payload: { cn: '72081000', country: 'TR', tonnes: 10, price: 80 } })).json();
+  assert.ok(Math.abs(calc2.years[0].defaultValue - 2.2) < 1e-9, 'stored without the 2026 mark-up'); assert.ok(Math.abs(calc2.years[0].seeDefault - 2.42) < 1e-9);
+  assert.ok(Math.abs(calc2.years[2].seeDefault - 2.2 * 1.3) < 1e-9, '2028 mark-up 30%');
+  // self-service sign-up: closed unless switched on; confirmed by e-mail
+  assert.equal((await app.inject({ method: 'POST', url: '/api/public/cbam/signup', payload: { company: 'New Exporter', country: 'IN', role: 'exporter', name: 'Neha', email: 'neha@newexp.test', accept: true } })).statusCode, 403);
+  process.env.CBAM_SIGNUP = 'on';
+  try {
+    assert.equal((await app.inject({ method: 'POST', url: '/api/public/cbam/signup', payload: { company: 'New Exporter', country: 'IN', role: 'exporter', name: 'Neha', email: 'neha@newexp.test', accept: true } })).statusCode, 200);
+    const mail = (await pq(`SELECT body FROM email_outbox WHERE to_email = 'neha@newexp.test' ORDER BY created_at DESC LIMIT 1`, [])).rows[0].body as string;
+    const token = /token=([A-Za-z0-9_-]+)/.exec(mail)![1]!;
+    assert.equal((await app.inject({ method: 'POST', url: '/api/public/cbam/signup/confirm', payload: { token, password: 'short' } })).statusCode, 400);
+    const ok = await app.inject({ method: 'POST', url: '/api/public/cbam/signup/confirm', payload: { token, password: 'Exporter-Pass-2026!' } });
+    assert.equal(ok.statusCode, 200, ok.body);
+    assert.equal((await app.inject({ method: 'POST', url: '/api/public/cbam/signup/confirm', payload: { token, password: 'Exporter-Pass-2026!' } })).statusCode, 400, 'the link works once');
+    const ck = await login('neha@newexp.test', 'Exporter-Pass-2026!');
+    const t = (await pq(`SELECT t.products, t.plan, s.role FROM tenant t JOIN cbam_settings s ON s.tenant_id = t.id WHERE t.name = 'New Exporter'`, [])).rows[0];
+    assert.deepEqual(t.products, ['cbam']); assert.equal(t.plan, 'trial'); assert.equal(t.role, 'exporter');
+    assert.equal((await call(ck, 'GET', '/api/cbam/comms')).status, 200, 'signed up: no password change asked');
+    // an address that already has an account: same answer, no second account
+    assert.equal((await app.inject({ method: 'POST', url: '/api/public/cbam/signup', payload: { company: 'X Co', country: 'IN', role: 'exporter', name: 'Neha', email: 'neha@newexp.test', accept: true } })).statusCode, 200);
+    assert.equal((await pq(`SELECT count(*)::int AS n FROM cbam_signup WHERE email = 'neha@newexp.test'`, [])).rows[0].n, 1);
+  } finally { delete process.env.CBAM_SIGNUP; }
+});
+
 test('ESG: frameworks decide the materiality needed, double materiality scoring (actual, potential, human rights), decisions need a reason, second-person approval, industry questions with answers checked, export; companies kept apart', async () => {
   const T = tenantA, Y = 2023;
   let d = (await api('GET', `/api/esg?year=${Y}`, undefined, T)).body;

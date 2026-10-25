@@ -2,6 +2,18 @@
 
 Newest first.
 
+## 2026-10-25 · Dedicated CBAM tool: own sign-in and sign-up, importer side, supplier requests, forecast, free calculator
+
+- Migration 061: `cbam_settings` (role importer / exporter / both, EORI, authorised declarant number, price assumption), `cbam_supplier`, `cbam_import.supplier_id`, `cbam_request` (access code as sha256, 60 days; due date; reminders), `cbam_response` (form or EU template; review accept / return), `cbam_request_message`, `cbam_supplier_value`, `cbam_supplier_session` (8 h, header `x-cbam-supplier`), `cbam_signup` (platform-only). Tenant RLS on the rest; `purge.ts` covers them and `cbam_communication`.
+- `lib/cbamSuite.ts`: de minimis 50 t (electricity and hydrogen always counted; warning at 90%), 50% quarterly holding, certificate sales from 1 Feb 2027, declaration due 30 Sept, credibility of supplier values against defaults (<30% / >200%), forecast to 2034 (price path, volumes, CBAM factor phase-out, supplier scenarios).
+- `cbamSuite.routes.ts`: settings, importer overview, suppliers CRUD and values, requests (create returns the code once and e-mails the supplier; code, remind, withdraw, message), response review (accept stores supplier values and applies them to import lines), response → communication precursor, answer lookup / answer for suppliers with an account, forecasts (CRUD, Excel).
+- `cbamPublic.routes.ts` (no login): `info`, `cn`, `calc` (shared references only), self-service `signup` + `confirm` (needs `CBAM_SIGNUP=on` and SMTP; 30-day cbam-only trial), supplier `login` / `logout` / `me` / `template` / `form` / `message`.
+- `cbamAdmin.routes.ts` (platform admin): load official default values and benchmarks from any Excel/CSV (preview with column guess; values with the year's mark-up stored without it; replaces the same kind + year + source), list and delete sets.
+- `lib/cbamReminders.ts`: overdue open requests reminded at most weekly, three times in all; chained into the hourly reminder run.
+- `cbam.routes.ts`: import lines linked to suppliers by name; `GET /api/cbam/declaration.json?year` (`cbam-declaration-data/1`, with EORI). `cbamComm.routes.ts`: `defaults` comparison per good.
+- Web: CBAM sign-in at `/cbam` (brand name `cbam.name`, default "<product> CBAM"); public pages `/cbam-signup`, `/cbam-start`, `/cbam-supplier`, `/cbam-calculator`; menu by role (Importing, Exporting, Knowledge, Setup); `pages/CbamTool.tsx` (importer dashboard, suppliers & requests, answer a request, forecast, CN codes & rules, settings), `pages/CbamPublic.tsx`; official-values loader in Default values & benchmarks; declaration JSON button; printable communication summary (`/cbam/print/:id`); default comparison and saving per tonne in the review step.
+- Manual: CBAM → The dedicated CBAM tool. Test: the whole importer/supplier flow, threshold, credibility, forecast, calculator, sign-up, official-values import, declaration JSON, auto-remind. 108 tests pass.
+
 ## 2026-10-25 · CBAM Exporter: CBAM as a package of its own, with a simpler menu
 
 - Migration 060: product `cbam` allowed in `tenant.products` (any mix with `ekotrace`, `ekofin`). Platform console: **CBAM Exporter** checkbox.

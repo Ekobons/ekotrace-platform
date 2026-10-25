@@ -3,6 +3,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { api } from '../lib/api';
 import { BRAND } from '../lib/brand';
 import { BrandMark } from '../components/BrandMark';
+import { CbamBrandSide } from './CbamPublic';
 
 export function Login({ onDone }: { onDone: () => void }) {
   // a bin's QR label opened before signing in: a contractor goes to the portal with that bin chosen
@@ -37,9 +38,11 @@ export function Login({ onDone }: { onDone: () => void }) {
       if ((x as { code?: string }).code === 'SSO_REQUIRED') setMode('sso');
     } finally { setBusy(false); }
   }
+  // the CBAM tool's own sign-in page
+  const cbam = /^\/cbam(\/|$)/.test(window.location.pathname);
   return (
     <div className="signin">
-      <BrandSide />
+      {cbam ? <CbamBrandSide /> : <BrandSide />}
       <main className="signin-form">
         <form className="sf" onSubmit={submit}>
           {mode === 'code' ? <>
@@ -69,12 +72,17 @@ export function Login({ onDone }: { onDone: () => void }) {
             <button className="btn p sf-go" disabled={busy}>{busy ? 'Checking…' : 'Sign in'}</button>
             <button type="button" className="btn sf-sso" onClick={() => { setMode('sso'); setErr(null); }}>Sign in with your company account</button>
             <p className="sf-note">Forgot your password? Your company's super admin or admin can reset it.</p>
-            <div className="sf-other">
+            {cbam ? <div className="sf-other">
+              <span>New here?</span>
+              <a href="/cbam-signup">Create a free account</a>
+              <a href="/cbam-supplier">Suppliers: answer a CBAM data request with your access code</a>
+              <a href="/cbam-calculator">Free CBAM cost calculator — no account</a>
+            </div> : <div className="sf-other">
               <span>Not a {BRAND.name} user?</span>
               <a href="/survey">Answer a commuting survey with your code</a>
               <a href={`/contractor${binCode ? `?bin=${binCode}` : ''}`}>Waste contractors: sign in with your access code</a>
               <a href="/supplier">Suppliers: share your emissions data with your access code</a>
-            </div>
+            </div>}
           </>}
         </form>
       </main>

@@ -2,7 +2,7 @@
  * App shell: login gate, prototype sidebar (by role), company context, routes.
  */
 import { createContext, useCallback, useContext, useEffect, useState, type CSSProperties, type ReactNode } from 'react';
-import { NavLink, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
+import { NavLink, Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { api, currentTenant, setTenant, whenLoggedOut, ROLE_LABEL, type Company, type Me, type Role } from './lib/api';
 import { Icon } from './components/Icon';
 import { FieldApp } from './pages/FieldApp';
@@ -44,7 +44,10 @@ import { MetricRegistry } from './pages/MetricRegistry';
 import { CarbonCredits } from './pages/CarbonCredits';
 import { ProductLca } from './pages/ProductLca';
 import { Cbam } from './pages/Cbam';
-import { CbamHome, CbamReporting } from './pages/CbamPackage';
+import { CbamPrint } from './pages/CbamComm';
+import { CbamReporting } from './pages/CbamPackage';
+import { CbamAnswer, CbamForecast, CbamHomeByRole, CbamLibrary, CbamSettings, CbamSuppliers, useCbamRole } from './pages/CbamTool';
+import { CbamCalculator, CbamSignup, CbamStart, CbamSupplierPage } from './pages/CbamPublic';
 import { Esg } from './pages/Esg';
 import { AiSettingsPage } from './pages/AiSettings';
 import { SmartImport } from './pages/SmartImport';
@@ -74,7 +77,7 @@ type Tab = { to: string; label: string; roles?: Role[] };
 /** A menu entry; with `tabs`, one entry for several pages shown as tabs at the top of each (old links keep working). */
 type NavItem = { to?: string; label: string; icon: string; roles?: Role[]; stage?: number; tabs?: Tab[] };
 /** Section colours of the side menu, as in the prototype. */
-const SEC_C: Record<string, string> = { '': 'var(--lime)', Portfolio: '#8EC5FF', Capture: '#7FD3B9', Analyse: '#8EC5FF', 'Value chain': '#F2C46D', 'Net zero': '#B6E36B', Disclose: '#C9A7F5', Setup: '#E7ECEA', Help: '#F7A8B8' };
+const SEC_C: Record<string, string> = { Importing: '#8EC5FF', Exporting: '#7FD3B9', Knowledge: '#F2C46D', '': 'var(--lime)', Portfolio: '#8EC5FF', Capture: '#7FD3B9', Analyse: '#8EC5FF', 'Value chain': '#F2C46D', 'Net zero': '#B6E36B', Disclose: '#C9A7F5', Setup: '#E7ECEA', Help: '#F7A8B8' };
 /** EKOFIN (financed emissions): its own menu; people, currencies, documents and the audit log are shared with EKOTRACE. */
 const FIN_NAV: { group?: string; items: NavItem[] }[] = [
   { items: [{ to: '/fin', label: 'Portfolio dashboard', icon: 'chart' }] },
@@ -92,22 +95,38 @@ const FIN_NAV: { group?: string; items: NavItem[] }[] = [
   { group: 'Help', items: [{ to: '/help', label: 'User manual', icon: 'book' }] },
 ];
 /** CBAM Exporter: the simpler menu of a CBAM-only company. */
-const CBAM_NAV: { group?: string; items: NavItem[] }[] = [
-  { items: [{ to: '/cbam/home', label: 'CBAM home', icon: 'home' }] },
-  { group: 'CBAM', items: [
-    { to: '/cbam/comms', label: 'Communications to importers', icon: 'doc' },
-    { to: '/cbam/installations', label: 'Installations', icon: 'building' },
-    { to: '/cbam/reporting', label: 'Reports', icon: 'chart' },
-    { to: '/cbam/annual', label: 'Annual emissions report', icon: 'shield', roles: ['super_admin', 'admin', 'manager', 'verifier'] },
-    { to: '/cbam/reference', label: 'Default values & benchmarks', icon: 'scale' },
-  ] },
-  { group: 'Setup', items: [
-    { to: '/people', label: 'People & access', icon: 'users', roles: ['super_admin', 'admin', 'manager'] },
-    { to: '/vault', label: 'Document vault', icon: 'folder' },
-    { to: '/audit', label: 'Security & audit log', icon: 'lock', roles: ['super_admin', 'admin', 'verifier'] },
-  ] },
-  { group: 'Help', items: [{ to: '/help', label: 'User manual', icon: 'book' }] },
-];
+/** CBAM tool: its own menu, by the company's role in CBAM (importer, exporter or both). */
+function cbamNav(role: 'importer' | 'exporter' | 'both'): { group?: string; items: NavItem[] }[] {
+  const imp = role !== 'exporter', exp = role !== 'importer';
+  return [
+    { items: [{ to: '/cbam/home', label: 'CBAM home', icon: 'home' }] },
+    ...(imp ? [{ group: 'Importing', items: [
+      { to: '/cbam/imports', label: 'Imports & declaration', icon: 'upload' },
+      { to: '/cbam/suppliers', label: 'Suppliers & requests', icon: 'users' },
+      { to: '/cbam/forecast', label: 'Cost forecast', icon: 'chart' },
+    ] as NavItem[] }] : []),
+    ...(exp ? [{ group: 'Exporting', items: [
+      { to: '/cbam/comms', label: 'Communications to importers', icon: 'doc' },
+      { to: '/cbam/answer', label: 'Answer a request', icon: 'inbox' },
+      { to: '/cbam/installations', label: 'Installations', icon: 'building' },
+      { to: '/cbam/precursors', label: 'Precursor suppliers', icon: 'truck' },
+      { to: '/cbam/reporting', label: 'Reports', icon: 'grid' },
+      { to: '/cbam/annual', label: 'Annual emissions report', icon: 'shield', roles: ['super_admin', 'admin', 'manager', 'verifier'] },
+    ] as NavItem[] }] : []),
+    { group: 'Knowledge', items: [
+      { to: '/cbam/library', label: 'CN codes & rules', icon: 'book' },
+      { to: '/cbam/calculator', label: 'Cost calculator', icon: 'scale' },
+      { to: '/cbam/reference', label: 'Default values & benchmarks', icon: 'list' },
+    ] },
+    { group: 'Setup', items: [
+      { to: '/cbam/settings', label: 'CBAM settings', icon: 'gear' },
+      { to: '/people', label: 'People & access', icon: 'users', roles: ['super_admin', 'admin', 'manager'] },
+      { to: '/vault', label: 'Document vault', icon: 'folder' },
+      { to: '/audit', label: 'Security & audit log', icon: 'lock', roles: ['super_admin', 'admin', 'verifier'] },
+    ] },
+    { group: 'Help', items: [{ to: '/help', label: 'User manual', icon: 'book' }] },
+  ];
+}
 type Product = 'ekotrace' | 'ekofin' | 'cbam';
 const HOME: Record<Product, string> = { ekotrace: '/home', ekofin: '/fin', cbam: '/cbam/home' };
 const SHORT: Record<Product, string> = { ekotrace: 'TRC', ekofin: 'FIN', cbam: 'CBM' };
@@ -157,7 +176,7 @@ export function App() {
     catch (e) { const code = (e as { code?: string }).code; if (code === 'MUST_CHANGE_PASSWORD') setMustChange(true); setMe(null); }
   }, []);
   // public pages (survey, contractor and supplier portals) have no staff session to look up
-  const isPublic = ['/survey', '/contractor', '/supplier'].includes(window.location.pathname);
+  const isPublic = ['/survey', '/contractor', '/supplier', '/cbam-signup', '/cbam-start', '/cbam-supplier', '/cbam-calculator'].includes(window.location.pathname);
   useEffect(() => { whenLoggedOut(() => setMe(null)); if (!isPublic) reload(); }, [reload, isPublic]);
   useEffect(() => {
     api.brand().then((b) => { document.title = b.productName ?? b.name; if (b.colors?.primary) document.documentElement.style.setProperty('--primary', b.colors.primary); }).catch(() => {});
@@ -170,6 +189,11 @@ export function App() {
   if (window.location.pathname === '/contractor') return <ContractorPortal />;
   // suppliers answering a data request: email + access code, no user account
   if (window.location.pathname === '/supplier') return <SupplierPortal />;
+  // the CBAM tool's open pages: sign-up, confirmation, suppliers answering a request, the free calculator
+  if (window.location.pathname === '/cbam-signup') return <CbamSignup />;
+  if (window.location.pathname === '/cbam-start') return <CbamStart />;
+  if (window.location.pathname === '/cbam-supplier') return <CbamSupplierPage />;
+  if (window.location.pathname === '/cbam-calculator') return <CbamCalculator />;
   if (me === 'loading') return <div className="empty">Loading…</div>;
   if (me === null) return <Login onDone={reload} />;
   if (me.user.mustChangePassword || mustChange) return <ChangePassword forced onDone={reload} />;
@@ -202,7 +226,8 @@ function Shell() {
   const products: Product[] = (tenant?.products?.length ? tenant.products : ['ekotrace']) as Product[];
   const [picked, setPicked] = useState<Product>(() => { try { return (localStorage.getItem('eko_product') as Product) || 'ekotrace'; } catch { return 'ekotrace'; } });
   const product: Product = path.startsWith('/fin') && products.includes('ekofin') ? 'ekofin' : path.startsWith('/cbam/') && products.includes('cbam') && (picked === 'cbam' || !products.includes('ekotrace')) ? 'cbam' : products.includes(picked) ? picked : products[0]!;
-  const NAV = product === 'ekofin' ? FIN_NAV : product === 'cbam' ? CBAM_NAV : EKO_NAV;
+  const cbamRole = useCbamRole(product === 'cbam');
+  const NAV = product === 'ekofin' ? FIN_NAV : product === 'cbam' ? cbamNav(cbamRole ?? 'both') : EKO_NAV;
   const switchTo = (p: Product) => { setPicked(p); try { localStorage.setItem('eko_product', p); } catch { /* not kept */ } nav(HOME[p]); };
   const allGroups = NAV.flatMap((g) => (g.group ? [g.group] : []));
   const allClosed = allGroups.every((g) => folded.has(g));
@@ -326,8 +351,17 @@ function Shell() {
           <Route path="/metrics" element={<NeedCo><MetricRegistry /></NeedCo>} />
           <Route path="/credits" element={<NeedCo><CarbonCredits /></NeedCo>} />
           <Route path="/lca" element={<NeedCo><ProductLca /></NeedCo>} />
-          <Route path="/cbam" element={<NeedCo><Cbam /></NeedCo>} />
-          <Route path="/cbam/home" element={<NeedCbam><CbamHome /></NeedCbam>} />
+          <Route path="/cbam" element={product === 'cbam' ? <Navigate to="/cbam/home" replace /> : <NeedCo><Cbam /></NeedCo>} />
+          <Route path="/cbam/home" element={<NeedCbam><CbamHomeByRole /></NeedCbam>} />
+          <Route path="/cbam/imports" element={<NeedCbam><Cbam only="imports" /></NeedCbam>} />
+          <Route path="/cbam/suppliers" element={<NeedCbam><CbamSuppliers /></NeedCbam>} />
+          <Route path="/cbam/precursors" element={<NeedCbam><CbamSuppliers kind="precursor" /></NeedCbam>} />
+          <Route path="/cbam/forecast" element={<NeedCbam><CbamForecast /></NeedCbam>} />
+          <Route path="/cbam/library" element={<NeedCbam><CbamLibrary /></NeedCbam>} />
+          <Route path="/cbam/calculator" element={<NeedCbam><div className="page"><CbamCalculator embedded /></div></NeedCbam>} />
+          <Route path="/cbam/settings" element={<NeedCbam><CbamSettings /></NeedCbam>} />
+          <Route path="/cbam/answer" element={<NeedCbam><CbamAnswer /></NeedCbam>} />
+          <Route path="/cbam/print/:id" element={<NeedCbam><PrintRoute /></NeedCbam>} />
           <Route path="/cbam/comms" element={<NeedCbam><Cbam only="comms" /></NeedCbam>} />
           <Route path="/cbam/installations" element={<NeedCbam><Cbam only="installations" /></NeedCbam>} />
           <Route path="/cbam/annual" element={<NeedCbam><Cbam only="reports" /></NeedCbam>} />
@@ -396,6 +430,7 @@ function NeedCbam({ children }: { children: ReactNode }) {
   if (p.includes('cbam') || p.includes('ekotrace')) return <>{children}</>;
   return <div className="page"><div className="card empty"><h2>CBAM is not switched on</h2><p className="sub">The CBAM Exporter package is separate. Contact the Ekobon team to add it to this company.</p></div></div>;
 }
+function PrintRoute() { const { id } = useParams(); return <CbamPrint id={id ?? ''} />; }
 function Gate({ ok, children }: { ok: boolean; children: ReactNode }) {
   return ok ? <>{children}</> : <div className="page"><div className="card empty">You do not have access to this page.</div></div>;
 }

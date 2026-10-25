@@ -64,19 +64,19 @@ async function report(c: Tx, id: string) {
   return { report: r, lines: out };
 }
 
-async function refs(c: Tx) {
+export async function refs(c: Tx) {
   return (await c.query(`SELECT id, kind, cn, country, route, year, quarter, value::float8 AS value, source, indicative, tenant_id IS NOT NULL AS own FROM cbam_reference ORDER BY kind, year DESC, quarter, cn`)).rows as
     { id: string; kind: string; cn: string | null; country: string | null; route: string | null; year: number; quarter: number | null; value: number; source: string; indicative: boolean; own: boolean }[];
 }
 /** The best reference value: same kind and year (or the latest before), longest CN prefix, same country first. */
-function pick(R: Awaited<ReturnType<typeof refs>>, kind: string, cn: string, ctry: string | null, year: number) {
+export function pick(R: Awaited<ReturnType<typeof refs>>, kind: string, cn: string, ctry: string | null, year: number) {
   const c = R.filter((r) => r.kind === kind && r.cn && cn.startsWith(r.cn) && (!r.country || r.country === ctry) && r.year <= year)
     .sort((a, b) => (b.cn!.length - a.cn!.length) || (Number(!!b.country) - Number(!!a.country)) || (b.year - a.year) || (Number(b.own) - Number(a.own)));
   return c[0] ?? null;
 }
-const priceOf = (R: Awaited<ReturnType<typeof refs>>, year: number, q: number) => R.find((r) => r.kind === 'price' && r.year === year && r.quarter === q && r.own) ?? R.find((r) => r.kind === 'price' && r.year === year && r.quarter === q) ?? null;
+export const priceOf = (R: Awaited<ReturnType<typeof refs>>, year: number, q: number) => R.find((r) => r.kind === 'price' && r.year === year && r.quarter === q && r.own) ?? R.find((r) => r.kind === 'price' && r.year === year && r.quarter === q) ?? null;
 
-async function imports(c: Tx, year: number) {
+export async function imports(c: Tx, year: number) {
   const R = await refs(c);
   const rows = (await c.query(`SELECT *, mass::float8 AS mass, see_direct::float8 AS see_direct, see_indirect::float8 AS see_indirect, default_value::float8 AS default_value, benchmark::float8 AS benchmark,
                                       carbon_price_eur::float8 AS carbon_price_eur FROM cbam_import WHERE year = $1 ORDER BY quarter, import_date NULLS LAST, cn`, [year])).rows;
@@ -488,6 +488,7 @@ export async function cbamRoutes(app: FastifyInstance) {
     return tenantTx(tenant, async (c) => {
       const b = await fromOwnReport(c, b0);
       const r = (await c.query(`INSERT INTO cbam_import (tenant_id, ${IMPORT_COLS}, created_name) VALUES ($1,${Array.from({ length: 22 }, (_, i) => `$${i + 2}`).join(',')},$24) RETURNING id`, [tenant, ...importCols(b), req.user.name])).rows[0];
+      await c.query(`UPDATE cbam_import i SET supplier_id = s.id FROM cbam_supplier s WHERE i.supplier_id IS NULL AND s.kind = 'import' AND lower(i.supplier) = lower(s.name)`);
       await audit(c, req, 'cbam.import.create', 'cbam_import', r.id, b);
       return { id: r.id };
     });
@@ -500,6 +501,8 @@ export async function cbamRoutes(app: FastifyInstance) {
       const cols = IMPORT_COLS.split(', ');
       const r = await c.query(`UPDATE cbam_import SET ${cols.map((k, i) => `${k} = $${i + 2}`).join(', ')} WHERE id = $1`, [id, ...importCols(b)]);
       if (!r.rowCount) throw notFound('Import line');
+      await c.query(`UPDATE cbam_import i SET supplier_id = NULL WHERE i.id = $1 AND i.supplier_id IS NOT NULL AND lower(coalesce(i.supplier, '')) <> (SELECT lower(name) FROM cbam_supplier WHERE id = i.supplier_id)`, [id]);
+      await c.query(`UPDATE cbam_import i SET supplier_id = s.id FROM cbam_supplier s WHERE i.supplier_id IS NULL AND s.kind = 'import' AND lower(i.supplier) = lower(s.name)`);
       await audit(c, req, 'cbam.import.update', 'cbam_import', id, b);
       return { ok: true };
     });
@@ -586,6 +589,7 @@ export async function cbamRoutes(app: FastifyInstance) {
     if (!q.commit) return { lines: out.slice(0, 500), ok: good.length, problems: out.filter((x) => !x.ok).length };
     return tenantTx(tenant, async (c) => {
       for (const b of good) await c.query(`INSERT INTO cbam_import (tenant_id, ${IMPORT_COLS}, created_name) VALUES ($1,${Array.from({ length: 22 }, (_, i) => `$${i + 2}`).join(',')},$24)`, [tenant, ...importCols(b), req.user.name]);
+      await c.query(`UPDATE cbam_import i SET supplier_id = s.id FROM cbam_supplier s WHERE i.supplier_id IS NULL AND s.kind = 'import' AND lower(i.supplier) = lower(s.name)`);
       await audit(c, req, 'cbam.import.upload', 'cbam_import', null, { file: filename, imported: good.length, skipped: out.length - good.length });
       return { imported: good.length, skipped: out.length - good.length };
     });
@@ -647,6 +651,32 @@ export async function cbamRoutes(app: FastifyInstance) {
       return wb;
     });
     return sendWorkbook(reply, wb, `CBAM declaration ${q.year}.xlsx`);
+  });
+
+  // The declaration as structured data (JSON), for other systems and for checks before filing.
+  app.get('/api/cbam/declaration.json', async (req, reply) => {
+    const tenant = requireTenant(req);
+    const q = z.object({ year: z.coerce.number().int().min(2026).max(2100) }).parse(req.query);
+    const out = await tenantTx(tenant, async (c) => {
+      const L = await imports(c, q.year);
+      const co = (await c.query(`SELECT t.name, s.eori FROM tenant t LEFT JOIN cbam_settings s ON s.tenant_id = t.id WHERE t.id = $1`, [tenant])).rows[0];
+      await audit(c, req, 'cbam.declaration.json', 'cbam_import', null, { year: q.year, lines: L.length });
+      const r6 = (x: number | null | undefined) => (x == null ? null : Math.round(x * 1e6) / 1e6);
+      const groups = new Map<string, typeof L>();
+      for (const x of L) { const k = `${x.cn}|${x.origin}|${x.installation_id_reg ?? x.installation ?? ''}|${x.source}`; groups.set(k, [...(groups.get(k) ?? []), x]); }
+      return {
+        format: 'cbam-declaration-data/1', note: 'Structured summary prepared for the CBAM Registry declaration; not the Registry XML format.', generatedBy: PRODUCT, generatedAt: new Date().toISOString(),
+        declarant: { name: co?.name ?? null, eori: co?.eori ?? null }, year: q.year, cbamFactor: cbamFactor(q.year),
+        totals: { netMass: r6(L.reduce((a, x) => a + x.mass, 0)), embeddedEmissions: r6(L.reduce((a, x) => a + (x.calc.embedded ?? 0), 0)), freeAllocationAdjustment: r6(L.reduce((a, x) => a + x.calc.faa, 0)),
+          certificates: r6(L.reduce((a, x) => a + (x.calc.certificates ?? 0), 0)), estimatedCostEur: r6(L.reduce((a, x) => a + (x.calc.cost ?? 0), 0)) },
+        goods: [...groups.values()].map((xs) => { const x = xs[0]!; const mass = xs.reduce((a, y) => a + y.mass, 0); const emb = xs.reduce((a, y) => a + (y.calc.embedded ?? 0), 0); return {
+          cn: x.cn, category: x.categoryName, countryOfOrigin: x.origin, installation: x.installation ?? null, installationId: x.installation_id_reg ?? null, route: x.route ?? null, method: x.source === 'actual' ? 'actual' : 'default',
+          netMass: r6(mass), seeDirect: x.source === 'actual' ? r6(x.see_direct) : null, seeIndirect: x.source === 'actual' ? r6(x.see_indirect) : null, defaultValue: x.source === 'default' ? r6(x.defaultUsed) : null, markup: x.calc.markup || null,
+          embeddedEmissions: r6(emb), benchmark: r6(x.benchmarkUsed), freeAllocationAdjustment: r6(xs.reduce((a, y) => a + y.calc.faa, 0)), carbonPricePaidEurPerT: r6(x.carbon_price_eur), verification: x.verifier_ref ?? null,
+          certificates: r6(xs.reduce((a, y) => a + (y.calc.certificates ?? 0), 0)), lines: xs.length, problems: [...new Set(xs.flatMap((y) => y.calc.problems))] }; }),
+      };
+    });
+    return reply.header('content-disposition', `attachment; filename="CBAM declaration ${q.year}.json"`).send(out);
   });
 
   // ------------------------------------------------------------- references --
