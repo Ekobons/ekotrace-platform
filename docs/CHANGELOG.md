@@ -2,6 +2,15 @@
 
 Newest first.
 
+## 2026-10-25 · CBAM Exporter: CBAM as a package of its own, with a simpler menu
+
+- Migration 060: product `cbam` allowed in `tenant.products` (any mix with `ekotrace`, `ekofin`). Platform console: **CBAM Exporter** checkbox.
+- `lib/cbamAccess.ts`: hook in the CBAM route plugins (`cbam.routes.ts`, `cbamComm.routes.ts`) — the company needs `cbam` or `ekotrace` (403 `PRODUCT_OFF` otherwise).
+- `GET /api/cbam/comms/summary?year=` (per installation × quarter: latest communication, status, problems, direct/indirect emissions; goods × quarter SEE, default share, embedded electricity; communications list; latest overall) and `GET /api/cbam/comms/summary/export?year=` (Excel: goods by quarter, installation emissions, communications, about).
+- Communication titles named after a blank installation take the installation's name once entered.
+- Web: product `cbam` with its own menu (CBAM home, Communications to importers, Installations, Reports, Annual emissions report, Default values & benchmarks, People, Vault, Audit, Help) and home `/cbam/home`; routes `/cbam/home|comms|installations|reporting|annual|reference` (`NeedCbam`); `Cbam only=` renders one part without the tab bar; `pages/CbamPackage.tsx` (CbamHome: get-started steps, KPIs, quarter tracker with + Start copying the quarter before, goods by quarter; CbamReporting). Product switcher handles three products. `productName('cbam')` = CBAM Exporter.
+- Manual: CBAM → CBAM Exporter package. Test: summary and Excel, a CBAM-only company has CBAM, a financed-emissions-only company is refused, unknown product refused. 107 tests pass.
+
 ## 2026-10-25 · CBAM exporter portal: the Commission's communication template, filled in
 
 - Migration 059: `cbam_communication` (one per installation and reporting period; the template's inputs kept as `data` jsonb; status draft / final / sent; `sent_to`; RLS).

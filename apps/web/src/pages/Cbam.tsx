@@ -8,7 +8,7 @@
  *    free allocation adjustment, certificates and cost; export of the annual declaration workbook.
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useApp } from '../App';
 import { api, download, type CbamData, type CbamImport, type CbamInstallation, type CbamLine, type CbamReport } from '../lib/api';
 import { Icon } from '../components/Icon';
@@ -26,10 +26,18 @@ const cnFmt = (c: string) => c.replace(/^(\d{4})(\d{2})?(\d{2})?$/, (_, a, b, cc
 const numOrNull = (s: string) => (s.trim() === '' ? null : Number(s));
 type Act = (fn: () => Promise<unknown>, msg: string) => Promise<void>;
 
-export function Cbam() {
+/** In the CBAM Exporter package, each part is a page of its own (`only`), without the tab bar. */
+const ONLY: Partial<Record<Tab, [string, string]>> = {
+  comms: ['Communications to importers', 'Each quarter, the embedded emissions of the goods you sell to the EU, in the Commission\'s communication template — filled in step by step and downloaded as Excel.'],
+  installations: ['Installations', 'Your plants as registered in the CBAM Registry, with their production processes.'],
+  reports: ['Annual emissions report', 'The installation\'s report for the year: activity, attributed emissions, precursors, goods and verification — with the summary for the CBAM Registry.'],
+  reference: ['Default values & benchmarks', 'The Commission\'s default values and CBAM benchmarks, to compare with your own embedded emissions.'],
+};
+export function Cbam({ only }: { only?: Tab } = {}) {
   const { toast } = useApp();
+  const navTo = useNavigate();
   const [sp, setSp] = useSearchParams();
-  const tab = (TABS.some(([k]) => k === sp.get('tab')) ? sp.get('tab') : 'overview') as Tab;
+  const tab = only ?? ((TABS.some(([k]) => k === sp.get('tab')) ? sp.get('tab') : 'overview') as Tab);
   const year = Number(sp.get('year') ?? new Date().getFullYear());
   const set = (x: Record<string, string | null>) => { const n = new URLSearchParams(sp); for (const [k, v] of Object.entries(x)) { if (v) n.set(k, v); else n.delete(k); } setSp(n, { replace: true }); };
   const [d, setD] = useState<CbamData | null>(null);
@@ -40,6 +48,11 @@ export function Cbam() {
   if (!d) return <div className="page"><div className="card empty">Loading…</div></div>;
   return (
     <div className="page">
+      {only ? <div className="row tahead" style={{ flexWrap: 'wrap' }}>
+        <div className="grow"><span className="lbl">CBAM</span><h1>{ONLY[only]?.[0]}</h1><div className="muted">{ONLY[only]?.[1]}</div></div>
+        {(only === 'reports' || only === 'reference') && <label className="field" style={{ minWidth: 110 }}><span>Year</span>
+          <select className="input" value={year} onChange={(e) => set({ year: e.target.value })}>{[2025, 2026, 2027, 2028].map((y) => <option key={y}>{y}</option>)}</select></label>}
+      </div> : <>
       <div className="row tahead" style={{ flexWrap: 'wrap' }}>
         <div className="grow"><span className="lbl">Disclose</span><h1>CBAM</h1>
           <div className="muted">EU Carbon Border Adjustment Mechanism. <b>Producers</b> outside the EU work out the embedded emissions of the cement, fertilisers, iron and steel, aluminium or hydrogen they sell to the EU and share them through the CBAM Registry. <b>Importers</b> in the EU declare the goods they import each year and surrender CBAM certificates.</div></div>
@@ -47,9 +60,10 @@ export function Cbam() {
           <select className="input" value={year} onChange={(e) => set({ year: e.target.value })}>{[2025, 2026, 2027, 2028].map((y) => <option key={y}>{y}</option>)}</select></label>
       </div>
       <div className="tabs">{TABS.map(([k, l]) => <button key={k} className={tab === k ? 'on' : ''} onClick={() => set({ tab: k })}>{l}</button>)}</div>
+      </>}
       {tab === 'overview' && <Overview d={d} go={(t) => set({ tab: t })} />}
-      {tab === 'comms' && <CbamComms commId={sp.get('comm')} open={(id) => set({ comm: id })} />}
-      {tab === 'installations' && <Installations d={d} act={act} openReport={(id) => set({ tab: 'reports', report: id })} />}
+      {tab === 'comms' && <CbamComms commId={sp.get('comm')} open={(id) => set({ comm: id })} compact={!!only} />}
+      {tab === 'installations' && <Installations d={d} act={act} openReport={(id) => (only ? navTo(`/cbam/annual?report=${id}`) : set({ tab: 'reports', report: id }))} />}
       {tab === 'reports' && <Reports d={d} reportId={sp.get('report')} pick={(id) => set({ report: id })} reloadAll={reload} />}
       {tab === 'imports' && <Imports year={year} d={d} />}
       {tab === 'reference' && <References d={d} act={act} />}

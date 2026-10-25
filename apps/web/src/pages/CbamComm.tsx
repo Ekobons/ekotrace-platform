@@ -81,15 +81,15 @@ function YesNo({ v, on }: { v: boolean; on: (x: boolean) => void }) {
 }
 
 // ------------------------------------------------------------------ list --
-export function CbamComms({ commId, open }: { commId: string | null; open: (id: string | null) => void }) {
+export function CbamComms({ commId, open, compact }: { commId: string | null; open: (id: string | null) => void; compact?: boolean }) {
   const { toast } = useApp();
   const [lists, setLists] = useState<CommLists | null>(null);
   useEffect(() => { api.cbamCommLists().then(setLists).catch((e) => toast((e as Error).message)); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   if (!lists) return <div className="card empty">Loading…</div>;
-  return commId ? <Editor key={commId} id={commId} lists={lists} back={() => open(null)} open={open} /> : <CommList lists={lists} open={open} />;
+  return commId ? <Editor key={commId} id={commId} lists={lists} back={() => open(null)} open={open} /> : <CommList lists={lists} open={open} compact={compact} />;
 }
 
-function CommList({ open }: { lists: CommLists; open: (id: string) => void }) {
+function CommList({ open, compact }: { lists: CommLists; open: (id: string) => void; compact?: boolean }) {
   const { toast } = useApp();
   const [d, setD] = useState<{ comms: CommListItem[]; installations: { id: string; name: string; country: string }[]; can: { edit: boolean } } | null>(null);
   const [tick, setTick] = useState(0);
@@ -99,7 +99,10 @@ function CommList({ open }: { lists: CommLists; open: (id: string) => void }) {
   const run = async (fn: () => Promise<unknown>, msg: string) => { try { await fn(); toast(msg); setTick((t) => t + 1); } catch (e) { toast((e as Error).message); } };
   if (!d) return <div className="card empty">Loading…</div>;
   return <>
-    <section className="card cmhero">
+    {compact ? d.can.edit && <div className="row" style={{ gap: 8, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+      <button className="btn" onClick={() => file.current?.click()}><Icon name="upload" size={16} /> Import a filled template</button>
+      <button className="btn p" onClick={() => setNewOpen(true)}>+ New communication</button>
+    </div> : <section className="card cmhero">
       <div className="grow">
         <span className="lbl">Exporter portal</span>
         <h3 style={{ margin: '4px 0 6px' }}>Communication to your EU importers</h3>
@@ -109,9 +112,9 @@ function CommList({ open }: { lists: CommLists; open: (id: string) => void }) {
       {d.can.edit && <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
         <button className="btn" onClick={() => file.current?.click()}><Icon name="upload" size={16} /> Import a filled template</button>
         <button className="btn p" onClick={() => setNewOpen(true)}>+ New communication</button>
-        <input ref={file} type="file" accept=".xlsx" hidden onChange={(e) => { const x = e.target.files?.[0]; e.target.value = ''; if (x) void run(async () => { const r = await api.cbamCommImport(x); open(r.id); }, 'Template imported'); }} />
       </div>}
-    </section>
+    </section>}
+    <input ref={file} type="file" accept=".xlsx" hidden onChange={(e) => { const x = e.target.files?.[0]; e.target.value = ''; if (x) void run(async () => { const r = await api.cbamCommImport(x); open(r.id); }, 'Template imported'); }} />
     {!d.comms.length && <div className="card empty">No communication yet. Start one for the quarter, or import an Excel template you filled before — the next quarters can then be copied from it.</div>}
     {d.comms.length > 0 && <section className="card" style={{ padding: 0 }}><div className="scroll"><table className="t">
       <thead><tr><th>Communication</th><th>Period</th><th>Goods (SEE total)</th><th>Status</th><th>Updated</th><th /></tr></thead>

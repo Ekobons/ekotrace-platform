@@ -44,6 +44,7 @@ import { MetricRegistry } from './pages/MetricRegistry';
 import { CarbonCredits } from './pages/CarbonCredits';
 import { ProductLca } from './pages/ProductLca';
 import { Cbam } from './pages/Cbam';
+import { CbamHome, CbamReporting } from './pages/CbamPackage';
 import { Esg } from './pages/Esg';
 import { AiSettingsPage } from './pages/AiSettings';
 import { SmartImport } from './pages/SmartImport';
@@ -90,7 +91,26 @@ const FIN_NAV: { group?: string; items: NavItem[] }[] = [
   ] },
   { group: 'Help', items: [{ to: '/help', label: 'User manual', icon: 'book' }] },
 ];
-type Product = 'ekotrace' | 'ekofin';
+/** CBAM Exporter: the simpler menu of a CBAM-only company. */
+const CBAM_NAV: { group?: string; items: NavItem[] }[] = [
+  { items: [{ to: '/cbam/home', label: 'CBAM home', icon: 'home' }] },
+  { group: 'CBAM', items: [
+    { to: '/cbam/comms', label: 'Communications to importers', icon: 'doc' },
+    { to: '/cbam/installations', label: 'Installations', icon: 'building' },
+    { to: '/cbam/reporting', label: 'Reports', icon: 'chart' },
+    { to: '/cbam/annual', label: 'Annual emissions report', icon: 'shield', roles: ['super_admin', 'admin', 'manager', 'verifier'] },
+    { to: '/cbam/reference', label: 'Default values & benchmarks', icon: 'scale' },
+  ] },
+  { group: 'Setup', items: [
+    { to: '/people', label: 'People & access', icon: 'users', roles: ['super_admin', 'admin', 'manager'] },
+    { to: '/vault', label: 'Document vault', icon: 'folder' },
+    { to: '/audit', label: 'Security & audit log', icon: 'lock', roles: ['super_admin', 'admin', 'verifier'] },
+  ] },
+  { group: 'Help', items: [{ to: '/help', label: 'User manual', icon: 'book' }] },
+];
+type Product = 'ekotrace' | 'ekofin' | 'cbam';
+const HOME: Record<Product, string> = { ekotrace: '/home', ekofin: '/fin', cbam: '/cbam/home' };
+const SHORT: Record<Product, string> = { ekotrace: 'TRC', ekofin: 'FIN', cbam: 'CBM' };
 /** Short side-menu name of the financed-emissions factor library (EKOFIN EFs / Financed EFs). */
 const FIN_EF = productName('ekofin') === 'EKOFIN' ? 'EKOFIN EFs' : 'Financed EFs';
 const PRODUCT_NAME: Record<Product, string> = new Proxy({} as Record<Product, string>, { get: (_t, p) => productName(p as Product) });
@@ -181,9 +201,9 @@ function Shell() {
   // the products this company has (EKOTRACE, EKOFIN or both) and the one being used, kept on this browser
   const products: Product[] = (tenant?.products?.length ? tenant.products : ['ekotrace']) as Product[];
   const [picked, setPicked] = useState<Product>(() => { try { return (localStorage.getItem('eko_product') as Product) || 'ekotrace'; } catch { return 'ekotrace'; } });
-  const product: Product = path.startsWith('/fin') && products.includes('ekofin') ? 'ekofin' : products.includes(picked) ? picked : products[0]!;
-  const NAV = product === 'ekofin' ? FIN_NAV : EKO_NAV;
-  const switchTo = (p: Product) => { setPicked(p); try { localStorage.setItem('eko_product', p); } catch { /* not kept */ } nav(p === 'ekofin' ? '/fin' : '/home'); };
+  const product: Product = path.startsWith('/fin') && products.includes('ekofin') ? 'ekofin' : path.startsWith('/cbam/') && products.includes('cbam') && (picked === 'cbam' || !products.includes('ekotrace')) ? 'cbam' : products.includes(picked) ? picked : products[0]!;
+  const NAV = product === 'ekofin' ? FIN_NAV : product === 'cbam' ? CBAM_NAV : EKO_NAV;
+  const switchTo = (p: Product) => { setPicked(p); try { localStorage.setItem('eko_product', p); } catch { /* not kept */ } nav(HOME[p]); };
   const allGroups = NAV.flatMap((g) => (g.group ? [g.group] : []));
   const allClosed = allGroups.every((g) => folded.has(g));
   const foldAll = () => { const n = new Set(allClosed ? [] : allGroups); try { localStorage.setItem('eko_nav', JSON.stringify([...n])); } catch { /* not kept */ } setFolded(n); };
@@ -250,7 +270,7 @@ function Shell() {
           )}
         </div>
         {tenant && products.length > 1 && (mini
-          ? <button type="button" className="prodmini" title={`Switch to ${PRODUCT_NAME[product === 'ekofin' ? 'ekotrace' : 'ekofin']}`} onClick={() => switchTo(product === 'ekofin' ? 'ekotrace' : 'ekofin')}>{product === 'ekofin' ? 'FIN' : 'TRC'}</button>
+          ? (() => { const next = products[(products.indexOf(product) + 1) % products.length]!; return <button type="button" className="prodmini" title={`Switch to ${PRODUCT_NAME[next]}`} onClick={() => switchTo(next)}>{SHORT[product]}</button>; })()
           : <div className="prodsw" role="tablist" aria-label="Product">{products.map((p) => <button key={p} type="button" role="tab" aria-selected={p === product} className={p === product ? 'on' : ''} onClick={() => p !== product && switchTo(p)}>{PRODUCT_NAME[p]}</button>)}</div>)}
         {tenant && !mini && <div className="navtools"><button type="button" onClick={foldAll} title={allClosed ? 'Expand all sections' : 'Collapse all sections'}>{allClosed ? '▸▸ Expand all' : '▾▾ Collapse all'}</button></div>}
         <nav className="nav">
@@ -293,7 +313,7 @@ function Shell() {
           {tabsOf(section).map((t) => <NavLink key={t.to} to={t.to} className={() => (path === t.to ? 'on' : '')}>{t.label}{badge(t.to) > 0 && <span className="navb amber">{badge(t.to)}</span>}</NavLink>)}
         </nav>}
         <Routes>
-          <Route path="/" element={<Navigate to={role === 'platform_admin' && !tenant ? '/console' : product === 'ekofin' ? '/fin' : '/home'} replace />} />
+          <Route path="/" element={<Navigate to={role === 'platform_admin' && !tenant ? '/console' : HOME[product]} replace />} />
           <Route path="/fin" element={<NeedFin><FinDashboard /></NeedFin>} />
           <Route path="/fin/portfolios" element={<NeedFin><FinPortfolios /></NeedFin>} />
           <Route path="/fin/counterparties" element={<NeedFin><FinCounterparties /></NeedFin>} />
@@ -307,6 +327,12 @@ function Shell() {
           <Route path="/credits" element={<NeedCo><CarbonCredits /></NeedCo>} />
           <Route path="/lca" element={<NeedCo><ProductLca /></NeedCo>} />
           <Route path="/cbam" element={<NeedCo><Cbam /></NeedCo>} />
+          <Route path="/cbam/home" element={<NeedCbam><CbamHome /></NeedCbam>} />
+          <Route path="/cbam/comms" element={<NeedCbam><Cbam only="comms" /></NeedCbam>} />
+          <Route path="/cbam/installations" element={<NeedCbam><Cbam only="installations" /></NeedCbam>} />
+          <Route path="/cbam/annual" element={<NeedCbam><Cbam only="reports" /></NeedCbam>} />
+          <Route path="/cbam/reference" element={<NeedCbam><Cbam only="reference" /></NeedCbam>} />
+          <Route path="/cbam/reporting" element={<NeedCbam><CbamReporting /></NeedCbam>} />
           <Route path="/esg" element={<NeedCo><Esg /></NeedCo>} />
           <Route path="/ai" element={<NeedCo><AiSettingsPage /></NeedCo>} />
           <Route path="/import" element={<NeedCo><SmartImport /></NeedCo>} />
@@ -361,6 +387,14 @@ function NeedFin({ children }: { children: ReactNode }) {
   if (!tenant) return <NeedCo>{children}</NeedCo>;
   if (tenant.products?.includes('ekofin')) return <>{children}</>;
   return <div className="page"><div className="card empty"><h2>{productName('ekofin')} is not switched on</h2><p className="sub">Financed emissions for banks and investors is a separate product. Contact the Ekobon team to add it to this company.</p></div></div>;
+}
+/** CBAM Exporter pages: the company has the CBAM Exporter package or the full product. */
+function NeedCbam({ children }: { children: ReactNode }) {
+  const { tenant } = useApp();
+  if (!tenant) return <NeedCo>{children}</NeedCo>;
+  const p = tenant.products ?? ['ekotrace'];
+  if (p.includes('cbam') || p.includes('ekotrace')) return <>{children}</>;
+  return <div className="page"><div className="card empty"><h2>CBAM is not switched on</h2><p className="sub">The CBAM Exporter package is separate. Contact the Ekobon team to add it to this company.</p></div></div>;
 }
 function Gate({ ok, children }: { ok: boolean; children: ReactNode }) {
   return ok ? <>{children}</> : <div className="page"><div className="card empty">You do not have access to this page.</div></div>;

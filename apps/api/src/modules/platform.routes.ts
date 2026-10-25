@@ -14,8 +14,8 @@ import { PLANS } from '../lib/plans.js';
 
 const plan = z.enum(['trial', 'starter', 'professional', 'enterprise']);
 const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
-/** Products a company has: EKOTRACE (own footprint), EKOFIN (financed emissions), or both. */
-const products = z.array(z.enum(['ekotrace', 'ekofin'])).min(1).max(2).transform((p) => [...new Set(p)]);
+/** Products a company has: EKOTRACE (own footprint), EKOFIN (financed emissions), CBAM Exporter (CBAM only), in any mix. */
+const products = z.array(z.enum(['ekotrace', 'ekofin', 'cbam'])).min(1).max(3).transform((p) => [...new Set(p)]);
 
 export async function platformRoutes(app: FastifyInstance) {
   app.get('/api/platform/companies', async (req) => {

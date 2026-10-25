@@ -12,6 +12,22 @@ The goods covered (Annex I) are cement and clinker, fertilisers and ammonia, nit
 > Importer | import lines by CN code and origin → actual or default emissions → free allocation adjustment → certificates → declaration
 ```
 
+## CBAM Exporter package
+
+Companies that only need CBAM — plants outside the EU selling cement, fertilisers, iron and steel, aluminium or hydrogen to EU buyers — can have the **CBAM Exporter** package on its own. The Ekobon team switches it on in the platform console (Products → CBAM Exporter). People of such a company log in to a simpler menu with CBAM only:
+
+Menu | What it is
+---|---
+CBAM home | The year at a glance: a quarter tracker per installation (draft, final, sent, problems to fix; **+ Start** a quarter, copying the one before), the specific embedded emissions of each good by quarter with up/down arrows, and the share from default values
+Communications to importers | The exporter portal below: fill in a quarter step by step, download the Commission's Excel
+Installations | Plants as registered in the CBAM Registry, with their production processes
+Reports | The year by quarter — SEE per good (total, or direct and indirect), installation emissions, the communications and where they were sent — and the **annual summary** in Excel
+Annual emissions report | The installation's yearly report for the CBAM Registry, with verification
+Default values & benchmarks | The Commission's values, to compare with your own
+Setup | People & access, document vault, security & audit log
+
+A company with the full product has the same pages under Disclose → CBAM; a company with both can switch between them at the top of the menu.
+
 ## Exporter portal — communication to your importers
 
 Your EU importers need the embedded emissions of the goods you sell them, in the European Commission's **CBAM Communication template for installations** (version 2.1). The **Exporter portal** tab fills that template with you, one communication per installation and reporting period (usually a quarter), and downloads the official Excel ready to send.

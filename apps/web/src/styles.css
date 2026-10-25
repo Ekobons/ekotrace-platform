@@ -1533,3 +1533,17 @@ ul.plain { list-style: none; margin: 0; padding: 0; }
 .cmdet, .cmbox, .cmbody, .cmfs { grid-template-columns: minmax(0, 1fr); }
 .cmdet > *, .cmbox > * { min-width: 0; }
 .cmrow > .grow { flex: 1 1 260px; min-width: 0; }
+/* CBAM Exporter package */
+.cmstart { display: grid; gap: 4px; }
+.cmsteps { list-style: none; counter-reset: s; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.cmsteps li { counter-increment: s; display: grid; gap: 6px; align-content: start; justify-items: start; border: 1px solid var(--line); border-radius: 12px; padding: 14px; background: var(--soft); }
+.cmsteps li::before { content: counter(s); display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: 99px; background: var(--ink); color: var(--lime); font-weight: 700; font-size: 13px; }
+.cmtrack td.ctr, .cmtrack th.ctr { text-align: center; }
+.cmcell { border: 0; background: none; cursor: pointer; display: inline-grid; gap: 2px; justify-items: center; padding: 2px 6px; border-radius: 8px; font: inherit; }
+.cmcell:hover { background: var(--soft); }
+.cmcell small.bad { color: var(--bad); font-size: 11px; font-weight: 600; }
+.cmlink { display: flex; gap: 12px; align-items: center; text-decoration: none; color: var(--fg); }
+.cmlink svg { color: var(--primary); flex: none; }
+.cmlink span { display: grid; gap: 2px; }
+.cmlink:hover { border-color: var(--primary); }
+@media (max-width: 900px) { .cmsteps { grid-template-columns: minmax(0, 1fr); } }

@@ -85,9 +85,9 @@ export function Console() {
   );
 }
 
-const PRODUCT_LABEL: Record<'ekotrace' | 'ekofin', string> = { get ekotrace() { return productName('ekotrace'); }, get ekofin() { return productName('ekofin'); } };
-type Prod = 'ekotrace' | 'ekofin';
-/** Which products the company has: EKOTRACE (own GHG inventory), EKOFIN (financed emissions), or both. */
+const PRODUCT_LABEL: Record<'ekotrace' | 'ekofin' | 'cbam', string> = { get ekotrace() { return productName('ekotrace'); }, get ekofin() { return productName('ekofin'); }, get cbam() { return productName('cbam'); } };
+type Prod = 'ekotrace' | 'ekofin' | 'cbam';
+/** Which products the company has: EKOTRACE (own GHG inventory), EKOFIN (financed emissions), CBAM Exporter (CBAM only), in any mix. */
 function ProductBoxes({ value, onChange }: { value: Prod[]; onChange: (v: Prod[]) => void }) {
   const flip = (p: Prod) => onChange(value.includes(p) ? value.filter((x) => x !== p) : [...value, p]);
   return (
@@ -95,6 +95,7 @@ function ProductBoxes({ value, onChange }: { value: Prod[]; onChange: (v: Prod[]
       <div className="row" style={{ gap: 18 }}>
         <label className="row chkline" style={{ gap: 6 }}><input type="checkbox" checked={value.includes('ekotrace')} onChange={() => flip('ekotrace')} />EKOTRACE · own GHG inventory</label>
         <label className="row chkline" style={{ gap: 6 }}><input type="checkbox" checked={value.includes('ekofin')} onChange={() => flip('ekofin')} />{productName('ekofin') === 'EKOFIN' ? 'EKOFIN · financed emissions' : 'Financed emissions'} (banks, investors)</label>
+        <label className="row chkline" style={{ gap: 6 }}><input type="checkbox" checked={value.includes('cbam')} onChange={() => flip('cbam')} />CBAM Exporter · CBAM only, simpler menu (included with {productName('ekotrace')})</label>
       </div>
       {!value.length && <small className="bad">Choose at least one</small>}
     </div>);

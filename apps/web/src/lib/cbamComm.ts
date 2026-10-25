@@ -52,3 +52,10 @@ export interface CommResult {
 export interface CommMeta { id: string; title: string; status: 'draft' | 'final' | 'sent'; sentTo: string; installationId: string | null; installation: string | null; periodStart: string | null; periodEnd: string | null; period: string; template: string; createdName: string; createdAt: string; updatedName: string; updatedAt: string }
 export interface CommView { comm: CommMeta; data: CommData; result: CommResult; can?: { edit: boolean }; installations?: { id: string; name: string; country: string }[] }
 export interface CommListItem extends CommMeta { products: number; processes: number; errors: number; warnings: number; goods: { cn: string; name: string; seeTotal: N; unit: string }[] }
+export interface CbamSummary {
+  year: number; registered: number; can: { edit: boolean };
+  installations: { name: string; cells: Record<number, { id: string; status: 'draft' | 'final' | 'sent'; title: string; period: string; errors: number; sentTo: string }>; emissions: Record<number, { direct: number; indirect: number | null }> }[];
+  goods: { cn: string; name: string; cnName: string; unit: string; installation: string; q: Record<number, { seeDirect: N; seeIndirect: N; seeTotal: N; defaultShare: N; embeddedElec: N; commId: string }> }[];
+  comms: { id: string; title: string; installation: string; period: string; quarter: number; status: string; sentTo: string; errors: number; updatedAt: string; updatedName: string }[];
+  latest: { id: string; title: string; status: string; period: string; updatedAt: string } | null;
+}

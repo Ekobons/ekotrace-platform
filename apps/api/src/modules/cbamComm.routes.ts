@@ -10,11 +10,17 @@
  *   PUT    /api/cbam/comms/:id             save {title?, status?, sentTo?, installationId?, data?}; returns the results
  *   DELETE /api/cbam/comms/:id
  *   GET    /api/cbam/comms/:id/export      the official template filled in (.xlsx)
+ *   GET    /api/cbam/comms/summary?year=   the year by quarter: communications per installation, SEE per good, emissions
+ *   GET    /api/cbam/comms/summary/export?year=   the same as Excel (CBAM annual summary)
  */
 import type { FastifyInstance, FastifyRequest } from 'fastify';
+import ExcelJS from 'exceljs';
 import { z } from 'zod';
+import { cbamOnly } from '../lib/cbamAccess.js';
 import { tenantTx, type Tx } from '../db/pool.js';
 import { audit, requireRole, requireTenant } from '../lib/auth.js';
+import { sendWorkbook, styleHeader } from '../lib/xlsx.js';
+import { PRODUCT } from '../lib/brand.js';
 import { AppError, notFound } from '../lib/errors.js';
 import { LIMITS, PRODUCT_PARAMS, TEMPLATE_VERSION, buildWorkbook, calculate, commLists, emptyComm, fromWorkbook, normalise, type CommData } from '../lib/cbamComm.js';
 
@@ -49,7 +55,44 @@ const view = (r: any) => {
   };
 };
 
+
+/** The year by quarter, from the communications whose period starts in it. */
+async function yearSummary(c: Tx, year: number) {
+  const rows = (await c.query(`SELECT m.*, i.name AS installation FROM cbam_communication m LEFT JOIN cbam_installation i ON i.id = m.installation_id
+                                WHERE m.period_start >= make_date($1, 1, 1) AND m.period_start < make_date($1 + 1, 1, 1) ORDER BY m.period_start, m.updated_at`, [year])).rows;
+  const all = (await c.query(`SELECT id, title, status, period_start, period_end, data, installation_id, updated_at FROM cbam_communication ORDER BY period_start DESC NULLS LAST, updated_at DESC LIMIT 1`)).rows;
+  type Cell = { id: string; status: string; title: string; period: string; errors: number; sentTo: string };
+  type Inst = { name: string; cells: Record<number, Cell>; emissions: Record<number, { direct: number; indirect: number | null }> };
+  type Good = { cn: string; name: string; cnName: string; unit: string; installation: string; q: Record<number, { seeDirect: number | null; seeIndirect: number | null; seeTotal: number | null; defaultShare: number | null; embeddedElec: number | null; commId: string }> };
+  const inst = new Map<string, Inst>();
+  const goods = new Map<string, Good>();
+  const comms: { id: string; title: string; installation: string; period: string; quarter: number; status: string; sentTo: string; errors: number; updatedAt: unknown; updatedName: string }[] = [];
+  for (const r of rows) {
+    const v = view(r);
+    const quarter = Math.floor((Number(String(v.comm.periodStart).slice(5, 7)) - 1) / 3) + 1;
+    const name = v.data.installation.name || r.installation || 'Installation';
+    const key = r.installation_id ?? name.toLowerCase();
+    const e: Inst = inst.get(key) ?? { name, cells: {}, emissions: {} };
+    const errors = v.result.checks.filter((x) => x.level === 'error').length;
+    // the latest communication of the quarter counts (a copy replaces an older draft)
+    e.cells[quarter] = { id: r.id, status: r.status, title: r.title, period: v.comm.period, errors, sentTo: r.sent_to };
+    e.emissions[quarter] = { direct: v.result.ghg.direct, indirect: v.result.ghg.indirect };
+    inst.set(key, e);
+    comms.push({ id: r.id, title: r.title, installation: name, period: v.comm.period, quarter, status: r.status, sentTo: r.sent_to, errors, updatedAt: r.updated_at, updatedName: r.updated_name });
+    v.result.products.forEach((p) => {
+      const x = v.data.products[p.i]; if (!x?.cn) return;
+      const gk = `${key}|${x.cn}|${x.name}`;
+      const g: Good = goods.get(gk) ?? { cn: x.cn, name: x.name, cnName: p.cnName, unit: p.unit, installation: name, q: {} };
+      g.q[quarter] = { seeDirect: p.seeDirect, seeIndirect: p.seeIndirect, seeTotal: p.seeTotal, defaultShare: p.defaultShare, embeddedElec: p.embeddedElec, commId: r.id };
+      goods.set(gk, g);
+    });
+  }
+  const latest = all[0] ? { id: all[0].id, title: all[0].title, status: all[0].status, period: quarterLabel(iso(all[0].period_start), iso(all[0].period_end)), updatedAt: all[0].updated_at } : null;
+  return { year, installations: [...inst.values()], goods: [...goods.values()].sort((a, b) => a.cn.localeCompare(b.cn) || a.name.localeCompare(b.name)), comms, latest };
+}
+
 export async function cbamCommRoutes(app: FastifyInstance) {
+  cbamOnly(app);
   app.get('/api/cbam/comm/lists', async () => {
     const L = commLists();
     return { ...L, limits: LIMITS, params: PRODUCT_PARAMS.map(([col, key, label, kind]) => ({ col, key, label, kind })), version: TEMPLATE_VERSION };
@@ -132,6 +175,47 @@ export async function cbamCommRoutes(app: FastifyInstance) {
     });
   });
 
+
+  app.get('/api/cbam/comms/summary', async (req) => {
+    const tenant = requireTenant(req);
+    const q = z.object({ year: z.coerce.number().int().min(2023).max(2100).optional() }).parse(req.query);
+    return tenantTx(tenant, async (c) => {
+      const installations = Number((await c.query(`SELECT count(*) AS n FROM cbam_installation`)).rows[0].n);
+      return { ...(await yearSummary(c, q.year ?? new Date().getUTCFullYear())), registered: installations, can: { edit: canEdit(req) } };
+    });
+  });
+
+  app.get('/api/cbam/comms/summary/export', async (req, reply) => {
+    const tenant = requireTenant(req);
+    const q = z.object({ year: z.coerce.number().int().min(2023).max(2100) }).parse(req.query);
+    const s = await tenantTx(tenant, async (c) => { const s = await yearSummary(c, q.year); await audit(c, req, 'cbam.summary.export', 'cbam_communication', null, { year: q.year }); return s; });
+    const wb = new ExcelJS.Workbook(); wb.creator = PRODUCT;
+    const Q = [1, 2, 3, 4];
+    const g = wb.addWorksheet('Goods by quarter');
+    g.addRow(['Installation', 'CN code', 'Product', 'CN description', 'Unit', ...Q.flatMap((n) => [`Q${n} SEE direct`, `Q${n} SEE indirect`, `Q${n} SEE total`, `Q${n} default share`])]);
+    for (const x of s.goods) g.addRow([x.installation, x.cn, x.name, x.cnName, x.unit, ...Q.flatMap((n) => { const v = x.q[n]; return v ? [v.seeDirect, v.seeIndirect, v.seeTotal, v.defaultShare] : [null, null, null, null]; })]);
+    styleHeader(g, [24, 12, 24, 40, 10, ...Q.flatMap(() => [12, 12, 12, 12])]);
+    g.eachRow((r, i) => { if (i > 1) for (let k = 6; k <= 21; k++) r.getCell(k).numFmt = (k - 6) % 4 === 3 ? '0.0%' : '0.0000'; });
+    const e = wb.addWorksheet('Installation emissions');
+    e.addRow(['Installation', ...Q.flatMap((n) => [`Q${n} direct tCO2e`, `Q${n} indirect tCO2e`]), 'Year direct tCO2e', 'Year indirect tCO2e']);
+    for (const x of s.installations) {
+      const d = Q.map((n) => x.emissions[n]?.direct ?? null), ind = Q.map((n) => x.emissions[n]?.indirect ?? null);
+      e.addRow([x.name, ...Q.flatMap((_, k) => [d[k], ind[k]]), d.reduce<number>((a, b) => a + (b ?? 0), 0), ind.reduce<number>((a, b) => a + (b ?? 0), 0)]);
+    }
+    styleHeader(e, [28, ...Q.flatMap(() => [14, 14]), 16, 16]);
+    e.eachRow((r, i) => { if (i > 1) for (let k = 2; k <= 11; k++) r.getCell(k).numFmt = '#,##0.000'; });
+    const cm = wb.addWorksheet('Communications');
+    cm.addRow(['Installation', 'Quarter', 'Title', 'Status', 'Problems to fix', 'Sent to', 'Updated', 'By']);
+    for (const x of s.comms) cm.addRow([x.installation, `Q${x.quarter}`, x.title, x.status, x.errors, x.sentTo, x.updatedAt ? new Date(String(x.updatedAt)).toISOString().slice(0, 10) : '', x.updatedName]);
+    styleHeader(cm, [28, 9, 36, 10, 14, 40, 12, 22]);
+    const n = wb.addWorksheet('About');
+    n.addRow([`CBAM annual summary ${q.year} — prepared with ${PRODUCT}`]).font = { bold: true, size: 13 };
+    n.addRow(['Specific embedded emissions (SEE) per tonne of good (MWh for electricity), from the communications to importers whose reporting period starts in the year (the latest one of each quarter per installation).']);
+    n.addRow(['Each quarter\'s full communication is the Commission\'s template, downloaded from the exporter portal.']);
+    n.getColumn(1).width = 140;
+    return sendWorkbook(reply, wb, `CBAM_summary_${q.year}.xlsx`);
+  });
+
   app.get('/api/cbam/comms/:id', async (req) => {
     const tenant = requireTenant(req);
     const id = idOf(req);
@@ -159,6 +243,9 @@ export async function cbamCommRoutes(app: FastifyInstance) {
         const errors = calculate(data).checks.filter((x) => x.level === 'error');
         if (errors.length) throw new AppError(`Fix ${errors.length} problem${errors.length === 1 ? '' : 's'} before marking it final — first: ${errors[0]?.msg}`);
       }
+      // a title still named after a blank installation follows the name once it is entered
+      const autoTitle = !b.title && /^Installation — /.test(cur.title) && data.installation.name ? `${data.installation.name} — ${cur.title.slice('Installation — '.length)}`.slice(0, 200) : null;
+      if (autoTitle) b.title = autoTitle;
       await c.query(`UPDATE cbam_communication SET title = COALESCE($2, title), status = COALESCE($3, status), sent_to = COALESCE($4, sent_to),
                        installation_id = CASE WHEN $5::boolean THEN $6::uuid ELSE installation_id END, data = $7, period_start = $8, period_end = $9, updated_name = $10, updated_at = now() WHERE id = $1`,
         [id, b.title ?? null, b.status ?? null, b.sentTo ?? null, b.installationId !== undefined, b.installationId ?? null, JSON.stringify(data), data.period.start, data.period.end, req.user.name]);

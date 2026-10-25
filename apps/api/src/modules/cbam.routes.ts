@@ -23,6 +23,7 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import ExcelJS from 'exceljs';
 import { z } from 'zod';
+import { cbamOnly } from '../lib/cbamAccess.js';
 import { tenantTx, type Tx } from '../db/pool.js';
 import { audit, requireRole, requireTenant } from '../lib/auth.js';
 import { AppError, notFound } from '../lib/errors.js';
@@ -121,6 +122,7 @@ async function fromOwnReport(c: Tx, b: ImportBody) {
 }
 
 export async function cbamRoutes(app: FastifyInstance) {
+  cbamOnly(app);
   app.get('/api/cbam', async (req) => {
     const tenant = requireTenant(req);
     const q = z.object({ year: z.coerce.number().int().min(2023).max(2100).optional() }).parse(req.query);

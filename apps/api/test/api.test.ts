@@ -3374,6 +3374,24 @@ test('CBAM communication to importers: create from an installation, save with li
   assert.equal((await api('GET', `/api/cbam/comms/${id}`, undefined, tenantB)).status, 404, 'another company cannot see it');
   assert.equal((await api('GET', '/api/cbam/comms', undefined, tenantB)).body.comms.length, 0);
   assert.equal((await api('DELETE', `/api/cbam/comms/${imp.json().id}`, undefined, T)).status, 200);
+  // the year by quarter, and as Excel
+  const sum = (await api('GET', '/api/cbam/comms/summary?year=2026', undefined, T)).body;
+  assert.equal(sum.installations.length, 1);
+  assert.equal(sum.installations[0].cells[1].status, 'final'); assert.equal(sum.installations[0].cells[2].status, 'draft');
+  assert.equal(sum.goods[0].cn, '72142000'); assert.ok(Math.abs(sum.goods[0].q[1].seeTotal - p.seeTotal) < 1e-9);
+  const sx = await app.inject({ method: 'GET', url: '/api/cbam/comms/summary/export?year=2026', headers: { cookie: adminCookie, 'x-tenant-id': T } });
+  assert.equal(sx.statusCode, 200);
+  const sw = new ExcelJS.Workbook(); await sw.xlsx.load(sx.rawPayload as unknown as ArrayBuffer);
+  assert.equal(sw.getWorksheet('Goods by quarter')!.getRow(2).getCell(2).value, '72142000');
+  // CBAM Exporter package: a CBAM-only company has CBAM; a financed-emissions-only company does not
+  const cb = (await api('POST', '/api/platform/companies', { name: 'Exporter Only', country: 'IN', gwpSet: 'AR6', products: ['cbam'], superAdmin: { name: 'Exp', email: 'super@cbam.test' } })).body.company.id as string;
+  assert.equal((await api('GET', '/api/cbam/comms', undefined, cb)).status, 200);
+  assert.equal((await api('POST', '/api/cbam/comms', { period: { start: '2026-04-01', end: '2026-06-30' } }, cb)).status, 200);
+  const fo = (await api('POST', '/api/platform/companies', { name: 'Bank Only', country: 'AE', gwpSet: 'AR6', products: ['ekofin'], superAdmin: { name: 'Fin', email: 'super@fin.test' } })).body.company.id as string;
+  const off = await api('GET', '/api/cbam/comms', undefined, fo);
+  assert.equal(off.status, 403); assert.match(off.body.message, /CBAM Exporter/);
+  assert.equal((await api('GET', '/api/cbam?year=2026', undefined, fo)).status, 403);
+  assert.equal((await api('POST', '/api/platform/companies', { name: 'Bad', country: 'AE', gwpSet: 'AR6', products: ['other'], superAdmin: { name: 'X', email: 'x@bad.test' } })).status, 400);
 });
 
 test('ESG: frameworks decide the materiality needed, double materiality scoring (actual, potential, human rights), decisions need a reason, second-person approval, industry questions with answers checked, export; companies kept apart', async () => {
