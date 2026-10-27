@@ -116,7 +116,7 @@ export interface CccTxn { kind: 'issued' | 'bought' | 'sold' | 'surrendered'; fy
 export function account(txns: CccTxn[], fy: number, ccc: number | null, price: number | null) {
   const s = (k: CccTxn['kind'], f?: number) => txns.filter((t) => t.kind === k && (f == null || t.fy === f)).reduce((a, t) => a + t.quantity, 0);
   const held = s('issued') + s('bought') - s('sold') - s('surrendered');
-  const obligation = ccc != null && ccc < 0 ? -ccc : 0;
+  const obligation = ccc != null && ccc < 0 ? Math.ceil(-ccc - 1e-9) : 0;   // whole CCCs, rounded up
   const surrendered = s('surrendered', fy);
   const open = Math.max(0, obligation - surrendered);
   const toBuy = Math.max(0, open - held);

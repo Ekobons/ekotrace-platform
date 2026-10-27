@@ -19,7 +19,8 @@ const g4 = (x: number | null | undefined) => (x == null ? '—' : x.toLocaleStri
 const pct = (x: number | null | undefined) => (x == null ? '—' : `${(x * 100).toFixed(1)}%`);
 const inr = (x: number | null | undefined) => (x == null ? '—' : `₹${x >= 1e7 ? `${(x / 1e7).toLocaleString('en-IN', { maximumFractionDigits: 2 })} cr` : x >= 1e5 ? `${(x / 1e5).toLocaleString('en-IN', { maximumFractionDigits: 2 })} lakh` : x.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`);
 const d8 = (x: string) => new Date(`${x.slice(0, 10)}T00:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
-const today = () => new Date().toISOString().slice(0, 10);
+const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+const okNum = (v: string) => v.trim() === '' || Number.isFinite(Number(v.replace(/,/g, '')));
 const TXN: Record<CctsTxn['kind'], string> = { issued: 'Issued by BEE', bought: 'Bought', sold: 'Sold', surrendered: 'Surrendered' };
 
 export function Ccts() {
@@ -33,9 +34,14 @@ export function Ccts() {
   const [tick, setTick] = useState(0);
   const [editing, setEditing] = useState<'new' | 'edit' | null>(null);
   const reload = () => setTick((t) => t + 1);
-  useEffect(() => { cctsApi.list(fy).then(setList).catch((e) => toast((e as Error).message)); }, [fy, tick]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { let live = true; cctsApi.list(fy).then((x) => { if (live) setList(x); }).catch((e) => toast((e as Error).message)); return () => { live = false; }; }, [fy, tick]); // eslint-disable-line react-hooks/exhaustive-deps
   const id = sp.get('e') ?? list?.entities[0]?.id ?? null;
-  useEffect(() => { if (id) cctsApi.get(id, fy).then(setD).catch((e) => toast((e as Error).message)); else setD(null); }, [id, fy, tick]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    let live = true;
+    if (d && (d.entity.id !== id || d.fy !== fy)) setD(null);
+    if (id) cctsApi.get(id, fy).then((x) => { if (live) setD(x); }).catch((e) => { if (live) { setD(null); toast((e as Error).message); } }); else setD(null);
+    return () => { live = false; };
+  }, [id, fy, tick]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!list) return <div className="page"><div className="card empty">Loading…</div></div>;
   const years = [...new Set([...(d?.years ?? []), fy, currentFy(), 2025])].sort((a, b) => b - a);
@@ -73,10 +79,10 @@ export function Ccts() {
             {([['months', 'Monthly data'], ['ccc', `CCC account${d.txns.length ? ` (${d.txns.length})` : ''}`], ['measures', `Reduction measures${d.measures.length ? ` (${d.measures.length})` : ''}`], ['setup', 'Entity & targets']] as const).map(([k, l]) => (
               <button key={k} role="tab" aria-selected={tab === k} className={tab === k ? 'on' : ''} onClick={() => set('tab', k === 'months' ? null : k)}>{l}</button>))}
           </div>
-          {tab === 'months' && <MonthsTab d={d} onSaved={reload} />}
-          {tab === 'ccc' && <CccTab d={d} onSaved={reload} />}
+          {tab === 'months' && <MonthsTab key={`${d.entity.id}:${d.fy}`} d={d} onSaved={reload} />}
+          {tab === 'ccc' && <CccTab key={`${d.entity.id}:${d.fy}`} d={d} onSaved={reload} />}
           {tab === 'measures' && <MeasuresTab d={d} onSaved={reload} />}
-          {tab === 'setup' && <SetupTab d={d} list={list} onEdit={() => setEditing('edit')} onSaved={reload} />}
+          {tab === 'setup' && <SetupTab key={`${d.entity.id}:${d.fy}`} d={d} list={list} onEdit={() => setEditing('edit')} onSaved={reload} />}
         </>
       )}
       {editing && <EntityDrawer list={list} entity={editing === 'edit' ? d?.entity ?? null : null}
@@ -248,7 +254,7 @@ function MonthsTab({ d, onSaved }: { d: CctsDetail; onSaved: () => void }) {
       <div className="scroll"><table className="t cctsgrid">
         <thead><tr><th>Month</th>{COLS.map((c) => <th key={c.k} className="num" title={c.hint}>{c.l}<div className="muted small" style={{ fontWeight: 400 }}>{c.k === 'output' ? d.entity.outputUnit : c.hint}</div></th>)}<th className="num">Total tCO₂e</th><th className="num">GEI</th><th>Note</th></tr></thead>
         <tbody>{y.months.map((m) => {
-          const r = draft[m.month]!;
+          const r = draft[m.month] ?? orig[m.month]!;
           return (
             <tr key={m.month} className={m.complete ? '' : 'dim'}>
               <td className="nowrap"><b>{monthName(m.month)}</b>{m.problems.length > 0 && <div className="small warn-t" title={m.problems.join(' · ')}>⚠ {m.problems[0]}</div>}</td>
@@ -383,7 +389,7 @@ function SetupTab({ d, list, onEdit, onSaved }: { d: CctsDetail; list: CctsList;
   const [tg, setTg] = useState<Record<number, string>>(() => Object.fromEntries(yrs.map((y) => [y, String(d.targets.find((t) => t.fy === y)?.targetGei ?? '')])));
   const saveTargets = async () => {
     try {
-      const r = await cctsApi.targets(e.id, yrs.map((y) => ({ fy: y, targetGei: tg[y]!.trim() === '' ? null : Number(tg[y]) })));
+      const r = await cctsApi.targets(e.id, yrs.map((y) => ({ fy: y, targetGei: (tg[y] ?? '').trim() === '' ? null : Number((tg[y] ?? '').replace(/,/g, '')) })));
       toast(r.warnings.length ? r.warnings.join(' · ') : 'Targets saved'); onSaved();
     } catch (x) { toast((x as Error).message); }
   };
@@ -413,7 +419,7 @@ function SetupTab({ d, list, onEdit, onSaved }: { d: CctsDetail; list: CctsList;
                 <td className="num">{d.canSetup ? <input className="input sm num" style={{ width: 110 }} inputMode="decimal" value={tg[y]} onChange={(x) => setTg((o) => ({ ...o, [y]: x.target.value }))} /> : g4(v || null)}</td>
                 <td className="num small">{v && e.baselineGei ? `${v <= e.baselineGei ? '−' : '+'}${pct(Math.abs(1 - v / e.baselineGei))}` : '—'}</td></tr>);
           })}</tbody></table>
-        {d.canSetup && <div className="row" style={{ marginTop: 8 }}><span className="grow" /><button className="btn p sm" onClick={saveTargets}>Save targets</button></div>}
+        {d.canSetup && <div className="row" style={{ marginTop: 8 }}><span className="grow" /><button className="btn p sm" disabled={yrs.some((y) => !okNum(tg[y] ?? ''))} onClick={saveTargets}>Save targets</button></div>}
         <h3 style={{ margin: '16px 0 6px' }}>Compliance calendar {d.label}</h3>
         <ul className="small" style={{ margin: 0, paddingLeft: 18, lineHeight: 1.7 }}>{d.calendar.map((c) => <li key={c.key}><b>{d8(c.date)}</b> — {c.label}</li>)}</ul>
       </div>
@@ -471,6 +477,6 @@ function EntityDrawer({ list, entity, onClose, onDone, onRemoved }: { list: Ccts
         <label className="field span2"><span>Notes</span><textarea className="input" rows={2} value={f.notes} onChange={(e) => up({ notes: e.target.value })} /></label>
       </div>
       <div className="row">{entity && <button className="btn" onClick={remove}>Remove</button>}<span className="grow" /><button className="btn" onClick={() => dlg.current?.close()}>Cancel</button>
-        <button className="btn p" disabled={f.name.trim().length < 2} onClick={save}>{entity ? 'Save' : 'Add entity'}</button></div>
+        <button className="btn p" disabled={f.name.trim().length < 2 || ![f.baselineOutput, f.baselineGei, f.gridEf, f.priceInr].every(okNum)} onClick={save}>{entity ? 'Save' : 'Add entity'}</button></div>
     </div></dialog>);
 }

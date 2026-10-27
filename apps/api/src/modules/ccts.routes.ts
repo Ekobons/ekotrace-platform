@@ -30,7 +30,8 @@ const uuid = z.string().uuid();
 const idOf = (req: FastifyRequest, k = 'id') => uuid.parse((req.params as Record<string, string>)[k]);
 const iso = (d: unknown) => (d == null ? null : d instanceof Date ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` : String(d).slice(0, 10));
 const num = (x: unknown) => (x == null ? null : Number(x));
-const currentFy = () => { const d = new Date(); return d.getUTCMonth() >= 3 ? d.getUTCFullYear() : d.getUTCFullYear() - 1; };
+/** The compliance year today in India (Asia/Kolkata). */
+const currentFy = () => { const [y, m] = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit' }).format(new Date()).split('-').map(Number); return m! >= 4 ? y! : y! - 1; };
 const canSetup = (req: FastifyRequest) => ['super_admin', 'admin', 'platform_admin'].includes(req.user.role);
 const canData = (req: FastifyRequest) => ['super_admin', 'admin', 'manager', 'platform_admin'].includes(req.user.role);
 const MONTH_KEYS = ['output', 'fuel_t', 'process_t', 'pfc_t', 'grid_mwh', 're_mwh', 'heat_t', 'export_mwh', 'export_ef', 'transfer_t'] as const;
@@ -68,7 +69,7 @@ async function fromEntries(c: Tx, facilities: string[], fy: number) {
             coalesce(sum(CASE WHEN cat.code = 'stationary_combustion' THEN a.co2e_direct * share END), 0)::float8 / 1000 AS fuel_t,
             coalesce(sum(CASE WHEN it.code = 'grid:electricity' AND u.dimension = 'electricity' THEN a.quantity * u.to_base * share END), 0)::float8 / 1000 AS grid_mwh,
             count(DISTINCT a.id)::int AS entries
-       FROM generate_series($2::date, $3::date, interval '1 month') mo(m)
+       FROM generate_series($2::timestamp, $3::timestamp, interval '1 month') mo(m)
        JOIN activity a ON a.period_start <= (mo.m + interval '1 month - 1 day')::date AND a.period_end >= mo.m::date
        JOIN category cat ON cat.id = a.category_id JOIN item it ON it.id = a.item_id JOIN unit u ON u.code = a.unit
        CROSS JOIN LATERAL (SELECT ((least(a.period_end, (mo.m + interval '1 month - 1 day')::date) - greatest(a.period_start, mo.m::date) + 1)::numeric
@@ -210,7 +211,7 @@ export async function cctsRoutes(app: FastifyInstance) {
     const id = idOf(req);
     const v = z.number().min(0).max(1e12).nullable().default(null);
     const b = z.object({ months: z.array(z.object({
-      month: z.string().regex(/^\d{4}-\d{2}-01$/), output: v, fuel_t: v, process_t: v, pfc_t: v, grid_mwh: v, re_mwh: v, heat_t: v, export_mwh: v,
+      month: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])-01$/), output: v, fuel_t: v, process_t: v, pfc_t: v, grid_mwh: v, re_mwh: v, heat_t: v, export_mwh: v,
       export_ef: z.number().min(0).max(5).nullable().default(null), transfer_t: v, note: z.string().trim().max(1000).default(''),
     })).min(1).max(24) }).parse(req.body);
     return tenantTx(tenant, async (c) => {

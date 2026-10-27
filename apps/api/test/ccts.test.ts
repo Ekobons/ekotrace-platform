@@ -63,6 +63,8 @@ test('account: held, obligation, to buy and environmental compensation at twice 
   assert.equal(a.held, 60); assert.equal(a.obligation, 300); assert.equal(a.surrenderedForYear, 40); assert.equal(a.open, 260); assert.equal(a.toBuy, 200);
   assert.equal(a.value!.toBuy, 120000); assert.equal(a.value!.compensation, 240000);
   assert.equal(account([], 2025, 123.7, 500).expectedIssue, 123);
+  assert.equal(account([], 2025, -10.2, null).obligation, 11);   // whole CCCs, rounded up
+  assert.equal(account([], 2025, -10, null).obligation, 10);
 });
 
 // ------------------------------------------------------------------------------------------- API --
@@ -163,6 +165,7 @@ test('API: months from entries (split by days, approved only, boundary only) plu
   await call('PUT', `/api/ccts/${ent}/months`, { months: [{ month: '2025-04-01', output: 1000, process_t: 500, fuel_t: 200 }] }, co);
   const d2 = (await call('GET', `/api/ccts/${ent}?fy=2025`, undefined, co)).body;
   near(d2.year.months[0].fuel, 200); assert.equal(d2.year.months[0].sources.fuel, 'typed');
+  assert.equal((await call('PUT', `/api/ccts/${ent}/months`, { months: [{ month: '2025-13-01', output: 1 }] }, co)).status, 400);
   // clearing a month removes it
   await call('PUT', `/api/ccts/${ent}/months`, { months: [{ month: '2025-05-01' }] }, co);
   assert.equal((await call('GET', `/api/ccts/${ent}?fy=2025`, undefined, co)).body.year.monthsIn, 1);
