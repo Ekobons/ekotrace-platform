@@ -1,0 +1,363 @@
+{
+  "week": "2026-10-26",
+  "summary": "First weekly run. CBAM is quiet (Q3 2026 certificate price €82.32, already in the tool); several grid factor editions are newer than those held (India CEA v21, Singapore SES 2026, Australia NGA 2026) and Node.js 22.23.4 is a security release to install. California's SB 253 first deadline of 10 November 2026 is confirmed.",
+  "items": [
+    {
+      "key": "in-cea-v21",
+      "stream": "factors",
+      "title": "India CEA CO2 Baseline Database v21.0 (FY 2024-25); v22.0 indicated",
+      "detail": "CEA v21.0 (November 2025, FY 2024-25) gives a weighted average of 0.710 and a combined margin of 0.736 t CO2/MWh. A v22.0 user guide is filed under a September 2026 upload folder on cea.nic.in, but the site refused access, so its date and values are not confirmed.",
+      "impact": "EKOTRACE holds IN-CEA-V20 (FY 2023-24, 0.727). Add the FY 2024-25 India grid factor (0.710 t CO2/MWh, v21.0) and check for v22.0 before loading.",
+      "sources": [
+        {
+          "title": "CEA CO2 Baseline Database v21.0 (PDF)",
+          "url": "https://cea.nic.in/api/cdm-report-version/view-pdf/en/78"
+        }
+      ],
+      "whereTo": "Emission factors → Factors"
+    },
+    {
+      "key": "sg-ema-ses-2026",
+      "stream": "factors",
+      "title": "Singapore Energy Statistics 2026: grid emission factor to 2025",
+      "detail": "EMA's Singapore Energy Statistics 2026 chapter 2 now shows the grid emission factor for 2020–2025 (data as of September 2026; page last updated 22 October 2026). The 2025 value appears only in a chart, so it was not read off for this note.",
+      "impact": "EKOTRACE holds SG-EMA-GEF for 2023 (0.412) and 2024 (0.402). Add the 2025 value from the SES 2026 tables, and check that 2024 is unchanged.",
+      "published": "2026-10-22",
+      "sources": [
+        {
+          "title": "EMA, Singapore Energy Statistics, chapter 2",
+          "url": "https://ema.gov.sg/resources/singapore-energy-statistics/chapter2"
+        }
+      ],
+      "whereTo": "Emission factors → Factors"
+    },
+    {
+      "key": "au-nga-2026",
+      "stream": "factors",
+      "title": "Australia NGA Factors 2026 edition",
+      "detail": "DCCEEW lists a 'National Greenhouse Accounts Factors 2026' publication; BDO's article of 14 September 2026 refers to the 2026 release. The DCCEEW page could not be fetched, so the release date and values are not confirmed here.",
+      "impact": "EKOTRACE holds AU-NGA-2025 (national and state scope 2 and scope 3 electricity factors). Load the 2026 Table 1 values once checked on the DCCEEW page.",
+      "sources": [
+        {
+          "title": "BDO Australia, check your emissions calculations (14 Sep 2026)",
+          "url": "https://www.bdo.com.au/en-au/insights/esg-sustainability/before-you-publish-your-sustainability-report-check-your-emissions-calculations"
+        }
+      ],
+      "whereTo": "Emission factors → Factors"
+    },
+    {
+      "key": "supply-chain-factors-v1-4-0",
+      "stream": "factors",
+      "title": "Supply Chain GHG Emission Factors v1.4.0 (2024 USD)",
+      "detail": "Version 1.4.0 of the US Supply Chain GHG Emission Factors (USEEIO-based) was published on Zenodo on 14 October 2025 by the Cornerstone Sustainability Data Initiative, which maintains the dataset after EPA. It is priced in 2024 USD. EPA's own GitHub still shows v1.3 as latest.",
+      "impact": "EKOTRACE loads v1.3.0 (2017 NAICS-6, 2022 USD). v1.4.0 would need a new import and a change of price year from 2022 to 2024 in the spend conversion. Decide whether to adopt the Cornerstone release as the successor.",
+      "published": "2025-10-14",
+      "sources": [
+        {
+          "title": "Zenodo record, Supply Chain GHG Emission Factors v1.4.0",
+          "url": "https://zenodo.org/records/17202747"
+        },
+        {
+          "title": "USEPA/supply-chain-factors releases",
+          "url": "https://github.com/USEPA/supply-chain-factors/releases"
+        }
+      ],
+      "whereTo": "Emission factors → Sources & import"
+    },
+    {
+      "key": "dewa-sustainability-report-2025",
+      "stream": "factors",
+      "title": "DEWA Sustainability Report 2025 online",
+      "detail": "DEWA has published a Sustainability Report 2025 (data for calendar year 2025). No publication date or grid emission factor could be read from the text extracted.",
+      "impact": "EKOTRACE's Dubai grid factors come from DEWA's Climate Change Report 2021 (2018–2020). Check the 2025 report for a newer grid emission factor and add it if stated.",
+      "sources": [
+        {
+          "title": "DEWA Sustainability Report 2025 (PDF)",
+          "url": "https://dewa.gov.ae/-/media/Files/Sustainability/Sustainability_Report_2025_English.ashx"
+        }
+      ],
+      "whereTo": "Emission factors → Factors"
+    },
+    {
+      "key": "ademe-base-carbone-v23-6",
+      "stream": "factors",
+      "title": "ADEME Base Carbone / Base Empreinte V23.6",
+      "detail": "The Base Carbone dataset on data.gouv.fr shows V23.6 with a last update of 24 October 2026 and a V23.5→V23.6 change log. The release date of V23.6 itself is not stated.",
+      "impact": "EKOTRACE does not load ADEME factors. No change needed unless French activity factors are wanted.",
+      "published": "2026-10-24",
+      "sources": [
+        {
+          "title": "data.gouv.fr, Base Carbone",
+          "url": "https://www.data.gouv.fr/datasets/base-carbone-r-2"
+        }
+      ],
+      "whereTo": ""
+    },
+    {
+      "key": "aib-residual-mix-2025",
+      "stream": "factors",
+      "title": "AIB European Residual Mixes 2025",
+      "detail": "AIB published the 2025 European residual mix on 28 May 2026 (report v1.0 dated 26 May 2026).",
+      "impact": "EKOTRACE's European market-based fallback uses EEA 2022 grid values. Residual mixes are the usual market-based fallback for European sites; consider loading them as market-basis factors.",
+      "published": "2026-05-28",
+      "sources": [
+        {
+          "title": "AIB, European Residual Mix",
+          "url": "https://www.aib-net.org/facts/european-residual-mix"
+        }
+      ],
+      "whereTo": "Emission factors → Factors"
+    },
+    {
+      "key": "iea-emission-factors-2026",
+      "stream": "factors",
+      "title": "IEA Emissions Factors 2026 released (licensed)",
+      "detail": "IEA's Emissions Factors 2026 became available on 25 September 2026, with data to 2024 and provisional 2025 values for OECD countries. Licensed dataset; reported for information only.",
+      "impact": "None unless a licence is bought.",
+      "published": "2026-09-25",
+      "sources": [
+        {
+          "title": "IEA, Emissions Factors 2026",
+          "url": "https://www.iea.org/data-and-statistics/data-product/emissions-factors-2026"
+        }
+      ],
+      "whereTo": ""
+    },
+    {
+      "key": "ghgp-scope2-status-2026-10",
+      "stream": "factors",
+      "title": "GHG Protocol: Scope 2 market-based direction and revision timeline",
+      "detail": "On 16 October 2026 the GHG Protocol reported that its Independent Standards Board set a direction towards an hourly-matching, deliverability-based market method, with the 2015 approach usable until a date not yet set. A consolidated consultation on scopes 1–3 and market instruments is planned for Q2 2027 and the joint GHG Protocol–ISO Corporate Standard for Q4 2028.",
+      "impact": "No change to calculations now. Relevant to how EKOTRACE plans market-based Scope 2 (hourly certificates).",
+      "published": "2026-10-16",
+      "sources": [
+        {
+          "title": "GHG Protocol, Scope 2 market-based method update",
+          "url": "https://ghgprotocol.org/blog/scope-2-market-based-method-update-2025-2026-public-consultation-current-status"
+        },
+        {
+          "title": "GHG Protocol Pulse: September Update",
+          "url": "https://ghgprotocol.org/blog/ghg-protocol-pulse-september-update"
+        }
+      ],
+      "whereTo": ""
+    },
+    {
+      "key": "cbam-price-2026-q3",
+      "stream": "cbam",
+      "title": "CBAM certificate price Q3 2026: €82.32",
+      "detail": "The Commission published the Q3 2026 CBAM certificate price at €82.32 on 5 October 2026 (Q1 €75.36, Q2 €75.28). The Q4 2026 price is due on 4 January 2027. Default values (file of 6 August 2026) and benchmarks (6 February 2026) are unchanged.",
+      "impact": "The Q3 value is already in EKOTRACE (migration 048). Nothing to load; the Q4 price follows on 4 January 2027.",
+      "published": "2026-10-05",
+      "sources": [
+        {
+          "title": "European Commission, Price of CBAM certificates",
+          "url": "https://taxation-customs.ec.europa.eu/carbon-border-adjustment-mechanism/price-cbam-certificates_en"
+        },
+        {
+          "title": "European Commission, CBAM legislation and guidance",
+          "url": "https://taxation-customs.ec.europa.eu/carbon-border-adjustment-mechanism/cbam-legislation-and-guidance_en"
+        }
+      ],
+      "whereTo": ""
+    },
+    {
+      "key": "cbam-downstream-2025-0419",
+      "stream": "cbam",
+      "title": "CBAM downstream extension (2025/0419(COD)) in trilogue",
+      "detail": "Parliament adopted its first-reading amendments on 15 September 2026 and sent the file to interinstitutional negotiations. The Legislative Observatory shows no formal step in October 2026. A first trilogue on 20 October 2026 is reported by a law firm but not confirmed officially.",
+      "impact": "No tool change. The product scope is not law yet.",
+      "sources": [
+        {
+          "title": "European Parliament Legislative Observatory, 2025/0419(COD)",
+          "url": "https://oeil.europarl.europa.eu/oeil/en/procedure-file?reference=2025/0419(COD)"
+        }
+      ],
+      "whereTo": ""
+    },
+    {
+      "key": "cpi-2026-09",
+      "stream": "cpi",
+      "title": "CPI-U September 2026 released",
+      "detail": "BLS released September 2026 CPI on 14 October 2026: CPI-U, US city average, all items, not seasonally adjusted, 336.940 (1982-84=100), up 3.7% over 12 months. October 2026 CPI is due on 10 November 2026.",
+      "impact": "Information only. The tool uses annual averages; the 2026 average follows with the December index in January 2027.",
+      "published": "2026-10-14",
+      "sources": [
+        {
+          "title": "BLS, Consumer Price Index news release",
+          "url": "https://www.bls.gov/news.release/cpi.nr0.htm"
+        }
+      ],
+      "whereTo": ""
+    },
+    {
+      "key": "fx-2026-09-preliminary-check",
+      "stream": "fx",
+      "title": "September 2026 rates are marked preliminary; FRED not reachable from this run",
+      "detail": "October 2026 is not complete, so no new month is due. The September 2026 rates in migration 019 are labelled 'preliminary'. This run could not reach FRED (connection refused by the network policy), so they were not recomputed.",
+      "impact": "Nothing to apply. The next run after 2 November 2026 should add October 2026 and re-check September, provided fred.stlouisfed.org is allowed.",
+      "sources": [
+        {
+          "title": "Federal Reserve G.5 via FRED",
+          "url": "https://fred.stlouisfed.org/"
+        }
+      ],
+      "whereTo": ""
+    },
+    {
+      "key": "nodejs-22-23-4-security",
+      "stream": "tech",
+      "title": "Node.js 22.23.4 security release (7 CVEs)",
+      "detail": "Released 21 October 2026. Fixes CVE-2026-105482, CVE-2026-106069, CVE-2026-111497 and CVE-2026-106072 (high in the 22.x notes), CVE-2026-105481 and CVE-2026-106074 (medium), CVE-2026-106073 (low), and removes the eMudhra intermediate CA from the bundled certificates.",
+      "impact": "EKOTRACE runs on Node.js 22. Upgrade the runtime on the EC2 servers.",
+      "published": "2026-10-21",
+      "sources": [
+        {
+          "title": "Node.js, October 2026 security releases",
+          "url": "https://nodejs.org/en/blog/vulnerability/october-2026-security-releases"
+        },
+        {
+          "title": "Node.js v22.23.4",
+          "url": "https://nodejs.org/en/blog/release/v22.23.4"
+        }
+      ],
+      "whereTo": "Upgrade Node.js on the EC2 servers to 22.23.4 and restart"
+    },
+    {
+      "key": "fastify-advisories-2026-10",
+      "stream": "tech",
+      "title": "Fastify and fast-uri advisories: EKOTRACE already on fixed versions",
+      "detail": "Fastify CVE-2026-107832 (low, fixed in 5.12.6, published 13 October 2026) and fast-uri CVE-2026-110306 (moderate, fixed in 3.1.9 and 4.2.3, published 19 October 2026). Three further fast-uri advisories were added on 23 October 2026 and were not reviewed individually.",
+      "impact": "The lockfile has fastify 5.12.7 and fast-uri 3.1.9 and 4.2.3, so these two are covered. Run npm audit to check the three later fast-uri advisories.",
+      "published": "2026-10-13",
+      "sources": [
+        {
+          "title": "GHSA-389g-gv7q-r4x8 (Fastify)",
+          "url": "https://github.com/fastify/fastify/security/advisories/GHSA-389g-gv7q-r4x8"
+        },
+        {
+          "title": "GHSA-w74x-v6f9-j3xg (fast-uri)",
+          "url": "https://github.com/advisories/GHSA-w74x-v6f9-j3xg"
+        }
+      ],
+      "whereTo": "Run npm audit in the repo"
+    },
+    {
+      "key": "react-rsc-advisories-2026-10-14",
+      "stream": "tech",
+      "title": "React Server Components: critical RCE advisory (not used by EKOTRACE)",
+      "detail": "On 14 October 2026 React published GHSA-xqc2-xf4c-x3h3 (critical, unauthenticated remote code execution) and GHSA-h3gv-c5rc-p453 (high, denial of service) for react-server-dom-* 19.0–19.3.0, fixed in 19.0.9, 19.1.10, 19.2.9 and 19.3.1.",
+      "impact": "EKOTRACE's web app is a Vite single-page app on react 19.3.0 with no react-server-dom package, so it is not affected.",
+      "published": "2026-10-14",
+      "sources": [
+        {
+          "title": "GHSA-xqc2-xf4c-x3h3",
+          "url": "https://github.com/facebook/react/security/advisories/GHSA-xqc2-xf4c-x3h3"
+        },
+        {
+          "title": "GHSA-h3gv-c5rc-p453",
+          "url": "https://github.com/facebook/react/security/advisories/GHSA-h3gv-c5rc-p453"
+        }
+      ],
+      "whereTo": ""
+    },
+    {
+      "key": "postgres-pgbouncer-2026-10",
+      "stream": "tech",
+      "title": "PostgreSQL: no 16.x release; PgBouncer 1.26.1 fixes an authentication bypass",
+      "detail": "PostgreSQL 16.15 remains current; the next minor release is scheduled for 12 November 2026. On 14 October 2026 PgBouncer 1.26.1 fixed CVE-2026-107350 (SCRAM authentication bypass) and two denial-of-service CVEs.",
+      "impact": "Only relevant if PgBouncer sits in front of the database; if so, upgrade to 1.26.1. Plan the PostgreSQL 16 minor update after 12 November.",
+      "published": "2026-10-14",
+      "sources": [
+        {
+          "title": "PgBouncer 1.26.1 released",
+          "url": "https://www.postgresql.org/about/news/pgbouncer-1261-released-fixes-three-cves-3403/"
+        },
+        {
+          "title": "PostgreSQL roadmap",
+          "url": "https://www.postgresql.org/developer/roadmap/"
+        }
+      ],
+      "whereTo": ""
+    },
+    {
+      "key": "aws-bulletins-2026-10",
+      "stream": "tech",
+      "title": "AWS security bulletins: managed EC2 not affected",
+      "detail": "Bulletin 2026-137-AWS (15 October 2026) covers CVE-2026-99999 in the virtio-net/TAP path; managed EC2, Lambda and Fargate are not affected. Other October bulletins concern services EKOTRACE does not use.",
+      "impact": "No action for EC2 instances; keep the Amazon Linux kernel patched as usual.",
+      "published": "2026-10-15",
+      "sources": [
+        {
+          "title": "AWS security bulletin 2026-137-AWS",
+          "url": "https://aws.amazon.com/security/security-bulletins/2026-137-aws/"
+        }
+      ],
+      "whereTo": ""
+    },
+    {
+      "key": "carb-sb253-initial-regulation",
+      "stream": "regulation",
+      "title": "California SB 253: CARB regulation approved; first report due 10 November 2026",
+      "detail": "The Office of Administrative Law approved CARB's Initial Regulation (17 CCR §§96070–96077), effective 12 October 2026, confirming 10 November 2026 as the first deadline for Scope 1 and 2 reports. Scope 3 starts in 2027 under separate rules. SB 261 remains enjoined pending appeal.",
+      "impact": "US clients in scope need Scope 1 and 2 totals for 10 November 2026. No tool change.",
+      "published": "2026-10-12",
+      "sources": [
+        {
+          "title": "CARB notice (12 Oct 2026)",
+          "url": "https://content.govdelivery.com/accounts/CARB/bulletins/42ee5c1"
+        },
+        {
+          "title": "Morgan Lewis (13 Oct 2026)",
+          "url": "https://www.morganlewis.com/pubs/2026/10/californias-climate-disclosure-regulations-receive-final-approval-ahead-of-november-reporting-deadline"
+        }
+      ],
+      "whereTo": ""
+    },
+    {
+      "key": "esrs-revised-in-force-2026-11",
+      "stream": "regulation",
+      "title": "Simplified ESRS enter into force on 10 November 2026; EFRAG agenda consultation",
+      "detail": "The revised ESRS delegated act, published in the Official Journal on 21 September 2026 (per secondary sources), enters into force on 10 November 2026 and applies to financial years from 1 January 2027. On 16 October 2026 EFRAG opened a consultation on its 2027–2029 sustainability reporting agenda, closing 15 February 2027.",
+      "impact": "No tool change. Report templates for CSRD clients should follow the revised ESRS E1 for 2027 reports.",
+      "published": "2026-10-16",
+      "sources": [
+        {
+          "title": "EFRAG, 2027–2029 agenda consultation",
+          "url": "https://www.efrag.org/en/news-and-calendar/news/efrag-launches-public-consultation-on-its-sustainability-reporting-agenda-for-20272029"
+        },
+        {
+          "title": "Arendt, revised ESRS adopted",
+          "url": "https://www.arendt.com/news-insights/news/revised-european-sustainability-reporting-standards-eu-commission-adopts-delegated-act/"
+        }
+      ],
+      "whereTo": ""
+    },
+    {
+      "key": "issb-nature-ed-2026-10",
+      "stream": "market",
+      "title": "ISSB exposure draft: nature-related disclosures",
+      "detail": "The ISSB published an exposure draft of IFRS Sustainability Disclosure Practice Statement 1, Nature-related Disclosures, in October 2026; comments close on 19 February 2027.",
+      "impact": "No tool change.",
+      "sources": [
+        {
+          "title": "IFRS, nature-related disclosures exposure draft",
+          "url": "https://www.ifrs.org/projects/work-plan/biodiversity-ecosystems-and-ecosystem-services/ed-cl-nature-related-disclosures/"
+        }
+      ],
+      "whereTo": ""
+    }
+  ],
+  "linkedin": [
+    {
+      "key": "li-2026-10-26-1",
+      "title": "California SB 253: 10 November is confirmed",
+      "body": "California's climate disclosure rules are now final. On 12 October 2026 CARB's Initial Regulation took effect, confirming 10 November 2026 as the first deadline for companies in scope of SB 253 to report their Scope 1 and Scope 2 emissions. Scope 3 follows from 2027 under a separate rulemaking.\n\nTwo weeks is not long. For most reporting teams the work now is less about methodology and more about evidence: meter readings and bills that tie back to the totals, emission factors with a named source and year, and a clear record of who approved what.\n\nThat is how EKOTRACE is built. Activity lines carry their source documents, factors carry their publisher and edition, and figures pass through approval before they reach a report. If your 2025 Scope 1 and 2 numbers are still in spreadsheets, there is time to bring them into one auditable place before the deadline.\n\nAre you reporting under SB 253 this year? We would be glad to compare notes.\n\n#SB253 #ClimateDisclosure #GHGAccounting #Scope1 #Scope2"
+    },
+    {
+      "key": "li-2026-10-26-2",
+      "title": "CBAM: the Q3 2026 certificate price is €82.32",
+      "body": "The European Commission has published the CBAM certificate price for the third quarter of 2026: €82.32 per certificate, up from €75.36 in Q1 and €75.28 in Q2. The Q4 price follows on 4 January 2027, and from February 2027 certificates will be bought on the common central platform.\n\nFor EU importers, that means the 2026 cost of CBAM is no longer an estimate built on assumptions. It can be calculated quarter by quarter from the goods actually imported, their embedded emissions and the published price.\n\nThe quality of the emissions data decides the bill. Default values are a fallback and carry mark-ups; verified actual values from installations can lower the bill. That is why the supplier side matters as much as the importer side.\n\nIn EKOTRACE's CBAM tool, importers request data from their suppliers, suppliers fill in the Commission's communication template, and the cost is calculated with the official default values and benchmarks where actual data is missing.\n\n#CBAM #CarbonBorderAdjustment #EUTrade #Decarbonisation"
+    }
+  ]
+}
