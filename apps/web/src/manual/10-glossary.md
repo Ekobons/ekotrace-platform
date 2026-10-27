@@ -105,3 +105,16 @@
 | ISO 14064-1 categories | 1 direct; 2 imported energy; 3 transportation; 4 products used by the organization; 5 use of the organization’s products; 6 other indirect |
 | ESRS E1 | the climate standard of the EU Corporate Sustainability Reporting Directive (CSRD) |
 | IFRS S2 | the ISSB climate-related disclosure standard |
+
+## India CCTS
+
+| Term | Meaning |
+|---|---|
+| CCTS | Carbon Credit Trading Scheme, India's compliance carbon market (2023), run by the Bureau of Energy Efficiency (BEE) |
+| Obligated entity | a plant named in the gazette schedule of the GHG Emission Intensity Target Rules, 2025, with its own targets |
+| GEI | greenhouse gas emission intensity: tCO₂e per tonne of equivalent product |
+| Equivalent product | a plant's output expressed in one product (e.g. cement equivalent), so plants with different product mixes compare |
+| CCC | Carbon Credit Certificate: 1 tCO₂e, issued when a plant beats its target, surrendered when it misses it |
+| ACVA | accredited carbon verification agency, which verifies the emissions report (Form B) |
+| Form A | Performance Assessment Document sent to BEE by 31 July after the compliance year |
+| ICM registry | the Indian Carbon Market registry, run by Grid-India, where CCCs are held |
