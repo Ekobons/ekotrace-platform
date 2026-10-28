@@ -38,8 +38,8 @@ The Ministry's technical guidance on federal scopes, methods and deadlines is st
 | Role | Can |
 |---|---|
 | Super admin, admin | add and change reporting facilities, the federal position, the report status (submitted, verified), everything below |
-| Manager | source streams, production, QA, data gaps, verification dates, mitigation measures |
-| Preparer | source streams, production, QA, data gaps |
+| Manager | source streams, production, QA, data gaps, submission and verification details, mitigation measures |
+| Preparer | source streams, production, QA, data gaps (not the submission or verification details) |
 | Verifier and others | view, download the Excel files |
 
 ## Source streams
@@ -60,9 +60,11 @@ The **biomass fraction** of a stream's CO₂ is reported apart and not counted. 
 
 ### Filling from entries
 
-Link the reporting facility to an inventory facility, then **Fill from entries**. The approved stationary and mobile combustion entries of the calendar year become fuel combustion streams in TJ (entries crossing the year's ends count by their days inside it), and the refrigerants and other gases released become *other gas* streams. The tool matches each fuel to its IPCC defaults. **Refresh from entries** updates the quantities and keeps what people set: fuel, factors, uncertainty, instrument, notes. Streams with no entries any more are removed; streams typed by hand stay. The stream shows the tCO₂e the inventory worked out with its own factors, for comparison.
+Link the reporting facility to an inventory facility, then **Fill from entries**. The approved stationary and mobile combustion entries of the calendar year become fuel combustion streams in TJ on net calorific value (entries crossing the year's ends count by their days inside it), and the refrigerants and other gases released become *other gas* streams. The tool matches each fuel to its IPCC defaults. Energy billed on a gross basis (MMBtu, therm, GCV units) is brought to net (× 0.9 for gases, × 0.95 for liquids and solids, as IPCC suggests; a supplier's ratio is better). Entries in units with no energy content (e.g. km) are left out with a note on the stream.
 
-Process and mass-balance emissions recorded only in the facility report are added to the federal Scope 1.
+**Refresh from entries** updates the quantities and keeps what people set: fuel, factors, uncertainty, instrument, notes. A stream switched to its own units (tonnes with a measured NCV, say) or to another method keeps its figures; only the comparison with the inventory moves. Streams with no entries any more are removed; a stream you removed is not brought back; streams typed by hand stay. Each stream shows the tCO₂e the inventory worked out with its own factors, for comparison.
+
+Tick **Not in the inventory entries** on a process or mass-balance stream to add it to the federal Scope 1 (at the company's share of the facility). Leave it off when its fuels or materials are already entered, or they would count twice. Facility reports not linked to an inventory facility are added to the federal Scope 1 in full.
 
 ## Classes and tiers
 
@@ -75,7 +77,7 @@ The tool classes each stream from the year's totals, as EAD's guidance does: str
 | Tier 3 | ±2.5% |
 | Tier 4 | ±1.5% |
 
-Major streams need at least Tier 2, minor at least Tier 1; de minimis streams may be estimated. Where no tier is technically feasible or the cost is unreasonable, tick **fallback approach** and say why; the whole facility's uncertainty must then not exceed ±7.5%. The tool works out that uncertainty from the streams' uncertainties: the square root of the sum of (stream emissions × uncertainty)², divided by the total.
+Major streams need at least Tier 2, minor at least Tier 1; de minimis streams may be estimated. Streams are ranked by their size, so a carbon-out stream of a mass balance counts by its absolute value. Where no tier is technically feasible or the cost is unreasonable, tick **fallback approach**, say why and give its uncertainty; the whole facility's uncertainty must then not exceed ±7.5%, and every stream above de minimis needs its uncertainty to show it. The tool works out that uncertainty from the streams' uncertainties: the square root of the sum of (stream emissions × uncertainty)², divided by the total.
 
 ## The facility page
 
@@ -91,7 +93,7 @@ Major streams need at least Tier 2, minor at least Tier 1; de minimis streams ma
 | Mitigation | measures implemented, planned or studied, by means (efficiency, clean energy, CCUS, fuel switching, methane…). Offsets and removals are information only, never netted |
 | Monitoring plan & dates | facility identifiers, monitoring plan, the year's dates |
 
-**Submitted to EAD** (super admin, admin) needs the submission date and locks the year: streams, production, QA and data gaps can no longer change; the verification details still can. **Verified** needs the date of the statement. Setting the year back to Ready unlocks it.
+**Submitted to EAD** (super admin, admin) needs the submission date and locks the year: streams, production, QA and data gaps can no longer change, and the figures are frozen as submitted (a later change of GWP set, default factor or facility details does not change them); the verification details still can. **Verified** needs the date of the statement. Setting the year back to Ready unlocks it.
 
 ## The EAD report
 
@@ -99,7 +101,7 @@ Major streams need at least Tier 2, minor at least Tier 1; de minimis streams ma
 
 ## Federal
 
-The **Federal (MOCCAE)** tab shows the company's Scope 1 and 2 in the UAE for the calendar year, against the 0.5 MtCO₂e NRCC threshold, with the duties that follow. With the GHG inventory, the figures come from the approved entries of the facilities whose country is the UAE, by emirate (the facility's grid region) and by gas, under the company's consolidation approach. Without it, type Scope 1 and 2 (empty Scope 1 = the sum of the facility reports).
+The **Federal (MOCCAE)** tab shows the company's Scope 1 and 2 in the UAE for the calendar year, against the 0.5 MtCO₂e NRCC threshold, with the duties that follow. With the GHG inventory, the figures come from the approved entries of the facilities whose country is the UAE, by emirate (the facility's grid region) and by gas, under the company's consolidation approach, plus the facility-report additions above. Without it, type Scope 1 and 2 (empty Scope 1 = the sum of the facility reports).
 
 Record whether the company has been designated, the NRCC registration, the status of the IEQT submission (organisation registered, draft, submitted, verified) and the verifier. Company-wide reduction measures are listed here.
 

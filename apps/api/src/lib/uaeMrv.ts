@@ -78,6 +78,7 @@ export interface Stream {
   materiality?: Materiality | null;    // the operator's class; empty = worked out
   instrument?: string; efSource?: string; note?: string; documentId?: string | null;
   entryKey?: string | null; entriesT?: number | null; entries?: number | null;   // filled from inventory entries
+  addToFederal?: boolean;              // not in the inventory entries: add to the federal Scope 1 (process, mass balance)
 }
 export interface StreamResult {
   id: string; tj: number | null; co2: number; co2Bio: number; ch4: number; n2o: number; other: number; co2e: number;
@@ -85,6 +86,13 @@ export interface StreamResult {
 }
 
 const n = (x: number | null | undefined) => (x == null || !Number.isFinite(x) ? null : x);
+/** The net calorific value a stream uses (TJ per t or per thousand Nm³), or null when its activity is in TJ or not combustion. */
+export function ncvUsed(s: Stream): number | null {
+  if (s.kind !== 'combustion' || (s.adUnit ?? 't') === 'TJ') return null;
+  const f = s.fuel ? FUEL.get(s.fuel) : undefined;
+  if (s.adUnit === 'kNm3') return n(s.ncv) ?? (s.fuel === 'natural_gas' ? NG_TJ_PER_KNM3 : null);
+  return n(s.ncv) ?? (f ? f.ncv / 1000 : null);
+}
 /** Activity data in TJ (combustion) and in tonnes where it applies. */
 export function activity(s: Stream): { tj: number | null; t: number | null; problems: string[] } {
   const q = n(s.adQty), problems: string[] = [];
@@ -134,7 +142,7 @@ export function gases(s: Stream): { tj: number | null; co2: number; co2Bio: numb
     const ef = n(s.ef) ?? f?.co2 ?? null;
     if (ef == null) { out.problems.push('Needs an emission factor (tCO2/TJ)'); return out; }
     split(a.tj * ef * (n(s.of) ?? 1));
-    const ch4 = n(s.ch4Ef) ?? (s.mobile ? f?.ch4Mobile : f?.ch4) ?? 0, n2o = n(s.n2oEf) ?? (s.mobile ? f?.n2oMobile : f?.n2o) ?? 0;
+    const ch4 = n(s.ch4Ef) ?? (s.mobile ? f?.ch4Mobile ?? f?.ch4 : f?.ch4) ?? 0, n2o = n(s.n2oEf) ?? (s.mobile ? f?.n2oMobile ?? f?.n2o : f?.n2o) ?? 0;
     out.ch4 = (a.tj * ch4) / 1000; out.n2o = (a.tj * n2o) / 1000;
   } else if (s.kind === 'process') {
     const t = a.t ?? null;
@@ -150,28 +158,29 @@ export function gases(s: Stream): { tj: number | null; co2: number; co2Bio: numb
   return out;
 }
 
+/** The class thresholds for a total (of absolute stream emissions). */
+export const classThresholds = (total: number) => ({ deMinimis: Math.max(1000, Math.min(0.02 * total, 20000)), minor: Math.max(5000, Math.min(0.1 * total, 100000)) });
 /**
  * Source-stream classes (EAD guidance): streams are taken smallest first; together they are de minimis while
  * below the higher of 1 kt and 2% of the total (2% capped at 20 kt); then minor while below the higher of 5 kt and
- * 10% (capped at 100 kt); the rest are major. Negative (carbon out) streams are left out of the ranking (major).
+ * 10% (capped at 100 kt); the rest are major. Absolute values: a carbon-out stream counts by its size.
  */
 export function classify(es: { id: string; co2e: number }[]): Map<string, Materiality> {
-  const total = es.reduce((a, e) => a + Math.max(0, e.co2e), 0);
-  const dm = Math.max(1000, Math.min(0.02 * total, 20000)), mi = Math.max(5000, Math.min(0.1 * total, 100000));
+  const total = es.reduce((a, e) => a + Math.abs(e.co2e), 0);
+  const t = classThresholds(total);
   const out = new Map<string, Materiality>();
   let cum = 0;
-  for (const e of [...es].filter((x) => x.co2e >= 0).sort((a, b) => a.co2e - b.co2e)) {
-    cum += e.co2e;
-    out.set(e.id, cum < dm ? 'de_minimis' : cum < mi ? 'minor' : 'major');
+  for (const e of [...es].sort((a, b) => Math.abs(a.co2e) - Math.abs(b.co2e))) {
+    cum += Math.abs(e.co2e);
+    out.set(e.id, cum < t.deMinimis ? 'de_minimis' : cum < t.minor ? 'minor' : 'major');
   }
-  for (const e of es) if (!out.has(e.id)) out.set(e.id, 'major');
   return out;
 }
 
 export type Gwp = Record<string, number>;
 export interface FacilityResult {
   streams: StreamResult[]; co2: number; co2Bio: number; ch4: number; n2o: number; other: number; total: number; direct: number;
-  byGas: { gas: string; t: number; co2e: number }[]; uncertainty: number | null; thresholdMet: boolean; problems: string[];
+  byGas: { gas: string; t: number; co2e: number }[]; uncertainty: number | null; uncertaintyComplete: boolean; thresholdMet: boolean; problems: string[];
   thresholds: { deMinimis: number; minor: number };
 }
 /** The facility's year: streams, totals by gas, classes and tiers, uncertainty, the 25,000 t threshold. */
@@ -193,6 +202,7 @@ export function facility(streams: Stream[], gwp: Gwp): FacilityResult {
       else if (tier < req) problems.push(`${m === 'major' ? 'Major' : 'Minor'} stream: Tier ${req} needed (±${TIERS[req - 1]!.max}%), uncertainty ±${s.uncertainty}% is ${tier ? `Tier ${tier}` : 'below Tier 1'}`);
     }
     if (s.fallback && !s.note?.trim()) problems.push('Fallback approach: say why no tier is technically feasible or why it costs unreasonably much');
+    if (s.fallback && s.uncertainty == null) problems.push('Fallback approach: give the uncertainty of the stream');
     if (s.materiality && s.materiality !== auto) problems.push(`Classed ${s.materiality.replace('_', ' ')} by the operator; the totals put it at ${auto.replace('_', ' ')}`);
     return { id: s.id, tj: x.tj, co2: x.co2, co2Bio: x.co2Bio, ch4: x.ch4, n2o: x.n2o, other: x.other, co2e, tier, tierRequired: tiered ? req : 0, materiality: m, autoMateriality: auto, ok: !problems.length, problems };
   });
@@ -206,15 +216,19 @@ export function facility(streams: Stream[], gwp: Gwp): FacilityResult {
     if (r.other && s.gas) addG(s.gas, r.other, r.other * g(s.gas));
   });
   // whole-facility uncertainty from the streams' uncertainties (independent errors)
-  const known = res.filter((r, i) => r.co2e > 0 && streams[i]!.uncertainty != null);
+  const known = res.filter((r, i) => r.co2e !== 0 && streams[i]!.uncertainty != null);
   const uncertainty = total > 0 && known.length ? (Math.sqrt(known.reduce((a, r) => { const u = streams.find((s) => s.id === r.id)!.uncertainty! / 100; return a + (r.co2e * u) ** 2; }, 0)) / total) * 100 : null;
+  const missingU = res.filter((r, i) => r.co2e !== 0 && r.materiality !== 'de_minimis' && streams[i]!.uncertainty == null);
   const problems: string[] = [];
-  if (streams.some((s) => s.fallback) && uncertainty != null && uncertainty > 7.5) problems.push(`With a fallback approach the whole facility's uncertainty must not exceed ±7.5% (now ±${uncertainty.toFixed(1)}%)`);
+  if (streams.some((s) => s.fallback)) {
+    if (missingU.length) problems.push(`With a fallback approach every stream above de minimis needs its uncertainty to show the facility stays within ±7.5% (${missingU.length} missing)`);
+    else if (uncertainty != null && uncertainty > 7.5) problems.push(`With a fallback approach the whole facility's uncertainty must not exceed ±7.5% (now ±${uncertainty.toFixed(1)}%)`);
+  }
   const direct = sum('co2') + sum('ch4') * g('CH4');   // the threshold counts CO2 and methane
   return {
     streams: res, co2: sum('co2'), co2Bio: sum('co2Bio'), ch4: sum('ch4'), n2o: sum('n2o'), other: sum('other'), total, direct,
     byGas: [...byGas].map(([gas, v]) => ({ gas, ...v })).sort((a, b) => b.co2e - a.co2e), uncertainty, thresholdMet: direct >= EAD_THRESHOLD, problems,
-    thresholds: { deMinimis: Math.max(1000, Math.min(0.02 * total, 20000)), minor: Math.max(5000, Math.min(0.1 * total, 100000)) },
+    thresholds: classThresholds(res.reduce((a, r) => a + Math.abs(r.co2e), 0)), uncertaintyComplete: !missingU.length,
   };
 }
 

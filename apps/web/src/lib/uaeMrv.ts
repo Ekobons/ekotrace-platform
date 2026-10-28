@@ -13,12 +13,12 @@ export interface Stream {
   adQty?: number | null; adUnit?: 't' | 'TJ' | 'kNm3' | 'kL'; density?: number | null; ncv?: number | null; ef?: number | null; of?: number | null; carbon?: number | null; direction?: 'input' | 'output';
   biomass?: number | null; ch4Ef?: number | null; n2oEf?: number | null; measuredCo2?: number | null; measuredCh4?: number | null; gas?: string | null; gasT?: number | null;
   uncertainty?: number | null; materiality?: Materiality | null; instrument?: string; efSource?: string; note?: string; documentId?: string | null;
-  entryKey?: string | null; entriesT?: number | null; entries?: number | null;
+  entryKey?: string | null; entriesT?: number | null; entries?: number | null; addToFederal?: boolean;
 }
 export interface StreamResult { id: string; tj: number | null; co2: number; co2Bio: number; ch4: number; n2o: number; other: number; co2e: number; tier: 0 | 1 | 2 | 3 | 4 | null; tierRequired: number; materiality: Materiality; autoMateriality: Materiality; ok: boolean; problems: string[] }
 export interface FacilityResult {
   streams: StreamResult[]; co2: number; co2Bio: number; ch4: number; n2o: number; other: number; total: number; direct: number;
-  byGas: { gas: string; t: number; co2e: number }[]; uncertainty: number | null; thresholdMet: boolean; problems: string[]; thresholds: { deMinimis: number; minor: number };
+  byGas: { gas: string; t: number; co2e: number }[]; uncertainty: number | null; uncertaintyComplete: boolean; thresholdMet: boolean; problems: string[]; thresholds: { deMinimis: number; minor: number };
 }
 export interface Facility {
   id: string; name: string; nodeId: string | null; emirate: string; sector: Sector; subSector: string | null; eadId: string | null; permitNo: string | null; operator: string | null; address: string | null;
@@ -44,7 +44,7 @@ export interface Overview {
   year: number; company: Company; measures: Measure[]; calendar: CalItem[]; emirates: Record<string, string>; sectors: Record<Sector, { label: string; covered: boolean; hint: string }>; fuels: Fuel[];
   means: Record<string, string>; tiers: { tier: number; max: number }[]; thresholds: { ead: number; nrcc: number; verificationFrom: number };
   facilities: (Facility & { result: { total: number; direct: number; streams: number; problems: number; uncertainty: number | null }; status: YearStatus; ead: Ead })[];
-  federal: { s1: number | null; s2: number | null; total: number | null; large: boolean; duties: string[]; source: 'entries' | 'typed' | 'facilities' | 'none'; processOnly: number; byEmirate: { id: string; name: string; emirate: string | null; s1: number; s2: number; entries: number }[]; byGas: { gas: string; t: number; co2e: number }[] };
+  federal: { s1: number | null; s2: number | null; total: number | null; large: boolean; duties: string[]; source: 'entries' | 'typed' | 'facilities' | 'none'; processOnly: number; unlinked: number; byEmirate: { id: string; name: string; emirate: string | null; s1: number; s2: number; entries: number }[]; byGas: { gas: string; t: number; co2e: number }[] };
   nodes: { id: string; name: string; grid_region: string | null }[]; gases: { code: string; name: string }[]; ekotrace: boolean; canSetup: boolean; canData: boolean;
 }
 export interface Detail {
@@ -61,8 +61,8 @@ export const mrvApi = {
   deleteFacility: (id: string) => call<{ ok: true }>('DELETE', `/api/uae-mrv/facilities/${id}`),
   detail: (id: string, year: number) => call<Detail>('GET', `/api/uae-mrv/facilities/${id}?year=${year}`),
   saveYear: (id: string, year: number, b: YearBody) => call<{ ok: true }>('PUT', `/api/uae-mrv/facilities/${id}/years/${year}`, b),
-  saveStreams: (id: string, year: number, streams: Stream[]) => call<{ ok: true }>('PUT', `/api/uae-mrv/facilities/${id}/years/${year}/streams`, { streams }),
-  fromEntries: (id: string, year: number) => call<{ added: number; updated: number; removed: number }>('POST', `/api/uae-mrv/facilities/${id}/years/${year}/from-entries`),
+  saveStreams: (id: string, year: number, streams: Stream[], version: string | null) => call<{ ok: true }>('PUT', `/api/uae-mrv/facilities/${id}/years/${year}/streams`, { streams, version }),
+  fromEntries: (id: string, year: number) => call<{ added: number; updated: number; removed: number; kept: number; skipped: number }>('POST', `/api/uae-mrv/facilities/${id}/years/${year}/from-entries`),
   addMeasure: (b: MeasureBody) => call<{ id: string }>('POST', '/api/uae-mrv/measures', b),
   saveMeasure: (id: string, b: MeasureBody) => call<{ ok: true }>('PUT', `/api/uae-mrv/measures/${id}`, b),
   deleteMeasure: (id: string) => call<{ ok: true }>('DELETE', `/api/uae-mrv/measures/${id}`),

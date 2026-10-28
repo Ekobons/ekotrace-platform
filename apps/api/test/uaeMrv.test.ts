@@ -56,6 +56,12 @@ test('tiers, source-stream classes and whole-facility uncertainty', () => {
   const fb = facility([{ id: 'f', name: 'Flare', kind: 'combustion', fuel: 'refinery_gas', adQty: 100, adUnit: 'TJ', fallback: true, uncertainty: 12 }], AR5);
   assert.ok(fb.streams[0]!.problems.some((p) => p.includes('Fallback')));   // no reason given
   assert.ok(fb.problems.some((p) => p.includes('7.5%')));
+  // fallback with a stream missing its uncertainty: the facility uncertainty is incomplete, not a pass
+  const fb2 = facility([{ id: 'f', name: 'Flare', kind: 'combustion', fuel: 'refinery_gas', adQty: 100, adUnit: 'TJ', fallback: true, note: 'No meter on the flare line' }, { id: 'g', name: 'GT', kind: 'combustion', fuel: 'natural_gas', adQty: 2000, adUnit: 'TJ', uncertainty: 1 }], AR5);
+  assert.equal(fb2.uncertaintyComplete, false); assert.ok(fb2.problems.some((p) => p.includes('missing')));
+  // carbon out counts by its size in the classes; mobile fuels without road factors use the stationary ones
+  assert.equal(classify([{ id: 'in', co2e: 50_000 }, { id: 'out', co2e: -30_000 }]).get('out'), 'major');
+  near(gases({ id: 'k', name: 'Kerosene fleet', kind: 'combustion', fuel: 'kerosene', mobile: true, adQty: 10, adUnit: 'TJ' }).ch4, 0.03);
 });
 
 test('who reports: EAD threshold and sectors; federal NRCC threshold; calendar', () => {
@@ -165,11 +171,23 @@ test('API: streams from entries (calendar year, split by days, approved only), I
   assert.ok(d.problems.some((p: string) => p.includes('years running')));   // verifier since 2019: 7 years by 2025
   // people set the uncertainty and instrument; a refresh keeps them
   const streams = d.streams.map((s: Stream) => (s.kind === 'combustion' ? { ...s, uncertainty: 2, instrument: 'Ultrasonic meter FT-101' } : s));
-  assert.equal((await call('PUT', `/api/uae-mrv/facilities/${fac}/years/2025/streams`, { streams: [...streams, { id: 'clinker', name: 'Lime kiln', kind: 'process', adQty: 1000, adUnit: 't', ef: 0.785, uncertainty: 4 }] }, co, mgr)).status, 200);
+  assert.equal((await call('PUT', `/api/uae-mrv/facilities/${fac}/years/2025/streams`, { streams, version: null }, co, mgr)).status, 409);   // stale: the year changed since
+  assert.equal((await call('PUT', `/api/uae-mrv/facilities/${fac}/years/2025/streams`, { version: d.year.updatedAt, streams: [...streams, { id: 'clinker', name: 'Lime kiln', kind: 'process', adQty: 1000, adUnit: 't', ef: 0.785, uncertainty: 4, addToFederal: true }] }, co, mgr)).status, 200);
   assert.equal((await call('POST', `/api/uae-mrv/facilities/${fac}/years/2025/from-entries`, undefined, co, mgr)).body.updated, 2);
   d = (await call('GET', `/api/uae-mrv/facilities/${fac}?year=2025`, undefined, co)).body;
   assert.equal(d.streams.length, 3); assert.equal(d.streams.find((s: Stream) => s.kind === 'combustion').instrument, 'Ultrasonic meter FT-101');
   assert.equal(d.result.streams.find((s: { id: string }) => s.id === 'clinker').materiality, 'de_minimis');
+  // removing an inventory stream keeps it removed on refresh; a stream on its own units only gets the comparison
+  const gas = d.streams.find((s: Stream) => s.kind === 'gas');
+  const ng2 = d.streams.find((s: Stream) => s.kind === 'combustion');
+  const own = { ...ng2, adUnit: 'kNm3', adQty: 15_000, ncv: 0.0375 };
+  assert.equal((await call('PUT', `/api/uae-mrv/facilities/${fac}/years/2025/streams`, { version: d.year.updatedAt, streams: d.streams.filter((s: Stream) => s !== gas && s !== ng2).concat([own]) }, co, mgr)).status, 200);
+  const rf = (await call('POST', `/api/uae-mrv/facilities/${fac}/years/2025/from-entries`, undefined, co, mgr)).body;
+  assert.equal(rf.added, 0); assert.equal(rf.skipped, 1); assert.equal(rf.kept, 1);
+  d = (await call('GET', `/api/uae-mrv/facilities/${fac}?year=2025`, undefined, co)).body;
+  assert.equal(d.streams.some((s: Stream) => s.kind === 'gas'), false); assert.equal(d.streams.find((s: Stream) => s.kind === 'combustion').adQty, 15_000);
+  // put the inventory figures back for the next tests
+  assert.equal((await call('PUT', `/api/uae-mrv/facilities/${fac}/years/2025/streams`, { version: d.year.updatedAt, streams: d.streams.map((s: Stream) => (s.kind === 'combustion' ? ng2 : s)).concat([gas]) }, co, mgr)).status, 200);
 });
 
 test('API: submitted locks the year; status by super admin or admin; verification details; Excel', async () => {
@@ -183,6 +201,11 @@ test('API: submitted locks the year; status by super admin or admin; verificatio
   assert.equal((await call('PUT', `/api/uae-mrv/facilities/${fac}/years/2025`, { ...Y, status: 'submitted', submittedOn: '2026-03-28', qa: 'changed' }, co)).status, 409);
   assert.equal((await call('PUT', `/api/uae-mrv/facilities/${fac}/years/2025`, { ...Y, status: 'verified', submittedOn: '2026-03-28', verifiedOn: '2026-05-02', opinion: 'unmodified' }, co)).status, 200);
   assert.equal((await call('DELETE', `/api/uae-mrv/facilities/${fac}`, undefined, co)).status, 409);
+  const before = (await call('GET', `/api/uae-mrv/facilities/${fac}?year=2025`, undefined, co)).body.result.total;
+  const p = new pg.Client({ connectionString: url }); await p.connect(); await p.query(`SELECT set_config('app.platform','on',false)`);
+  await p.query(`UPDATE gwp_value SET value = 30 WHERE gwp_set = 'AR5' AND gas = 'CH4'`);
+  near((await call('GET', `/api/uae-mrv/facilities/${fac}?year=2025`, undefined, co)).body.result.total, before);   // frozen at submission
+  await p.query(`UPDATE gwp_value SET value = 28 WHERE gwp_set = 'AR5' AND gas = 'CH4'`); await p.end();
   const x = await call('GET', `/api/uae-mrv/facilities/${fac}/years/2025/export`, undefined, co);
   assert.equal(x.status, 200);
   const wb = new ExcelJS.Workbook(); await wb.xlsx.load(x.raw as unknown as ArrayBuffer);

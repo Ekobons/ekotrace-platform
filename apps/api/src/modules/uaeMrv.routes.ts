@@ -29,7 +29,7 @@ import { refdata } from './refdata.js';
 import { kwhOf } from './dashboard.routes.js';
 import {
   EMIRATES, FUEL, FUELS, MAX_VERIFIER_YEARS, NRCC_THRESHOLD, EAD_THRESHOLD, EAD_VERIFICATION_FROM, SECTORS, TIERS, calendar, eadStatus, facility, federal, matchFuel,
-  type Gwp, type Sector, type Stream,
+  ncvUsed, type FacilityResult, type Gwp, type Sector, type Stream,
 } from '../lib/uaeMrv.js';
 
 const uuid = z.string().uuid();
@@ -62,7 +62,7 @@ const streamBody = z.object({
   measuredCo2: fnum(), measuredCh4: z.number().min(0).max(1e12).nullable().optional(), gas: z.string().max(40).nullable().optional(), gasT: z.number().min(0).max(1e12).nullable().optional(),
   uncertainty: z.number().min(0).max(100).nullable().optional(), materiality: z.enum(['de_minimis', 'minor', 'major']).nullable().optional(),
   instrument: z.string().trim().max(300).optional(), efSource: z.string().trim().max(300).optional(), note: z.string().trim().max(2000).optional(), documentId: uuid.nullable().optional(),
-  entryKey: z.string().max(80).nullable().optional(), entriesT: z.number().nullable().optional(), entries: z.number().int().nullable().optional(),
+  entryKey: z.string().max(80).nullable().optional(), entriesT: z.number().nullable().optional(), entries: z.number().int().nullable().optional(), addToFederal: z.boolean().optional(),
 });
 const measureBody = z.object({
   facilityId: uuid.nullable().default(null), title: z.string().trim().min(2).max(300),
@@ -106,11 +106,14 @@ async function streamsOf(c: Tx, id: string, year: number): Promise<Stream[]> {
 async function yearRow(c: Tx, id: string, year: number) {
   return (await c.query(`SELECT * FROM mrv_year WHERE facility_id = $1 AND year = $2`, [id, year])).rows[0] ?? null;
 }
+/** The year's row, created if needed, locked for this transaction (no submit racing a save). */
 async function ensureYear(c: Tx, tenant: string, id: string, year: number, who: string) {
-  const y = await yearRow(c, id, year);
-  if (y) return y;
-  return (await c.query(`INSERT INTO mrv_year (tenant_id, facility_id, year, updated_name) VALUES ($1,$2,$3,$4) RETURNING *`, [tenant, id, year, who])).rows[0];
+  await c.query(`INSERT INTO mrv_year (tenant_id, facility_id, year, updated_name) VALUES ($1,$2,$3,$4) ON CONFLICT (facility_id, year) DO NOTHING`, [tenant, id, year, who]);
+  return (await c.query(`SELECT * FROM mrv_year WHERE facility_id = $1 AND year = $2 FOR UPDATE`, [id, year])).rows[0];
 }
+/** The streams were changed by someone else since the person loaded them. */
+const staleErr = () => new AppError('Someone changed this year\'s source streams in the meantime: reload and make your change again', 409, 'STALE');
+const sameVersion = (row: any, version: string | null | undefined) => (row?.updated_at ? new Date(row.updated_at).getTime() : null) === (version ? new Date(version).getTime() : null);
 const lockedErr = (year: number) => new AppError(`The ${year} report is submitted: set it back to Ready (super admin, admin) before changing it`, 409, 'LOCKED');
 
 /** Proposed source streams from the approved entries of one inventory facility in a calendar year. */
@@ -127,22 +130,30 @@ async function fromEntries(c: Tx, nodeId: string, year: number): Promise<Stream[
   const ref = await refdata();
   const units = new Map(ref.unitList.map((u) => [u.code, { dimension: u.dimension, to_base: Number(u.toBase) }]));
   const out: Stream[] = [];
-  const merged = new Map<string, Stream>();
+  const merged = new Map<string, Stream & { notes: string[] }>();
   for (const r of rows) {
     const mobile = r.cat === 'mobile_combustion';
-    const kwh = await kwhOf(c, units, r.iid, `${r.item} ${r.sub}`, r.unit, r.qty, year, true);
     const f = matchFuel(`${r.item} ${r.sub}`, !!r.bio);
+    let kwh = await kwhOf(c, units, r.iid, `${r.item} ${r.sub}`, r.unit, r.qty, year, true);
+    const notes: string[] = [];
+    // IPCC factors are on net calorific value: energy billed on a gross basis (MMBtu, therm, GCV) is brought to net
+    if (kwh != null && units.get(r.unit)?.dimension === 'energy_gross') {
+      const ratio = f?.gas ? 0.9 : 0.95;
+      kwh *= ratio; notes.push(`${r.unit} is on gross calorific value: × ${ratio} to net (IPCC: gases 0.9, liquids and solids 0.95); a supplier NCV/GCV ratio is better`);
+    }
+    if (kwh == null) notes.push(`${r.n} ${r.n === 1 ? 'entry' : 'entries'} in ${r.unit} have no energy content and are left out: enter their activity data`);
     const key = `item:${r.iid}`;
+    const tj = kwh == null ? 0 : kwh * 3.6e-6;
     const prev = merged.get(key);
-    const tj = kwh == null ? null : Math.round(kwh * 3.6e-6 * 1e4) / 1e4;
-    if (prev) { prev.adQty = Math.round(((prev.adQty ?? 0) + (tj ?? 0)) * 1e4) / 1e4; prev.entriesT = (prev.entriesT ?? 0) + r.t; prev.entries = (prev.entries ?? 0) + r.n; continue; }
-    const s: Stream = {
-      id: key, name: `${r.item}${mobile ? ' (fleet)' : ''}`, kind: 'combustion', fuel: f?.code ?? null, mobile, adQty: tj, adUnit: 'TJ',
-      efSource: f ? `IPCC 2006 default for ${f.name}` : 'Choose the fuel or enter the emission factor', instrument: '', note: tj == null ? `No energy content for ${r.unit}: enter the activity data` : '',
+    if (prev) { prev.adQty = (prev.adQty ?? 0) + tj; prev.entriesT = (prev.entriesT ?? 0) + r.t; prev.entries = (prev.entries ?? 0) + r.n; prev.notes.push(...notes); continue; }
+    const s = {
+      id: key, name: `${r.item}${mobile ? ' (fleet)' : ''}`, kind: 'combustion' as const, fuel: f?.code ?? null, mobile, adQty: tj, adUnit: 'TJ' as const,
+      efSource: f ? `IPCC 2006 default for ${f.name}` : 'Choose the fuel or enter the emission factor', instrument: '', note: '', notes,
       entryKey: key, entriesT: r.t, entries: r.n,
     };
     merged.set(key, s); out.push(s);
   }
+  for (const s of merged.values()) { s.adQty = Math.round((s.adQty ?? 0) * 1e4) / 1e4; s.note = [...new Set(s.notes)].join(' · '); delete (s as Partial<typeof s>).notes; }
   // fugitive and other gases released, by gas (Kyoto basket only)
   const gasRows = (await c.query(
     `SELECT r.gas, sum(r.kg_gas * ${SHARE})::float8 / 1000 AS t, sum(r.kg_co2e * ${SHARE})::float8 / 1000 AS co2e, count(DISTINCT a.id)::int AS n
@@ -171,14 +182,30 @@ async function federalFromEntries(c: Tx, tenant: string, year: number) {
   const bySource = (await c.query(
     `SELECT cat.name AS category, i.name AS item, a.unit, sum(a.quantity * ${SHARE})::float8 AS qty, sum(a.co2e_direct * ${SHARE})::float8 / 1000 AS s1, sum(a.co2e_scope2 * ${SHARE})::float8 / 1000 AS s2
        ${BASE.replace('JOIN category cat ON cat.id = a.category_id', 'JOIN category cat ON cat.id = a.category_id JOIN item i ON i.id = a.item_id')} AND (a.co2e_direct <> 0 OR a.co2e_scope2 <> 0)
-      GROUP BY 1, 2, 3 ORDER BY 5 + 6 DESC`, p)).rows.map((r) => ({ category: r.category as string, item: r.item as string, unit: r.unit as string, qty: r.qty as number, s1: r.s1 as number, s2: r.s2 as number }));
+      GROUP BY 1, 2, 3 ORDER BY coalesce(sum(a.co2e_direct * ${SHARE}), 0) + coalesce(sum(a.co2e_scope2 * ${SHARE}), 0) DESC`, p)).rows.map((r) => ({ category: r.category as string, item: r.item as string, unit: r.unit as string, qty: r.qty as number, s1: r.s1 as number, s2: r.s2 as number }));
   const s1 = fac.reduce((a, f) => a + f.s1, 0), s2 = fac.reduce((a, f) => a + f.s2, 0);
   return { s1, s2, facilities: fac, byGas, bySource };
 }
 
-/** Process and mass-balance emissions of a facility report linked to the inventory: not in its entries, so added to the federal Scope 1. */
-const processStreams = (fy: { streams: Stream[]; result: { streams: { id: string; co2e: number }[] } }) =>
-  fy.streams.reduce((a, s) => a + (!s.entryKey && (s.kind === 'process' || s.kind === 'mass_balance') ? fy.result.streams.find((r) => r.id === s.id)?.co2e ?? 0 : 0), 0);
+/** Streams of a facility report marked as not in the inventory entries (process, mass balance): added to the federal Scope 1. */
+const extraStreams = (fy: { streams: Stream[]; result: { streams: { id: string; co2e: number }[] } }) =>
+  fy.streams.reduce((a, s) => a + (s.addToFederal && !s.entryKey && (s.kind === 'process' || s.kind === 'mass_balance') ? fy.result.streams.find((r) => r.id === s.id)?.co2e ?? 0 : 0), 0);
+/** The company's share of an inventory facility under its consolidation approach (0 outside the UAE). */
+async function shareOf(c: Tx, tenant: string, nodeId: string) {
+  const t = (await c.query('SELECT consolidation FROM tenant WHERE id = $1', [tenant])).rows[0];
+  const f = (await c.query(`SELECT country, ownership_pct::float8 AS own, financial_control AS fin, operational_control AS op FROM org_node WHERE id = $1`, [nodeId])).rows[0];
+  if (!f || f.country !== 'AE') return 0;
+  return t.consolidation === 'equity' ? (f.own ?? 100) / 100 : t.consolidation === 'financial' ? (f.fin ? 1 : 0) : f.op ? 1 : 0;
+}
+/** What the facility reports add to the federal Scope 1 beyond the entries: flagged streams of linked facilities (at the company's share), whole reports of unlinked ones. */
+async function federalExtras(c: Tx, tenant: string, facs: { f: FacilityV; fy: { streams: Stream[]; result: FacilityResult } }[]) {
+  let process = 0, unlinked = 0;
+  for (const { f, fy } of facs) {
+    if (f.nodeId) { const x = extraStreams(fy); if (x) process += x * (await shareOf(c, tenant, f.nodeId)); }
+    else unlinked += fy.result.total;
+  }
+  return { process, unlinked };
+}
 
 const companyView = (r: any, year: number) => ({
   year, designated: (r?.designated ?? 'unknown') as 'yes' | 'no' | 'unknown', designationRef: r?.designation_ref ?? null, nrccNo: r?.nrcc_no ?? null, nrccRegistered: iso(r?.nrcc_registered),
@@ -188,18 +215,21 @@ const companyView = (r: any, year: number) => ({
 
 /** One facility's year, worked out. */
 async function facilityYear(c: Tx, tenant: string, f: FacilityV, year: number) {
-  const { set, gwp } = await gwpOf(c, tenant);
+  const row = await yearRow(c, f.id, year);
   const streams = await streamsOf(c, f.id, year);
-  const res = facility(streams, gwp);
-  const y = yearView(await yearRow(c, f.id, year), year);
-  const ead = eadStatus(f, streams.length ? res.direct : null, year);
+  // a submitted report keeps the figures it was submitted with
+  const fz = LOCKED.has(row?.status) && row?.frozen ? (row.frozen as { result: FacilityResult; gwpSet: string; ead: ReturnType<typeof eadStatus> }) : null;
+  const { set, gwp } = fz ? { set: fz.gwpSet, gwp: {} as Gwp } : await gwpOf(c, tenant);
+  const res = fz ? fz.result : facility(streams, gwp);
+  const y = yearView(row, year);
+  const ead = fz ? fz.ead : eadStatus(f, streams.length ? res.direct : null, year);
   const problems = [...res.problems];
   const verifYears = f.verifierSince ? year - f.verifierSince + 1 : null;
   if (verifYears != null && verifYears > MAX_VERIFIER_YEARS) problems.push(`${f.verifier ?? 'The verifier'} has verified this facility ${verifYears} years running: at most ${MAX_VERIFIER_YEARS} consecutive years, then a two-year break`);
   if (ead.status === 'required' && year >= EAD_VERIFICATION_FROM && !f.verifier && !(f.operationsStart && Number(f.operationsStart.slice(0, 4)) === year)) problems.push(`Reporting year ${year} must be verified: name the accredited verifier`);
   if (f.mpChange && (!f.mpSubmitted || f.mpSubmitted < f.mpChange)) problems.push(`Significant change on ${f.mpChange}: a revised monitoring plan is due within 30 days`);
   if (res.co2Bio > 0) problems.push(`Biogenic CO₂ of ${res.co2Bio.toFixed(1)} t is reported apart and not counted in the total`);
-  return { streams, result: res, year: y, ead, problems, gwpSet: set };
+  return { streams, result: res, year: y, ead, problems, gwpSet: set, frozen: !!fz };
 }
 
 export async function uaeMrvRoutes(app: FastifyInstance) {
@@ -210,20 +240,20 @@ export async function uaeMrvRoutes(app: FastifyInstance) {
     const year = z.object({ year: YEAR.optional() }).parse(req.query).year ?? lastYear();
     return tenantTx(tenant, async (c) => {
       const eko = await hasEkotrace(c, tenant);
-      const facilities = [];
-      let mrvS1 = 0, processOnly = 0;
+      const facilities = [], all: { f: FacilityV; fy: Awaited<ReturnType<typeof facilityYear>> }[] = [];
+      let mrvS1 = 0;
       for (const r of (await c.query(`SELECT * FROM mrv_facility ORDER BY name`)).rows) {
         const f = facilityView(r), fy = await facilityYear(c, tenant, f, year);
-        mrvS1 += fy.result.total;
-        if (f.nodeId) processOnly += processStreams(fy);
+        mrvS1 += fy.result.total; all.push({ f, fy });
         facilities.push({ ...f, result: { total: fy.result.total, direct: fy.result.direct, streams: fy.streams.length, problems: fy.problems.length + fy.result.streams.filter((s) => !s.ok).length, uncertainty: fy.result.uncertainty }, status: fy.year.status, ead: fy.ead });
       }
       const co = companyView((await c.query(`SELECT * FROM mrv_company_year WHERE tenant_id = $1 AND year = $2`, [tenant, year])).rows[0], year);
       const ent = eko ? await federalFromEntries(c, tenant, year) : null;
-      const s1 = ent ? ent.s1 + processOnly : co.s1Typed ?? (facilities.length ? mrvS1 : null), s2 = ent ? ent.s2 : co.s2Typed;
+      const ex = ent ? await federalExtras(c, tenant, all) : { process: 0, unlinked: 0 };
+      const s1 = ent ? ent.s1 + ex.process + ex.unlinked : co.s1Typed ?? (facilities.length ? mrvS1 : null), s2 = ent ? ent.s2 : co.s2Typed;
       const measures = (await c.query(`SELECT * FROM mrv_measure WHERE facility_id IS NULL ORDER BY status, created_at`)).rows.map(measureView);
       return {
-        year, facilities, company: co, federal: { s1, s2, ...federal(s1, s2, co.designated), source: ent ? 'entries' : co.s1Typed != null ? 'typed' : facilities.length ? 'facilities' : 'none', processOnly: ent ? processOnly : 0, byEmirate: ent?.facilities ?? [], byGas: ent?.byGas ?? [] },
+        year, facilities, company: co, federal: { s1, s2, ...federal(s1, s2, co.designated), source: ent ? 'entries' : co.s1Typed != null ? 'typed' : facilities.length ? 'facilities' : 'none', processOnly: ex.process, unlinked: ex.unlinked, byEmirate: ent?.facilities ?? [], byGas: ent?.byGas ?? [] },
         measures, calendar: calendar(year), emirates: EMIRATES, sectors: SECTORS, fuels: FUELS.map((f) => ({ code: f.code, name: f.name, ncv: f.ncv, co2: f.co2, ch4: f.ch4, n2o: f.n2o, ch4Mobile: f.ch4Mobile ?? null, n2oMobile: f.n2oMobile ?? null, density: f.density ?? null, gas: !!f.gas, biogenic: !!f.biogenic })),
         means: MEANS, tiers: TIERS, thresholds: { ead: EAD_THRESHOLD, nrcc: NRCC_THRESHOLD, verificationFrom: EAD_VERIFICATION_FROM },
         nodes: eko ? (await c.query(`SELECT id, name, grid_region FROM org_node WHERE kind = 'facility' AND active ORDER BY name`)).rows : [],
@@ -336,23 +366,30 @@ export async function uaeMrvRoutes(app: FastifyInstance) {
       const y = await ensureYear(c, tenant, id, year, req.user.name);
       const statusChange = b.status !== y.status;
       if (statusChange && !['super_admin', 'admin', 'platform_admin'].includes(req.user.role)) throw new AppError('A super admin or admin changes the report status', 403, 'FORBIDDEN');
+      if (req.user.role === 'preparer') {
+        const was = [iso(y.submitted_on), y.reference ?? null, iso(y.verif_notified), iso(y.site_visit), iso(y.verified_on), y.opinion ?? null, y.statement_doc ?? null];
+        const now = [b.submittedOn, b.reference || null, b.verifNotified, b.siteVisit, b.verifiedOn, b.opinion, b.statementDoc];
+        if (JSON.stringify(was) !== JSON.stringify(now)) throw new AppError('A manager, admin or super admin records the submission and verification', 403, 'FORBIDDEN');
+      }
       if (LOCKED.has(y.status) && LOCKED.has(b.status)) {
         // a submitted report: only the submission and verification details move on
         const P = (x: any[]) => JSON.stringify((x ?? []).map((r) => [r.product, r.qty ?? null, r.unit]));
         const G = (x: any[]) => JSON.stringify((x ?? []).map((r) => [r.description, r.approach, r.t ?? null]));
         if (P(b.production) !== P(y.production) || G(b.gaps) !== G(y.gaps) || b.qa !== (y.qa ?? '')) throw lockedErr(year);
       }
+      let frozen: unknown = LOCKED.has(b.status) ? y.frozen ?? null : null;   // kept while submitted, dropped when reopened
       if (LOCKED.has(b.status) && !LOCKED.has(y.status)) {
         const f = await getFacility(c, id), fy = await facilityYear(c, tenant, f, year);
         if (!fy.streams.length) throw new AppError('No source streams: nothing to submit');
         if (!b.submittedOn) throw new AppError('Give the date the report was submitted to EAD');
+        frozen = { result: fy.result, gwpSet: fy.gwpSet, ead: fy.ead, on: new Date().toISOString() };
       }
       if (b.status === 'verified' && !b.verifiedOn) throw new AppError('Give the date of the verification statement');
       if (b.statementDoc && !(await c.query(`SELECT 1 FROM document WHERE id = $1`, [b.statementDoc])).rowCount) throw notFound('Document');
       await c.query(
-        `UPDATE mrv_year SET status=$3, submitted_on=$4, reference=$5, production=$6, gaps=$7, qa=$8, verif_notified=$9, site_visit=$10, verified_on=$11, opinion=$12, statement_doc=$13, updated_name=$14, updated_at=now()
+        `UPDATE mrv_year SET status=$3, submitted_on=$4, reference=$5, production=$6, gaps=$7, qa=$8, verif_notified=$9, site_visit=$10, verified_on=$11, opinion=$12, statement_doc=$13, updated_name=$14, frozen=$15, updated_at=now()
           WHERE facility_id = $1 AND year = $2`,
-        [id, year, b.status, b.submittedOn, b.reference || null, JSON.stringify(b.production), JSON.stringify(b.gaps), b.qa, b.verifNotified, b.siteVisit, b.verifiedOn, b.opinion, b.statementDoc, req.user.name]);
+        [id, year, b.status, b.submittedOn, b.reference || null, JSON.stringify(b.production), JSON.stringify(b.gaps), b.qa, b.verifNotified, b.siteVisit, b.verifiedOn, b.opinion, b.statementDoc, req.user.name, frozen == null ? null : JSON.stringify(frozen)]);
       await audit(c, req, 'uaemrv.year', 'mrv_facility', id, { year, ...b });
       return { ok: true };
     });
@@ -362,19 +399,26 @@ export async function uaeMrvRoutes(app: FastifyInstance) {
     const tenant = requireTenant(req);
     requireRole(req, 'super_admin', 'admin', 'manager', 'preparer');
     const id = idOf(req), year = yearOf(req);
-    const b = z.object({ streams: z.array(streamBody).max(300) }).parse(req.body);
+    const b = z.object({ streams: z.array(streamBody).max(300), version: z.string().max(40).nullable().default(null) }).parse(req.body);
     const ids = new Set(b.streams.map((s) => s.id));
     if (ids.size !== b.streams.length) throw new AppError('Two source streams have the same id');
     return tenantTx(tenant, async (c) => {
       await getFacility(c, id);
+      const existed = (await c.query(`SELECT updated_at FROM mrv_year WHERE facility_id = $1 AND year = $2`, [id, year])).rows[0] ?? null;
       const y = await ensureYear(c, tenant, id, year, req.user.name);
       if (LOCKED.has(y.status)) throw lockedErr(year);
+      if (!sameVersion(existed ? y : null, b.version)) throw staleErr();
+      // inventory streams people removed stay removed when the year is refreshed from entries
+      const before = await streamsOf(c, id, year);
+      const gone = before.filter((x) => x.entryKey && !b.streams.some((n) => n.entryKey === x.entryKey)).map((x) => x.entryKey!);
+      const back = b.streams.filter((n) => n.entryKey).map((n) => n.entryKey!);
+      const dismissed = [...new Set([...(y.dismissed ?? []), ...gone])].filter((k) => !back.includes(k));
       for (const s of b.streams) if (s.documentId && !(await c.query(`SELECT 1 FROM document WHERE id = $1`, [s.documentId])).rowCount) throw notFound('Document');
       await c.query(`DELETE FROM mrv_stream WHERE facility_id = $1 AND year = $2`, [id, year]);
       let i = 0;
       for (const s of b.streams) await c.query(`INSERT INTO mrv_stream (tenant_id, facility_id, year, sort, entry_key, data) VALUES ($1,$2,$3,$4,$5,$6)`, [tenant, id, year, i++, s.entryKey ?? null, JSON.stringify(s)]);
-      await c.query(`UPDATE mrv_year SET updated_name = $3, updated_at = now() WHERE facility_id = $1 AND year = $2`, [id, year, req.user.name]);
-      await audit(c, req, 'uaemrv.streams', 'mrv_facility', id, { year, streams: b.streams.length });
+      await c.query(`UPDATE mrv_year SET updated_name = $3, dismissed = $4, updated_at = now() WHERE facility_id = $1 AND year = $2`, [id, year, req.user.name, dismissed]);
+      await audit(c, req, 'uaemrv.streams', 'mrv_facility', id, { year, streams: b.streams.length, dismissed: gone });
       return { ok: true };
     });
   });
@@ -392,22 +436,25 @@ export async function uaeMrvRoutes(app: FastifyInstance) {
       const proposed = await fromEntries(c, f.nodeId, year);
       const current = await streamsOf(c, id, year);
       const byKey = new Map(current.filter((s) => s.entryKey).map((s) => [s.entryKey!, s]));
-      let added = 0, updated = 0, removed = 0;
+      const dismissed = new Set<string>(y.dismissed ?? []);
+      let added = 0, updated = 0, removed = 0, kept = 0;
       const next: Stream[] = [];
       for (const s of current) {
         if (!s.entryKey) { next.push(s); continue; }
         const p = proposed.find((x) => x.entryKey === s.entryKey);
         if (!p) { removed++; continue; }
-        // keep what people set (fuel, factors, uncertainty, instrument, notes); refresh the quantity from the entries
-        next.push({ ...s, ...(p.kind === 'gas' ? { gasT: p.gasT } : { adQty: p.adQty, adUnit: 'TJ' as const }), entriesT: p.entriesT, entries: p.entries });
-        updated++;
+        // keep what people set (fuel, factors, uncertainty, instrument, notes); refresh the quantity only where it is still the inventory's
+        const fresh = p.kind === 'gas' ? s.kind === 'gas' : s.kind === 'combustion' && (s.adUnit ?? 't') === 'TJ';
+        if (fresh) { next.push({ ...s, ...(p.kind === 'gas' ? { gasT: p.gasT } : { adQty: p.adQty }), entriesT: p.entriesT, entries: p.entries, note: s.note || p.note }); updated++; }
+        else { next.push({ ...s, entriesT: p.entriesT, entries: p.entries }); kept++; }   // own units or another method: only the comparison moves
       }
-      for (const p of proposed) if (!byKey.has(p.entryKey!)) { next.push(p); added++; }
+      for (const p of proposed) if (!byKey.has(p.entryKey!) && !dismissed.has(p.entryKey!)) { next.push(p); added++; }
       await c.query(`DELETE FROM mrv_stream WHERE facility_id = $1 AND year = $2`, [id, year]);
       let i = 0;
       for (const s of next) await c.query(`INSERT INTO mrv_stream (tenant_id, facility_id, year, sort, entry_key, data) VALUES ($1,$2,$3,$4,$5,$6)`, [tenant, id, year, i++, s.entryKey ?? null, JSON.stringify(s)]);
-      await audit(c, req, 'uaemrv.from-entries', 'mrv_facility', id, { year, added, updated, removed });
-      return { added, updated, removed };
+      await c.query(`UPDATE mrv_year SET updated_name = $3, updated_at = now() WHERE facility_id = $1 AND year = $2`, [id, year, req.user.name]);
+      await audit(c, req, 'uaemrv.from-entries', 'mrv_facility', id, { year, added, updated, removed, kept });
+      return { added, updated, removed, kept, skipped: proposed.filter((p) => dismissed.has(p.entryKey!) && !byKey.has(p.entryKey!)).length };
     });
   });
 
@@ -480,13 +527,13 @@ export async function uaeMrvRoutes(app: FastifyInstance) {
     c2.addRow([]); c2.addRow(['By gas', 't', 'tCO₂e']).font = { bold: true };
     for (const g of fy.result.byGas) c2.addRow([g.gas, round(g.t, 4), round(g.co2e)]);
     const d1 = sheet('D1 Source streams', ['#', 'Source stream', 'Type', 'Method', 'Class (operator)', 'Class (worked out)', 'tCO₂e', 'Share %'], [5, 40, 18, 16, 16, 18, 14, 10]);
-    fy.streams.forEach((s, i) => { const r = R.get(s.id)!; d1.addRow([i + 1, s.name, KIND[s.kind], s.fallback ? 'Fallback' : METHOD[s.kind], r.materiality.replace('_', ' '), r.autoMateriality.replace('_', ' '), round(r.co2e), fy.result.total ? round((r.co2e / fy.result.total) * 100, 2) : '']); });
+    fy.streams.forEach((s, i) => { const r = R.get(s.id)!; d1.addRow([i + 1, s.name, KIND[s.kind], s.fallback ? 'Fallback' : METHOD[s.kind], s.materiality ? s.materiality.replace('_', ' ') : '', r.autoMateriality.replace('_', ' '), round(r.co2e), fy.result.total ? round((r.co2e / fy.result.total) * 100, 2) : '']); });
     const d2 = sheet('D2 Calculation', ['#', 'Source stream', 'Fuel / material', 'Activity data', 'Unit', 'Density t/kL', 'NCV (TJ/unit)', 'TJ', 'EF', 'EF unit', 'Oxidation / conversion', 'Carbon t C/t', 'Biomass fraction', 'CH₄ kg/TJ', 'N₂O kg/TJ', 'CO₂ fossil t', 'CO₂ bio t', 'CH₄ t', 'N₂O t', 'tCO₂e', 'Uncertainty ±%', 'Tier', 'Tier needed', 'Instrument', 'Factor source', 'Notes'],
       [5, 32, 22, 14, 8, 10, 12, 12, 10, 12, 12, 10, 10, 10, 10, 12, 10, 10, 10, 12, 10, 8, 10, 24, 28, 36]);
     fy.streams.forEach((s, i) => {
       if (!['combustion', 'process', 'mass_balance'].includes(s.kind)) return;
       const r = R.get(s.id)!, fu = s.fuel ? FUEL.get(s.fuel) : undefined;
-      d2.addRow([i + 1, s.name, fu?.name ?? s.material ?? '', s.adQty, s.adUnit ?? 't', s.density ?? fu?.density ?? '', s.ncv ?? (fu && s.adUnit !== 'TJ' ? fu.ncv / 1000 : ''), r.tj == null ? '' : round(r.tj, 4),
+      d2.addRow([i + 1, s.name, fu?.name ?? s.material ?? '', s.adQty, s.adUnit ?? 't', s.adUnit === 'kL' ? s.density ?? fu?.density ?? '' : '', ncvUsed(s) ?? '', r.tj == null ? '' : round(r.tj, 4),
         s.kind === 'combustion' ? s.ef ?? fu?.co2 ?? '' : s.ef ?? '', s.kind === 'combustion' ? 'tCO₂/TJ' : s.kind === 'process' ? 'tCO₂/t' : '', s.of ?? 1, s.carbon ?? '', s.biomass ?? (fu?.biogenic ? 1 : 0),
         s.kind === 'combustion' ? s.ch4Ef ?? (s.mobile ? fu?.ch4Mobile : fu?.ch4) ?? '' : '', s.kind === 'combustion' ? s.n2oEf ?? (s.mobile ? fu?.n2oMobile : fu?.n2o) ?? '' : '',
         round(r.co2, 3), round(r.co2Bio, 3), round(r.ch4, 4), round(r.n2o, 4), round(r.co2e, 3), s.uncertainty ?? '', r.tier == null ? '' : r.tier || 'below 1', r.tierRequired || '', s.instrument ?? '', s.efSource ?? '', [s.note, ...r.problems].filter(Boolean).join(' · ')]);
@@ -540,11 +587,12 @@ export async function uaeMrvRoutes(app: FastifyInstance) {
       for (const r of (await c.query(`SELECT * FROM mrv_facility ORDER BY name`)).rows) { const f = facilityView(r); facs.push({ f, fy: await facilityYear(c, tenant, f, year) }); }
       const measures = (await c.query(`SELECT m.*, f.name AS facility FROM mrv_measure m LEFT JOIN mrv_facility f ON f.id = m.facility_id ORDER BY m.facility_id NULLS FIRST, m.status`)).rows;
       await audit(c, req, 'uaemrv.export.federal', 'tenant', tenant, { year });
-      return { co, t, ent, facs, measures };
+      const ex = ent ? await federalExtras(c, tenant, facs) : { process: 0, unlinked: 0 };
+      return { co, t, ent, facs, measures, ex };
     });
     const { co, t, ent, facs, measures } = d;
-    const processOnly = ent ? facs.reduce((a, x) => a + (x.f.nodeId ? processStreams(x.fy) : 0), 0) : 0;
-    const s1 = ent ? ent.s1 + processOnly : co.s1Typed ?? facs.reduce((a, x) => a + x.fy.result.total, 0), s2 = ent ? ent.s2 : co.s2Typed;
+    const { ex } = d;
+    const s1 = ent ? ent.s1 + ex.process + ex.unlinked : co.s1Typed ?? (facs.length ? facs.reduce((a, x) => a + x.fy.result.total, 0) : null), s2 = ent ? ent.s2 : co.s2Typed;
     const fed = federal(s1, s2, co.designated);
     const wb = new ExcelJS.Workbook(); wb.creator = PRODUCT;
     const sheet = (name: string, head: string[], widths: number[]) => { const ws = wb.addWorksheet(name); ws.addRow(head); styleHeader(ws, widths); return ws; };
@@ -552,14 +600,17 @@ export async function uaeMrvRoutes(app: FastifyInstance) {
     for (const r of [
       ['Organisation', t.name], ['Reporting year', `${year} (calendar year)`], ['Consolidation approach', t.consolidation], ['GWP set', t.gwp_set],
       ['Designated source', co.designated], ['Designation reference', co.designationRef], ['Scope 1 (tCO₂e)', s1 == null ? '' : round(s1)], ['Scope 2 location-based (tCO₂e)', s2 == null ? '' : round(s2)],
-      ['Scope 1 + 2 (tCO₂e)', fed.total == null ? '' : round(fed.total)], ['NRCC threshold (Cabinet Resolution 67 of 2024)', `${NRCC_THRESHOLD.toLocaleString('en-US')} tCO₂e — ${fed.large ? 'at or above' : 'below'}`],
+      ['Scope 1 + 2 (tCO₂e)', fed.total == null ? '' : round(fed.total)], ['Scope 1 by facility, emirate and gas', ex.process || ex.unlinked ? 'The facility, emirate and gas sheets cover the entries; the facility MRV additions are listed on "By facility"' : 'From the entries'], ['NRCC threshold (Cabinet Resolution 67 of 2024)', `${NRCC_THRESHOLD.toLocaleString('en-US')} tCO₂e — ${fed.large ? 'at or above' : 'below'}`],
       ['NRCC registration', co.nrccNo ? `${co.nrccNo}${co.nrccRegistered ? ` (${co.nrccRegistered})` : ''}` : ''], ['National MRV system (IEQT)', `${co.ieqtStatus}${co.ieqtSubmitted ? `, submitted ${co.ieqtSubmitted}` : ''}${co.ieqtRef ? `, ref. ${co.ieqtRef}` : ''}`],
-      ['Verifier', co.verifier], ['Source of figures', ent ? `${PRODUCT} approved entries of UAE facilities${processOnly ? `, plus ${round(processOnly)} tCO₂e of process and mass-balance emissions recorded only in the facility MRV reports` : ''}` : co.s1Typed != null ? 'Typed' : 'Sum of the facility MRV reports (Scope 1 only)'],
+      ['Verifier', co.verifier], ['Source of figures', ent ? `${PRODUCT} approved entries of UAE facilities${ex.process ? `, plus ${round(ex.process)} tCO₂e of process and mass-balance emissions recorded only in the facility MRV reports` : ''}${ex.unlinked ? `, plus ${round(ex.unlinked)} tCO₂e of facility MRV reports not linked to the inventory` : ''}` : co.s1Typed != null ? 'Typed' : 'Sum of the facility MRV reports (Scope 1 only)'],
     ] as [string, unknown][]) o.addRow(r);
     o.addRow([]); o.addRow(['Duties']).font = { bold: true }; fed.duties.forEach((x) => o.addRow(['', x]));
     if (ent) {
       const f = sheet('By facility', ['Facility', 'Emirate', 'Scope 1 tCO₂e', 'Scope 2 tCO₂e', 'Entries'], [36, 18, 16, 16, 10]);
       ent.facilities.forEach((x) => f.addRow([x.name, x.emirate ? EMIRATES[x.emirate] ?? x.emirate : 'Not set', round(x.s1), round(x.s2), x.entries]));
+      if (ex.process) f.addRow(['Process and mass-balance emissions from the facility MRV reports', '', round(ex.process), 0, '']);
+      if (ex.unlinked) f.addRow(['Facility MRV reports not linked to the inventory', '', round(ex.unlinked), 0, '']);
+      f.addRow(['Total', '', round(s1 ?? 0), round(s2 ?? 0), '']).font = { bold: true };
       const em = sheet('By emirate', ['Emirate', 'Scope 1 tCO₂e', 'Scope 2 tCO₂e'], [24, 16, 16]);
       const by = new Map<string, { s1: number; s2: number }>();
       ent.facilities.forEach((x) => { const k = x.emirate ? EMIRATES[x.emirate] ?? x.emirate : 'Not set'; const v = by.get(k) ?? { s1: 0, s2: 0 }; v.s1 += x.s1; v.s2 += x.s2; by.set(k, v); });

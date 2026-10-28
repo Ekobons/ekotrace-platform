@@ -91,7 +91,7 @@ async function main() {
   type St = { id: string; name: string; kind: string; [k: string]: unknown };
   for (const year of [2025, 2026]) {
     for (const id of [icad, depot]) await env('POST', `/api/uae-mrv/facilities/${id}/years/${year}/from-entries`);
-    const d = await env<{ streams: St[] }>('GET', `/api/uae-mrv/facilities/${icad}?year=${year}`);
+    const d = await env<{ streams: St[]; year: { updatedAt: string | null } }>('GET', `/api/uae-mrv/facilities/${icad}?year=${year}`);
     const unc: Record<string, number> = { 'Natural gas': 1.2, 'Gas oil': 3.5, LPG: 4 };
     const streams: St[] = d.streams.map((x) => ({
       ...x, uncertainty: unc[x.name] ?? 5,
@@ -99,12 +99,12 @@ async function main() {
       ...(x.name === 'Natural gas' ? { ncv: null, efSource: 'IPCC 2006 default; supplier NCV certificate on file (DEMO)' } : {}),
     }));
     streams.push(
-      { id: 'eaf-carbon-in', name: 'EAF carbon inputs (electrodes, charge carbon, DRI carbon)', kind: 'mass_balance', material: 'Graphite electrodes, anthracite, DRI', adQty: year === 2025 ? 11_800 : 8_600, adUnit: 't', carbon: 0.86, direction: 'input', uncertainty: 2.2, instrument: 'Weighbridge WB-2 (DEMO)', efSource: 'Laboratory carbon analysis, quarterly (DEMO)' },
-      { id: 'eaf-carbon-out', name: 'Carbon in steel and slag', kind: 'mass_balance', material: 'Billets and EAF slag', adQty: year === 2025 ? 1_020_000 : 760_000, adUnit: 't', carbon: 0.0021, direction: 'output', uncertainty: 1.5, instrument: 'Production records (DEMO)', efSource: 'Spectrometer heat analysis (DEMO)' },
+      { id: 'eaf-carbon-in', name: 'EAF carbon inputs (electrodes, charge carbon, DRI carbon)', kind: 'mass_balance', material: 'Graphite electrodes, anthracite, DRI', adQty: year === 2025 ? 11_800 : 8_600, adUnit: 't', carbon: 0.86, direction: 'input', addToFederal: true, uncertainty: 2.2, instrument: 'Weighbridge WB-2 (DEMO)', efSource: 'Laboratory carbon analysis, quarterly (DEMO)' },
+      { id: 'eaf-carbon-out', name: 'Carbon in steel and slag', kind: 'mass_balance', material: 'Billets and EAF slag', adQty: year === 2025 ? 1_020_000 : 760_000, adUnit: 't', carbon: 0.0021, direction: 'output', addToFederal: true, uncertainty: 1.5, instrument: 'Production records (DEMO)', efSource: 'Spectrometer heat analysis (DEMO)' },
     );
-    await env('PUT', `/api/uae-mrv/facilities/${icad}/years/${year}/streams`, { streams });
-    const dp = await env<{ streams: St[] }>('GET', `/api/uae-mrv/facilities/${depot}?year=${year}`);
-    await env('PUT', `/api/uae-mrv/facilities/${depot}/years/${year}/streams`, { streams: dp.streams.map((x) => ({ ...x, mobile: true, uncertainty: 4, instrument: 'Fuel card system and depot tank dips (DEMO)' })) });
+    await env('PUT', `/api/uae-mrv/facilities/${icad}/years/${year}/streams`, { streams, version: d.year.updatedAt });
+    const dp = await env<{ streams: St[]; year: { updatedAt: string | null } }>('GET', `/api/uae-mrv/facilities/${depot}?year=${year}`);
+    await env('PUT', `/api/uae-mrv/facilities/${depot}/years/${year}/streams`, { version: dp.year.updatedAt, streams: dp.streams.map((x) => ({ ...x, mobile: true, uncertainty: 4, instrument: 'Fuel card system and depot tank dips (DEMO)' })) });
   }
   const Y = (status: string, extra: Record<string, unknown> = {}) => ({
     status, submittedOn: null, reference: null, production: [{ product: 'Reinforcing bar (rebar)', qty: 640_000, unit: 't' }, { product: 'Wire rod', qty: 285_000, unit: 't' }],

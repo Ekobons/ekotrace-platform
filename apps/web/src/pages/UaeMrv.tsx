@@ -57,7 +57,7 @@ export function UaeMrv() {
       {tab === 'overview' && <OverviewTab o={o} open={(id) => { const n = new URLSearchParams(sp); n.set('tab', 'facility'); n.set('f', id); setSp(n, { replace: true }); }} onAdd={() => setAdding(true)} />}
       {tab === 'facility' && (fid ? <FacilityTab key={`${fid}:${year}`} o={o} id={fid} year={year} pick={(x) => set('f', x)} onChanged={reload} />
         : <div className="card" style={{ padding: 24 }}><h3 style={{ marginTop: 0 }}>No reporting facility yet</h3><p className="muted">Add each facility that reports to EAD (or that you track for the federal report): its emirate, sector and EAD identifiers.</p>{o.canSetup && <button className="btn p" onClick={() => setAdding(true)}>+ Reporting facility</button>}</div>)}
-      {tab === 'federal' && <FederalTab key={year} o={o} onSaved={reload} />}
+      {tab === 'federal' && <FederalTab key={o.year} o={o} onSaved={reload} />}
       {adding && <FacilityDrawer o={o} f={null} onClose={() => setAdding(false)} onDone={(id) => { setAdding(false); if (id) { const n = new URLSearchParams(sp); n.set('tab', 'facility'); n.set('f', id); setSp(n, { replace: true }); } reload(); }} />}
     </div>);
 }
@@ -116,7 +116,7 @@ function FacilityTab({ o, id, year, pick, onChanged }: { o: Overview; id: string
   const R = d.result, locked = d.year.status === 'submitted' || d.year.status === 'verified';
   const fill = async () => {
     setBusy(true);
-    try { const r = await mrvApi.fromEntries(id, year); toast(`From entries: ${r.added} added, ${r.updated} refreshed${r.removed ? `, ${r.removed} removed` : ''}`); reload(); }
+    try { const r = await mrvApi.fromEntries(id, year); toast(`From entries: ${r.added} added, ${r.updated} refreshed${r.kept ? `, ${r.kept} kept on their own units` : ''}${r.removed ? `, ${r.removed} removed` : ''}${r.skipped ? `, ${r.skipped} you removed left out` : ''}`); reload(); }
     catch (e) { toast((e as Error).message); } finally { setBusy(false); }
   };
   const open = d.problems.length + R.streams.filter((x) => !x.ok).length;
@@ -137,7 +137,7 @@ function FacilityTab({ o, id, year, pick, onChanged }: { o: Overview; id: string
         <div className="card kpi"><span className="muted small">CO₂ and methane against 25,000 t</span><b>{t0(R.direct)} <small className="muted">t</small></b>
           <span className="muted small">{d.ead.text}</span></div>
         <div className="card kpi"><span className="muted small">Whole-facility uncertainty</span><b>{R.uncertainty == null ? '—' : `±${R.uncertainty.toFixed(1)}%`}</b>
-          <span className="muted small">From the streams' activity-data uncertainty{d.streams.some((x) => x.fallback) ? ' · fallback: at most ±7.5%' : ''}</span></div>
+          <span className="muted small">{R.uncertaintyComplete ? "From the streams' activity-data uncertainty" : 'Incomplete: some streams have no uncertainty'}{d.streams.some((x) => x.fallback) ? ' · fallback: at most ±7.5%' : ''}</span></div>
         <div className="card kpi"><span className="muted small">Checks</span><b>{open}</b><span className="muted small">{R.streams.filter((x) => x.ok).length} of {R.streams.length} streams complete</span></div>
       </div>
       {d.problems.length > 0 && <div className="note warn small" style={{ marginTop: 10 }}>{d.problems.map((p, i) => <div key={i}>{p}</div>)}</div>}
@@ -160,7 +160,7 @@ function StreamsView({ o, d, locked, onSaved }: { o: Overview; d: Detail; locked
   const R = new Map(d.result.streams.map((r) => [r.id, r]));
   const fuel = (c?: string | null) => o.fuels.find((f) => f.code === c);
   const total = d.result.total;
-  const save = async (list: Stream[]) => { await mrvApi.saveStreams(d.facility.id, d.year.year, list); onSaved(); };
+  const save = async (list: Stream[]) => { await mrvApi.saveStreams(d.facility.id, d.year.year, list, d.year.updatedAt); onSaved(); };
   return (
     <div className="card flush">
       <div className="row vfilters"><div className="grow"><b>Source streams</b>
@@ -174,7 +174,7 @@ function StreamsView({ o, d, locked, onSaved }: { o: Overview; d: Detail; locked
             const act = x.kind === 'measured' ? `${t2(x.measuredCo2)} t CO₂` : x.kind === 'gas' ? `${t2(x.gasT)} t ${x.gas ?? ''}` : `${t2(x.adQty)} ${x.adUnit ?? 't'}`;
             return (
               <tr key={x.id} className="click" style={{ cursor: 'pointer' }} onClick={() => setOpen(x)}>
-                <td style={{ minWidth: 220 }}><b>{x.name}</b><div className="muted small">{fuel(x.fuel)?.name ?? x.material ?? ''}{x.mobile ? ' · fleet' : ''}{x.entryKey ? ` · from ${x.entries ?? ''} entries` : ''}{x.fallback ? ' · fallback' : ''}</div></td>
+                <td style={{ minWidth: 220 }}><b>{x.name}</b><div className="muted small">{[fuel(x.fuel)?.name ?? x.material, x.mobile && 'fleet', x.entryKey && `from ${x.entries ?? 0} ${x.entries === 1 ? 'entry' : 'entries'}`, x.fallback && 'fallback'].filter(Boolean).join(' · ')}</div></td>
                 <td className="small">{KIND[x.kind]}</td><td className="num small">{act}</td><td className="num small">{r.tj == null ? '—' : t2(r.tj)}</td>
                 <td className="num"><b>{t0(r.co2e)}</b>{r.co2Bio > 0 && <div className="muted small">+{t0(r.co2Bio)} bio</div>}</td>
                 <td className="num small">{total ? `${((r.co2e / total) * 100).toFixed(1)}%` : '—'}</td>
@@ -197,7 +197,7 @@ function StreamDrawer({ o, d, st, locked, onClose, onSave, onRemove }: { o: Over
   useEffect(() => { dlg.current?.showModal(); }, []);
   const [f, setF] = useState({
     name: st?.name ?? '', kind: st?.kind ?? 'combustion' as Kind, fuel: st?.fuel ?? '', material: st?.material ?? '', mobile: !!st?.mobile, fallback: !!st?.fallback,
-    adQty: s(st?.adQty), adUnit: st?.adUnit ?? (st ? 't' : 'TJ'), density: s(st?.density), ncv: s(st?.ncv), ef: s(st?.ef), of: s(st?.of), carbon: s(st?.carbon), direction: st?.direction ?? 'input',
+    adQty: s(st?.adQty), adUnit: st?.adUnit ?? 't', addToFederal: !!st?.addToFederal, density: s(st?.density), ncv: s(st?.ncv), ef: s(st?.ef), of: s(st?.of), carbon: s(st?.carbon), direction: st?.direction ?? 'input',
     biomass: s(st?.biomass), ch4Ef: s(st?.ch4Ef), n2oEf: s(st?.n2oEf), measuredCo2: s(st?.measuredCo2), measuredCh4: s(st?.measuredCh4), gas: st?.gas ?? '', gasT: s(st?.gasT),
     uncertainty: s(st?.uncertainty), materiality: st?.materiality ?? '', instrument: st?.instrument ?? '', efSource: st?.efSource ?? '', note: st?.note ?? '', documentId: st?.documentId ?? '',
   });
@@ -209,7 +209,7 @@ function StreamDrawer({ o, d, st, locked, onClose, onSave, onRemove }: { o: Over
   const body = (): Stream => ({
     ...(st ?? {}), id: st?.id ?? `s${Date.now().toString(36)}`, name: f.name.trim(), kind: f.kind, fuel: f.fuel || null, material: f.material.trim() || null, mobile: f.mobile, fallback: f.fallback,
     adQty: parse(f.adQty), adUnit: f.adUnit as Stream['adUnit'], density: parse(f.density), ncv: parse(f.ncv), ef: parse(f.ef), of: parse(f.of), carbon: parse(f.carbon), direction: f.direction as 'input' | 'output',
-    biomass: parse(f.biomass), ch4Ef: parse(f.ch4Ef), n2oEf: parse(f.n2oEf), measuredCo2: parse(f.measuredCo2), measuredCh4: parse(f.measuredCh4), gas: f.gas || null, gasT: parse(f.gasT),
+    biomass: parse(f.biomass), ch4Ef: parse(f.ch4Ef), n2oEf: parse(f.n2oEf), measuredCo2: parse(f.measuredCo2), measuredCh4: parse(f.measuredCh4), gas: f.gas || null, gasT: parse(f.gasT), addToFederal: (f.kind === 'process' || f.kind === 'mass_balance') && f.addToFederal,
     uncertainty: parse(f.uncertainty), materiality: (f.materiality || null) as Materiality | null, instrument: f.instrument.trim(), efSource: f.efSource.trim(), note: f.note.trim(), documentId: f.documentId || null,
   });
   const go = async (fn: () => Promise<void>) => { try { await fn(); toast('Saved'); } catch (e) { toast((e as Error).message); } };
@@ -222,7 +222,7 @@ function StreamDrawer({ o, d, st, locked, onClose, onSave, onRemove }: { o: Over
       {st?.entryKey && <div className="note info small">Filled from {st.entries} approved inventory entries ({t2(st.entriesT)} tCO₂e there with the inventory's own factors). Refreshing updates the quantity and keeps what you set here.</div>}
       <fieldset className="vform plain" disabled={locked}>
         <label className="field span2"><span>Source stream</span><input className="input" value={f.name} placeholder="e.g. Natural gas to gas turbines GT1–GT3" onChange={(e) => up({ name: e.target.value })} /></label>
-        <label className="field"><span>Type</span><select className="input" value={f.kind} onChange={(e) => up({ kind: e.target.value as Kind })}>{(Object.keys(KIND) as Kind[]).map((k) => <option key={k} value={k}>{KIND[k]}</option>)}</select></label>
+        <label className="field"><span>Type</span><select className="input" value={f.kind} onChange={(e) => { const k = e.target.value as Kind; up({ kind: k, ...(k !== 'combustion' && (f.adUnit === 'TJ' || f.adUnit === 'kNm3') ? { adUnit: 't' as const } : {}) }); }}>{(Object.keys(KIND) as Kind[]).map((k) => <option key={k} value={k}>{KIND[k]}</option>)}</select></label>
         {f.kind === 'combustion' ? <label className="field"><span>Fuel (IPCC 2006 defaults)</span><select className="input" value={f.fuel} onChange={(e) => up({ fuel: e.target.value })}><option value="">— own factors —</option>{o.fuels.map((x) => <option key={x.code} value={x.code}>{x.name}</option>)}</select></label>
           : f.kind === 'gas' ? <label className="field"><span>Gas</span><select className="input" value={f.gas} onChange={(e) => up({ gas: e.target.value })}><option value="">—</option>{o.gases.map((g) => <option key={g.code} value={g.code}>{g.name}</option>)}</select></label>
             : <label className="field"><span>Material / source</span><input className="input" value={f.material} placeholder={f.kind === 'process' ? 'e.g. Limestone (CaCO₃)' : f.kind === 'mass_balance' ? 'e.g. Coking coal in, steel out' : 'e.g. Stack 2 (CEMS)'} onChange={(e) => up({ material: e.target.value })} /></label>}
@@ -246,6 +246,7 @@ function StreamDrawer({ o, d, st, locked, onClose, onSave, onRemove }: { o: Over
         <label className="field"><span>Class</span><select className="input" value={f.materiality} onChange={(e) => up({ materiality: e.target.value })}><option value="">Worked out from the totals</option>{(Object.keys(CLASS) as Materiality[]).map((k) => <option key={k} value={k}>{CLASS[k]}</option>)}</select></label>
         <label className="field"><span>Measuring instrument</span><input className="input" value={f.instrument} placeholder="e.g. Coriolis meter FT-201, calibrated 03/2025" onChange={(e) => up({ instrument: e.target.value })} /></label>
         <label className="field"><span>Factor source</span><input className="input" value={f.efSource} placeholder="IPCC 2006 default / supplier certificate / lab analysis" onChange={(e) => up({ efSource: e.target.value })} /></label>
+        {d.ekotrace && d.facility.nodeId && (f.kind === 'process' || f.kind === 'mass_balance') && <label className="row small chkline span2" style={{ gap: 6 }}><input type="checkbox" checked={f.addToFederal} onChange={(e) => up({ addToFederal: e.target.checked })} />Not in the inventory entries: add to the federal Scope 1 (leave off if the fuels or materials are already entered)</label>}
         {calc && <label className="row small chkline span2" style={{ gap: 6 }}><input type="checkbox" checked={f.fallback} onChange={(e) => up({ fallback: e.target.checked })} />Fallback approach: no tier is technically feasible or the cost is unreasonable (say why below)</label>}
         <label className="field span2"><span>Notes</span><textarea className="input" rows={2} value={f.note} onChange={(e) => up({ note: e.target.value })} /></label>
         <label className="field span2"><span>Evidence (Document vault)</span><select className="input" value={f.documentId} onChange={(e) => up({ documentId: e.target.value })}><option value="">None</option>{d.documents.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select></label>
@@ -449,7 +450,7 @@ function FederalTab({ o, onSaved }: { o: Overview; onSaved: () => void }) {
   return (
     <>
       <div className="kgrid4">
-        <div className="card kpi"><span className="muted small">Scope 1, {o.year}</span><b>{t0(F.s1)} <small className="muted">tCO₂e</small></b><span className="muted small">{F.source === 'entries' ? `Approved entries of UAE facilities${F.processOnly ? ` + ${t0(F.processOnly)} t process emissions from the facility reports` : ''}` : F.source === 'typed' ? 'Typed' : F.source === 'facilities' ? 'Sum of the facility reports' : 'No figures yet'}</span></div>
+        <div className="card kpi"><span className="muted small">Scope 1, {o.year}</span><b>{t0(F.s1)} <small className="muted">tCO₂e</small></b><span className="muted small">{F.source === 'entries' ? `Approved entries of UAE facilities${F.processOnly ? ` + ${t0(F.processOnly)} t process emissions from the facility reports` : ''}${F.unlinked ? ` + ${t0(F.unlinked)} t from facility reports not linked to the inventory` : ''}` : F.source === 'typed' ? 'Typed' : F.source === 'facilities' ? 'Sum of the facility reports' : 'No figures yet'}</span></div>
         <div className="card kpi"><span className="muted small">Scope 2 (location-based)</span><b>{t0(F.s2)} <small className="muted">tCO₂e</small></b><span className="muted small">Grid electricity, heat and cooling bought</span></div>
         <div className="card kpi"><span className="muted small">Scope 1 + 2 vs 0.5 Mt</span><b>{t0(F.total)}</b><span className="muted small">{F.large ? 'NRCC registration and annual verification required' : 'Below the NRCC threshold'}</span></div>
         <div className="card kpi"><span className="muted small">National MRV system (IEQT)</span><b style={{ fontSize: 18 }}>{({ not_started: 'Not started', registered: 'Registered', draft: 'Draft', submitted: 'Submitted', verified: 'Verified' } as Record<string, string>)[C.ieqtStatus]}</b><span className="muted small">{C.ieqtSubmitted ? `Submitted ${d8(C.ieqtSubmitted)}` : 'Organisation approved by the emirate focal point first'}</span></div>
