@@ -283,7 +283,7 @@ pre.code { background: #F4F7F5; border: 1px solid var(--line); border-radius: 10
 .mentry .el-n { font-size: 11.5px; fill: var(--muted); }
 
 @media print {
-  .side, .no-print, .toast { display: none !important; }
+  .side, .no-print, .toast, .mbar, .mback { display: none !important; }
   .main { margin: 0 !important; padding: 0 !important; }
   .manual .grid2 { display: block; }
   .mdoc { border: 0; box-shadow: none; padding: 0; max-width: none; }

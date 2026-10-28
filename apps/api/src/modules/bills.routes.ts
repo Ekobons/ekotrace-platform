@@ -71,6 +71,13 @@ export async function ocrIfScanned(buf: Buffer): Promise<OcrResult> {
   try { const t = await pdfText(new Uint8Array(buf)); if (!t.scanned) return null; return await ocrPdf(new Uint8Array(buf)); } catch (e) { return { error: (e as Error).message.slice(0, 160) }; }
 }
 
+/** Whether this file is already a bill of the same kind (electricity / water) in the company. */
+export async function isDuplicateBill(c: Tx, buf: Buffer, category?: string | null) {
+  const water = !!category && category.startsWith('water');
+  const r = await c.query(`SELECT 1 FROM document d JOIN bill b ON b.document_id = d.id WHERE d.sha256 = $1 AND (coalesce(b.category, '') LIKE 'water%') = $2 LIMIT 1`, [sha256(buf.toString('binary')), water]);
+  return !!r.rowCount;
+}
+
 export async function createBill(c: Tx, tenant: string, buf: Buffer, filename: string, by: string, category?: string | null, ocr: OcrResult = null): Promise<{ id: string; duplicate: boolean }> {
   if (buf.subarray(0, 5).toString('latin1') !== '%PDF-') throw new AppError('This is not a PDF file');
   const hash = sha256(buf.toString('binary'));
@@ -189,7 +196,9 @@ export async function billRoutes(app: FastifyInstance) {
     if (buf.subarray(0, 5).toString('latin1') !== '%PDF-') throw new AppError('This is not a PDF file');
     const filename = decodeURIComponent(String(req.headers['x-filename'] ?? 'bill.pdf')).replace(/[^\w.\- ()]/g, '_').slice(0, 160);
     const category = req.headers['x-category'] ? z.string().regex(/^[a-z_]{3,40}$/).parse(String(req.headers['x-category'])) : null;
-    const ocr = await ocrIfScanned(buf);
+    // OCR (seconds) before the transaction, and only for a file not uploaded before
+    const dup = await tenantTx(tenant, (c) => isDuplicateBill(c, buf, category));
+    const ocr = dup ? null : await ocrIfScanned(buf);
     return tenantTx(tenant, async (c) => {
       const r = await createBill(c, tenant, buf, filename, req.user.id, category, ocr);
       if (!r.duplicate) {

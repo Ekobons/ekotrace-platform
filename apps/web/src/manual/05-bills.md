@@ -86,7 +86,7 @@ A PDF that is a scan (an image of the page, no text) is read with **optical char
 
 - The bill is marked **OCR** with the average word confidence, and the review says so: **check every figure against the preview** before “Checked — add to preview”. Low-quality scans, photos at an angle or handwriting may be misread or not read at all.
 - If OCR cannot read the page, or it is switched off on the server (setting `OCR=off`), the scan is flagged and the figures are typed from the preview, as before.
-- Reading takes a few seconds per page; one scan is read at a time.
+- Reading takes a few seconds per page. It runs in a separate process with a memory limit, one scan at a time, and is stopped after 90 seconds; a PDF holding an image too large to read safely is not decoded. When several scans are waiting, a further one is flagged for typing (“OCR is busy”) rather than kept waiting.
 
 ## AI reading
 

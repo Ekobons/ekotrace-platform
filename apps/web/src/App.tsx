@@ -250,7 +250,15 @@ function Shell() {
   // phones and small tablets: the menu slides in from a button in the top bar and closes when a page is chosen
   const [navOpen, setNavOpen] = useState(false);
   useEffect(() => { setNavOpen(false); }, [path]);
-  useEffect(() => { if (!navOpen) return; const k = (e: KeyboardEvent) => { if (e.key === 'Escape') setNavOpen(false); }; window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k); }, [navOpen]);
+  // while open: Escape closes it, focus moves into it (and back to the menu button after), the page behind does not scroll
+  useEffect(() => {
+    if (!navOpen) return;
+    const k = (e: KeyboardEvent) => { if (e.key === 'Escape') setNavOpen(false); };
+    window.addEventListener('keydown', k);
+    const prev = document.body.style.overflow; document.body.style.overflow = 'hidden';
+    (document.querySelector('#sidenav .mclose') as HTMLElement | null)?.focus();
+    return () => { window.removeEventListener('keydown', k); document.body.style.overflow = prev; (document.querySelector('.mbar .mbtn') as HTMLElement | null)?.focus(); };
+  }, [navOpen]);
   // the products this company has (EKOTRACE, EKOFIN or both) and the one being used, kept on this browser
   // packages the company has; with EKOTRACE, India CCTS and BRSR Core live in its Disclose menu rather than as workspaces
   const owned: Product[] = (tenant?.products?.length ? tenant.products : ['ekotrace']) as Product[];
@@ -314,7 +322,8 @@ function Shell() {
         <BrandMark /><b className="mtitle">{tenant?.name ?? BRAND.name}</b>
       </header>
       {navOpen && <div className="mback" onClick={() => setNavOpen(false)} aria-hidden="true" />}
-      <aside className="side" id="sidenav" aria-label="Menu">
+      <aside className="side" id="sidenav" aria-label="Menu" inert={small && !navOpen}
+        onClick={(e) => { if (small && (e.target as Element).closest('a')) setNavOpen(false); }}>
         <button type="button" className="mclose" onClick={() => setNavOpen(false)} aria-label="Close the menu">✕</button>
         <div className="brand"><BrandMark /><div className="bt"><b>{BRAND.name}</b><small>{BRAND.tagline}</small></div>
           <button type="button" className="minibtn" onClick={toggleMini} aria-label={mini ? 'Expand the menu' : 'Collapse the menu'} title={mini ? 'Expand the menu' : 'Collapse the menu'}>{mini ? '»' : '«'}</button></div>

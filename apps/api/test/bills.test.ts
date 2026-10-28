@@ -78,3 +78,16 @@ test('scanned bill: no text, read by OCR on the server, then the same reader fin
     assert.equal(r.amount?.value, 19240.5);
   } finally { await stopOcr(); }
 });
+
+test('OCR is kept apart: a job past its time is stopped and the next one still runs; the queue is short', async () => {
+  const scan = await makeScanPdf(SAMPLE_ELECTRICITY);
+  try {
+    await assert.rejects(ocrPdf(scan, 4, 30), /too long/);                       // killed, not left running
+    const ok = await ocrPdf(scan);                                               // a fresh OCR process
+    assert.equal(readBill(ok.text).quantity?.value, 45500);
+    const jobs = [0, 1, 2, 3, 4].map(() => ocrPdf(scan).then(() => 'ok', (e: Error) => e.message));
+    const out = await Promise.all(jobs);
+    assert.ok(out.some((x) => /busy/.test(x)), out.join(' | '));                 // more than three waiting: told to try later
+    assert.ok(out.filter((x) => x === 'ok').length >= 3);
+  } finally { await stopOcr(); }
+});

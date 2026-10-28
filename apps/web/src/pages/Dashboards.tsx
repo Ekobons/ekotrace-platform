@@ -21,7 +21,7 @@ import { Bars, DCard, Donut, Dot, DStat, HBars, Legend, MN, PAL, SC, Treemap, fm
 import { CONS, S, ViewBar, pc, range, signPct, sum, tot, useView, type Ctx, type Data, type Row } from '../components/ViewBar';
 
 /** Opening the entries behind a figure: Entries & results filtered to the same year, period, facilities and status. */
-type Drill = { cats?: string[]; fac?: string; m?: number; scope?: number; item?: string; wtt?: boolean; label: string };
+type Drill = { cats?: string[]; fid?: string; m?: number; scope?: number; items?: string[]; wtt?: boolean; label: string };
 const DrillCtx = createContext<(o: Drill) => void>(() => {});
 const useDrill = () => useContext(DrillCtx);
 const pad2 = (m: number) => String(m).padStart(2, '0');
@@ -37,14 +37,19 @@ export function Dashboards() {
   const drill = (o: Drill) => {
     if (!d || !c) return;
     const q = new URLSearchParams({ y: String(d.year) });
-    if (o.m) q.set('m', `${d.year}-${pad2(o.m)}`);
-    else if (c.months.length && c.months.length < 12) { q.set('mfrom', `${d.year}-${pad2(c.months[0]!)}`); q.set('mto', `${d.year}-${pad2(c.months[c.months.length - 1]!)}`); }
-    if (o.fac) q.set('fac', o.fac); else if (v.kind !== 'COMPANY') q.set('facs', d.facilities.map((f) => f.name).join('|'));
+    // the dashboard's month rule: an entry under 40 days counts in the month it starts; a longer one only in the full-year view
+    const ms = o.m ? [o.m] : c.months;
+    q.set('dm', ms.join(','));
+    q.set('whole', !o.m && c.ytd && c.nMax === 12 ? '1' : '0');
+    // facilities by id: the view's, without those the consolidation leaves out (weight 0)
+    const fids = o.fid ? [o.fid] : d.facilities.filter((f) => f.weight > 0).map((f) => f.id);
+    if (o.fid || v.kind !== 'COMPANY' || fids.length < d.facilities.length) q.set('fids', fids.join(','));
+    if (d.consolidation === 'equity') q.set('cons', 'equity');
     if (o.cats?.length) q.set('cats', o.cats.join('|'));
     if (o.scope) q.set('scope', String(o.scope));
-    if (o.item) q.set('item', o.item);
+    if (o.items?.length) q.set('items', o.items.join('|'));
     if (o.wtt) q.set('wtt', '1');
-    if (!pend) q.set('status', 'approved');
+    q.set('status', pend ? 'counted' : 'approved');
     q.set('from', `${o.label} · ${name}`);
     nav(`/entries?${q}`);
   };
@@ -110,15 +115,15 @@ const SHADE: Record<1 | 2 | 3, string[]> = { 1: ['#0E4F3F', '#1F6F5C', '#3E8B76'
 /** Every source with its scope (well-to-tank and grid losses are their own Scope 3 source). */
 const WTT = 'Fuel- and energy-related (well-to-tank, grid losses)';
 function sources(c: Ctx) {
-  const m = new Map<string, { n: string; v: number; s: 1 | 2 | 3; cats: Set<string>; group: boolean }>();
-  const add = (n: string, s: 1 | 2 | 3, v: number, r: Row) => { if (!v) return; const k = `${s}|${n}`; const o = m.get(k) ?? { n, v: 0, s, cats: new Set<string>(), group: n !== r.item }; o.v += v; o.cats.add(r.cat); m.set(k, o); };
+  const m = new Map<string, { n: string; v: number; s: 1 | 2 | 3; cats: Set<string>; items: Set<string>; group: boolean }>();
+  const add = (n: string, s: 1 | 2 | 3, v: number, r: Row) => { if (!v) return; const k = `${s}|${n}`; const o = m.get(k) ?? { n, v: 0, s, cats: new Set<string>(), items: new Set<string>(), group: n !== r.item }; o.v += v; o.cats.add(r.cat); o.items.add(r.item); m.set(k, o); };
   for (const r of c.cur) { const n = sourceOf(r); add(n, 1, r.s1, r); add(n, 2, r.s2, r); add(n, 3, r.s3, r); add(WTT, 3, r.s33, r); }
   const used = { 1: 0, 2: 0, 3: 0 };
-  return [...m.values()].filter((x) => x.v > 0).sort((a, b) => b.v - a.v).map((x) => ({ n: x.n, v: x.v, s: x.s, cats: [...x.cats], group: x.group, c: SHADE[x.s][used[x.s]++ % SHADE[x.s].length]! }));
+  return [...m.values()].filter((x) => x.v > 0).sort((a, b) => b.v - a.v).map((x) => ({ n: x.n, v: x.v, s: x.s, cats: [...x.cats], items: [...x.items], group: x.group, c: SHADE[x.s][used[x.s]++ % SHADE[x.s].length]! }));
 }
 /** What opening a source shows: its item (purchases: the spend categories behind the group), or the entries with upstream energy emissions. */
-const srcDrill = (t: { n: string; s: number; cats: string[]; group: boolean }): Drill =>
-  t.n === WTT ? { wtt: true, label: t.n } : t.group ? { cats: t.cats, label: t.n } : { item: t.n, cats: t.cats, label: t.n };
+const srcDrill = (t: { n: string; s: number; cats: string[]; items: string[] }): Drill =>
+  t.n === WTT ? { wtt: true, label: t.n } : { items: t.items, cats: t.cats, scope: t.s, label: t.n };
 /** The categories behind a GHG Protocol code ('3.3' is the upstream energy part of fuel and energy entries). */
 const codeDrill = (d: Data, k: string, label: string): Drill | null => {
   if (k === '3.3') return { wtt: true, label };
@@ -263,7 +268,7 @@ function Facilities({ d, c, pick }: { d: Data; c: Ctx; pick: (id: string) => voi
         <div className="scrollx"><table className="t dt"><thead><tr><th>Facility</th>{MN.map((m) => <th key={m} className="num">{m}</th>)}</tr></thead>
           <tbody>{rows.map((x) => <tr key={x.f.id}><td className="nowrap"><b>{x.f.name}</b></td>{MN.map((_, i) => { const m = i + 1; if (!c.months.includes(m)) return <td key={i} />;
             const v = cell(x.f.id, m), wt = c.waiting.has(`${x.f.id}|${m}`), has = c.filled.has(`${x.f.id}|${m}`);
-            return <td key={i} className={`num hm${v ? ' drill' : ''}`} onClick={v ? () => drill({ fac: x.f.name, m, label: `${x.f.name} · ${MN[m - 1]}` }) : undefined} title={!has ? 'No data yet' : wt ? 'Entries waiting for approval' : 'Approved — click to open the entries'} style={{ background: v ? `color-mix(in srgb, var(--primary) ${Math.round(8 + (v / mx) * 62)}%, transparent)` : 'transparent', ...(wt || !has ? { outline: '1.5px dashed var(--warn)', outlineOffset: -3 } : {}) }}>{v ? fmtT(v) : '—'}</td>; })}</tr>)}</tbody></table></div>
+            return <td key={i} className={`num hm${v ? ' drill' : ''}`} onClick={v ? () => drill({ fid: x.f.id, m, label: `${x.f.name} · ${MN[m - 1]}` }) : undefined} title={!has ? 'No data yet' : wt ? 'Entries waiting for approval' : 'Approved — click to open the entries'} style={{ background: v ? `color-mix(in srgb, var(--primary) ${Math.round(8 + (v / mx) * 62)}%, transparent)` : 'transparent', ...(wt || !has ? { outline: '1.5px dashed var(--warn)', outlineOffset: -3 } : {}) }}>{v ? fmtT(v) : '—'}</td>; })}</tr>)}</tbody></table></div>
         <div className="muted" style={{ fontSize: 11.5 }}>Dashed outline = month not fully approved, or no data yet.</div>
       </DCard>
     </div>
