@@ -21,6 +21,7 @@
     "demo:ccts": "tsx src/cli/demoCcts.ts",
     "demo:brsr": "tsx src/cli/demoBrsr.ts",
     "demo:uaemrv": "tsx src/cli/demoUaeMrv.ts",
+    "demo:energy": "tsx src/cli/demoEnergy.ts",
     "testfiles": "tsx src/cli/makeTestFiles.ts"
   },
   "dependencies": {

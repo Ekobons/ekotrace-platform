@@ -147,3 +147,19 @@
 | NCV | net calorific value: the energy in a fuel, in TJ per tonne or per thousand Nm³ |
 | Oxidation factor | the share of a fuel's carbon that burns to CO₂ (1 unless shown otherwise) |
 
+## Energy management
+
+| Term | Meaning |
+|---|---|
+| IPMVP | International Performance Measurement and Verification Protocol: options A–D for measuring savings |
+| M&V | measurement and verification of energy savings |
+| Baseline model | the equation fitted on the baseline year that says what a site would use under given conditions |
+| Avoided energy | expected (adjusted baseline) minus actual energy |
+| CUSUM | cumulative sum of the avoided energy month by month |
+| CV(RMSE) | coefficient of variation of the root-mean-square error: how far the model's months stray from the actual, as % of the mean |
+| NMBE | normalised mean bias error: whether the model over- or under-predicts on average |
+| Degree days (CDD, HDD) | how much and how long the outdoor temperature is above (cooling) or below (heating) a base temperature |
+| EnPI | energy performance indicator (ISO 50001 / 50006), e.g. kWh per m² or per tonne |
+| SEU | significant energy use: a use with substantial energy or potential to save (ISO 50001) |
+| EUI | energy use intensity: kWh per m² of floor area a year |
+

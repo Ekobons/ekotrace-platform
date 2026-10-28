@@ -51,6 +51,7 @@ npm run demo              # add "-- --reset" to delete the demo company and crea
 npm run demo:ccts         # optional: India CCTS demo (an Indian cement works and spinning mill, invented figures)
 npm run demo:brsr         # optional: SEBI BRSR Core demo (an Indian listed auto-components maker, invented figures)
 npm run demo:uaemrv       # optional: UAE MRV demo (an Abu Dhabi steel maker: EAD facility report and federal figures, invented)
+npm run demo:energy       # optional: Energy management demo (UAE cold store, office tower, hotel, bakery: baselines and savings, invented)
 
 # 5. Start (builds the screens and starts everything)
 npm run app
