@@ -15,7 +15,7 @@ export interface Profile {
 export interface Regulation { code: string; name: string; jurisdiction: string; authority: string; source: string; summary: string; applies: Applies; reason: string; counts: { total: number; done: number; overdue: number; open: number } }
 export interface Obligation {
   reg: string; obligation: string; period: number; label: string; title: string; detail: string; due: string | null; dueNote: string | null; moved: boolean;
-  status: Status; setStatus: Exclude<Status, 'overdue'> | null; source: 'set' | 'module' | 'none'; autoNote: string | null; owner: string | null; note: string; documentId: string | null; doneOn: string | null;
+  status: Status; setStatus: Exclude<Status, 'overdue'> | null; source: 'set' | 'module' | 'none'; autoStatus: Exclude<Status, 'overdue'> | null; autoNote: string | null; voluntary: boolean; owner: string | null; note: string; documentId: string | null; doneOn: string | null;
   penalty: string | null; module: { route: string; label: string } | null; applies: Applies; updatedName: string | null;
   custom?: { id: string; regulation: string; jurisdiction: string; recurrence: 'once' | 'annual'; firstDue: string; owner: string | null };
 }

@@ -14,6 +14,9 @@ const d8 = (x: string | null | undefined) => (x ? new Date(`${x.slice(0, 10)}T00
 const APPLIES: Record<Applies, [string, string]> = { applies: ['warn', 'Applies'], may_apply: ['info', 'May apply'], not_applicable: ['grey', 'Does not apply'] };
 const STATUS: Record<Status, [string, string]> = { not_started: ['grey', 'Not started'], in_progress: ['info', 'In progress'], done: ['', 'Done'], not_applicable: ['grey', 'Not applicable'], overdue: ['bad', 'Overdue'] };
 const MON = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+/** A module link only when the company has the package behind it. */
+const NEED: [string, string[]][] = [['/brsr', ['brsr']], ['/ccts', ['ccts']], ['/uae-mrv', ['uaemrv']], ['/cbam', ['ekotrace', 'cbam']], ['/vault', []]];
+const linkOf = (o: Obligation, products: string[]) => { if (!o.module) return null; const n = NEED.find(([r]) => o.module!.route.startsWith(r)); const need = n ? n[1] : ['ekotrace']; return !need.length || need.some((x) => products.includes(x)) ? o.module : null; };
 const daysTo = (due: string, today: string) => Math.round((new Date(`${due}T00:00:00Z`).getTime() - new Date(`${today}T00:00:00Z`).getTime()) / 86_400_000);
 
 export function ComplianceDesk() {
@@ -104,7 +107,7 @@ function Obligations({ d, filter, clear, open, onCustom }: { d: Desk; filter: st
               <td className="small nowrap">{o.label}</td>
               <td className="ctr"><span className={`chip ${STATUS[o.status][0]}`} title={o.source === 'module' ? 'Read from the module' : o.updatedName ? `Set by ${o.updatedName}` : undefined}>{STATUS[o.status][1]}{o.source === 'module' ? ' ·auto' : ''}</span></td>
               <td className="small">{o.owner ?? '—'}</td>
-              <td className="small" onClick={(e) => e.stopPropagation()}>{o.module ? <Link to={o.module.route}>{o.module.label} →</Link> : '—'}</td></tr>))}</tbody>
+              <td className="small" onClick={(e) => e.stopPropagation()}>{linkOf(o, d.products) ? <Link to={o.module!.route}>{o.module!.label} →</Link> : '—'}</td></tr>))}</tbody>
         </table></div>)}
     </div>);
 }
@@ -132,15 +135,16 @@ function StatusDrawer({ d, o, onClose, onDone, onEditCustom }: { d: Desk; o: Obl
   const { toast } = useApp();
   const dlg = useRef<HTMLDialogElement>(null);
   useEffect(() => { dlg.current?.showModal(); }, []);
-  const set0 = o.source === 'set';
-  const [f, setF] = useState({ status: set0 && o.setStatus && (o.setStatus !== 'not_started' || o.source === 'module') ? o.setStatus : '', owner: o.owner ?? '', note: o.note, documentId: o.documentId ?? '', doneOn: o.doneOn ?? '', dueOverride: o.moved ? o.due ?? '' : '' });
+  const auto = o.autoStatus != null;
+  const [f, setF] = useState({ status: o.setStatus && (o.setStatus !== 'not_started' || auto) ? o.setStatus : '', owner: o.owner ?? '', note: o.note, documentId: o.documentId ?? '', doneOn: o.doneOn ?? '', dueOverride: o.moved ? o.due ?? '' : '' });
   const up = (x: Partial<typeof f>) => setF((v) => ({ ...v, ...x }));
   const R = d.regulations.find((r) => r.code === o.reg);
   const ok = (f.status !== 'done' || f.doneOn) && (f.status !== 'not_applicable' || f.note.trim()) && (!f.dueOverride || f.note.trim());
   const save = async (clear = false) => {
     try {
-      await cpApi.status(clear ? { reg: o.reg, obligation: o.obligation, period: o.period, status: null, owner: null, note: '', documentId: null, doneOn: null, dueOverride: null }
-        : { reg: o.reg, obligation: o.obligation, period: o.period, status: (f.status || null) as Exclude<Status, 'overdue'> | null, owner: f.owner.trim() || null, note: f.note.trim(), documentId: f.documentId || null, doneOn: f.doneOn || null, dueOverride: f.dueOverride || null });
+      // without a status chosen, the row keeps owner, note and evidence and the status follows the module; Clear drops only the status
+      const st = clear ? null : (f.status || null) as Exclude<Status, 'overdue'> | null;
+      await cpApi.status({ reg: o.reg, obligation: o.obligation, period: o.period, status: st, owner: f.owner.trim() || null, note: f.note.trim(), documentId: f.documentId || null, doneOn: st === 'done' ? f.doneOn || null : null, dueOverride: f.dueOverride || null });
       toast('Saved'); onDone();
     } catch (e) { toast((e as Error).message); }
   };
@@ -148,18 +152,19 @@ function StatusDrawer({ d, o, onClose, onDone, onEditCustom }: { d: Desk; o: Obl
     <dialog ref={dlg} className="drawer" onClose={onClose}><div className="in">
       <div className="row"><div className="grow"><div className="eyebrow">{R?.name ?? o.custom?.regulation ?? 'Own obligation'} · {o.label}</div><h2>{o.title}</h2></div><button className="btn ghost" onClick={() => dlg.current?.close()} aria-label="Close"><Icon name="x" /></button></div>
       <div className="note info small">{o.detail}{o.due ? ` Due ${d8(o.due)}.` : ''}{o.dueNote ? ` ${o.dueNote}.` : ''}{o.penalty ? ` Penalty: ${o.penalty}.` : ''}</div>
-      {o.source === 'module' && <div className="note small">Status read from the module: <b>{STATUS[o.status][1]}</b>{o.autoNote ? ` — ${o.autoNote}` : ''}. Setting a status here takes over from it.</div>}
-      {o.module && <div className="small" style={{ margin: '6px 0' }}><Link to={o.module.route}>Open {o.module.label} →</Link></div>}
+      {auto && <div className="note small">The module says: <b>{STATUS[o.autoStatus!][1]}</b>{o.autoNote ? ` — ${o.autoNote}` : ''}.{o.source === 'set' ? ' A status set here is used instead; Clear goes back to the module.' : ' A status set here takes over from it.'}</div>}
+      {(o.applies === 'may_apply' || o.voluntary) && <div className="note small">{o.voluntary ? 'Recommended or voluntary' : 'The regulation may apply: complete the company profile'} — not shown as overdue.</div>}
+      {linkOf(o, d.products) && <div className="small" style={{ margin: '6px 0' }}><Link to={o.module!.route}>Open {o.module!.label} →</Link></div>}
       <fieldset className="vform plain" disabled={!d.canEdit}>
         <label className="field"><span>Status</span><select className="input" value={f.status} onChange={(e) => up({ status: e.target.value })}>
-          <option value="">{o.source === 'module' ? 'As the module says' : 'Not started'}</option><option value="in_progress">In progress</option><option value="done">Done</option><option value="not_applicable">Not applicable</option>{o.autoNote != null || o.source === 'module' ? <option value="not_started">Not started</option> : null}</select></label>
+          <option value="">{auto ? 'As the module says' : 'Not started'}</option><option value="in_progress">In progress</option><option value="done">Done</option><option value="not_applicable">Not applicable</option>{auto ? <option value="not_started">Not started</option> : null}</select></label>
         <label className="field"><span>Owner</span><input className="input" value={f.owner} onChange={(e) => up({ owner: e.target.value })} /></label>
         {f.status === 'done' && <label className="field"><span>Completed on</span><input type="date" className="input" value={f.doneOn} onChange={(e) => up({ doneOn: e.target.value })} /></label>}
         <label className="field"><span>Date moved to (extension)</span><input type="date" className="input" value={f.dueOverride} onChange={(e) => up({ dueOverride: e.target.value })} /></label>
         <label className="field span2"><span>Note{f.status === 'not_applicable' ? ' — why it does not apply' : f.dueOverride ? ' — why the date moved' : ''}</span><textarea className="input" rows={3} value={f.note} onChange={(e) => up({ note: e.target.value })} /></label>
         <label className="field span2"><span>Evidence (Document vault)</span><select className="input" value={f.documentId} onChange={(e) => up({ documentId: e.target.value })}><option value="">None</option>{d.documents.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select></label>
       </fieldset>
-      <div className="row">{o.custom && d.canEdit && <button className="btn" onClick={onEditCustom}>Edit obligation</button>}{o.source === 'set' && d.canEdit && <button className="btn" onClick={() => save(true)}>Clear</button>}<span className="grow" />
+      <div className="row">{o.custom && d.canEdit && <button className="btn" onClick={onEditCustom}>Edit obligation</button>}{o.setStatus && auto && d.canEdit && <button className="btn" onClick={() => save(true)}>Clear</button>}<span className="grow" />
         <button className="btn" onClick={() => dlg.current?.close()}>Cancel</button>{d.canEdit && <button className="btn p" disabled={!ok} onClick={() => save()}>Save</button>}</div>
     </div></dialog>);
 }
@@ -196,7 +201,8 @@ function ProfileDrawer({ d, onClose, onDone }: { d: Desk; onClose: () => void; o
   const dlg = useRef<HTMLDialogElement>(null);
   useEffect(() => { dlg.current?.showModal(); }, []);
   const S = d.stored, F = d.facts;
-  const [p, setP] = useState<Profile>({ ...d.profile, countries: (S.countries ?? []) as string[] });
+  // start from what people typed: facts the modules know stay empty here (shown as hints) so they keep following the modules
+  const [p, setP] = useState<Profile>({ ...d.profile, countries: (S.countries ?? []) as string[], cctsObligated: S.cctsObligated ?? null, cbamExporter: S.cbamExporter ?? null, eadFacility: S.eadFacility ?? null, uaeDesignated: S.uaeDesignated ?? 'unknown' });
   const [n, setN] = useState({ employees: S.employees ?? '', turnoverEur: S.turnoverEur ?? '', euTurnoverEur: S.euTurnoverEur ?? '', euSubsidiaryTurnoverEur: S.euSubsidiaryTurnoverEur ?? '', cbamImportTonnes: S.cbamImportTonnes ?? '', uaeScope12: S.uaeScope12 ?? '', usRevenueUsd: S.usRevenueUsd ?? '', countries: (S.countries ?? []).join(', ') } as Record<string, string | number>);
   const up = (x: Partial<Profile>) => setP((v) => ({ ...v, ...x }));
   const num = (k: string) => { const v = String(n[k] ?? '').replace(/,/g, '').trim(); return v === '' ? null : Number(v); };

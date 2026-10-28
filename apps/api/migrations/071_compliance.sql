@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS cp_status (
   reg           text NOT NULL CHECK (reg ~ '^[a-z0-9_:-]{2,60}$'),
   obligation    text NOT NULL CHECK (obligation ~ '^[a-z0-9_-]{1,40}$'),
   period        int NOT NULL CHECK (period BETWEEN 2000 AND 2100),
-  status        text NOT NULL CHECK (status IN ('not_started', 'in_progress', 'done', 'not_applicable')),
+  status        text CHECK (status IN ('not_started', 'in_progress', 'done', 'not_applicable')),   -- null: as the module says
   owner         text CHECK (owner IS NULL OR length(owner) <= 120),
   note          text NOT NULL DEFAULT '' CHECK (length(note) <= 2000),
   document_id   uuid REFERENCES document(id) ON DELETE SET NULL,

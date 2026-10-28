@@ -31,9 +31,9 @@ The Compliance desk is a **package of its own**, switched on per company by the 
 |---|---|
 | Countries of operation | the company's country and its facilities' countries (any EU member state adds *EU*) |
 | Obligated under India CCTS | entities in India CCTS |
-| CBAM goods imported, tonnes | the latest year of CBAM imports |
-| Sells CBAM goods to EU buyers | CBAM communications sent to importers |
-| UAE designated, Abu Dhabi facility | UAE MRV federal position and facilities |
+| CBAM goods imported, tonnes | CBAM imports of the last full year (the current year to date when there is none), without electricity and hydrogen, which are outside the 50-tonne threshold |
+| Sells CBAM goods to EU buyers | CBAM communications finalised or sent to importers |
+| UAE designated, Abu Dhabi facility | UAE MRV federal position; an Abu Dhabi facility in a covered sector (the 25,000 t threshold is not checked: answer *No* if it is below) |
 
 The rest is typed: financial year end, employees and turnover, EU turnover and the largest EU subsidiary, listing (and the India rank or SGX index), US revenue and California business, the Australian group, UK quoted or large.
 
@@ -42,18 +42,20 @@ The rest is typed: financial year end, employees and turnover, EU turnover and t
 | Regulation | Applies when | Main deadlines |
 |---|---|---|
 | EU CSRD (after Omnibus I) | EU company: more than 1,000 employees and more than €450m turnover; non-EU group: more than €450m EU turnover and an EU subsidiary or branch above €200m | statement with the management report (about 4 months after year end); FY2027 for EU companies, FY2028 for non-EU groups |
-| EU CBAM — importer | more than 50 t of CBAM goods imported a year | authorised declarant status (31 March 2026); declaration and surrender on 30 September of the next year |
+| EU CBAM — importer | more than 50 t of CBAM goods imported a year | authorised declarant status (31 March 2026); certificates for 50% of embedded emissions at each quarter end from 2027; declaration and surrender on 30 September of the next year |
 | EU CBAM — producer | sells CBAM goods to EU importers | embedded emissions to importers and verification (recommended timing) |
 | SEBI BRSR and BRSR Core | listed in India, top 1,000 | with the annual report (31 August for a March year end); Core assurance from top 150 FY2023-24 to top 1,000 FY2026-27 |
 | India CCTS | obligated entities | monitoring plan by 30 June; Form A by 31 July |
 | UAE federal (Decree-Law 11 of 2024) | designated sources, or Scope 1 + 2 in the UAE of 0.5 MtCO₂e or more | IEQT report: adjustment period to 31 May 2027; NRCC at 0.5 MtCO₂e and above; records for 5 years |
 | Abu Dhabi facility MRV (EAD) | Abu Dhabi facility of 25,000 t or more in a covered sector | registration and monitoring plan 31 March; verification notice 1 July; report 31 March of the next year |
 | Singapore (SGX) | listed on SGX | Scope 1 and 2 from FY2025; IFRS S2 FY2025 (STI), FY2028 (S$1bn or more), FY2030 (others); assurance from FY2029 |
-| Australia (AASB S2) | Group 1, 2 or 3 | with the annual report; Group 1 from 2025, Group 2 from 2027, Group 3 from 2028 |
+| Australia (AASB S2) | Group 1, 2 or 3 | with the annual report (3 months after year end for ASX-listed, 4 months for others); years starting from 1 January 2025 (Group 1), 1 July 2026 (Group 2), 1 July 2027 (Group 3) |
 | California SB 253 | US entity with more than US$1bn revenue doing business in California | Scope 1 and 2 by 10 November 2026; later dates set by CARB |
 | UK SECR | UK quoted company, or large unquoted company or LLP | with the accounts: 6 months (public) or 9 months (private) after year end |
 
-A regulation shows **may apply** when a fact it needs is missing from the profile. Its obligations are listed, marked *may apply*, until the profile settles it. Dates the authority has not set yet show *not set* with a note, and appear under **No date set yet** on the calendar.
+The first year of a regime counts from the **first financial year starting on or after** its start date, so a June or March year end begins a year later than a December one (CSRD, SGX, AASB S2).
+
+A regulation shows **may apply** when a fact it needs is missing from the profile. Its obligations are listed, marked *may apply*, until the profile settles it; they are never shown as overdue. Recommended or voluntary steps (CBAM verification and communications for producers, value-chain BRSR Core) are never overdue either. Dates the authority has not set yet show *not set* with a note, and appear under **No date set yet** on the calendar.
 
 ## Status
 
@@ -74,7 +76,7 @@ Statuses read from the modules carry **·auto**:
 | EAD report, verification notice, monitoring plan | UAE MRV: done when every Abu Dhabi facility has it |
 | India CCTS Form A | India CCTS: months entered is in progress |
 
-A status set by a person takes over from the module. **Clear** goes back to the module's status. **Date moved to** records an extension; it needs a note, and the moved date is used for overdue and on the calendar. Link the evidence (a filing receipt, a letter) from the Document vault.
+A status set by a person takes over from the module. Saving an owner, a note or evidence without choosing a status (*As the module says*) keeps the module's status. **Clear** drops the status set by a person and goes back to the module's, keeping the owner, note and evidence. **Date moved to** records an extension; it needs a note, and the moved date is used for overdue and on the calendar. Link the evidence (a filing receipt, a letter) from the Document vault.
 
 ## The year
 
@@ -82,7 +84,7 @@ The year shows the obligations **due in that year**, and those due in the previo
 
 ## Own obligations
 
-**+ Own obligation** adds anything the library does not hold: an environmental permit renewal, a local regulation, a lender's covenant, a CDP response, an SBTi commitment. It is due once, or every year on the same day.
+**+ Own obligation** adds anything the library does not hold: an environmental permit renewal, a local regulation, a lender's covenant, a CDP response, an SBTi commitment. It is due once, or every year on the same day (29 February falls on 28 February in other years). An annual one left open is carried into the next year like any other.
 
 ## Downloads
 

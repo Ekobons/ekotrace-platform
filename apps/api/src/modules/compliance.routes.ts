@@ -16,15 +16,15 @@ import { z } from 'zod';
 import { tenantTx, type Tx } from '../db/pool.js';
 import { audit, requireRole, requireTenant } from '../lib/auth.js';
 import { AppError, notFound } from '../lib/errors.js';
-import { PRODUCT } from '../lib/brand.js';
+import { PRODUCT, PRODUCT_SLUG } from '../lib/brand.js';
 import { sendWorkbook, styleHeader } from '../lib/xlsx.js';
 import { needProduct, productsOf } from '../lib/products.js';
-import { DEFAULT_PROFILE, REGULATION, REGULATIONS, effective, instances, type Applies, type Profile, type Status } from '../lib/compliance.js';
+import { DEFAULT_PROFILE, REGULATION, REGULATIONS, effective, instances, sameDay, type Applies, type Profile, type Status } from '../lib/compliance.js';
 
 const uuid = z.string().uuid();
 const YEAR = z.coerce.number().int().min(2020).max(2100);
 const iso = (d: unknown) => (d == null ? null : d instanceof Date ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` : String(d).slice(0, 10));
-const date = z.string().regex(/^(20\d\d|2100)-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/);
+const date = z.string().regex(/^(20\d\d|2100)-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/).refine((v) => new Date(`${v}T00:00:00Z`).toISOString().slice(0, 10) === v, 'Not a date');
 const EU = new Set(['AT', 'BE', 'BG', 'HR', 'CY', 'CZ', 'DK', 'EE', 'FI', 'FR', 'DE', 'GR', 'HU', 'IE', 'IT', 'LV', 'LT', 'LU', 'MT', 'NL', 'PL', 'PT', 'RO', 'SK', 'SI', 'ES', 'SE']);
 const canSetup = (req: FastifyRequest) => ['super_admin', 'admin', 'platform_admin'].includes(req.user.role);
 const canEdit = (req: FastifyRequest) => ['super_admin', 'admin', 'manager', 'platform_admin'].includes(req.user.role);
@@ -54,12 +54,14 @@ async function facts(c: Tx, tenant: string, products: string[]) {
   const f: Partial<Profile> & { sources: Record<string, string> } = { countries: [...cs].sort(), sources: { countries: 'Company and facility countries' } };
   if (products.includes('ccts') && await hasTable(c, 'ccts_entity')) { const n = Number((await c.query(`SELECT count(*)::int AS n FROM ccts_entity`)).rows[0].n); if (n) { f.cctsObligated = true; f.sources.cctsObligated = `${n} obligated ${n === 1 ? 'entity' : 'entities'} in India CCTS`; } }
   if ((products.includes('cbam') || products.includes('ekotrace')) && await hasTable(c, 'cbam_import')) {
-    const r = (await c.query(`SELECT year, sum(mass)::float8 AS t FROM cbam_import GROUP BY year ORDER BY year DESC LIMIT 1`)).rows[0];
-    if (r) { f.cbamImportTonnes = r.t; f.sources.cbamImportTonnes = `CBAM imports ${r.year}`; }
-    if (Number((await c.query(`SELECT count(*)::int AS n FROM cbam_communication`)).rows[0].n)) { f.cbamExporter = true; f.sources.cbamExporter = 'CBAM communications to importers'; }
+    // goods counted for the 50-tonne threshold: electricity (2716, in MWh) and hydrogen (2804 10 00) are outside it; the last full year when there is one
+    const thisYear = new Date().getUTCFullYear();
+    const r = (await c.query(`SELECT year, sum(mass)::float8 AS t FROM cbam_import WHERE cn NOT LIKE '2716%' AND cn NOT LIKE '280410%' GROUP BY year ORDER BY (year < $1) DESC, year DESC LIMIT 1`, [thisYear])).rows[0];
+    if (r) { f.cbamImportTonnes = r.t; f.sources.cbamImportTonnes = `CBAM imports ${r.year}${r.year >= thisYear ? ' (year to date)' : ''}`; }
+    if (Number((await c.query(`SELECT count(*)::int AS n FROM cbam_communication WHERE status IN ('final', 'sent')`)).rows[0].n)) { f.cbamExporter = true; f.sources.cbamExporter = 'CBAM communications to importers'; }
   }
   if (products.includes('uaemrv') && await hasTable(c, 'mrv_facility')) {
-    if ((await c.query(`SELECT 1 FROM mrv_facility WHERE emirate = 'AZ' AND sector <> 'other' LIMIT 1`)).rowCount) { f.eadFacility = true; f.sources.eadFacility = 'Abu Dhabi facility in UAE MRV'; }
+    if ((await c.query(`SELECT 1 FROM mrv_facility WHERE emirate = 'AZ' AND sector <> 'other' LIMIT 1`)).rowCount) { f.eadFacility = true; f.sources.eadFacility = 'Abu Dhabi facility in a covered sector in UAE MRV (threshold not checked)'; }
     const y = (await c.query(`SELECT designated, s1_typed, s2_typed, year FROM mrv_company_year ORDER BY year DESC LIMIT 1`)).rows[0];
     if (y && y.designated !== 'unknown') { f.uaeDesignated = y.designated; f.sources.uaeDesignated = `UAE MRV federal position ${y.year}`; }
   }
@@ -103,6 +105,12 @@ async function auto(c: Tx, products: string[], reg: string, ob: string, period: 
   return null;
 }
 
+type Row = {
+  reg: string; obligation: string; period: number; label: string; title: string; detail: string; due: string | null; dueNote: string | null; moved: boolean;
+  status: Status; setStatus: Status | null; source: 'set' | 'module' | 'none'; autoStatus: Status | null; autoNote: string | null; owner: string | null; note: string;
+  documentId: string | null; doneOn: string | null; penalty: string | null; module: { route: string; label: string } | null; voluntary: boolean; applies: Applies; updatedName: string | null;
+  custom?: { id: string; regulation: string; jurisdiction: string; recurrence: 'once' | 'annual'; firstDue: string; owner: string | null };
+};
 async function load(c: Tx, tenant: string, year: number) {
   const products = await productsOf(c, tenant);
   const stored = ((await c.query(`SELECT data FROM cp_profile WHERE tenant_id = $1`, [tenant])).rows[0]?.data ?? {}) as Partial<Profile>;
@@ -111,41 +119,44 @@ async function load(c: Tx, tenant: string, year: number) {
   const today = await todayOf(c, tenant);
   const regs = REGULATIONS.map((r) => ({ code: r.code, ...r.applies(profile) }));
   const statuses = new Map((await c.query(`SELECT * FROM cp_status`)).rows.map((r) => [`${r.reg}|${r.obligation}|${r.period}`, r]));
-  const all = instances(profile, regs, year - 2, year + 1);
-  const rows = [];
+  const all = instances(profile, regs, year - 2, year + 2);
+  const every = [];   // every instance in reach (for the 90-day window), then those shown for the year
   for (const it of all) {
     const st = statuses.get(`${it.reg}|${it.obligation}|${it.period}`);
     const due = st?.due_override ? iso(st.due_override) : it.due;
-    const a = st ? null : await auto(c, products, it.reg, it.obligation, it.period);
-    const status = effective((st?.status ?? a?.status ?? null) as Status | null, due, today);
+    const a = await auto(c, products, it.reg, it.obligation, it.period);
     const R = REGULATION.get(it.reg)!, O = R.obligations.find((o) => o.code === it.obligation)!;
-    // shown when due in the year, or due earlier and still open; open ones without a date show for their period's year
-    const dueYear = due ? Number(due.slice(0, 4)) : it.period;
-    // earlier ones carried over only from the year before (older gaps are history, not this year's work)
-    if (dueYear !== year && !(dueYear === year - 1 && status === 'overdue') && !(due == null && it.period === year)) continue;
-    rows.push({
+    const applies = regs.find((r) => r.code === it.reg)!.applies;
+    // a regulation that may apply, or a recommended step, is never overdue: it is open until settled
+    const status = effective((st?.status ?? a?.status ?? null) as Status | null, applies === 'applies' && !O.voluntary ? due : null, today);
+    every.push({
       reg: it.reg, obligation: it.obligation, period: it.period, label: it.label, title: O.title, detail: O.detail, due, dueNote: it.dueNote, moved: !!st?.due_override,
-      status, setStatus: (st?.status ?? null) as Status | null, source: st ? 'set' : a ? 'module' : 'none', autoNote: a?.note ?? null, owner: st?.owner ?? null, note: st?.note ?? '', documentId: st?.document_id ?? null, doneOn: iso(st?.done_on),
-      penalty: O.penalty ?? null, module: O.module ?? null,
-      applies: regs.find((r) => r.code === it.reg)!.applies, updatedName: st?.updated_name ?? null,
-    });
+      status, setStatus: (st?.status ?? null) as Status | null, source: st?.status ? 'set' : a ? 'module' : 'none', autoStatus: a?.status ?? null, autoNote: a?.note ?? null,
+      owner: st?.owner ?? null, note: st?.note ?? '', documentId: st?.document_id ?? null, doneOn: iso(st?.done_on),
+      penalty: O.penalty ?? null, module: O.module ?? null, voluntary: !!O.voluntary,
+      applies, updatedName: st?.updated_name ?? null,
+    } as Row);
   }
-  // the company's own obligations
+  // the company's own obligations: once, or every year on the same day (29 February → 28 February)
   const custom = (await c.query(`SELECT * FROM cp_custom ORDER BY due_date`)).rows;
   for (const x of custom) {
-    const first = iso(x.due_date)!;
-    const due = x.recurrence === 'annual' ? `${year}${first.slice(4)}` : first;
-    if (x.recurrence === 'annual' && Number(first.slice(0, 4)) > year) continue;
-    const period = Number(due.slice(0, 4));
-    const st = statuses.get(`custom:${x.id}|-|${period}`);
-    const status = effective((st?.status ?? null) as Status | null, st?.due_override ? iso(st.due_override) : due, today);
-    if (period !== year && !(period === year - 1 && status === 'overdue')) continue;
-    rows.push({ reg: `custom:${x.id}`, obligation: '-', period, label: x.recurrence === 'annual' ? String(period) : 'once', title: x.title, detail: x.detail, due: st?.due_override ? iso(st.due_override) : due, dueNote: null, moved: !!st?.due_override,
-      status, setStatus: (st?.status ?? null) as Status | null, source: st ? 'set' : 'none', autoNote: null, owner: st?.owner ?? x.owner, note: st?.note ?? '', documentId: st?.document_id ?? null, doneOn: iso(st?.done_on), penalty: null, module: null, applies: 'applies' as Applies, updatedName: st?.updated_name ?? null,
-      custom: { id: x.id, regulation: x.regulation, jurisdiction: x.jurisdiction, recurrence: x.recurrence, firstDue: first, owner: x.owner } });
+    const first = iso(x.due_date)!, y0 = Number(first.slice(0, 4));
+    const periods = x.recurrence === 'annual' ? [year - 1, year, year + 1].filter((y) => y >= y0) : [y0];
+    for (const period of periods) {
+      const st = statuses.get(`custom:${x.id}|-|${period}`);
+      const due = st?.due_override ? iso(st.due_override)! : x.recurrence === 'annual' ? sameDay(first, period) : first;
+      every.push({ reg: `custom:${x.id}`, obligation: '-', period, label: x.recurrence === 'annual' ? String(period) : 'once', title: x.title, detail: x.detail, due, dueNote: null, moved: !!st?.due_override,
+        status: effective((st?.status ?? null) as Status | null, due, today), setStatus: (st?.status ?? null) as Status | null, source: st?.status ? 'set' : 'none', autoStatus: null, autoNote: null,
+        owner: st?.owner ?? x.owner, note: st?.note ?? '', documentId: st?.document_id ?? null, doneOn: iso(st?.done_on), penalty: null, module: null, voluntary: false, applies: 'applies', updatedName: st?.updated_name ?? null,
+        custom: { id: x.id, regulation: x.regulation, jurisdiction: x.jurisdiction, recurrence: x.recurrence, firstDue: first, owner: x.owner } });
+    }
   }
+  // shown for the year: due in it, or due the year before and still overdue (older gaps are history); undated ones in their period's year
+  const rows = every.filter((r) => { const dy = r.due ? Number(r.due.slice(0, 4)) : r.period; return dy === year || (dy === year - 1 && r.status === 'overdue') || (r.due == null && r.period === year); });
+  const in90 = new Date(`${today}T00:00:00Z`); in90.setUTCDate(in90.getUTCDate() + 90);
+  const upcoming = every.filter((x) => x.due && x.due >= today && x.due <= in90.toISOString().slice(0, 10) && x.status !== 'done' && x.status !== 'not_applicable').sort((a, b) => a.due!.localeCompare(b.due!));
   rows.sort((a, b) => (a.due ?? '9999').localeCompare(b.due ?? '9999') || a.title.localeCompare(b.title));
-  return { profile, stored, facts: f, regs, rows, today, products };
+  return { profile, stored, facts: f, regs, rows, upcoming, today, products };
 }
 
 export async function complianceRoutes(app: FastifyInstance) {
@@ -163,10 +174,9 @@ export async function complianceRoutes(app: FastifyInstance) {
         return { code: r.code, name: R.name, jurisdiction: R.jurisdiction, authority: R.authority, source: R.source, summary: R.summary, applies: r.applies, reason: r.reason,
           counts: { total: mine.length, done: mine.filter((x) => x.status === 'done').length, overdue: mine.filter((x) => x.status === 'overdue').length, open: mine.filter((x) => x.status === 'not_started' || x.status === 'in_progress').length } };
       });
-      const in90 = new Date(`${d.today}T00:00:00Z`); in90.setUTCDate(in90.getUTCDate() + 90);
       return {
         year, today: d.today, profile: d.profile, stored: d.stored, facts: d.facts, regulations: regs, obligations: d.rows,
-        upcoming: d.rows.filter((x) => x.due && x.due >= d.today && x.due <= in90.toISOString().slice(0, 10) && x.status !== 'done' && x.status !== 'not_applicable'),
+        upcoming: d.upcoming,
         documents: (await c.query(`SELECT id, coalesce(title, filename) AS name FROM document WHERE kind = 'vault' AND archived_at IS NULL ORDER BY uploaded_at DESC LIMIT 300`)).rows,
         products: d.products, canSetup: canSetup(req), canEdit: canEdit(req),
       };
@@ -193,18 +203,18 @@ export async function complianceRoutes(app: FastifyInstance) {
       documentId: uuid.nullable().default(null), doneOn: date.nullable().default(null), dueOverride: date.nullable().default(null),
     }).parse(req.body);
     return tenantTx(tenant, async (c) => {
-      if (b.reg.startsWith('custom:')) { if (!(await c.query(`SELECT 1 FROM cp_custom WHERE id = $1`, [uuid.parse(b.reg.slice(7))])).rowCount) throw notFound('Obligation'); }
+      if (b.reg.startsWith('custom:')) { if (b.obligation !== '-' || !uuid.safeParse(b.reg.slice(7)).success || !(await c.query(`SELECT 1 FROM cp_custom WHERE id = $1`, [b.reg.slice(7)])).rowCount) throw notFound('Obligation'); }
       else if (!REGULATION.get(b.reg)?.obligations.some((o) => o.code === b.obligation)) throw notFound('Obligation');
       if (b.documentId && !(await c.query(`SELECT 1 FROM document WHERE id = $1`, [b.documentId])).rowCount) throw notFound('Document');
       if (b.status === 'done' && !b.doneOn) throw new AppError('Give the date it was completed');
       if (b.status === 'not_applicable' && !b.note) throw new AppError('Say why it does not apply');
       if (b.dueOverride && !b.note) throw new AppError('Say why the date moved (e.g. an extension granted)');
       if (b.status == null && !b.owner && !b.note && !b.documentId && !b.dueOverride) {
-        await c.query(`DELETE FROM cp_status WHERE reg = $1 AND obligation = $2 AND period = $3`, [b.reg, b.obligation, b.period]);   // back to the module's status
+        await c.query(`DELETE FROM cp_status WHERE reg = $1 AND obligation = $2 AND period = $3`, [b.reg, b.obligation, b.period]);   // nothing left: as the module says
       } else {
         await c.query(`INSERT INTO cp_status (tenant_id, reg, obligation, period, status, owner, note, document_id, done_on, due_override, updated_name) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
           ON CONFLICT (tenant_id, reg, obligation, period) DO UPDATE SET status=$5, owner=$6, note=$7, document_id=$8, done_on=$9, due_override=$10, updated_name=$11, updated_at=now()`,
-          [tenant, b.reg, b.obligation, b.period, b.status ?? 'not_started', b.owner || null, b.note, b.documentId, b.status === 'done' ? b.doneOn : null, b.dueOverride, req.user.name]);
+          [tenant, b.reg, b.obligation, b.period, b.status, b.owner || null, b.note, b.documentId, b.status === 'done' ? b.doneOn : null, b.dueOverride, req.user.name]);
       }
       await audit(c, req, 'compliance.status', 'cp_status', null, b);
       return { ok: true };
@@ -231,6 +241,10 @@ export async function complianceRoutes(app: FastifyInstance) {
     requireRole(req, 'super_admin', 'admin', 'manager');
     const id = uuid.parse((req.params as { id: string }).id), b = customBody.parse(req.body);
     return tenantTx(tenant, async (c) => {
+      const old = (await c.query(`SELECT due_date, recurrence FROM cp_custom WHERE id = $1`, [id])).rows[0];
+      if (!old) throw notFound('Obligation');
+      const oldYear = Number(iso(old.due_date)!.slice(0, 4)), newYear = Number(b.dueDate.slice(0, 4));
+      if (old.recurrence === 'once' && b.recurrence === 'once' && oldYear !== newYear) await c.query(`UPDATE cp_status SET period = $3 WHERE reg = $1 AND period = $2`, [`custom:${id}`, oldYear, newYear]);
       const r = await c.query(`UPDATE cp_custom SET title=$2, regulation=$3, jurisdiction=$4, due_date=$5, recurrence=$6, owner=$7, detail=$8 WHERE id = $1`, [id, b.title, b.regulation, b.jurisdiction, b.dueDate, b.recurrence, b.owner || null, b.detail]);
       if (!r.rowCount) throw notFound('Obligation');
       await audit(c, req, 'compliance.custom.update', 'cp_custom', id, b);
@@ -277,16 +291,18 @@ export async function complianceRoutes(app: FastifyInstance) {
     const tenant = requireTenant(req);
     const year = z.object({ year: YEAR }).parse(req.query).year;
     const d = await tenantTx(tenant, (c) => load(c, tenant, year));
-    const esc = (s: string) => s.replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\r?\n/g, '\\n');
+    const esc = (s: string) => s.replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\r\n|\r|\n/g, '\\n');
+    // RFC 5545: lines longer than 75 octets folded with CRLF + space, without splitting a UTF-8 character
+    const fold = (line: string) => { const out: string[] = []; let cur = '', n = 0; for (const ch of line) { const b = Buffer.byteLength(ch); if (n + b > (out.length ? 74 : 75)) { out.push(cur); cur = ''; n = 0; } cur += ch; n += b; } out.push(cur); return out.join('\r\n '); };
     const stamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d+Z$/, 'Z');
     const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', `PRODID:-//${PRODUCT}//Compliance desk//EN`, 'CALSCALE:GREGORIAN', `X-WR-CALNAME:${esc(`${PRODUCT} compliance ${year}`)}`];
     for (const x of d.rows) {
       if (!x.due || x.status === 'done' || x.status === 'not_applicable') continue;
       const day = x.due.replace(/-/g, ''), next = new Date(`${x.due}T00:00:00Z`); next.setUTCDate(next.getUTCDate() + 1);
-      lines.push('BEGIN:VEVENT', `UID:${x.reg}-${x.obligation}-${x.period}@${PRODUCT.toLowerCase()}`, `DTSTAMP:${stamp}`, `DTSTART;VALUE=DATE:${day}`, `DTEND;VALUE=DATE:${next.toISOString().slice(0, 10).replace(/-/g, '')}`,
+      lines.push('BEGIN:VEVENT', `UID:${tenant}-${x.reg.replace(':', '-')}-${x.obligation}-${x.period}@${PRODUCT_SLUG}`, `DTSTAMP:${stamp}`, `DTSTART;VALUE=DATE:${day}`, `DTEND;VALUE=DATE:${next.toISOString().slice(0, 10).replace(/-/g, '')}`,
         `SUMMARY:${esc(`${x.title} (${x.label})`)}`, `DESCRIPTION:${esc(`${REGULATION.get(x.reg)?.name ?? 'Own obligation'}. ${x.detail}${x.dueNote ? ` ${x.dueNote}.` : ''}`)}`, 'END:VEVENT');
     }
     lines.push('END:VCALENDAR');
-    return reply.header('content-type', 'text/calendar; charset=utf-8').header('content-disposition', `attachment; filename="compliance_${year}.ics"`).send(lines.join('\r\n'));
+    return reply.header('content-type', 'text/calendar; charset=utf-8').header('content-disposition', `attachment; filename="compliance_${year}.ics"`).send(`${lines.map(fold).join('\r\n')}\r\n`);
   });
 }

@@ -36,6 +36,19 @@ export function afterFyEnd(year: number, fyEndMonth: number, months: number) {
   const end = new Date(Date.UTC(year, fyEndMonth - 1 + months + 1, 0));
   return iso(end.getUTCFullYear(), end.getUTCMonth() + 1, end.getUTCDate());
 }
+/** The calendar year in which the first financial year starting on or after `date` ends. */
+export function firstFyStarting(date: string, fyEndMonth: number) {
+  for (let y = Number(date.slice(0, 4)); ; y++) {
+    const start = fyEndMonth === 12 ? iso(y, 1, 1) : iso(y - 1, fyEndMonth + 1, 1);
+    if (start >= date) return y;
+  }
+}
+/** The same day in another year; 29 February becomes 28 February in a year that has none. */
+export function sameDay(first: string, year: number) {
+  const md = first.slice(5);
+  if (md === '02-29' && !(year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0))) return `${year}-02-28`;
+  return `${year}-${md}`;
+}
 /** The reporting period label: the financial year ending in `year`. */
 export function periodLabel(year: number, fyEndMonth: number) {
   if (fyEndMonth === 12) return `FY ${year}`;
@@ -47,6 +60,8 @@ export interface Obligation {
   due: (period: number, p: Profile) => string | null;   // period = calendar year the reporting period ends in
   from?: number;                                       // first reporting period it applies to
   firstFor?: (p: Profile) => number | null;            // first period for this company (overrides `from`)
+  startsOn?: (p: Profile) => string | null;            // first period = the first financial year starting on or after this date (overrides both)
+  voluntary?: boolean;                                 // recommended or voluntary: never shown as overdue
   once?: boolean; penalty?: string; module?: { route: string; label: string };
   dueNote?: string;                                    // when due() is null or approximate
 }
@@ -79,9 +94,9 @@ export const REGULATIONS: Regulation[] = [
       return has(p, 'EU') ? maybe('Operates in the EU: give employees and turnover to check') : no('No EU operations recorded');
     },
     obligations: [
-      { code: 'dma', title: 'Double materiality assessment', detail: 'Impact and financial materiality of sustainability topics; decides which ESRS disclosures apply.', due: (y, p) => afterFyEnd(y, p.fyEndMonth, 0), firstFor: (p) => (p.euEntity ? 2027 : 2028), module: { route: '/esg', label: 'ESG & materiality' } },
-      { code: 'statement', title: 'Sustainability statement (ESRS) in the management report', detail: 'Published with the annual financial statements; simplified ESRS (Delegated Regulation (EU) 2026/1563) from FY2027.', due: (y, p) => afterFyEnd(y, p.fyEndMonth, 4), dueNote: 'With the management report; national deadlines vary (usually 4–5 months after year end)', firstFor: (p) => (p.euEntity ? 2027 : 2028), penalty: 'Set by each Member State', module: { route: '/reports', label: 'Reports (ESRS E1)' } },
-      { code: 'assurance', title: 'Limited assurance of the sustainability statement', detail: 'By the statutory auditor or an accredited independent assurance provider.', due: (y, p) => afterFyEnd(y, p.fyEndMonth, 4), firstFor: (p) => (p.euEntity ? 2027 : 2028), module: { route: '/assurance', label: 'Audit & assurance' } },
+      { code: 'dma', title: 'Double materiality assessment', detail: 'Impact and financial materiality of sustainability topics; decides which ESRS disclosures apply.', due: (y, p) => afterFyEnd(y, p.fyEndMonth, 0), startsOn: (p) => (p.euEntity ? '2027-01-01' : '2028-01-01'), module: { route: '/esg', label: 'ESG & materiality' } },
+      { code: 'statement', title: 'Sustainability statement (ESRS) in the management report', detail: 'Published with the annual financial statements; simplified ESRS (Delegated Regulation (EU) 2026/1563) from FY2027.', due: (y, p) => afterFyEnd(y, p.fyEndMonth, 4), dueNote: 'With the management report; national deadlines vary (usually 4–5 months after year end)', startsOn: (p) => (p.euEntity ? '2027-01-01' : '2028-01-01'), penalty: 'Set by each Member State', module: { route: '/reports', label: 'Reports (ESRS E1)' } },
+      { code: 'assurance', title: 'Limited assurance of the sustainability statement', detail: 'By the statutory auditor or an accredited independent assurance provider.', due: (y, p) => afterFyEnd(y, p.fyEndMonth, 4), startsOn: (p) => (p.euEntity ? '2027-01-01' : '2028-01-01'), module: { route: '/assurance', label: 'Audit & assurance' } },
     ],
   },
   {
@@ -91,7 +106,10 @@ export const REGULATIONS: Regulation[] = [
       : p.cbamImportTonnes > 50 ? yes(`${Math.round(p.cbamImportTonnes)} t of CBAM goods imported in the year: above the 50-tonne threshold`) : no(`${Math.round(p.cbamImportTonnes)} t of CBAM goods: below the 50-tonne threshold (electricity and hydrogen always count)`)),
     obligations: [
       { code: 'declarant', title: 'Authorised CBAM declarant status', detail: 'Applied for by 31 March 2026 to keep importing while pending; needed before importing above the threshold.', due: () => '2026-03-31', from: 2026, once: true, module: { route: '/cbam', label: 'CBAM' } },
-      { code: 'quarterly', title: 'Hold certificates for 50% of embedded emissions at each quarter end', detail: 'From the 2027 quarters, when certificate sales are open (from 1 February 2027).', due: (y) => (y >= 2027 ? iso(y, 12, 31) : null), from: 2027, dueNote: 'At the end of every quarter of the year', module: { route: '/cbam', label: 'CBAM' } },
+      { code: 'quarterly_q1', title: 'Hold certificates for 50% of embedded emissions — end of Q1', detail: 'From the 2027 quarters, when certificate sales are open (from 1 February 2027).', due: (y) => iso(y, 3, 31), from: 2027, module: { route: '/cbam', label: 'CBAM' } },
+      { code: 'quarterly_q2', title: 'Hold certificates for 50% of embedded emissions — end of Q2', detail: 'From the 2027 quarters, when certificate sales are open (from 1 February 2027).', due: (y) => iso(y, 6, 30), from: 2027, module: { route: '/cbam', label: 'CBAM' } },
+      { code: 'quarterly_q3', title: 'Hold certificates for 50% of embedded emissions — end of Q3', detail: 'From the 2027 quarters, when certificate sales are open (from 1 February 2027).', due: (y) => iso(y, 9, 30), from: 2027, module: { route: '/cbam', label: 'CBAM' } },
+      { code: 'quarterly_q4', title: 'Hold certificates for 50% of embedded emissions — end of Q4', detail: 'From the 2027 quarters, when certificate sales are open (from 1 February 2027).', due: (y) => iso(y, 12, 31), from: 2027, module: { route: '/cbam', label: 'CBAM' } },
       { code: 'declaration', title: 'Annual CBAM declaration', detail: 'Embedded emissions of the goods imported in the year, with verification reports where actual values are used.', due: (y) => iso(y + 1, 9, 30), from: 2026, penalty: 'Penalty per certificate not surrendered (as for the EU ETS excess-emissions penalty)', module: { route: '/cbam', label: 'CBAM' } },
       { code: 'surrender', title: 'Surrender CBAM certificates', detail: 'Certificates for the declared embedded emissions, less carbon price paid in the country of origin and the free-allocation adjustment.', due: (y) => iso(y + 1, 9, 30), from: 2026, module: { route: '/cbam', label: 'CBAM' } },
     ],
@@ -101,8 +119,8 @@ export const REGULATIONS: Regulation[] = [
     source: 'https://taxation-customs.ec.europa.eu/carbon-border-adjustment-mechanism_en', summary: 'No legal duty of its own, but EU importers need the installation\'s verified embedded emissions in time for their annual declaration; without them default values with mark-ups apply.',
     applies: (p) => (p.cbamExporter ? yes('Sells CBAM goods into the EU') : p.cbamExporter === false ? no('Does not sell CBAM goods into the EU') : maybe('Sells cement, steel, aluminium, fertilisers or hydrogen? Then EU buyers will ask for emissions data')),
     obligations: [
-      { code: 'communications', title: 'Embedded emissions to EU importers (communication template)', detail: 'Per installation and good; quarterly or annual, as buyers ask.', due: (y) => iso(y + 1, 3, 31), from: 2026, dueNote: 'Recommended: early enough for the importer\'s declaration of 30 September', module: { route: '/cbam/comms', label: 'CBAM communications' } },
-      { code: 'verification', title: 'Verification of the installation\'s emissions', detail: 'By an accredited verifier, so importers can use actual values.', due: (y) => iso(y + 1, 6, 30), from: 2026, dueNote: 'Recommended timing' },
+      { code: 'communications', title: 'Embedded emissions to EU importers (communication template)', detail: 'Per installation and good; quarterly or annual, as buyers ask.', due: (y) => iso(y + 1, 3, 31), from: 2026, dueNote: 'Recommended: early enough for the importer\'s declaration of 30 September', voluntary: true, module: { route: '/cbam/comms', label: 'CBAM communications' } },
+      { code: 'verification', title: 'Verification of the installation\'s emissions', detail: 'By an accredited verifier, so importers can use actual values.', due: (y) => iso(y + 1, 6, 30), from: 2026, dueNote: 'Recommended timing', voluntary: true },
     ],
   },
   {
@@ -113,7 +131,7 @@ export const REGULATIONS: Regulation[] = [
     obligations: [
       { code: 'brsr', title: 'BRSR with the annual report', detail: 'Sections A–C, including the BRSR Core.', due: (y) => iso(y, 8, 31), from: 2024, dueNote: 'With the annual report, sent before the AGM (within 5 months of year end)', penalty: 'SEBI LODR penalties', module: { route: '/brsr', label: 'BRSR Core' } },
       { code: 'core_assurance', title: 'BRSR Core reasonable assurance or assessment', detail: 'Glide path: top 150 FY 2023-24, top 250 FY 2024-25, top 500 FY 2025-26, top 1,000 FY 2026-27.', due: (y) => iso(y, 8, 31), firstFor: (p) => ({ top150: 2024, top250: 2025, top500: 2026, top1000: 2027 } as Record<string, number>)[p.indiaTop] ?? null, module: { route: '/brsr', label: 'BRSR Core' } },
-      { code: 'value_chain', title: 'Value-chain BRSR Core (voluntary)', detail: 'Top 250: partners of 2% or more of purchases or sales, up to 75% coverage.', due: (y) => iso(y, 8, 31), firstFor: (p) => (p.indiaTop === 'top150' || p.indiaTop === 'top250' ? 2026 : null), module: { route: '/brsr', label: 'BRSR Core' } },
+      { code: 'value_chain', title: 'Value-chain BRSR Core (voluntary)', detail: 'Top 250: partners of 2% or more of purchases or sales, up to 75% coverage.', due: (y) => iso(y, 8, 31), firstFor: (p) => (p.indiaTop === 'top150' || p.indiaTop === 'top250' ? 2026 : null), voluntary: true, module: { route: '/brsr', label: 'BRSR Core' } },
     ],
   },
   {
@@ -157,10 +175,10 @@ export const REGULATIONS: Regulation[] = [
     source: 'https://www.sgx.com/regulation/sustainability-reporting', summary: 'All listed issuers report Scope 1 and 2 from FY2025; STI constituents full ISSB climate disclosures from FY2025 and Scope 3 from FY2026; other issuers with market cap of S$1 billion or more full disclosures from FY2028, others FY2030; external limited assurance of Scope 1 and 2 from FY2029 (timelines extended August 2025).',
     applies: (p) => (p.listed === 'sgx' ? yes(p.sgxSti ? 'SGX-listed STI constituent' : 'SGX-listed issuer') : (has(p, 'SG') ? maybe('Large non-listed companies (revenue S$1 billion+, assets S$0.5 billion+) from FY2030') : no('Not listed on SGX'))),
     obligations: [
-      { code: 'scope12', title: 'Scope 1 and 2 GHG emissions in the sustainability report', detail: 'With the annual report.', due: (y, p) => afterFyEnd(y, p.fyEndMonth, 4), from: 2025, dueNote: 'With the annual report (within 4 months of year end; check SGX Listing Rule 711A)', module: { route: '/reports', label: 'Reports (IFRS S2)' } },
-      { code: 'issb', title: 'ISSB (IFRS S2) climate disclosures', detail: 'Governance, strategy, risk management, metrics and targets.', due: (y, p) => afterFyEnd(y, p.fyEndMonth, 4), firstFor: (p) => (p.listed !== 'sgx' ? null : p.sgxSti ? 2025 : p.sgxCapOver1bn ? 2028 : 2030), module: { route: '/reports', label: 'Reports (IFRS S2)' } },
-      { code: 'scope3', title: 'Scope 3 GHG emissions', detail: 'Mandatory for STI constituents; voluntary for other issuers until further notice.', due: (y, p) => afterFyEnd(y, p.fyEndMonth, 4), firstFor: (p) => (p.listed === 'sgx' && p.sgxSti ? 2026 : null) },
-      { code: 'assurance', title: 'External limited assurance of Scope 1 and 2', detail: 'Deferred from FY2027.', due: (y, p) => afterFyEnd(y, p.fyEndMonth, 4), firstFor: (p) => (p.listed === 'sgx' ? 2029 : null), module: { route: '/assurance', label: 'Audit & assurance' } },
+      { code: 'scope12', title: 'Scope 1 and 2 GHG emissions in the sustainability report', detail: 'With the annual report.', due: (y, p) => afterFyEnd(y, p.fyEndMonth, 4), startsOn: (p) => (p.listed === 'sgx' ? '2025-01-01' : '2030-01-01'), dueNote: 'With the annual report (within 4 months of year end; check SGX Listing Rule 711A)', module: { route: '/reports', label: 'Reports (IFRS S2)' } },
+      { code: 'issb', title: 'ISSB (IFRS S2) climate disclosures', detail: 'Governance, strategy, risk management, metrics and targets.', due: (y, p) => afterFyEnd(y, p.fyEndMonth, 4), startsOn: (p) => (p.listed !== 'sgx' ? '2030-01-01' : p.sgxSti ? '2025-01-01' : p.sgxCapOver1bn ? '2028-01-01' : '2030-01-01'), module: { route: '/reports', label: 'Reports (IFRS S2)' } },
+      { code: 'scope3', title: 'Scope 3 GHG emissions', detail: 'Mandatory for STI constituents; voluntary for other issuers until further notice.', due: (y, p) => afterFyEnd(y, p.fyEndMonth, 4), startsOn: (p) => (p.listed === 'sgx' && p.sgxSti ? '2026-01-01' : null) },
+      { code: 'assurance', title: 'External limited assurance of Scope 1 and 2', detail: 'Deferred from FY2027.', due: (y, p) => afterFyEnd(y, p.fyEndMonth, 4), startsOn: (p) => (p.listed === 'sgx' ? '2029-01-01' : null), module: { route: '/assurance', label: 'Audit & assurance' } },
     ],
   },
   {
@@ -168,8 +186,8 @@ export const REGULATIONS: Regulation[] = [
     source: 'https://aasb.gov.au/research-resources/knowledge-hub/aasb-s2-knowledge-hub/', summary: 'Sustainability report with the annual financial report under the Corporations Act. Group 1 from years starting 1 January 2025, Group 2 from 1 July 2026, Group 3 from 1 July 2027 (size thresholds, NGER reporters, asset owners).',
     applies: (p) => (p.auGroup !== 'none' ? yes(`Australian reporting entity in ${p.auGroup.replace('group', 'Group ')}`) : (has(p, 'AU') ? maybe('Operates in Australia: Groups 1–3 by employees, revenue, assets or NGER reporting') : no('No operations in Australia'))),
     obligations: [
-      { code: 'report', title: 'Sustainability report (climate statements, AASB S2)', detail: 'Scope 1 and 2 from the first year; Scope 3 from the second year.', due: (y, p) => afterFyEnd(y, p.fyEndMonth, 4), firstFor: (p) => ({ group1: 2025, group2: 2027, group3: 2028 } as Record<string, number>)[p.auGroup] ?? null, dueNote: 'With the annual financial report (3 months for disclosing entities, 4 months for others)', module: { route: '/reports', label: 'Reports (IFRS S2)' } },
-      { code: 'assurance', title: 'Assurance of the climate statements', detail: 'Limited assurance phasing to reasonable assurance (AUASB ASSA 5010).', due: (y, p) => afterFyEnd(y, p.fyEndMonth, 4), firstFor: (p) => ({ group1: 2025, group2: 2027, group3: 2028 } as Record<string, number>)[p.auGroup] ?? null, module: { route: '/assurance', label: 'Audit & assurance' } },
+      { code: 'report', title: 'Sustainability report (climate statements, AASB S2)', detail: 'Scope 1 and 2 from the first year; Scope 3 from the second year.', due: (y, p) => afterFyEnd(y, p.fyEndMonth, p.listed === 'asx' ? 3 : 4), startsOn: (p) => ({ group1: '2025-01-01', group2: '2026-07-01', group3: '2027-07-01' } as Record<string, string>)[p.auGroup] ?? null, dueNote: 'With the annual financial report (3 months for disclosing entities, 4 months for others)', module: { route: '/reports', label: 'Reports (IFRS S2)' } },
+      { code: 'assurance', title: 'Assurance of the climate statements', detail: 'Limited assurance phasing to reasonable assurance (AUASB ASSA 5010).', due: (y, p) => afterFyEnd(y, p.fyEndMonth, p.listed === 'asx' ? 3 : 4), startsOn: (p) => ({ group1: '2025-01-01', group2: '2026-07-01', group3: '2027-07-01' } as Record<string, string>)[p.auGroup] ?? null, module: { route: '/assurance', label: 'Audit & assurance' } },
     ],
   },
   {
@@ -201,7 +219,8 @@ export function instances(p: Profile, regs: { code: string; applies: Applies }[]
     if (r.applies === 'not_applicable') continue;
     const R = REGULATION.get(r.code)!;
     for (const o of R.obligations) {
-      const first = o.firstFor ? o.firstFor(p) : o.from ?? 2000;
+      const start = o.startsOn?.(p);
+      const first = o.startsOn ? (start ? firstFyStarting(start, R.periodOf === 'calendar' ? 12 : R.periodOf === 'india_fy' ? 3 : p.fyEndMonth) : null) : o.firstFor ? o.firstFor(p) : o.from ?? 2000;
       if (first == null) continue;
       for (let y = Math.max(from, first); y <= to; y++) {
         if (o.once && y !== first) continue;
