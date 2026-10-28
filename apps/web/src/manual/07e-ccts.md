@@ -2,6 +2,8 @@
 
 Menu → Disclose → **India CCTS** tracks India's Carbon Credit Trading Scheme (compliance mechanism) for each **obligated entity** of the company: its GHG emission intensity (GEI) against the target notified by the Ministry of Environment, Forest and Climate Change, and the Carbon Credit Certificates (CCCs) it earns or must surrender.
 
+India CCTS is a **package of its own**, switched on per company by the Ekobon team. With the GHG inventory, fuel and grid electricity can come from the approved entries of its facilities. Without it, every figure is typed per month.
+
 The method follows the Bureau of Energy Efficiency's *Detailed Procedure for Compliance Mechanism under CCTS* (v1.0, July 2024). Targets come from the gazette schedules of the *Greenhouse Gases Emission Intensity Target Rules, 2025* (first schedule October 2025: aluminium, cement, chlor-alkali, pulp & paper; second schedule January 2026: secondary aluminium, refineries, petrochemicals, textiles; iron & steel in draft).
 
 ```flow

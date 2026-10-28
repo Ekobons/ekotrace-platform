@@ -15,6 +15,6 @@ export async function loadBrand(): Promise<void> {
   } catch { /* keep the default */ }
 }
 
-export type ProductCode = 'ekotrace' | 'ekofin' | 'cbam';
-/** The products' names: EKOTRACE / EKOFIN under the Ekotrace brand; elsewhere the brand's name and "Financed emissions" (a module); CBAM Exporter under every brand. */
-export const productName = (p: ProductCode) => (p === 'cbam' ? 'CBAM Exporter' : BRAND.name.toLowerCase() === 'ekotrace' ? (p === 'ekofin' ? 'EKOFIN' : 'EKOTRACE') : p === 'ekofin' ? 'Financed emissions' : BRAND.name);
+export type ProductCode = 'ekotrace' | 'ekofin' | 'cbam' | 'ccts' | 'brsr';
+/** The products' names: EKOTRACE / EKOFIN under the Ekotrace brand; elsewhere the brand's name and "Financed emissions" (a module); CBAM Exporter, India CCTS and BRSR Core under every brand. */
+export const productName = (p: ProductCode) => (p === 'cbam' ? 'CBAM Exporter' : p === 'ccts' ? 'India CCTS' : p === 'brsr' ? 'BRSR Core' : BRAND.name.toLowerCase() === 'ekotrace' ? (p === 'ekofin' ? 'EKOFIN' : 'EKOTRACE') : p === 'ekofin' ? 'Financed emissions' : BRAND.name);

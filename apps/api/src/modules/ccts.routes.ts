@@ -13,8 +13,9 @@
  *   POST   /api/ccts/:id/measures             add an emission-reduction measure (super admin, admin, manager); PUT/DELETE /api/ccts/measures/:mid
  *   GET    /api/ccts/:id/form-a?fy=           Excel: Form A draft (performance assessment), monthly data, method
  *
- * Fuel and grid electricity come from the approved EKOTRACE entries of the facilities inside the entity's boundary
+ * A package of its own (tenant.products 'ccts'). With EKOTRACE, fuel and grid electricity come from the approved entries of the facilities inside the entity's boundary
  * (entries spanning several months are split by days), unless the entity is set to typed figures or a month overrides them.
+ * Without EKOTRACE every entity works on typed figures.
  */
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import ExcelJS from 'exceljs';
@@ -24,6 +25,7 @@ import { audit, requireRole, requireTenant } from '../lib/auth.js';
 import { AppError, notFound } from '../lib/errors.js';
 import { PRODUCT } from '../lib/brand.js';
 import { sendWorkbook, styleHeader } from '../lib/xlsx.js';
+import { hasEkotrace, needProduct } from '../lib/products.js';
 import { SECTORS, account, calendar, fyLabel, fyMonths, month, year, type CccTxn, type MonthIn } from '../lib/ccts.js';
 
 const uuid = z.string().uuid();
@@ -107,20 +109,24 @@ async function facilitiesCheck(c: Tx, ids: string[]) {
 const cols = (b: EntityBody) => [b.name, b.registrationNo || null, b.sector, b.subSector || null, b.state || null, b.address || null, b.outputUnit ?? SECTORS[b.sector]!.unit,
   b.product || SECTORS[b.sector]!.product, b.baselineOutput, b.baselineGei, b.gridEf, b.energySource, [...new Set(b.facilityIds)], b.acva || null, b.priceInr, b.notes];
 
+/** Without EKOTRACE there are no entries: every entity works on typed figures. */
+const effective = <T extends { energySource: 'entries' | 'manual' }>(e: T, eko: boolean): T => (eko ? e : { ...e, energySource: 'manual' });
+
 export async function cctsRoutes(app: FastifyInstance) {
+  needProduct(app, 'ccts');
   app.get('/api/ccts', async (req) => {
     const tenant = requireTenant(req);
     const fy = z.object({ fy: z.coerce.number().int().min(2023).max(2100).optional() }).parse(req.query).fy ?? currentFy();
     return tenantTx(tenant, async (c) => {
-      const list = [];
+      const list = [], eko = await hasEkotrace(c, tenant);
       for (const r of (await c.query(`SELECT * FROM ccts_entity ORDER BY name`)).rows) {
-        const e = entityView(r), y = await yearOf(c, e, fy), acc = account(await txns(c, e.id), fy, y.ccc, e.priceInr);
+        const e = effective(entityView(r), eko), y = await yearOf(c, e, fy), acc = account(await txns(c, e.id), fy, y.ccc, e.priceInr);
         list.push({ ...e, result: { gei: y.gei, target: y.target, monthsIn: y.monthsIn, ccc: y.ccc, projected: y.projection?.ccc ?? y.ccc, output: y.output, emissions: y.emissions }, held: acc.held });
       }
       return {
         fy, label: fyLabel(fy), entities: list, sectors: SECTORS, calendar: calendar(fy),
         facilities: (await c.query(`SELECT id, name, country FROM org_node WHERE kind = 'facility' AND active ORDER BY name`)).rows,
-        canSetup: canSetup(req), canData: canData(req),
+        canSetup: canSetup(req), canData: canData(req), ekotrace: eko,
       };
     });
   });
@@ -130,6 +136,7 @@ export async function cctsRoutes(app: FastifyInstance) {
     requireRole(req, 'super_admin', 'admin');
     const b = entityBody.parse(req.body);
     return tenantTx(tenant, async (c) => {
+      if (!(await hasEkotrace(c, tenant))) b.energySource = 'manual';
       await facilitiesCheck(c, b.facilityIds);
       const r = (await c.query(
         `INSERT INTO ccts_entity (tenant_id, name, registration_no, sector, sub_sector, state, address, output_unit, product, baseline_output, baseline_gei, grid_ef, energy_source, facility_ids, acva, price_inr, notes, created_name)
@@ -144,7 +151,8 @@ export async function cctsRoutes(app: FastifyInstance) {
     const id = idOf(req);
     const fy = z.object({ fy: z.coerce.number().int().min(2023).max(2100).optional() }).parse(req.query).fy ?? currentFy();
     return tenantTx(tenant, async (c) => {
-      const e = entityView(await entity(c, id));
+      const eko = await hasEkotrace(c, tenant);
+      const e = effective(entityView(await entity(c, id)), eko);
       const y = await yearOf(c, e, fy);
       const T = await txns(c, id);
       const targets = (await c.query(`SELECT fy, target_gei::float8 AS "targetGei" FROM ccts_target WHERE entity_id = $1 ORDER BY fy`, [id])).rows;
@@ -155,7 +163,7 @@ export async function cctsRoutes(app: FastifyInstance) {
         measures: (await c.query(`SELECT * FROM ccts_measure WHERE entity_id = $1 ORDER BY fy DESC, created_at`, [id])).rows.map(measureView),
         calendar: calendar(fy), years: [...new Set([...targets.map((t: { fy: number }) => t.fy), fy, currentFy(), 2025])].sort((a, b) => b - a),
         facilities: (await c.query(`SELECT id, name FROM org_node WHERE id = ANY($1)`, [e.facilityIds])).rows,
-        sectors: SECTORS, canSetup: canSetup(req), canData: canData(req),
+        sectors: SECTORS, canSetup: canSetup(req), canData: canData(req), ekotrace: eko,
       };
     });
   });
@@ -166,6 +174,7 @@ export async function cctsRoutes(app: FastifyInstance) {
     const id = idOf(req), b = entityBody.parse(req.body);
     return tenantTx(tenant, async (c) => {
       await entity(c, id);
+      if (!(await hasEkotrace(c, tenant))) b.energySource = 'manual';
       await facilitiesCheck(c, b.facilityIds);
       await c.query(
         `UPDATE ccts_entity SET name=$2, registration_no=$3, sector=$4, sub_sector=$5, state=$6, address=$7, output_unit=$8, product=$9, baseline_output=$10, baseline_gei=$11, grid_ef=$12,
@@ -314,7 +323,7 @@ export async function cctsRoutes(app: FastifyInstance) {
     const id = idOf(req);
     const fy = z.object({ fy: z.coerce.number().int().min(2023).max(2100) }).parse(req.query).fy;
     const d = await tenantTx(tenant, async (c) => {
-      const e = entityView(await entity(c, id));
+      const e = effective(entityView(await entity(c, id)), await hasEkotrace(c, tenant));
       const y = await yearOf(c, e, fy);
       const acc = account((await txns(c, id)) as CccTxn[], fy, y.ccc, e.priceInr);
       const measures = (await c.query(`SELECT * FROM ccts_measure WHERE entity_id = $1 AND fy = $2 ORDER BY created_at`, [id, fy])).rows.map(measureView);

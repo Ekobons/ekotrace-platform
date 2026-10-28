@@ -2,6 +2,13 @@
 
 Newest first.
 
+## 2026-10-28 · India CCTS and BRSR Core as packages of their own
+
+- Migration 067: `tenant.products` may hold `ccts` and `brsr`; companies already using either get it. `lib/products.ts`: `PRODUCTS`, `productsOf`, `hasEkotrace`, `needProduct(app, code)` (preHandler: 403 `PRODUCT_OFF` without the package). Platform API accepts any mix of the five packages.
+- India CCTS and BRSR Core are no longer part of EKOTRACE. With EKOTRACE they read its approved entries and sit in its Disclose menu (shown only with the package). Without EKOTRACE they are workspaces of their own (`packNav`: the page, Organisation, People & access, Document vault, Audit log, Help): CCTS entities work on typed figures (`energy_source` forced to manual); BRSR treats the environmental rows as typed (no note, no override, no boundary, no detail by source, no purchase-file suggestions). APIs return `ekotrace`.
+- Platform console: package checkboxes for India CCTS and BRSR Core with what each mix means. A page of a missing package says so.
+- Demos: `demo:ccts` and `demo:brsr` companies get their package. Manual: Getting started → Packages; both chapters. Tests: package gating and standalone mode for both. 
+
 ## 2026-10-28 · SEBI BRSR Core: the nine attributes, review, value chain, Excel
 
 - Migration 065: `brsr_report` (per FY: revenue from operations, PPP rate, output and unit, `facility_ids` boundary, provider, approach assurance | assessment | none, status draft | ready | final), `brsr_value` (per KPI: value, note, document, owner, review open | ready | reviewed with who and when, who changed it), `brsr_partner` (upstream / downstream value-chain partners: business with the company, attributable share, KPI values). Tenant RLS on all three.

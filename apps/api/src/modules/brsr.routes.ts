@@ -10,8 +10,9 @@
  *   POST   /api/brsr/:fy/partners              add a value-chain partner; PUT / DELETE /api/brsr/partners/:pid
  *   GET    /api/brsr/:fy/export                Excel: BRSR Core table, value chain, detail, method
  *
- * Auto KPIs come from the approved entries of the boundary's facilities: entries that cross the year's ends are
- * split by days, and the company's consolidation approach (Methodology & boundaries) applies.
+ * A package of its own (tenant.products 'brsr'). With EKOTRACE, auto KPIs come from the approved entries of the
+ * boundary's facilities: entries that cross the year's ends are split by days, and the company's consolidation
+ * approach (Methodology & boundaries) applies. Without EKOTRACE every KPI is typed.
  */
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import ExcelJS from 'exceljs';
@@ -23,6 +24,7 @@ import { PRODUCT } from '../lib/brand.js';
 import { sendWorkbook, styleHeader } from '../lib/xlsx.js';
 import { refdata } from './refdata.js';
 import { kwhOf } from './dashboard.routes.js';
+import { hasEkotrace, needProduct } from '../lib/products.js';
 import { ATTRIBUTES, KPI, KPIS, PPP_DEFAULT, VC_KPIS, checks, derive, fyLabel, revenuePpp, wasteCategory, wasteRoute, type Values } from '../lib/brsr.js';
 
 const FY = z.coerce.number().int().min(2020).max(2100);
@@ -125,6 +127,9 @@ export async function fromEntries(c: Tx, tenant: string, fy: number, facilityIds
   };
 }
 
+/** No entries to read (BRSR Core without EKOTRACE). */
+const NO_ENTRIES = (): Awaited<ReturnType<typeof fromEntries>> => ({ values: {}, gases: [], detail: { energy: [], water: [], waste: [], entries: { ghg: 0, energy: 0, water: 0, waste: 0 }, missingEnergy: 0 } });
+
 const SOURCE: Record<string, string> = {
   ghg: 'approved entries, Scope 1 (fuels, vehicles, process, fugitive, own waste sites) and Scope 2 location-based',
   water: 'approved water entries (withdrawal by source, discharge by destination)', energy: 'approved fuel, vehicle and energy entries; renewable = bioenergy and electricity covered by certificates or contracts',
@@ -132,10 +137,10 @@ const SOURCE: Record<string, string> = {
 };
 
 /** The whole year: base values (auto, overridden or typed), derived values, sources and review state. */
-async function yearData(c: Tx, tenant: string, fy: number) {
+async function yearData(c: Tx, tenant: string, fy: number, eko: boolean) {
   const r = await report(c, tenant, fy);
-  // a Final year shows the figures frozen when it was set Final
-  const auto: Awaited<ReturnType<typeof fromEntries>> = r?.status === 'final' && r.frozen ? r.frozen : await fromEntries(c, tenant, fy, r?.facility_ids ?? null);
+  // a Final year shows the figures frozen when it was set Final; without EKOTRACE there are no entries
+  const auto: Awaited<ReturnType<typeof fromEntries>> = !eko ? NO_ENTRIES() : r?.status === 'final' && r.frozen ? r.frozen : await fromEntries(c, tenant, fy, r?.facility_ids ?? null);
   const stored = r ? (await c.query(`SELECT v.*, d.filename FROM brsr_value v LEFT JOIN document d ON d.id = v.document_id WHERE v.report_id = $1`, [r.id])).rows : [];
   const S = new Map(stored.map((x) => [x.kpi as string, x]));
   const base: Values = {};
@@ -150,12 +155,12 @@ async function yearData(c: Tx, tenant: string, fy: number) {
   const all = derive(base, ctx);
   const rows = KPIS.map((k) => {
     const s = S.get(k.code);
-    const overridden = k.kind === 'auto' && s?.value != null;
+    const overridden = eko && k.kind === 'auto' && s?.value != null;
     // a figure from entries reviewed at another value has changed since: it needs reviewing again
-    const stale = s?.review === 'reviewed' && k.kind === 'auto' && !overridden && !same(num(s.reviewed_value), all[k.code] ?? null);
+    const stale = eko && s?.review === 'reviewed' && k.kind === 'auto' && !overridden && !same(num(s.reviewed_value), all[k.code] ?? null);
     return {
-      code: k.code, value: all[k.code] ?? null, auto: k.kind === 'auto' ? auto.values[k.code] ?? null : null, overridden,
-      source: k.kind === 'derived' ? 'derived' : overridden ? 'override' : k.kind === 'auto' ? (all[k.code] != null ? 'entries' : 'missing') : s?.value != null ? 'typed' : 'missing',
+      code: k.code, value: all[k.code] ?? null, auto: k.kind === 'auto' && eko ? auto.values[k.code] ?? null : null, overridden,
+      source: k.kind === 'derived' ? 'derived' : overridden ? 'override' : k.kind === 'auto' && eko ? (all[k.code] != null ? 'entries' : 'missing') : s?.value != null ? 'typed' : 'missing',
       note: s?.note ?? '', documentId: s?.document_id ?? null, document: s?.filename ?? null, owner: s?.owner_name ?? null,
       review: (stale ? 'open' : s?.review ?? 'open') as 'open' | 'ready' | 'reviewed', changedSinceReview: stale, reviewedName: s?.reviewed_name ?? null, reviewedAt: s?.reviewed_at ?? null, updatedName: s?.updated_name ?? null, updatedAt: s?.updated_at ?? null,
     };
@@ -190,11 +195,13 @@ function valueChain(partners: ReturnType<typeof partnerView>[], v: Values) {
 }
 
 export async function brsrRoutes(app: FastifyInstance) {
+  needProduct(app, 'brsr');
   app.get('/api/brsr', async (req) => {
     const tenant = requireTenant(req);
     const fy = z.object({ fy: FY.optional() }).parse(req.query).fy ?? currentFy();
     return tenantTx(tenant, async (c) => {
-      const cur = await yearData(c, tenant, fy), prev = await yearData(c, tenant, fy - 1);
+      const eko = await hasEkotrace(c, tenant);
+      const cur = await yearData(c, tenant, fy, eko), prev = await yearData(c, tenant, fy - 1, eko);
       const partners = cur.report ? (await c.query(`SELECT * FROM brsr_partner WHERE report_id = $1 ORDER BY side, amount_inr DESC NULLS LAST, name`, [cur.report.id])).rows.map(partnerView) : [];
       const core = cur.rows.filter((r) => KPI.get(r.code)!.inCore);
       const enterable = cur.rows.filter((r) => KPI.get(r.code)!.kind !== 'derived');
@@ -211,7 +218,7 @@ export async function brsrRoutes(app: FastifyInstance) {
         sources: SOURCE, valueChain: valueChain(partners, cur.values), years: [...new Set([fy, fy - 1, currentFy(), currentFy() - 1, ...(await c.query(`SELECT fy FROM brsr_report ORDER BY fy DESC`)).rows.map((x) => x.fy as number)])].sort((a, b) => b - a),
         facilities: (await c.query(`SELECT id, name FROM org_node WHERE kind = 'facility' AND active ORDER BY name`)).rows,
         documents: (await c.query(`SELECT id, coalesce(title, filename) AS name FROM document WHERE kind = 'vault' AND archived_at IS NULL ORDER BY uploaded_at DESC LIMIT 300`)).rows,
-        canEdit: canEdit(req), canSetup: canSetup(req), canReview: ['super_admin', 'admin'].includes(req.user.role),
+        canEdit: canEdit(req), canSetup: canSetup(req), canReview: ['super_admin', 'admin'].includes(req.user.role), ekotrace: eko,
       };
     });
   });
@@ -240,7 +247,7 @@ export async function brsrRoutes(app: FastifyInstance) {
       }
       await c.query(`UPDATE brsr_report SET revenue_inr=$2, ppp_factor=$3, output_qty=$4, output_unit=$5, facility_ids=$6, provider=$7, approach=$8, status=$9, notes=$10, updated_name=$11, updated_at=now() WHERE id = $1`,
         [r.id, b.revenueInr, b.pppFactor, b.outputQty, b.outputUnit || null, b.facilityIds?.length ? [...new Set(b.facilityIds)] : null, b.provider || null, b.approach, b.status, b.notes, req.user.name]);
-      if (b.status === 'final') {
+      if (b.status === 'final' && (await hasEkotrace(c, tenant))) {
         const frozen = await fromEntries(c, tenant, fy, b.facilityIds?.length ? [...new Set(b.facilityIds)] : null);
         await c.query(`UPDATE brsr_report SET frozen = $2 WHERE id = $1`, [r.id, JSON.stringify(frozen)]);
       }
@@ -259,10 +266,11 @@ export async function brsrRoutes(app: FastifyInstance) {
     })).min(1).max(200) }).parse(req.body);
     return tenantTx(tenant, async (c) => {
       const r = await ensure(c, tenant, fy, req.user.name);
-      if (r.status === 'final') throw new AppError(`${fyLabel(fy)} is marked final; a super admin or admin reopens it first`, 409, 'FINAL');
+      if (r.status === 'final') throw finalErr(fy);
+      const eko = await hasEkotrace(c, tenant);
       for (const x of b.values) {
         if (x.value != null && x.value < 0 && x.kpi !== 'water.consumption') throw new AppError(`${KPI.get(x.kpi)!.label}: a value cannot be negative`);
-        if (AUTO.has(x.kpi) && x.value != null && !x.note) throw new AppError(`${KPI.get(x.kpi)!.label}: say why the value from entries is replaced`);
+        if (eko && AUTO.has(x.kpi) && x.value != null && !x.note) throw new AppError(`${KPI.get(x.kpi)!.label}: say why the value from entries is replaced`);
         if (x.documentId && !(await c.query(`SELECT 1 FROM document WHERE id = $1`, [x.documentId])).rowCount) throw notFound('Document');
         const prev = (await c.query(`SELECT value, note, document_id, owner_name FROM brsr_value WHERE report_id = $1 AND kpi = $2`, [r.id, x.kpi])).rows[0];
         const same = prev && num(prev.value) === x.value && prev.note === x.note && (prev.document_id ?? null) === x.documentId && (prev.owner_name ?? null) === (x.owner || null);
@@ -290,7 +298,7 @@ export async function brsrRoutes(app: FastifyInstance) {
       const r = await ensure(c, tenant, fy, req.user.name);
       if (r.status === 'final') throw new AppError(`${fyLabel(fy)} is marked final`, 409, 'FINAL');
       let skipped = 0;
-      const shown = b.review === 'reviewed' ? (await yearData(c, tenant, fy)).values : {};
+      const shown = b.review === 'reviewed' ? (await yearData(c, tenant, fy, await hasEkotrace(c, tenant))).values : {};
       for (const k of b.kpis) {
         const prev = (await c.query(`SELECT updated_by FROM brsr_value WHERE report_id = $1 AND kpi = $2`, [r.id, k])).rows[0];
         if (b.review === 'reviewed' && prev?.updated_by && prev.updated_by === req.user.id) { skipped++; continue; }   // never review your own entry
@@ -310,6 +318,7 @@ export async function brsrRoutes(app: FastifyInstance) {
     const tenant = requireTenant(req);
     const fy = fyOf(req);
     return tenantTx(tenant, async (c) => {
+      if (!(await hasEkotrace(c, tenant))) return { total: 0, suggestions: [], unavailable: true };   // purchase files are part of EKOTRACE
       const rows = (await c.query(
         `SELECT s.id, s.name, sum(l.usd)::float8 AS usd FROM purchase_line l JOIN supplier s ON s.id = l.supplier_id
           WHERE l.status = 'published' AND coalesce(l.purchase_date, l.period_start) BETWEEN $1 AND $2 AND l.usd > 0 GROUP BY 1, 2 ORDER BY 3 DESC`, [`${fy}-04-01`, `${fy + 1}-03-31`])).rows;
@@ -369,11 +378,12 @@ export async function brsrRoutes(app: FastifyInstance) {
     const tenant = requireTenant(req);
     const fy = fyOf(req);
     const d = await tenantTx(tenant, async (c) => {
-      const cur = await yearData(c, tenant, fy), prev = await yearData(c, tenant, fy - 1);
+      const eko = await hasEkotrace(c, tenant);
+      const cur = await yearData(c, tenant, fy, eko), prev = await yearData(c, tenant, fy - 1, eko);
       const partners = cur.report ? (await c.query(`SELECT * FROM brsr_partner WHERE report_id = $1 ORDER BY side, amount_inr DESC NULLS LAST`, [cur.report.id])).rows.map(partnerView) : [];
       const company = (await c.query(`SELECT name FROM tenant WHERE id = $1`, [tenant])).rows[0].name as string;
       await audit(c, req, 'brsr.export', 'brsr_report', cur.report?.id ?? null, { fy });
-      return { cur, prev, partners, company };
+      return { cur, prev, partners, company, eko };
     });
     const { cur, prev, partners, company } = d;
     const rep = reportView(cur.report, fy);
@@ -433,6 +443,7 @@ export async function brsrRoutes(app: FastifyInstance) {
       'Format: SEBI LODR master circular Annexure 17A (BRSR Core), as amended by SEBI/HO/CFD/CFD-PoD-1/P/CIR/2025/42 (28 March 2025). Calculations: Industry Standards on Reporting of BRSR Core (ISF, December 2024).',
       `Revenue from operations: ₹${rep.revenueInr?.toLocaleString('en-IN') ?? '—'}. PPP conversion rate: ${rep.pppFactor} ₹ per international $ (IMF implied PPP conversion rate) → USD ${revenuePpp(cur.ctx)?.toFixed(2) ?? '—'} million (PPP). Intensities are per USD million (PPP).`,
       `Output for intensity per unit: ${rep.outputQty?.toLocaleString('en-IN') ?? '—'} ${rep.outputUnit ?? ''}.`,
+      ...(d.eko ? [] : ['Every figure was entered (no GHG inventory connected): the company is responsible for the method behind the environmental figures.']),
       `Boundary: ${rep.facilityIds?.length ? `${rep.facilityIds.length} facilities` : 'every facility of the company'}; consolidation approach as set under Methodology & boundaries; approved entries only; entries crossing the year's ends split by days.`,
       'GHG: Scope 1 and Scope 2 (location-based) under the GHG Protocol with the factors shown in each entry (CEA for Indian grid electricity where set as the grid region).',
       'Energy: fuels converted with their calorific values; electricity, heat and cooling as bought; renewable = biomass, biogas and biofuels, and electricity covered by renewable certificates or contracts. GJ = kWh × 0.0036.',

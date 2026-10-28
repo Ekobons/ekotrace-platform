@@ -85,18 +85,21 @@ export function Console() {
   );
 }
 
-const PRODUCT_LABEL: Record<'ekotrace' | 'ekofin' | 'cbam', string> = { get ekotrace() { return productName('ekotrace'); }, get ekofin() { return productName('ekofin'); }, get cbam() { return productName('cbam'); } };
-type Prod = 'ekotrace' | 'ekofin' | 'cbam';
-/** Which products the company has: EKOTRACE (own GHG inventory), EKOFIN (financed emissions), CBAM Exporter (CBAM only), in any mix. */
+type Prod = 'ekotrace' | 'ekofin' | 'cbam' | 'ccts' | 'brsr';
+const PRODUCT_LABEL: Record<Prod, string> = { get ekotrace() { return productName('ekotrace'); }, get ekofin() { return productName('ekofin'); }, get cbam() { return productName('cbam'); }, ccts: 'India CCTS', brsr: 'BRSR Core' };
+/** The packages the company has, chosen one by one: EKOTRACE (own GHG inventory), EKOFIN (financed emissions), CBAM Exporter, India CCTS, BRSR Core — in any mix. */
 function ProductBoxes({ value, onChange }: { value: Prod[]; onChange: (v: Prod[]) => void }) {
   const flip = (p: Prod) => onChange(value.includes(p) ? value.filter((x) => x !== p) : [...value, p]);
   return (
     <div className="field"><span>Products</span>
-      <div className="row" style={{ gap: 18 }}>
+      <div className="row" style={{ gap: 18, flexWrap: "wrap" }}>
         <label className="row chkline" style={{ gap: 6 }}><input type="checkbox" checked={value.includes('ekotrace')} onChange={() => flip('ekotrace')} />EKOTRACE · own GHG inventory</label>
         <label className="row chkline" style={{ gap: 6 }}><input type="checkbox" checked={value.includes('ekofin')} onChange={() => flip('ekofin')} />{productName('ekofin') === 'EKOFIN' ? 'EKOFIN · financed emissions' : 'Financed emissions'} (banks, investors)</label>
         <label className="row chkline" style={{ gap: 6 }}><input type="checkbox" checked={value.includes('cbam')} onChange={() => flip('cbam')} />CBAM Exporter · CBAM only, simpler menu (included with {productName('ekotrace')})</label>
+        <label className="row chkline" style={{ gap: 6 }}><input type="checkbox" checked={value.includes('ccts')} onChange={() => flip('ccts')} />India CCTS · GEI tracker for obligated entities</label>
+        <label className="row chkline" style={{ gap: 6 }}><input type="checkbox" checked={value.includes('brsr')} onChange={() => flip('brsr')} />BRSR Core · SEBI, listed companies</label>
       </div>
+      {(value.includes('ccts') || value.includes('brsr')) && <small className="muted">{value.includes('ekotrace') ? `With ${productName('ekotrace')}, India CCTS and BRSR Core read its approved entries and sit in its Disclose menu.` : `Without ${productName('ekotrace')}, every figure in India CCTS and BRSR Core is typed, in a small menu of its own.`}</small>}
       {!value.length && <small className="bad">Choose at least one</small>}
     </div>);
 }

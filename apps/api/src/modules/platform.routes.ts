@@ -11,11 +11,12 @@ import { requirePlatformAdmin } from '../lib/auth.js';
 import { AppError, notFound } from '../lib/errors.js';
 import { hashPassword, temporaryPassword } from '../lib/password.js';
 import { PLANS } from '../lib/plans.js';
+import { PRODUCTS } from '../lib/products.js';
 
 const plan = z.enum(['trial', 'starter', 'professional', 'enterprise']);
 const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 /** Products a company has: EKOTRACE (own footprint), EKOFIN (financed emissions), CBAM Exporter (CBAM only), in any mix. */
-const products = z.array(z.enum(['ekotrace', 'ekofin', 'cbam'])).min(1).max(3).transform((p) => [...new Set(p)]);
+const products = z.array(z.enum(PRODUCTS)).min(1).max(PRODUCTS.length).transform((p) => [...new Set(p)]);
 
 export async function platformRoutes(app: FastifyInstance) {
   app.get('/api/platform/companies', async (req) => {
