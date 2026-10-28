@@ -465,12 +465,13 @@ function EntityDrawer({ list, entity, onClose, onDone, onRemoved }: { list: Ccts
         <label className="field"><span>Baseline output 2023-24 ({f.outputUnit})</span><input className="input num" inputMode="decimal" value={f.baselineOutput} onChange={(e) => up({ baselineOutput: e.target.value })} /></label>
         <label className="field"><span>Baseline GEI 2023-24 (tCO₂e/{f.outputUnit})</span><input className="input num" inputMode="decimal" value={f.baselineGei} onChange={(e) => up({ baselineGei: e.target.value })} /></label>
         <label className="field"><span>Grid factor, tCO₂/MWh (CEA, baseline year)</span><input className="input num" inputMode="decimal" value={f.gridEf} onChange={(e) => up({ gridEf: e.target.value })} /></label>
-        <label className="field"><span>Fuel and grid electricity</span><select className="input" value={f.energySource} onChange={(e) => up({ energySource: e.target.value as 'entries' | 'manual' })}>
+        {list.ekotrace ? <label className="field"><span>Fuel and grid electricity</span><select className="input" value={f.energySource} onChange={(e) => up({ energySource: e.target.value as 'entries' | 'manual' })}>
           <option value="entries">From approved entries of the facilities below</option><option value="manual">Typed per month</option></select></label>
-        <div className="field span2"><span>Facilities inside the boundary (gate to gate)</span>
+          : <div className="field muted small">Fuel and grid electricity are typed per month (no GHG inventory connected).</div>}
+        {list.ekotrace && <div className="field span2"><span>Facilities inside the boundary (gate to gate)</span>
           <div className="row small" style={{ gap: 14, flexWrap: 'wrap', marginTop: 4 }}>{list.facilities.length ? list.facilities.map((x) => (
             <label key={x.id} className="row chkline" style={{ gap: 6 }}><input type="checkbox" checked={f.facilityIds.includes(x.id)} onChange={(e) => up({ facilityIds: e.target.checked ? [...f.facilityIds, x.id] : f.facilityIds.filter((y) => y !== x.id) })} />{x.name}</label>))
-            : <span className="muted">No facilities yet (Setup → Organisation).</span>}</div></div>
+            : <span className="muted">No facilities yet (Setup → Organisation).</span>}</div></div>}
         {txt('acva', 'Accredited carbon verification agency (ACVA)')}
         <label className="field"><span>CCC price assumption (₹ per CCC)</span><input className="input num" inputMode="decimal" value={f.priceInr} onChange={(e) => up({ priceInr: e.target.value })} /></label>
         {txt('address', 'Address', '', 'field span2')}

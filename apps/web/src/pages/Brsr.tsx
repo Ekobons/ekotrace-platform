@@ -42,12 +42,12 @@ export function Brsr() {
     const ks = d.kpis.filter((k) => k.attr === a && k.kind !== 'derived'), rs = ks.map((k) => row(k.code));
     return { total: ks.length, filled: rs.filter((r) => r.value != null).length, reviewed: rs.filter((r) => r.review === 'reviewed').length };
   };
-  const ghg = (row('ghg.s1').value ?? 0) + (row('ghg.s2').value ?? 0);
+  const ghg = row('ghg.s1').value == null && row('ghg.s2').value == null ? null : (row('ghg.s1').value ?? 0) + (row('ghg.s2').value ?? 0);
   return (
     <div className="page">
       <div className="row tahead" style={{ flexWrap: 'wrap' }}>
         <div className="grow"><span className="lbl">Disclose · India</span><h1>BRSR Core</h1>
-          <div className="muted">SEBI's Business Responsibility and Sustainability Report — Core: nine attributes with their KPIs, for reasonable assurance or assessment. Environmental figures come from approved entries; the rest is entered here.</div></div>
+          <div className="muted">SEBI's Business Responsibility and Sustainability Report — Core: nine attributes with their KPIs, for reasonable assurance or assessment. {d.ekotrace ? 'Environmental figures come from approved entries; the rest is entered here.' : 'Every figure is entered here.'}</div></div>
         <label className="field" style={{ minWidth: 140 }}><span>Financial year</span>
           <select className="input" value={fy} onChange={(e) => set('fy', e.target.value)}>{d.years.map((y) => <option key={y} value={y}>{fyLabel(y)}</option>)}</select></label>
         <button className="btn" onClick={() => setSettings(true)}><Icon name="gear" /> Year settings</button>
@@ -91,7 +91,8 @@ function Attribute({ d, attr, onSaved }: { d: BrsrData; attr: number; onSaved: (
   const { toast } = useApp();
   const kpis = d.kpis.filter((k) => k.attr === attr);
   const rows = new Map(d.rows.map((r) => [r.code, r]));
-  const init = () => Object.fromEntries(kpis.filter((k) => k.kind === 'typed').map((k) => [k.code, rows.get(k.code)!.value == null ? '' : String(rows.get(k.code)!.value)]));
+  const typedHere = (k: Kpi) => k.kind === 'typed' || (k.kind === 'auto' && !d.ekotrace);   // without EKOTRACE the environmental rows are typed too
+  const init = () => Object.fromEntries(kpis.filter(typedHere).map((k) => [k.code, rows.get(k.code)!.value == null ? '' : String(rows.get(k.code)!.value)]));
   const [draft, setDraft] = useState<Record<string, string>>(init);
   const orig = useMemo(init, [d]); // eslint-disable-line react-hooks/exhaustive-deps
   const prevOrig = useRef(orig);
@@ -121,7 +122,7 @@ function Attribute({ d, attr, onSaved }: { d: BrsrData; attr: number; onSaved: (
   return (
     <div className="card flush">
       <div className="row vfilters" style={{ flexWrap: 'wrap', gap: 8 }}>
-        <div className="grow"><b>{attr} · {d.attributes[attr]}</b>{d.sources[head] && <div className="muted small">Worked out from {d.sources[head]}.</div>}</div>
+        <div className="grow"><b>{attr} · {d.attributes[attr]}</b>{d.ekotrace && d.sources[head] && <div className="muted small">Worked out from {d.sources[head]}.</div>}</div>
         {sel.size > 0 && <>
           <span className="muted small">{sel.size} selected</span>
           {d.canEdit && <button className="btn sm" disabled={final} onClick={() => review('ready')}>Mark ready</button>}
@@ -143,20 +144,20 @@ function Attribute({ d, attr, onSaved }: { d: BrsrData; attr: number; onSaved: (
                   <td className="brsrlbl">{k.kind === 'derived' ? <b>{k.label}</b> : k.label}{!k.inCore && <span className="muted small"> · input</span>}{k.hint && <div className="muted small">{k.hint}</div>}
                     {r.note && <div className="small" style={{ color: 'var(--info)' }}>“{r.note}”</div>}</td>
                   <td className="small nowrap muted">{k.unit}</td>
-                  <td className="num">{k.kind === 'typed' && d.canEdit && !final
+                  <td className="num">{typedHere(k) && d.canEdit && !final
                     ? <input className="input sm num" style={{ width: 130 }} inputMode="decimal" aria-label={k.label} value={draft[k.code] ?? ''} onChange={(e) => setDraft((o) => ({ ...o, [k.code]: e.target.value }))} />
                     : <b>{fmt(r.value, k.dp)}</b>}
                     {r.overridden && <div className="muted small">entries: {fmt(r.auto, k.dp)}</div>}</td>
                   <td className="num small muted">{fmt(r.previous, k.dp)}</td>
                   <td className="small nowrap"><span className={r.source === 'missing' ? 'warn-t' : r.source === 'override' ? 'warn-t' : 'muted'}>{SRC[r.source]}</span>
                     {r.document && <div title={r.document}><Icon name="doc" /> evidence</div>}{r.owner && <div className="muted">{r.owner}</div>}
-                    {k.kind !== 'derived' && d.canEdit && !final && <div><button className="linkbtn small" onClick={() => setOpen(k)}>{k.kind === 'auto' ? 'Replace / note…' : 'Note & evidence…'}</button></div>}</td>
+                    {k.kind !== 'derived' && d.canEdit && !final && <div><button className="linkbtn small" onClick={() => setOpen(k)}>{k.kind === 'auto' && d.ekotrace ? 'Replace / note…' : 'Note & evidence…'}</button></div>}</td>
                   <td className="ctr">{k.kind !== 'derived' && <span className={`chip ${REVIEW[r.review][0]}`} title={r.changedSinceReview ? 'The entries changed after it was reviewed: review it again' : r.reviewedName ? `Reviewed by ${r.reviewedName}` : undefined}>{r.changedSinceReview ? 'Changed' : REVIEW[r.review][1]}</span>}</td>
                 </tr>);
             })}</Fragment>))}
         </tbody>
       </table></div>
-      {attr <= 4 && <Detail d={d} attr={attr} />}
+      {attr <= 4 && d.ekotrace && <Detail d={d} attr={attr} />}
       {open && <RowDrawer d={d} k={open} r={rows.get(open.code)!} onClose={() => setOpen(null)} onDone={() => { setOpen(null); onSaved(); }} />}
     </div>);
 }
@@ -178,7 +179,7 @@ function RowDrawer({ d, k, r, onClose, onDone }: { d: BrsrData; k: Kpi; r: Row; 
   const { toast } = useApp();
   const dlg = useRef<HTMLDialogElement>(null);
   useEffect(() => { dlg.current?.showModal(); }, []);
-  const auto = k.kind === 'auto';
+  const auto = k.kind === 'auto' && d.ekotrace;
   const [f, setF] = useState({ value: auto ? (r.overridden ? String(r.value) : '') : (r.value == null ? '' : String(r.value)), note: r.note, documentId: r.documentId ?? '', owner: r.owner ?? '' });
   const up = (x: Partial<typeof f>) => setF((o) => ({ ...o, ...x }));
   const needNote = auto && f.value.trim() !== '' && !f.note.trim();
@@ -227,10 +228,10 @@ function Settings({ d, onClose, onDone }: { d: BrsrData; onClose: () => void; on
         <div className="field span2 muted small">{rev != null && ppp ? `Revenue adjusted for PPP: USD ${fmt(rev / ppp / 1e6, 2)} million. ` : ''}The Industry Standards use the IMF implied PPP conversion rate (22.4 as of April 2024). Use the latest IMF value and disclose it.</div>
         <label className="field"><span>Physical output (for intensity per unit)</span><input className="input num" inputMode="decimal" value={f.outputQty} onChange={(e) => up({ outputQty: e.target.value })} /></label>
         <label className="field"><span>Output unit</span><input className="input" value={f.outputUnit} placeholder="t of product; FTE for service companies" onChange={(e) => up({ outputUnit: e.target.value })} /></label>
-        <div className="field span2"><span>Boundary</span>
+        {d.ekotrace && <div className="field span2"><span>Boundary</span>
           <label className="row small chkline" style={{ gap: 6, marginTop: 4 }}><input type="checkbox" checked={f.all} onChange={(e) => up({ all: e.target.checked })} />Every facility of the company</label>
           {!f.all && <div className="row small" style={{ gap: 14, flexWrap: 'wrap', marginTop: 6 }}>{d.facilities.map((x) => (
-            <label key={x.id} className="row chkline" style={{ gap: 6 }}><input type="checkbox" checked={f.facilityIds.includes(x.id)} onChange={(e) => up({ facilityIds: e.target.checked ? [...f.facilityIds, x.id] : f.facilityIds.filter((y) => y !== x.id) })} />{x.name}</label>))}</div>}</div>
+            <label key={x.id} className="row chkline" style={{ gap: 6 }}><input type="checkbox" checked={f.facilityIds.includes(x.id)} onChange={(e) => up({ facilityIds: e.target.checked ? [...f.facilityIds, x.id] : f.facilityIds.filter((y) => y !== x.id) })} />{x.name}</label>))}</div>}</div>}
         <label className="field"><span>Assessment or assurance</span><select className="input" value={f.approach} onChange={(e) => up({ approach: e.target.value as ReportBody['approach'] })}>
           <option value="assurance">Reasonable assurance</option><option value="assessment">Assessment (ISF standards)</option><option value="none">None this year</option></select></label>
         <label className="field"><span>Provider</span><input className="input" value={f.provider} onChange={(e) => up({ provider: e.target.value })} /></label>
@@ -265,7 +266,7 @@ function ValueChain({ d, onSaved }: { d: BrsrData; onSaved: () => void }) {
       <div className="card flush" style={{ marginBottom: 12 }}>
         <div className="row vfilters"><div className="grow"><b>{s === 'upstream' ? 'Upstream — suppliers' : 'Downstream — customers, dealers, distributors'}</b>
           <div className="muted small">{S.total ? `${fmt((S.coverage ?? 0) * 100, 1)}% of ${s === 'upstream' ? 'purchases' : 'sales'} covered (${inr(S.amount)} of ${inr(S.total)})` : `Enter total ${s === 'upstream' ? 'purchases (attribute 7)' : 'sales (attribute 9)'} to see the coverage`}</div></div>
-          {s === 'upstream' && d.canEdit && !final && <button className="btn sm" onClick={loadSug}>Suggest from purchase files</button>}
+          {s === 'upstream' && d.canEdit && !final && d.ekotrace && <button className="btn sm" onClick={loadSug}>Suggest from purchase files</button>}
           {d.canEdit && !final && <button className="btn sm p" onClick={() => setEdit({ side: s })}>+ Partner</button>}</div>
         {s === 'upstream' && sug && (
           <div style={{ padding: '0 14px 10px' }}>{sug.suggestions.length ? <table className="t small"><thead><tr><th>Supplier (≥ 2% of spend)</th><th className="num">Share</th><th className="num">Cumulative</th><th /></tr></thead>

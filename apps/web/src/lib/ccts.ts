@@ -31,14 +31,14 @@ export interface CctsTxn { id: string; kind: 'issued' | 'bought' | 'sold' | 'sur
 export interface CctsMeasure { id: string; fy: number; title: string; yearDone: number | null; beforeT: number | null; afterT: number | null; investmentInr: number | null; note: string; createdName: string | null }
 export interface CalendarItem { key: string; date: string; label: string }
 export interface CctsList {
-  fy: number; label: string; sectors: Record<string, Sector>; calendar: CalendarItem[]; facilities: { id: string; name: string; country: string }[]; canSetup: boolean; canData: boolean;
+  fy: number; label: string; sectors: Record<string, Sector>; calendar: CalendarItem[]; facilities: { id: string; name: string; country: string }[]; canSetup: boolean; canData: boolean; ekotrace: boolean;
   entities: (CctsEntity & { result: { gei: number | null; target: number | null; monthsIn: number; ccc: number | null; projected: number | null; output: number; emissions: number }; held: number })[];
 }
 export interface CctsDetail {
   entity: CctsEntity; fy: number; label: string; targets: { fy: number; targetGei: number }[]; year: CctsYear;
   previous: { fy: number; label: string; gei: number | null; output: number; emissions: number; target: number | null; ccc: number | null } | null;
   account: CctsAccount; projectedAccount: CctsAccount | null; txns: CctsTxn[]; measures: CctsMeasure[]; calendar: CalendarItem[]; years: number[];
-  facilities: { id: string; name: string }[]; sectors: Record<string, Sector>; canSetup: boolean; canData: boolean;
+  facilities: { id: string; name: string }[]; sectors: Record<string, Sector>; canSetup: boolean; canData: boolean; ekotrace: boolean;
 }
 export type EntityBody = Omit<CctsEntity, 'id'>;
 export type MonthBody = { month: string; note: string } & Record<MonthKey, number | null>;

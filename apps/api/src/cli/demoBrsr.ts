@@ -45,7 +45,7 @@ async function main() {
   const pw = temporaryPassword();
   const hash = await hashPassword(pw);
   const ids = await platformTx(async (c) => {
-    const t = (await c.query(`INSERT INTO tenant (name, country, gwp_set, plan, products, currency, timezone) VALUES ($1,'IN','AR5','enterprise',ARRAY['ekotrace'],'INR','Asia/Kolkata') RETURNING id`, [NAME])).rows[0].id as string;
+    const t = (await c.query(`INSERT INTO tenant (name, country, gwp_set, plan, products, currency, timezone) VALUES ($1,'IN','AR5','enterprise',ARRAY['ekotrace','brsr'],'INR','Asia/Kolkata') RETURNING id`, [NAME])).rows[0].id as string;
     const g = (await c.query(`INSERT INTO org_node (tenant_id, kind, name, country) VALUES ($1,'group',$2,'IN') RETURNING id`, [t, NAME])).rows[0].id as string;
     const fac = async (n: string, type: string, loc: string, emp: number) => (await c.query(`INSERT INTO org_node (tenant_id, parent_id, kind, name, facility_type, location, country, employees, grid_region) VALUES ($1,$2,'facility',$3,$4,$5,'IN',$6,'IN') RETURNING id`, [t, g, n, type, loc, emp])).rows[0].id as string;
     const f = { chakan: await fac('Chakan plant (demo)', 'Plant', 'Chakan, Pune', 1450), hosur: await fac('Hosur plant (demo)', 'Plant', 'Hosur, Tamil Nadu', 980), office: await fac('Mumbai head office (demo)', 'Office', 'Mumbai', 210) };

@@ -103,8 +103,8 @@ before(async () => {
   await c.end();
   const r = await app.inject({ method: 'POST', url: '/api/auth/login', payload: { email: 'ops@ekobon.test', password: 'correct horse battery' } });
   admin = String(r.headers['set-cookie']).split(';')[0]!;
-  co = (await call('POST', '/api/platform/companies', { name: 'Bharat Cement Ltd', country: 'IN', superAdmin: { name: 'SA', email: 'sa@bharat.test' } })).body.company.id;
-  other = (await call('POST', '/api/platform/companies', { name: 'Other Co', country: 'IN', superAdmin: { name: 'SA2', email: 'sa@other.test' } })).body.company.id;
+  co = (await call('POST', '/api/platform/companies', { name: 'Bharat Cement Ltd', country: 'IN', products: ['ekotrace', 'ccts'], superAdmin: { name: 'SA', email: 'sa@bharat.test' } })).body.company.id;
+  other = (await call('POST', '/api/platform/companies', { name: 'Other Co', country: 'IN', products: ['ekotrace', 'ccts'], superAdmin: { name: 'SA2', email: 'sa@other.test' } })).body.company.id;
   const q = new pg.Client({ connectionString: url }); await q.connect(); await q.query(`SELECT set_config('app.platform','on',false)`);
   const root = (await q.query(`SELECT id FROM org_node WHERE tenant_id = $1 AND kind = 'group'`, [co])).rows[0].id; await q.end();
   plant = (await call('POST', '/api/org/nodes', { parentId: root, kind: 'facility', name: 'Kiln plant', country: 'IN' }, co)).body.id;
@@ -204,4 +204,16 @@ test('API: measures and the Form A workbook', async () => {
   near(val(/^Achieved GEI/) as number, (200 + 500 + 30 * 0.716) / 1000);
   let found = false; a.eachRow((r) => { if (r.getCell(1).value === 'Waste heat recovery 13 MW') found = true; });
   assert.ok(found);
+});
+
+test('API: India CCTS is a package of its own; without EKOTRACE the entity works on typed figures', async () => {
+  const eko = (await call('POST', '/api/platform/companies', { name: 'Inventory Only Ltd', country: 'IN', superAdmin: { name: 'SA3', email: 'sa@inv.test' } })).body.company.id;
+  const r = await call('GET', '/api/ccts', undefined, eko);
+  assert.equal(r.status, 403); assert.equal(r.body.error, 'PRODUCT_OFF');
+  const solo = (await call('POST', '/api/platform/companies', { name: 'CCTS Only Mill', country: 'IN', products: ['ccts'], superAdmin: { name: 'SA4', email: 'sa@mill.test' } })).body.company.id;
+  const e = await call('POST', '/api/ccts', { name: 'Spinning mill', sector: 'textile', baselineOutput: 1000, baselineGei: 2, energySource: 'entries' }, solo);
+  assert.equal(e.status, 200, e.text);
+  const d = (await call('GET', `/api/ccts/${e.body.id}?fy=2025`, undefined, solo)).body;
+  assert.equal(d.ekotrace, false); assert.equal(d.entity.energySource, 'manual');
+  assert.equal((await call('PATCH', '/api/platform/companies/' + solo, { products: ['ccts', 'nope'] })).status, 400);
 });

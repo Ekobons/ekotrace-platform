@@ -89,8 +89,8 @@ before(async () => {
   const pw = await hashPassword('correct horse battery');
   await p.query(`INSERT INTO app_user (tenant_id, email, name, role, password_hash, must_change_password) VALUES (NULL,'ops@ekobon.test','Ops','platform_admin',$1,false)`, [pw]);
   admin = await login('ops@ekobon.test', 'correct horse battery');
-  co = (await call('POST', '/api/platform/companies', { name: 'Listed Co Ltd', country: 'IN', superAdmin: { name: 'SA', email: 'sa@listed.test' } })).body.company.id;
-  other = (await call('POST', '/api/platform/companies', { name: 'Other Co', country: 'IN', superAdmin: { name: 'SA2', email: 'sa@other.test' } })).body.company.id;
+  co = (await call('POST', '/api/platform/companies', { name: 'Listed Co Ltd', country: 'IN', products: ['ekotrace', 'brsr'], superAdmin: { name: 'SA', email: 'sa@listed.test' } })).body.company.id;
+  other = (await call('POST', '/api/platform/companies', { name: 'Other Co', country: 'IN', products: ['ekotrace', 'brsr'], superAdmin: { name: 'SA2', email: 'sa@other.test' } })).body.company.id;
   const root = (await p.query(`SELECT id FROM org_node WHERE tenant_id = $1 AND kind = 'group'`, [co])).rows[0].id;
   plant = (await call('POST', '/api/org/nodes', { parentId: root, kind: 'facility', name: 'Pune plant', country: 'IN' }, co)).body.id;
   office = (await call('POST', '/api/org/nodes', { parentId: root, kind: 'facility', name: 'Mumbai office', country: 'IN' }, co)).body.id;
@@ -247,4 +247,18 @@ test('API: Final freezes the figures and locks settings and partners; reviews fo
   assert.equal(d.report.revenueInr, 10_000e6); near(row(d, 'ghg.s2').value, 716 * 6);
   await p.query(`UPDATE activity SET co2e_scope2 = co2e_scope2 / 6 WHERE facility_id = $1 AND co2e_scope2 > 0`, [plant]);
   await p.end();
+});
+
+test('API: BRSR Core is a package of its own; without EKOTRACE every KPI is typed, no note needed', async () => {
+  const eko = (await call('POST', '/api/platform/companies', { name: 'Inventory Only Ltd', country: 'IN', superAdmin: { name: 'SA3', email: 'sa@inv.test' } })).body.company.id;
+  const r = await call('GET', '/api/brsr?fy=2025', undefined, eko);
+  assert.equal(r.status, 403); assert.equal(r.body.error, 'PRODUCT_OFF');
+  const solo = (await call('POST', '/api/platform/companies', { name: 'BRSR Only Ltd', country: 'IN', products: ['brsr'], superAdmin: { name: 'SA4', email: 'sa@solo.test' } })).body.company.id;
+  const w = await call('PUT', '/api/brsr/2025/values', { values: [{ kpi: 'ghg.s1', value: 120 }, { kpi: 'ghg.s2', value: 80 }, { kpi: 'water.withdrawal', value: 1000 }, { kpi: 'water.discharge', value: 400 }] }, solo);
+  assert.equal(w.status, 200, w.text);
+  const d = (await call('GET', '/api/brsr?fy=2025', undefined, solo)).body;
+  const row = (c: string) => d.rows.find((x: { code: string }) => x.code === c);
+  assert.equal(d.ekotrace, false); assert.equal(row('ghg.s1').source, 'typed'); assert.equal(row('ghg.s1').overridden, false);
+  near(row('water.consumption').value, 600); assert.equal(row('energy.total').source, 'missing');
+  assert.equal((await call('GET', '/api/brsr/2025/suggest-partners', undefined, solo)).body.unavailable, true);
 });

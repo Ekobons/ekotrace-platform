@@ -2,6 +2,8 @@
 
 Menu → Disclose → **BRSR Core** prepares the *BRSR Core* of SEBI's Business Responsibility and Sustainability Report: nine attributes with their KPIs, the set listed companies must have **assured or assessed**, and the value-chain disclosures.
 
+BRSR Core is a **package of its own**, switched on per company by the Ekobon team. With the GHG inventory, the environmental figures come from its approved entries. Without it, every figure is typed (no note needed), and the detail by source, the boundary and the suggestions from purchase files are not shown.
+
 The format follows Annexure 17A of SEBI's master circular for listed entities as amended by the circular of 28 March 2025 (SEBI/HO/CFD/CFD-PoD-1/P/CIR/2025/42), with the *Industry Standards on Reporting of BRSR Core* (Industry Standards Forum, December 2024) for definitions and the PPP adjustment.
 
 ```flow

@@ -46,7 +46,7 @@ async function main() {
   const pw = temporaryPassword();
   const hash = await hashPassword(pw);
   const ids = await platformTx(async (c) => {
-    const t = (await c.query(`INSERT INTO tenant (name, country, gwp_set, plan, products, currency, timezone) VALUES ($1,'IN','AR5','enterprise',ARRAY['ekotrace'],'INR','Asia/Kolkata') RETURNING id`, [NAME])).rows[0].id as string;
+    const t = (await c.query(`INSERT INTO tenant (name, country, gwp_set, plan, products, currency, timezone) VALUES ($1,'IN','AR5','enterprise',ARRAY['ekotrace','ccts'],'INR','Asia/Kolkata') RETURNING id`, [NAME])).rows[0].id as string;
     const g = (await c.query(`INSERT INTO org_node (tenant_id, kind, name, country) VALUES ($1,'group',$2,'IN') RETURNING id`, [t, NAME])).rows[0].id as string;
     const fac = async (n: string, type: string, loc: string) => (await c.query(`INSERT INTO org_node (tenant_id, parent_id, kind, name, facility_type, location, country) VALUES ($1,$2,'facility',$3,$4,$5,'IN') RETURNING id`, [t, g, n, type, loc])).rows[0].id as string;
     const kiln = await fac('Chittorgarh works (demo)', 'Plant', 'Chittorgarh, Rajasthan'), mill = await fac('Bhilwara spinning mill (demo)', 'Plant', 'Bhilwara, Rajasthan');
