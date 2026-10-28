@@ -16,6 +16,7 @@ import { Library } from './pages/Library';
 import { Updates } from './pages/Updates';
 import { Organisation } from './pages/Organisation';
 import { UaeMrv } from './pages/UaeMrv';
+import { EnergyMgmt } from './pages/EnergyMgmt';
 import { People } from './pages/People';
 import { Methodology } from './pages/Methodology';
 import { EnergyRegister } from './pages/EnergyRegister';
@@ -131,9 +132,9 @@ function cbamNav(role: 'importer' | 'exporter' | 'both'): { group?: string; item
   ];
 }
 /** India CCTS, BRSR Core or UAE MRV without EKOTRACE: a small menu of its own (with EKOTRACE they sit in its Disclose menu). */
-function packNav(p: 'ccts' | 'brsr' | 'uaemrv'): { group?: string; items: NavItem[] }[] {
+function packNav(p: 'ccts' | 'brsr' | 'uaemrv' | 'energy'): { group?: string; items: NavItem[] }[] {
   return [
-    { items: [p === 'ccts' ? { to: '/ccts', label: 'India CCTS', icon: 'gauge' } : p === 'brsr' ? { to: '/brsr', label: 'BRSR Core', icon: 'list' } : { to: '/uae-mrv', label: 'UAE MRV', icon: 'shield' }] },
+    { items: [p === 'ccts' ? { to: '/ccts', label: 'India CCTS', icon: 'gauge' } : p === 'brsr' ? { to: '/brsr', label: 'BRSR Core', icon: 'list' } : p === 'uaemrv' ? { to: '/uae-mrv', label: 'UAE MRV', icon: 'shield' } : { to: '/energy-mgmt', label: 'Energy management', icon: 'bolt' }] },
     { group: 'Setup', items: [
       { to: '/organisation', label: 'Organisation', icon: 'tree', roles: ['super_admin', 'admin'] },
       { to: '/people', label: 'People & access', icon: 'users', roles: ['super_admin', 'admin', 'manager'] },
@@ -143,11 +144,11 @@ function packNav(p: 'ccts' | 'brsr' | 'uaemrv'): { group?: string; items: NavIte
     { group: 'Help', items: [{ to: '/help', label: 'User manual', icon: 'book' }] },
   ];
 }
-type Product = 'ekotrace' | 'ekofin' | 'cbam' | 'ccts' | 'brsr' | 'uaemrv';
-const HOME: Record<Product, string> = { ekotrace: '/home', ekofin: '/fin', cbam: '/cbam/home', ccts: '/ccts', brsr: '/brsr', uaemrv: '/uae-mrv' };
-const SHORT: Record<Product, string> = { ekotrace: 'TRC', ekofin: 'FIN', cbam: 'CBM', ccts: 'CCT', brsr: 'BRS', uaemrv: 'MRV' };
+type Product = 'ekotrace' | 'ekofin' | 'cbam' | 'ccts' | 'brsr' | 'uaemrv' | 'energy';
+const HOME: Record<Product, string> = { ekotrace: '/home', ekofin: '/fin', cbam: '/cbam/home', ccts: '/ccts', brsr: '/brsr', uaemrv: '/uae-mrv', energy: '/energy-mgmt' };
+const SHORT: Record<Product, string> = { ekotrace: 'TRC', ekofin: 'FIN', cbam: 'CBM', ccts: 'CCT', brsr: 'BRS', uaemrv: 'MRV', energy: 'NRG' };
 /** Packages that sit inside EKOTRACE's Disclose menu when the company has EKOTRACE. */
-const ADDONS: Product[] = ['ccts', 'brsr', 'uaemrv'];
+const ADDONS: Product[] = ['ccts', 'brsr', 'uaemrv', 'energy'];
 /** Short side-menu name of the financed-emissions factor library (EKOFIN EFs / Financed EFs). */
 const FIN_EF = productName('ekofin') === 'EKOFIN' ? 'EKOFIN EFs' : 'Financed EFs';
 const PRODUCT_NAME: Record<Product, string> = new Proxy({} as Record<Product, string>, { get: (_t, p) => productName(p as Product) });
@@ -170,7 +171,7 @@ const EKO_NAV: { group?: string; items: NavItem[] }[] = [
     { to: '/suppliers', label: 'Suppliers', icon: 'users', roles: ['super_admin', 'admin', 'manager', 'preparer', 'verifier'] },
     { to: '/lca', label: 'Product LCA', icon: 'leaf', roles: ['super_admin', 'admin', 'manager', 'preparer', 'verifier'] },
   ] },
-  { group: 'Net zero', items: [{ to: '/targets', label: 'Targets & actions', icon: 'target' }, { to: '/credits', label: 'Carbon credits', icon: 'leaf' }] },
+  { group: 'Net zero', items: [{ to: '/targets', label: 'Targets & actions', icon: 'target' }, { to: '/energy-mgmt', label: 'Energy management', icon: 'bolt', product: 'energy' }, { to: '/credits', label: 'Carbon credits', icon: 'leaf' }] },
   { group: 'Disclose', items: [{ to: '/reports', label: 'Reports', icon: 'doc' }, { to: '/cbam', label: 'CBAM', icon: 'scale', roles: ['super_admin', 'admin', 'manager', 'verifier'] }, { to: '/ccts', label: 'India CCTS', icon: 'gauge', roles: ['super_admin', 'admin', 'manager', 'verifier'], product: 'ccts' }, { to: '/brsr', label: 'BRSR Core', icon: 'list', roles: ['super_admin', 'admin', 'manager', 'preparer', 'verifier'], product: 'brsr' }, { to: '/uae-mrv', label: 'UAE MRV', icon: 'shield', roles: ['super_admin', 'admin', 'manager', 'preparer', 'verifier'], product: 'uaemrv' }, { to: '/esg', label: 'ESG & materiality', icon: 'grid', roles: ['super_admin', 'admin', 'manager', 'verifier'] }, { to: '/assurance', label: 'Audit & assurance', icon: 'shield', roles: ['super_admin', 'admin', 'manager', 'verifier'] }] },
   { group: 'Setup', items: [
     { to: '/organisation', label: 'Organisation & groups', icon: 'tree' },
@@ -245,9 +246,9 @@ function Shell() {
   const owned: Product[] = (tenant?.products?.length ? tenant.products : ['ekotrace']) as Product[];
   const products: Product[] = owned.includes('ekotrace') ? owned.filter((p) => !ADDONS.includes(p)) : owned;
   const [picked, setPicked] = useState<Product>(() => { try { return (localStorage.getItem('eko_product') as Product) || 'ekotrace'; } catch { return 'ekotrace'; } });
-  const product: Product = path.startsWith('/fin') && products.includes('ekofin') ? 'ekofin' : path.startsWith('/ccts') && products.includes('ccts') ? 'ccts' : path.startsWith('/brsr') && products.includes('brsr') ? 'brsr' : path.startsWith('/uae-mrv') && products.includes('uaemrv') ? 'uaemrv' : path.startsWith('/cbam/') && products.includes('cbam') && (picked === 'cbam' || !products.includes('ekotrace')) ? 'cbam' : products.includes(picked) ? picked : products[0]!;
+  const product: Product = path.startsWith('/fin') && products.includes('ekofin') ? 'ekofin' : path.startsWith('/ccts') && products.includes('ccts') ? 'ccts' : path.startsWith('/brsr') && products.includes('brsr') ? 'brsr' : path.startsWith('/uae-mrv') && products.includes('uaemrv') ? 'uaemrv' : path.startsWith('/energy-mgmt') && products.includes('energy') ? 'energy' : path.startsWith('/cbam/') && products.includes('cbam') && (picked === 'cbam' || !products.includes('ekotrace')) ? 'cbam' : products.includes(picked) ? picked : products[0]!;
   const cbamRole = useCbamRole(product === 'cbam');
-  const NAV = product === 'ekofin' ? FIN_NAV : product === 'cbam' ? cbamNav(cbamRole ?? 'both') : product === 'ccts' || product === 'brsr' || product === 'uaemrv' ? packNav(product) : EKO_NAV;
+  const NAV = product === 'ekofin' ? FIN_NAV : product === 'cbam' ? cbamNav(cbamRole ?? 'both') : product === 'ccts' || product === 'brsr' || product === 'uaemrv' || product === 'energy' ? packNav(product) : EKO_NAV;
   const switchTo = (p: Product) => { setPicked(p); try { localStorage.setItem('eko_product', p); } catch { /* not kept */ } nav(HOME[p]); };
   const allGroups = NAV.flatMap((g) => (g.group ? [g.group] : []));
   const allClosed = allGroups.every((g) => folded.has(g));
@@ -373,6 +374,7 @@ function Shell() {
           <Route path="/ccts" element={<NeedCo><NeedPack has={owned.includes('ccts')} name="India CCTS"><Ccts /></NeedPack></NeedCo>} />
           <Route path="/brsr" element={<NeedCo><NeedPack has={owned.includes('brsr')} name="BRSR Core"><Brsr /></NeedPack></NeedCo>} />
           <Route path="/uae-mrv" element={<NeedCo><NeedPack has={owned.includes('uaemrv')} name="UAE MRV"><UaeMrv /></NeedPack></NeedCo>} />
+          <Route path="/energy-mgmt" element={<NeedCo><NeedPack has={owned.includes('energy')} name="Energy management"><EnergyMgmt /></NeedPack></NeedCo>} />
           <Route path="/lca" element={<NeedCo><ProductLca /></NeedCo>} />
           <Route path="/cbam" element={product === 'cbam' ? <Navigate to="/cbam/home" replace /> : <NeedCo><Cbam /></NeedCo>} />
           <Route path="/cbam/home" element={<NeedCbam><CbamHomeByRole /></NeedCbam>} />

@@ -1629,3 +1629,4 @@ table.brsrtable tr.derived td { background: #F7FBF9; }
 table.brsrtable td, table.brsrtable th { padding-left: 8px; padding-right: 8px; }
 table.brsrtable td.brsrlbl { min-width: 220px; max-width: 320px; }
 fieldset.plain { border: 0; margin: 0; padding: 0; min-width: 0; }
+.ok-t { color: var(--ok); }
