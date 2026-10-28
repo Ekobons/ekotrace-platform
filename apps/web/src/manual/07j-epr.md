@@ -35,17 +35,20 @@ EPR is a **package of its own**, switched on per company by the Ekobon team. Wit
 | EU — packaging (PPWR, Regulation (EU) 2025/40) | by material, four plastic types | a fee per tonne to the producer responsibility organisation (no tonnage target) | registration in each member state from 12 August 2026; recycled content in plastic from 2030: contact-sensitive PET 30%, other contact-sensitive 10%, beverage bottles 30%, other 35% (2040: 50 / 25 / 65 / 65%) |
 | Other scheme | packaging, EEE, batteries, tyres, oil, textiles, other | typed | typed — e.g. the UAE framework (MOCCAE, pilot with Tadweer) |
 
-India periods run April–March and are shown as *FY 2025-26*; the year picker shows the year the financial year ends in. EU and other schemes run by calendar year.
+India periods run April–March and are shown as *FY 2025-26*; the year picker shows the year the financial year ends in. EU and other schemes run by calendar year. The page opens on the current year: the current Indian financial year when every stream runs April–March.
 
 ## The year
 
 For each year the stream shows the **base** (and which years it comes from), the **target**, the **obligation**, the shortfall **carried in** from earlier years, the certificates that **met** it and the **shortfall**:
 
 - Certificates clear the oldest carried shortfall first, then the year's own obligation.
-- In India a shortfall may be carried for up to three years. After that it is forfeited to environmental compensation and no longer carried.
+- In India a shortfall may be carried for up to three years. Past that it is still owed, and is flagged: compensation paid on it is no longer refundable.
+- The recycling part of a carried shortfall is carried too: recycling certificates must cover this year's recycling minimum and what is still carried.
+- Certificates beyond what was required are shown as surplus.
+- With the two-year average, a base taken from one year only is flagged: type the other year, or 0 if nothing was placed.
 - **Exposure** is the shortfall × the environmental compensation rate typed on the stream. **To buy** is the shortfall × the assumed certificate price.
 - For plastic packaging, at least the **recycling share** of the obligation must be met with recycling certificates. The rest may be end-of-life disposal (co-processing, waste-to-energy, road building) where the guidelines allow it.
-- Batteries and tyres: certificates bought may cover the liability, any carried liability and 10% more. More is flagged. A tyre certificate used after its two years have run out is flagged.
+- Batteries and tyres: certificates bought may cover the liability, any carried liability and 10% more. More is flagged. A tyre certificate used after its two years have run out does not count.
 
 **Recycled content** compares the recycled plastic (or material) in what was placed on the market with the required share. For food-contact plastic packaging, the FY 2025-26 shortfall may be carried for up to three years from FY 2026-27, clearing at least one-third a year. The stream shows what is still carried and how far it is behind that schedule. Importers' own recycled content does not count, but certificates from surplus PIBOs do (kind *Recycled content*).
 
@@ -54,19 +57,19 @@ For each year the stream shows the **base** (and which years it comes from), the
 | Who | Records |
 |---|---|
 | Producer, importer, brand owner | certificates bought: kind (recycling, end-of-life, recycled content, refurbishing, reuse), the compliance year it counts for, the year generated (for validity), tonnes, price, certificate no., recycler and registration |
-| Recycler / processor | certificates generated (year generated), and sold (year sold, buyer, price). No more can be sold than are in stock, and a generated certificate cannot be removed while sales draw on it |
+| Recycler / processor | certificates generated (year generated), and sold (year sold, buyer, price). Sales draw on the oldest certificates of the same kind still valid in the year of the sale. Unsold certificates past their validity lapse. No more can be sold than are in stock, and a generated certificate cannot be removed while sales draw on it |
 
-A certificate number is recorded once per stream. For tyres, choose the end product (each has a weightage).
+A certificate number is recorded once: a number bought on one stream cannot be applied on another. For tyres, choose the end product (each has a weightage).
 
 ## Annual return
 
-Click a year's **Return** to record its status, the date filed and the acknowledgement, with the evidence from the Document vault. A filed return locks that year's quantities. Set it back to *in progress* to change them. A stream with a filed return cannot be deleted: set it inactive instead.
+Click a year's **Return** to record its status, the date filed and the acknowledgement, with the evidence from the Document vault. A filed return locks that year: its quantities, its certificates and the settings behind its obligation (average life, food contact, that year's targets). Set it back to *in progress* to change them. Once a stream has figures or certificates, its regime, role and category stay as they are. A stream with a filed return cannot be deleted: set it inactive instead.
 
 ## Compliance desk
 
 With the Compliance desk, two regulations read from EPR:
 
-- **India EPR:** annual returns (done when every India producer stream has filed) and targets met (done when no stream is short).
+- **India EPR:** annual returns (done when every India producer stream has filed) and targets met (done when no stream is short: obligation, recycling minimum and recycled content).
 - **EU PPWR:** registration in each member state (done when every EU stream has a registration) and reporting.
 
 ## Excel

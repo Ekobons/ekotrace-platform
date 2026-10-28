@@ -23,7 +23,7 @@ import { AppError, notFound } from '../lib/errors.js';
 import { PRODUCT } from '../lib/brand.js';
 import { sendWorkbook, styleHeader } from '../lib/xlsx.js';
 import { needProduct } from '../lib/products.js';
-import { REGIMES, periodLabel, positions, type Cert, type Position, type Regime, type StreamSettings, type YearRow } from '../lib/epr.js';
+import { REGIMES, periodLabel, positions, recyclerStock, type Cert, type Position, type Regime, type StreamSettings, type YearRow } from '../lib/epr.js';
 
 const uuid = z.string().uuid();
 const YEAR = z.coerce.number().int().min(2015).max(2100);
@@ -34,9 +34,9 @@ const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine((v) => !Number.isNaN
 const canSetup = (req: FastifyRequest) => ['super_admin', 'admin', 'platform_admin'].includes(req.user.role);
 const canData = (req: FastifyRequest) => ['super_admin', 'admin', 'manager', 'preparer', 'platform_admin'].includes(req.user.role);
 const canCerts = (req: FastifyRequest) => ['super_admin', 'admin', 'manager', 'platform_admin'].includes(req.user.role);
-const txt = (max: number) => z.string().trim().max(max).nullable().default(null);
+const txt = (max: number) => z.string().trim().max(max).nullable().default(null).transform((v) => (v === '' ? null : v));
 const REGIME_KEYS = Object.keys(REGIMES) as [Regime, ...Regime[]];
-const pctMap = z.record(z.string().regex(/^(20[1-9]\d|2100)$/), z.number().min(0).max(100)).default({});
+const pctMap = z.record(z.string().regex(/^\d{4}$/).refine((k) => Number(k) >= 2015 && Number(k) <= 2100, 'Year from 2015'), z.number().min(0).max(100)).default({});
 export const ROLES: Record<string, string> = { producer: 'Producer', importer: 'Importer', brand_owner: 'Brand owner', recycler: 'Recycler / processor' };
 export const KINDS: Record<string, string> = { recycling: 'Recycling', eol: 'End-of-life disposal', recycled_content: 'Recycled content (surplus PIBO)', refurbish: 'Refurbishing', reuse: 'Reuse' };
 
@@ -83,11 +83,8 @@ function compute(s: any, years: any[], certs: any[], to: number) {
   const C = certs.map(certOf);
   const last = Math.max(to, ...years.map((y) => y.year), ...C.map((x) => x.year ?? 0));
   const pos = positions(settingsOf(s), years.map(yearOf), C, last);
-  const R = REGIMES[s.regime as Regime];
-  const generated = C.filter((x) => x.direction === 'in').reduce((t, x) => t + x.tonnes, 0), sold = C.filter((x) => x.direction === 'out').reduce((t, x) => t + x.tonnes, 0);
-  // recyclers: certificates generated, less sold, less those past their validity (counted at the year viewed)
-  const lapsed = R.certValidityYears ? C.filter((x) => x.direction === 'in' && x.generatedYear != null && to > x.generatedYear + R.certValidityYears!).reduce((t, x) => t + x.tonnes, 0) : 0;
-  return { pos, stock: s.role === 'recycler' ? { generated, sold, lapsed: Math.min(lapsed, Math.max(0, generated - sold)), available: Math.max(0, generated - sold - lapsed) } : null };
+  // recyclers: certificates as at the year viewed, sales drawn first in, first out with validity
+  return { pos, stock: s.role === 'recycler' ? recyclerStock(s.regime as Regime, C, to) : null };
 }
 const at = (pos: Position[], y: number) => pos.find((p) => p.year === y) ?? null;
 
@@ -96,9 +93,13 @@ export async function eprRoutes(app: FastifyInstance) {
 
   app.get('/api/epr', async (req) => {
     const tenant = requireTenant(req);
-    const year = z.object({ year: YEAR.optional() }).parse(req.query).year ?? new Date().getUTCFullYear();
+    const asked = z.object({ year: YEAR.optional() }).parse(req.query).year;
     return tenantTx(tenant, async (c) => {
       const streams = (await c.query(`SELECT * FROM epr_stream ORDER BY active DESC, regime, name`)).rows;
+      // without a year: the current one — India's financial year when every active stream runs April–March
+      const now = new Date(), cal = now.getUTCFullYear();
+      const act = streams.filter((x) => x.active);
+      const year = asked ?? (act.length && act.every((x) => REGIMES[x.regime as Regime].period === 'india_fy') ? (now.getUTCMonth() >= 3 ? cal + 1 : cal) : cal);
       const ys = (await c.query(`SELECT * FROM epr_year ORDER BY year`)).rows, cs = (await c.query(`SELECT * FROM epr_cert`)).rows;
       const out = streams.map((s) => {
         const { pos, stock } = compute(s, ys.filter((y) => y.stream_id === s.id), cs.filter((x) => x.stream_id === s.id), year);
@@ -129,9 +130,17 @@ export async function eprRoutes(app: FastifyInstance) {
   const writeStream = async (c: Tx, req: FastifyRequest, b: StreamBody, id?: string) => {
     const v = [b.regime, b.role, b.category, b.name, b.country, b.scheme, b.registration, b.avgLife, b.foodContact, JSON.stringify(b.targetPct), JSON.stringify(b.recyclingPct), JSON.stringify(b.rcPct), b.ecRate, b.certPrice, b.feeRate, b.currency, b.pro, b.registeredOn, b.notes, b.active];
     if (id) {
-      const old = (await c.query(`SELECT role FROM epr_stream WHERE id = $1`, [id])).rows[0];
+      const old = (await c.query(`SELECT * FROM epr_stream WHERE id = $1 FOR UPDATE`, [id])).rows[0];
       if (!old) throw notFound('Stream');
-      if (old.role === 'recycler' && b.role !== 'recycler' && (await c.query(`SELECT 1 FROM epr_cert WHERE stream_id = $1 AND direction = 'out' LIMIT 1`, [id])).rowCount) throw new AppError('This stream has certificates sold: it stays a recycler stream');
+      const used = !!(await c.query(`SELECT 1 FROM epr_cert WHERE stream_id = $1 UNION ALL SELECT 1 FROM epr_year WHERE stream_id = $1 LIMIT 1`, [id])).rowCount;
+      if (used && (old.regime !== b.regime || old.role !== b.role || old.category !== b.category)) throw new AppError('The stream has figures or certificates: its regime, role and category stay as they are (add a new stream instead)');
+      // a filed year's obligation must not change behind the return
+      const filed = (await c.query(`SELECT year FROM epr_year WHERE stream_id = $1 AND return_status = 'filed'`, [id])).rows.map((r) => String(r.year));
+      if (filed.length) {
+        const same = (m1: Record<string, number>, m2: Record<string, number>) => filed.every((y) => (m1[y] ?? null) === (m2[y] ?? null));
+        if ((num(old.avg_life) ?? null) !== b.avgLife || old.food_contact !== b.foodContact || !same(old.target_pct ?? {}, b.targetPct) || !same(old.recycling_pct ?? {}, b.recyclingPct) || !same(old.rc_pct ?? {}, b.rcPct))
+          throw new AppError(`Returns are filed for ${filed.map((y) => periodLabel(b.regime, Number(y))).join(', ')}: the average life, food-contact setting and those years' targets stay as filed`, 409, 'FILED');
+      }
       await c.query(`UPDATE epr_stream SET regime=$2, role=$3, category=$4, name=$5, country=$6, scheme=$7, registration=$8, avg_life=$9, food_contact=$10, target_pct=$11, recycling_pct=$12, rc_pct=$13, ec_rate=$14, cert_price=$15, fee_rate=$16, currency=$17, pro=$18, registered_on=$19, notes=$20, active=$21 WHERE id = $1`, [id, ...v]);
       await audit(c, req, 'epr.stream.update', 'epr_stream', id, b);
       return id;
@@ -211,9 +220,17 @@ export async function eprRoutes(app: FastifyInstance) {
   });
   type CertBody = z.infer<typeof certBody>;
   /** Rules a certificate must meet against its stream; `except` leaves the certificate being changed out of the stock. */
+  const filedYear = async (c: Tx, streamId: string, y: number | null) => y != null && !!(await c.query(`SELECT 1 FROM epr_year WHERE stream_id = $1 AND year = $2 AND return_status = 'filed'`, [streamId, y])).rowCount;
+  /** A recycler's stock must cover every sale (first in, first out, same kind, valid in the year sold) once the change is made. */
+  const checkStock = async (c: Tx, s: any, change: (list: (Cert & { id?: string })[]) => (Cert & { id?: string })[]) => {
+    const list = (await c.query(`SELECT * FROM epr_cert WHERE stream_id = $1`, [s.id])).rows.map(certOf);
+    const st = recyclerStock(s.regime as Regime, change(list), 2100);
+    if (st.problems.length) throw new AppError(st.problems[0]!);
+  };
   const checkCert = async (c: Tx, b: CertBody, except?: string) => {
-    const s = (await c.query(`SELECT * FROM epr_stream WHERE id = $1`, [b.streamId])).rows[0];
+    const s = (await c.query(`SELECT * FROM epr_stream WHERE id = $1 FOR UPDATE`, [b.streamId])).rows[0];
     if (!s) throw notFound('Stream');
+    if (s.role !== 'recycler' && await filedYear(c, b.streamId, b.year)) throw new AppError(`The return for ${periodLabel(s.regime, b.year!)} is filed: reopen it to change its certificates`, 409, 'FILED');
     const R = REGIMES[s.regime as Regime];
     if (b.direction === 'out' && s.role !== 'recycler') throw new AppError('Only a recycler stream sells certificates');
     if (s.role !== 'recycler' && b.year == null) throw new AppError('Give the compliance year the certificate counts for');
@@ -222,14 +239,13 @@ export async function eprRoutes(app: FastifyInstance) {
     if (R.certValidityYears && b.generatedYear != null && b.year != null && b.direction === 'in' && s.role !== 'recycler' && b.year > b.generatedYear + R.certValidityYears)
       throw new AppError(`Certificates of this regime lapse ${R.certValidityYears} years after the year they are generated in`);
     if (b.documentId && !(await c.query(`SELECT 1 FROM document WHERE id = $1`, [b.documentId])).rowCount) throw notFound('Document');
-    if (b.direction === 'out') {
-      const r = (await c.query(`SELECT coalesce(sum(CASE WHEN direction = 'in' THEN tonnes ELSE -tonnes END), 0)::float8 AS stock FROM epr_cert WHERE stream_id = $1 AND ($2::uuid IS NULL OR id <> $2)`, [b.streamId, except ?? null])).rows[0];
-      if (b.tonnes > Number(r.stock) + 1e-9) throw new AppError(`Only ${Number(r.stock).toLocaleString('en-US', { maximumFractionDigits: 3 })} t of certificates in stock`);
-    }
-    if (except && b.direction === 'in' && s.role === 'recycler') {
-      // lowering a generated certificate may not leave more sold than generated
-      const r = (await c.query(`SELECT coalesce(sum(CASE WHEN direction = 'in' THEN tonnes ELSE -tonnes END), 0)::float8 AS stock FROM epr_cert WHERE stream_id = $1 AND id <> $2`, [b.streamId, except])).rows[0];
-      if (Number(r.stock) + b.tonnes < -1e-9) throw new AppError('More certificates would be sold than generated');
+    if (s.role === 'recycler' && b.direction === 'out' && b.year == null) throw new AppError('Give the year the certificates were sold');
+    if (b.certificateNo && s.role !== 'recycler' && b.direction === 'in'
+      && (await c.query(`SELECT 1 FROM epr_cert x JOIN epr_stream y ON y.id = x.stream_id WHERE x.certificate_no = $1 AND x.direction = 'in' AND y.role <> 'recycler' AND x.stream_id <> $2 LIMIT 1`, [b.certificateNo, b.streamId])).rowCount)
+      throw new AppError('This certificate number is already applied on another stream');
+    if (s.role === 'recycler') {
+      const mine: Cert & { id?: string } = { id: except ?? 'new', year: b.year, kind: b.kind, direction: b.direction, tonnes: b.tonnes, price: b.price, generatedYear: b.generatedYear };
+      await checkStock(c, s, (list) => [...list.filter((x) => x.id !== except), mine]);
     }
   };
   const certVals = (b: CertBody) => [b.streamId, b.direction, b.kind, b.year, b.generatedYear, b.tonnes, b.price, b.certificateNo, b.counterparty, b.counterpartyReg, b.endProduct, b.tradedOn, b.documentId, b.note];
@@ -249,9 +265,10 @@ export async function eprRoutes(app: FastifyInstance) {
     const tenant = requireTenant(req); requireRole(req, 'super_admin', 'admin', 'manager');
     const cid = idOf(req, 'cid'), b = certBody.parse(req.body);
     return tenantTx(tenant, async (c) => {
-      const old = (await c.query(`SELECT stream_id FROM epr_cert WHERE id = $1 FOR UPDATE`, [cid])).rows[0];
+      const old = (await c.query(`SELECT c.stream_id, c.year, s.role, s.regime FROM epr_cert c JOIN epr_stream s ON s.id = c.stream_id WHERE c.id = $1 FOR UPDATE OF c`, [cid])).rows[0];
       if (!old) throw notFound('Certificate');
       if (old.stream_id !== b.streamId) throw new AppError('A certificate cannot move to another stream');
+      if (old.role !== 'recycler' && await filedYear(c, old.stream_id, old.year)) throw new AppError(`The return for ${periodLabel(old.regime, old.year)} is filed: reopen it to change its certificates`, 409, 'FILED');
       await checkCert(c, b, cid);
       await c.query(`UPDATE epr_cert SET stream_id=$2, direction=$3, kind=$4, year=$5, generated_year=$6, tonnes=$7, price=$8, certificate_no=$9, counterparty=$10, counterparty_reg=$11, end_product=$12, traded_on=$13, document_id=$14, note=$15 WHERE id = $1`, [cid, ...certVals(b)]).catch(dupNo);
       await audit(c, req, 'epr.cert.update', 'epr_cert', cid, b);
@@ -264,9 +281,10 @@ export async function eprRoutes(app: FastifyInstance) {
     return tenantTx(tenant, async (c) => {
       const x = (await c.query(`SELECT * FROM epr_cert WHERE id = $1 FOR UPDATE`, [cid])).rows[0];
       if (!x) throw notFound('Certificate');
-      if (x.direction === 'in') {
-        const r = (await c.query(`SELECT coalesce(sum(CASE WHEN direction = 'in' THEN tonnes ELSE -tonnes END), 0)::float8 AS stock FROM epr_cert WHERE stream_id = $1 AND id <> $2`, [x.stream_id, cid])).rows[0];
-        if (Number(r.stock) < -1e-9) throw new AppError('Certificates from this one have been sold: remove the sale first');
+      const s = (await c.query(`SELECT * FROM epr_stream WHERE id = $1 FOR UPDATE`, [x.stream_id])).rows[0];
+      if (s.role !== 'recycler' && await filedYear(c, x.stream_id, x.year)) throw new AppError(`The return for ${periodLabel(s.regime, x.year)} is filed: reopen it to change its certificates`, 409, 'FILED');
+      if (s.role === 'recycler' && x.direction === 'in') {
+        try { await checkStock(c, s, (list) => list.filter((y) => y.id !== cid)); } catch { throw new AppError('Certificates from this one have been sold: remove the sale first'); }
       }
       await c.query(`DELETE FROM epr_cert WHERE id = $1`, [cid]);
       await audit(c, req, 'epr.cert.delete', 'epr_cert', cid, { tonnes: x.tonnes, certificateNo: x.certificate_no });

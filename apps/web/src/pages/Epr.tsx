@@ -23,15 +23,17 @@ export function Epr() {
   const [sp, setSp] = useSearchParams();
   const set = (k: string, v: string | null) => { const n = new URLSearchParams(sp); if (v) n.set(k, v); else n.delete(k); setSp(n, { replace: true }); };
   const thisYear = new Date().getFullYear();
-  const year = sp.get('y') ? Number(sp.get('y')) : thisYear;
+  const asked = sp.get('y') ? Number(sp.get('y')) : null;
   const sid = sp.get('s');
   const tab = sp.get('tab') ?? 'overview';
   const [o, setO] = useState<Overview | null>(null);
   const [tick, setTick] = useState(0);
   const [edit, setEdit] = useState<Stream | 'new' | null>(null);
   const reload = () => setTick((x) => x + 1);
-  useEffect(() => { let live = true; eprApi.overview(year).then((x) => { if (live) setO(x); }).catch((e) => toast((e as Error).message)); return () => { live = false; }; }, [year, tick]); // eslint-disable-line react-hooks/exhaustive-deps
+  // without a year chosen, the API picks the current one (India's financial year when every stream runs April–March)
+  useEffect(() => { let live = true; eprApi.overview(asked).then((x) => { if (live) setO(x); }).catch((e) => toast((e as Error).message)); return () => { live = false; }; }, [asked, tick]); // eslint-disable-line react-hooks/exhaustive-deps
   if (!o) return <div className="page"><div className="card empty">Loading…</div></div>;
+  const year = o.year;
   const years = [...new Set([year, thisYear - 2, thisYear - 1, thisYear, thisYear + 1])].sort((a, b) => b - a);
   const india = o.streams.some((s) => o.library[s.regime].period === 'india_fy');
   return (
@@ -61,11 +63,11 @@ function Kpis({ o }: { o: Overview }) {
   const short = prod.reduce((t, s) => t + (s.position?.shortfall ?? 0), 0);
   const cur = [...new Set(prod.filter((s) => s.position?.ecExposure).map((s) => s.currency))];
   const ec = prod.reduce((t, s) => t + (s.position?.ecExposure ?? 0), 0);
-  const due = prod.filter((s) => s.returnDue), filed = due.filter((s) => s.returnStatus === 'filed').length;
+  const due = o.streams.filter((s) => s.active && s.role !== 'recycler' && s.returnDue), filed = due.filter((s) => s.returnStatus === 'filed').length;
   const stock = rec.reduce((t, s) => t + (s.stock?.available ?? 0), 0);
   return (
     <div className="kgrid4">
-      <div className="card kpi"><span className="muted small">Obligation this year</span><b>{t1(req)} <small className="muted">t</small></b><span className="muted small">{prod.length} producer {prod.length === 1 ? 'stream' : 'streams'}, carried shortfalls included</span></div>
+      <div className="card kpi"><span className="muted small">Obligation this year (all materials)</span><b>{t1(req)} <small className="muted">t</small></b><span className="muted small">{prod.length} producer {prod.length === 1 ? 'stream' : 'streams'}, carried shortfalls included</span></div>
       <div className="card kpi"><span className="muted small">Met with certificates</span><b>{req ? Math.round(pctOf(met, req)) : 0}%</b>
         <div style={{ height: 6, background: 'var(--bg)', borderRadius: 4, marginTop: 6 }}><div style={{ width: `${pctOf(met, req)}%`, height: 6, borderRadius: 4, background: 'var(--primary)' }} /></div><span className="muted small">{t1(met)} t applied</span></div>
       <div className="card kpi"><span className="muted small">Shortfall</span><b style={{ color: short ? 'var(--bad)' : undefined }}>{t1(short)} <small className="muted">t</small></b><span className="muted small">{ec && cur.length === 1 ? `Compensation exposure ${money(ec, cur[0]!)}` : ec ? 'Compensation in several currencies' : 'No compensation exposure'}</span></div>
@@ -156,7 +158,7 @@ function StreamView({ id, year, o, back, onEdit, reloadAll }: { id: string; year
           <div className="card kpi"><span className="muted small">Met with certificates</span><b>{t1(p?.met)} t</b><span className="muted small">{p?.metRecycling ? `${t1(p.metRecycling)} t recycling` : ''}{p?.recyclingShortfall ? <span className="bad-t"> · recycling short {t1(p.recyclingShortfall)} t</span> : ''}</span></div>
           <div className="card kpi"><span className="muted small">Shortfall</span><b style={{ color: p?.shortfall ? 'var(--bad)' : undefined }}>{t1(p?.shortfall)} t</b><span className="muted small">{p?.ecExposure != null ? `Exposure ${money(p.ecExposure, s.currency)}` : 'Set the compensation rate in Settings'}{p?.costToClose != null && p.shortfall ? ` · ${money(p.costToClose, s.currency)} to buy` : ''}</span></div>
         </div>)}
-      {p?.warnings.map((w) => <div key={w} className="note warn small" style={{ marginTop: 8 }}>{w}</div>)}
+      {[...(p?.warnings ?? []), ...(d.stock?.problems ?? [])].map((w) => <div key={w} className="note warn small" style={{ marginTop: 8 }}>{w}</div>)}
       <YearsCard d={d} onReturn={setRet} reload={reload} />
       <div className="card flush" style={{ marginTop: 12 }}>
         <div className="row vfilters"><b className="grow">Certificates</b>{d.canCerts && <button className="btn sm p" onClick={() => setCert('new')}>+ {rec ? 'Generated or sold' : 'Certificate bought'}</button>}</div>
@@ -185,8 +187,14 @@ function YearsCard({ d, onReturn, reload }: { d: StreamDetail; onReturn: (y: num
   const { toast } = useApp();
   const s = d.stream, L = d.library, rec = s.role === 'recycler', plastic = s.regime === 'in_plastic', ppwr = s.regime === 'eu_ppwr';
   const allYears = [...new Set([...d.years.map((y) => y.year), ...d.positions.map((p) => p.year), d.year, d.year - 1, d.year - 2])].sort((a, b) => a - b);
-  const init = () => Object.fromEntries(allYears.map((y) => { const r = d.years.find((x) => x.year === y); return [y, { placed: r?.placed ?? null, preConsumer: r?.preConsumer ?? null, suppliedToPibo: r?.suppliedToPibo ?? null, recycledTonnes: r?.recycledTonnes ?? null, obligationTyped: r?.obligationTyped ?? null, note: r?.note ?? '' }]; }));
-  const [v, setV] = useState<Record<number, Record<Cell, number | null> & { note: string }>>(init);
+  const str = (x: number | null | undefined) => (x == null ? '' : String(x));
+  const init = () => Object.fromEntries(allYears.map((y) => { const r = d.years.find((x) => x.year === y); return [y, { placed: str(r?.placed), preConsumer: str(r?.preConsumer), suppliedToPibo: str(r?.suppliedToPibo), recycledTonnes: str(r?.recycledTonnes), obligationTyped: str(r?.obligationTyped), note: r?.note ?? '' }]; }));
+  // what is typed is kept as text (so 12.5 can be typed) and read as numbers on save
+  const [v, setV] = useState<Record<number, Record<Cell, string> & { note: string }>>(init);
+  const numOf = (t: string) => { const x = t.replace(/,/g, '').trim(); return x === '' ? null : Number(x); };
+  const CELLS: Cell[] = ['placed', 'preConsumer', 'suppliedToPibo', 'recycledTonnes', 'obligationTyped'];
+  const badCell = (t: string) => { const n = numOf(t); return n != null && (!Number.isFinite(n) || n < 0); };
+  const bad = allYears.some((y) => CELLS.some((k) => badCell(v[y]?.[k] ?? '')));
   const [dirty, setDirty] = useState(false);
   useEffect(() => { setV(init()); setDirty(false); }, [d]); // eslint-disable-line react-hooks/exhaustive-deps
   // the obligation typed from the portal is always offered where the library has no target; pre-consumer, PIBO and portal columns otherwise on request
@@ -199,13 +207,13 @@ function YearsCard({ d, onReturn, reload }: { d: StreamDetail; onReturn: (y: num
   const filed = (y: number) => d.years.find((x) => x.year === y)?.returnStatus === 'filed';
   const save = async () => {
     try {
-      await eprApi.years(s.id, allYears.filter((y) => !filed(y)).map((y) => ({ year: y, ...v[y]! })));
+      await eprApi.years(s.id, allYears.filter((y) => !filed(y)).map((y) => { const r = v[y]!; return { year: y, placed: numOf(r.placed), preConsumer: numOf(r.preConsumer), suppliedToPibo: numOf(r.suppliedToPibo), recycledTonnes: numOf(r.recycledTonnes), obligationTyped: numOf(r.obligationTyped), note: r.note }; }));
       toast('Saved'); setDirty(false); reload();
     } catch (e) { toast((e as Error).message); }
   };
   return (
     <div className="card flush" style={{ marginTop: 12 }}>
-      <div className="row vfilters"><b className="grow">Year by year</b><span className="muted small">{L.units}; {L.period === 'india_fy' ? 'April–March' : 'calendar years'}</span>{!rec && hidden > 0 && <button className="linkbtn small" onClick={() => setMore(!more)}>{more ? 'Fewer columns' : 'Pre-consumer, PIBO and portal columns'}</button>}{d.canData && <button className="btn sm p" disabled={!dirty} onClick={save}>Save figures</button>}</div>
+      <div className="row vfilters"><b className="grow">Year by year</b><span className="muted small">{L.units}; {L.period === 'india_fy' ? 'April–March' : 'calendar years'}</span>{!rec && hidden > 0 && <button className="linkbtn small" onClick={() => setMore(!more)}>{more ? 'Fewer columns' : 'Pre-consumer, PIBO and portal columns'}</button>}{d.canData && <button className="btn sm p" disabled={!dirty || bad} onClick={save}>Save figures</button>}</div>
       <div className="scrollx"><table className="t">
         <thead><tr><th>Period</th>{cols.map(([k, l]) => <th key={k} className="num">{l}</th>)}{!rec && !ppwr && <><th className="num">Base × target</th><th className="num">Obligation (t)</th><th className="num">Carried in</th><th className="num">Met (t)</th><th className="num">Shortfall</th></>}{!rec && <th className="num">Recycled content</th>}{!rec && <th className="ctr">Return</th>}</tr></thead>
         <tbody>{allYears.map((y) => {
@@ -213,7 +221,7 @@ function YearsCard({ d, onReturn, reload }: { d: StreamDetail; onReturn: (y: num
           return (
             <tr key={y} className={y === d.year ? 'sel' : ''}>
               <td className="nowrap"><b>{periodOf(L.period, y)}</b></td>
-              {cols.map(([k]) => <td key={k} className="num"><input className="input num cell" disabled={lock} value={v[y]?.[k] ?? ''} placeholder="—" onChange={(e) => { const t = e.target.value.replace(/,/g, '').trim(); const n = t === '' ? null : Number(t); if (t !== '' && !Number.isFinite(n)) return; setV({ ...v, [y]: { ...v[y]!, [k]: n } }); setDirty(true); }} /></td>)}
+              {cols.map(([k]) => <td key={k} className="num"><input className={`input num cell ${badCell(v[y]?.[k] ?? '') ? 'bad' : ''}`} disabled={lock} value={v[y]?.[k] ?? ''} placeholder="—" inputMode="decimal" onChange={(e) => { setV({ ...v, [y]: { ...v[y]!, [k]: e.target.value } }); setDirty(true); }} /></td>)}
               {!rec && !ppwr && <><td className="num small" title={p?.baseFrom}>{t1(p?.base)}{p?.targetPct != null ? ` × ${p.targetPct}%` : ''}</td><td className="num">{t1(p?.obligation)}{p?.typed ? <span className="muted small"> typed</span> : ''}</td>
                 <td className="num small">{p?.carriedIn ? t1(p.carriedIn) : '—'}</td><td className="num">{t1(p?.met)}</td><td className={`num ${p?.shortfall ? 'bad-t' : ''}`}>{t1(p?.shortfall)}</td></>}
               {!rec && <td className="num small">{p?.rcRequired != null ? <span className={p.rcShortfall ? 'bad-t' : ''}>{t1(p.rcActual)} / {t1(p.rcRequired)}{p.rcPct != null ? ` (${p.rcPct}%)` : ''}</span> : '—'}{p?.rcCarried ? <div className="muted small">{t1(p.rcCarried)} t carried</div> : null}</td>}
@@ -231,9 +239,9 @@ function CertDrawer({ d, o, c, year, onClose, onDone }: { d: StreamDetail; o: Ov
   const [f, setF] = useState({ direction: c?.direction ?? 'in', kind: c?.kind ?? 'recycling', year: c?.year ?? (rec ? null : year), generatedYear: c?.generatedYear ?? (rec ? year : null), tonnes: c ? String(c.tonnes) : '', price: c?.price != null ? String(c.price) : '',
     certificateNo: c?.certificateNo ?? '', counterparty: c?.counterparty ?? '', counterpartyReg: c?.counterpartyReg ?? '', endProduct: c?.endProduct ?? '', tradedOn: c?.tradedOn ?? '', documentId: c?.documentId ?? '', note: c?.note ?? '' });
   const up = (x: Partial<typeof f>) => setF((v) => ({ ...v, ...x }));
-  const yrs = Array.from({ length: 8 }, (_, i) => year + 1 - i);
+  const yrs = [...new Set([...Array.from({ length: 8 }, (_, i) => year + 1 - i), ...[c?.year, c?.generatedYear].filter((x): x is number => x != null)])].sort((a, b) => b - a);
   const tonnes = Number(f.tonnes.replace(/,/g, ''));
-  const ok = Number.isFinite(tonnes) && tonnes > 0 && (rec ? (f.direction === 'out' || f.generatedYear != null) : f.year != null);
+  const ok = Number.isFinite(tonnes) && tonnes > 0 && (rec ? (f.direction === 'out' ? f.year != null : f.generatedYear != null) : f.year != null);
   const body = (): CertBody => ({ streamId: s.id, direction: f.direction as 'in' | 'out', kind: f.kind as Cert['kind'], year: f.year, generatedYear: f.generatedYear, tonnes, price: f.price.trim() ? Number(f.price.replace(/,/g, '')) : null,
     certificateNo: f.certificateNo.trim() || null, counterparty: f.counterparty.trim() || null, counterpartyReg: f.counterpartyReg.trim() || null, endProduct: f.endProduct.trim() || null, tradedOn: f.tradedOn || null, documentId: f.documentId || null, note: f.note.trim() });
   const go = async (fn: () => Promise<unknown>) => { try { await fn(); toast('Saved'); onDone(); } catch (e) { toast((e as Error).message); } };
@@ -242,7 +250,7 @@ function CertDrawer({ d, o, c, year, onClose, onDone }: { d: StreamDetail; o: Ov
     <dialog ref={dlg} className="drawer" onClose={onClose}><div className="in">
       <div className="row"><div className="grow"><div className="eyebrow">{s.name}</div><h2>{c ? 'Certificate' : rec ? 'Certificates generated or sold' : 'Certificate bought'}</h2></div><button className="btn ghost" onClick={() => dlg.current?.close()} aria-label="Close"><Icon name="x" /></button></div>
       <div className="vform">
-        {rec && <label className="field span2"><span>Type</span><select className="input" value={f.direction} onChange={(e) => up({ direction: e.target.value as 'in' | 'out' })}><option value="in">Generated (from tonnes processed)</option><option value="out">Sold to a producer</option></select></label>}
+        {rec && <label className="field span2"><span>Type</span><select className="input" value={f.direction} onChange={(e) => { const dir = e.target.value as 'in' | 'out'; up(dir === 'out' ? { direction: dir, year: f.year ?? year, generatedYear: null } : { direction: dir, year: null, generatedYear: f.generatedYear ?? year }); }}><option value="in">Generated (from tonnes processed)</option><option value="out">Sold to a producer</option></select></label>}
         <label className="field"><span>Kind</span><select className="input" value={f.kind} onChange={(e) => up({ kind: e.target.value as Cert['kind'] })}>{Object.entries(o.kinds).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></label>
         <label className="field"><span>Tonnes</span><input className="input num" value={f.tonnes} onChange={(e) => up({ tonnes: e.target.value })} /></label>
         {!rec && <label className="field"><span>Counts for (compliance year)</span>{yearSel(f.year, (y) => up({ year: y }))}</label>}

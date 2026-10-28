@@ -5,7 +5,7 @@ import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import pg from 'pg';
 import ExcelJS from 'exceljs';
-import { REGIMES, baseOf, periodLabel, positions, type Cert, type StreamSettings, type YearRow } from '../src/lib/epr.js';
+import { REGIMES, baseOf, periodLabel, positions, recyclerStock, type Cert, type StreamSettings, type YearRow } from '../src/lib/epr.js';
 
 const S = (o: Partial<StreamSettings>): StreamSettings => ({ regime: 'in_plastic', role: 'brand_owner', category: 'cat1', avgLife: null, targetPct: {}, recyclingPct: {}, rcPct: {}, ecRate: null, certPrice: null, feeRate: null, foodContact: false, ...o });
 const Y = (year: number, placed: number | null, o: Partial<YearRow> = {}): YearRow => ({ year, placed, preConsumer: null, suppliedToPibo: null, recycledTonnes: null, obligationTyped: null, ...o });
@@ -15,7 +15,7 @@ const close = (a: number | null | undefined, b: number, tol = 1e-6) => assert.ok
 test('plastic: average of the two previous years; recycling share; carry-forward cleared oldest first; compensation', () => {
   const s = S({ ecRate: 5000, certPrice: 3000 });
   const rows = [Y(2024, 900), Y(2025, 1100, { preConsumer: 50, suppliedToPibo: 150 }), Y(2026, 1200), Y(2027, 1300)];
-  assert.deepEqual(baseOf(s, new Map(rows.map((r) => [r.year, r])), 2026), { base: 950, from: 'average of FY 2023-24 and FY 2024-25' });   // (900 + 1000) / 2
+  assert.deepEqual(baseOf(s, new Map(rows.map((r) => [r.year, r])), 2026), { base: 950, from: 'average of FY 2023-24 and FY 2024-25', partial: false });   // (900 + 1000) / 2
   const p = positions(s, rows, [C(2025, 900), C(2026, 500), C(2026, 200, 'eol'), C(2027, 400)], 2027);   // FY 2024-25: 900 t on FY 2023-24 alone, met
   const y26 = p.find((x) => x.year === 2026)!, y27 = p.find((x) => x.year === 2027)!;
   close(y26.obligation, 950); close(y26.recyclingMin, 570); close(y26.met, 700); close(y26.shortfall, 250); close(y26.recyclingShortfall, 70);
@@ -26,11 +26,23 @@ test('plastic: average of the two previous years; recycling share; carry-forward
   assert.equal(REGIMES.in_plastic.recyclingShare!(2028, 'cat2'), 60); assert.equal(REGIMES.in_plastic.recyclingShare!(2028, 'cat4'), 80);
 });
 
-test('plastic: a shortfall carried more than three years is forfeited', () => {
-  const p = positions(S({}), [Y(2022, 100), Y(2023, 100), Y(2024, 100), Y(2025, 100), Y(2026, 100), Y(2027, 100), Y(2028, 100)], [], 2029);
-  // obligations from FY 2023-24 (base 100 at 70% in 2023, 100% from 2024); the 2024 shortfall is forfeited in 2028
-  const y28 = p.find((x) => x.year === 2028)!;
-  assert.ok(y28.forfeited > 0);
+test('plastic: a shortfall carried three years stays owed and is flagged; recycling part carried; one-year base flagged', () => {
+  const p = positions(S({}), [Y(2022, 100), Y(2023, 100), Y(2024, 100), Y(2025, 100), Y(2026, 100), Y(2027, 100)], [], 2027);
+  const y27 = p.find((x) => x.year === 2027)!;
+  assert.ok(y27.overdue > 0); assert.ok(y27.warnings.some((w) => /no longer refundable/.test(w)));
+  close(y27.shortfall, 70 + 100 * 4);                                         // nothing forfeited: FY 2022-23 70 t + four years of 100 t
+  // 100 t carried with its recycling part: recycling certificates clear the carried part first
+  const r = positions(S({}), [Y(2023, 100), Y(2024, 100), Y(2025, 100)], [C(2024, 100), C(2026, 100)], 2026);   // FY 2024-25 unmet: 100 t (50 t recycling) carried
+  const r26 = r.find((x) => x.year === 2026)!;
+  close(r26.carriedIn, 100); close(r26.shortfall, 100); close(r26.recyclingShortfall, 60 + 50 - 100);
+  const one = positions(S({}), [Y(2025, 100)], [], 2026).find((x) => x.year === 2026)!;
+  assert.ok(one.warnings.some((w) => /one year only/.test(w)));
+  // surplus certificates are reported, not lost silently
+  const sp = positions(S({}), [Y(2024, 100), Y(2025, 100)], [C(2025, 100), C(2026, 150)], 2026).find((x) => x.year === 2026)!;
+  close(sp.surplus, 50);
+  // an importer's own recycled content does not count
+  const im = positions(S({ role: 'importer' }), [Y(2026, 100, { recycledTonnes: 40 })], [], 2026).find((x) => x.year === 2026)!;
+  close(im.rcShortfall, 30); assert.equal(im.rcActual, 0);
 });
 
 test('plastic recycled content: G.S.R. 237(E) targets; food-contact shortfall carried three years at one-third a year', () => {
@@ -56,9 +68,10 @@ test('e-waste: one average life earlier × 60 / 70 / 80%; batteries need the por
   const b2 = positions(S({ regime: 'in_battery', category: 'portable', avgLife: 3, role: 'producer', targetPct: { 2026: 70 } }), [Y(2023, 50)], [], 2026);
   close(b2.find((x) => x.year === 2026)!.obligation, 35);
   assert.equal(REGIMES.in_battery.recycledContent!(2028, 'ev'), 5); assert.equal(REGIMES.in_battery.recycledContent!(2027, 'industrial'), 40);
-  const ty = positions(S({ regime: 'in_tyre', category: 'new', role: 'producer' }), [Y(2024, 1000)], [C(2026, 1200, 'recycling', { generatedYear: 2023 })], 2026);
+  const ty = positions(S({ regime: 'in_tyre', category: 'new', role: 'producer' }), [Y(2024, 1000)], [C(2026, 300, 'recycling', { generatedYear: 2023 }), C(2026, 1200, 'recycling', { generatedYear: 2025 })], 2026);
   const t26 = ty.find((x) => x.year === 2026)!;
-  close(t26.obligation, 1000); assert.ok(t26.overCap); assert.ok(t26.warnings.some((w) => /lapsed/.test(w)));
+  close(t26.obligation, 1000); close(t26.lapsed, 300); close(t26.met, 1200); assert.ok(t26.overCap); assert.ok(t26.warnings.some((w) => /lapsed/.test(w)));
+  close(positions(S({ regime: 'in_tyre', category: 'imported_waste', role: 'importer' }), [Y(2022, 500)], [], 2023).find((x) => x.year === 2023)!.obligation, 500);   // imported waste tyres: 100% of the year before
 });
 
 test('EU PPWR: recycled content from 2030 by plastic type; recycler stock', () => {
@@ -67,6 +80,13 @@ test('EU PPWR: recycled content from 2030 by plastic type; recycler stock', () =
   const r = positions(S({ role: 'recycler' }), [Y(2026, 5000)], [C(2026, 4000, 'recycling', { generatedYear: 2026 }), { year: 2026, kind: 'recycling', direction: 'out', tonnes: 2500, price: 4000, generatedYear: null }], 2026);
   const y = r.find((x) => x.year === 2026)!;
   assert.equal(y.obligation, null); assert.equal(y.stockIn, 4000); assert.equal(y.stockOut, 2500);
+  // tyres: sales draw on the oldest valid certificates; unsold ones lapse after two years
+  const st = recyclerStock('in_tyre', [C(0, 100, 'recycling', { year: null, generatedYear: 2022 }), { year: 2023, kind: 'recycling', direction: 'out', tonnes: 100, price: null, generatedYear: null }, C(0, 100, 'recycling', { year: null, generatedYear: 2025 })], 2025);
+  assert.deepEqual([st.generated, st.sold, st.lapsed, st.available], [200, 100, 0, 100]);
+  const st2 = recyclerStock('in_tyre', [C(0, 100, 'recycling', { year: null, generatedYear: 2022 })], 2025);
+  assert.deepEqual([st2.lapsed, st2.available], [100, 0]);
+  const st3 = recyclerStock('in_tyre', [C(0, 100, 'recycling', { year: null, generatedYear: 2022 }), { year: 2026, kind: 'recycling', direction: 'out', tonnes: 50, price: null, generatedYear: null }], 2026);
+  assert.equal(st3.problems.length, 1);                                    // sold after the certificates lapsed
 });
 
 // ------------------------------------------------------------------------------------------- API --
@@ -144,6 +164,17 @@ test('API: package, roles, streams, years, certificates, carry-forward, returns,
   assert.equal((await call('PUT', `/api/epr/streams/${sid}/years/2026/return`, { status: 'filed', filedOn: '2026-06-28', returnRef: 'AR-2026-77' }, co, mgr)).status, 200);
   assert.equal((await call('PUT', `/api/epr/streams/${sid}/years`, { rows: [{ year: 2026, placed: 1 }] }, co, prep)).status, 409);
   assert.equal((await call('DELETE', `/api/epr/streams/${sid}`, undefined, co)).status, 400);                                 // filed: set inactive instead
+  // a filed year is locked against certificates and the settings that change its obligation
+  assert.equal((await call('POST', '/api/epr/certs', { streamId: sid, direction: 'in', kind: 'recycling', year: 2026, tonnes: 10 }, co, mgr)).status, 409);
+  assert.equal((await call('PUT', `/api/epr/streams/${sid}`, { ...STREAM, targetPct: { 2026: 50 } }, co)).status, 409);
+  assert.equal((await call('PUT', `/api/epr/streams/${sid}`, { ...STREAM, targetPct: { 2028: 100 } }, co)).status, 200);      // a later year may change
+  assert.equal((await call('PUT', `/api/epr/streams/${sid}`, { ...STREAM, category: 'cat2' }, co)).status, 400);              // regime / role / category fixed once used
+  // the same certificate number cannot be applied on two streams
+  const s2 = (await call('POST', '/api/epr/streams', { ...STREAM, category: 'cat2', name: 'Flexible wrappers' }, co)).body.id;
+  assert.equal((await call('POST', '/api/epr/certs', { streamId: s2, direction: 'in', kind: 'recycling', year: 2027, tonnes: 5, certificateNo: 'PWP-2026-0001' }, co, mgr)).status, 400);
+  assert.equal((await call('POST', '/api/epr/certs', { streamId: s2, direction: 'in', kind: 'recycling', year: 2027, tonnes: 5, certificateNo: '' }, co, mgr)).status, 200);
+  assert.equal((await call('POST', '/api/epr/certs', { streamId: s2, direction: 'in', kind: 'recycling', year: 2027, tonnes: 5, certificateNo: '  ' }, co, mgr)).status, 200);   // blank numbers are none
+  assert.equal((await call('PUT', `/api/epr/streams/${s2}`, { ...STREAM, category: 'cat2', name: 'Flexible wrappers', active: false }, co)).status, 200);
   // a recycler stream: generated, then sold no more than the stock
   const rid = (await call('POST', '/api/epr/streams', { regime: 'in_plastic', role: 'recycler', category: 'cat2', name: 'Flexible film recycling plant', registration: 'PWP-77' }, co)).body.id;
   assert.equal((await call('POST', '/api/epr/certs', { streamId: rid, direction: 'in', kind: 'recycling', year: null, generatedYear: 2026, tonnes: 800 }, co, mgr)).status, 200);
@@ -151,7 +182,9 @@ test('API: package, roles, streams, years, certificates, carry-forward, returns,
   const sold = (await call('POST', '/api/epr/certs', { streamId: rid, direction: 'out', kind: 'recycling', year: 2026, tonnes: 500, price: 3000, counterparty: 'Ganga Foods' }, co, mgr)).body.id;
   assert.ok(sold);
   d = (await call('GET', `/api/epr/streams/${rid}?year=2026`, undefined, co)).body;
-  assert.deepEqual(d.stock, { generated: 800, sold: 500, lapsed: 0, available: 300 });
+  assert.deepEqual(d.stock, { generated: 800, sold: 500, lapsed: 0, available: 300, problems: [] });
+  assert.equal((await call('POST', '/api/epr/certs', { streamId: rid, direction: 'out', kind: 'recycling', year: null, tonnes: 10 }, co, mgr)).status, 400);   // a sale needs its year
+  assert.equal((await call('POST', '/api/epr/certs', { streamId: rid, direction: 'out', kind: 'eol', year: 2026, tonnes: 10 }, co, mgr)).status, 400);       // no end-of-life stock
   // the generated certificate cannot be removed while its sale stands
   const gen = d.certs.find((x: any) => x.direction === 'in').id;
   assert.equal((await call('DELETE', `/api/epr/certs/${gen}`, undefined, co, mgr)).status, 400);

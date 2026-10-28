@@ -87,7 +87,8 @@ function merge(stored: Partial<Profile>, f: Partial<Profile>): Profile {
 }
 
 /** Status read from the modules for an obligation instance (null when the module cannot tell). */
-async function auto(c: Tx, products: string[], reg: string, ob: string, period: number): Promise<{ status: Status; note: string } | null> {
+type AutoCache = { epr?: import('../lib/epr.js').Position[][] };
+async function auto(c: Tx, products: string[], reg: string, ob: string, period: number, cache: AutoCache = {}): Promise<{ status: Status; note: string } | null> {
   if (reg === 'in_brsr' && products.includes('brsr') && await hasTable(c, 'brsr_report')) {
     const r = (await c.query(`SELECT status, provider, approach FROM brsr_report WHERE fy = $1`, [period - 1])).rows[0];
     if (!r) return null;
@@ -112,17 +113,27 @@ async function auto(c: Tx, products: string[], reg: string, ob: string, period: 
     if (!rows.length) return null;
     if (ob === 'return' || ob === 'report') { const n = rows.filter((r) => r.return_status === 'filed').length; return n === rows.length ? { status: 'done', note: `Filed for all ${rows.length} ${rows.length === 1 ? 'stream' : 'streams'}` } : rows.some((r) => r.return_status && r.return_status !== 'not_started') ? { status: 'in_progress', note: `${n} of ${rows.length} filed` } : null; }
     if (ob === 'targets') {
-      // each India producer stream's position for the year, as the EPR module computes it
-      const streams = (await c.query(`SELECT * FROM epr_stream WHERE active AND regime LIKE 'in\\_%' AND role <> 'recycler'`)).rows;
-      let short = 0, known = 0;
-      for (const st of streams) {
-        const ys = (await c.query(`SELECT * FROM epr_year WHERE stream_id = $1`, [st.id])).rows.map((y) => ({ year: y.year, placed: y.placed == null ? null : Number(y.placed), preConsumer: y.pre_consumer == null ? null : Number(y.pre_consumer), suppliedToPibo: y.supplied == null ? null : Number(y.supplied), recycledTonnes: y.recycled == null ? null : Number(y.recycled), obligationTyped: y.obligation == null ? null : Number(y.obligation) }));
-        const cs = (await c.query(`SELECT * FROM epr_cert WHERE stream_id = $1`, [st.id])).rows.map((x) => ({ year: x.year, kind: x.kind, direction: x.direction, tonnes: Number(x.tonnes), price: null, generatedYear: x.generated_year }));
-        const p = eprPositions({ regime: st.regime as EprRegime, role: st.role, category: st.category, avgLife: st.avg_life == null ? null : Number(st.avg_life), targetPct: st.target_pct ?? {}, recyclingPct: st.recycling_pct ?? {}, rcPct: st.rc_pct ?? {}, ecRate: null, certPrice: null, feeRate: null, foodContact: !!st.food_contact }, ys, cs, period).find((x) => x.year === period);
-        if (p?.shortfall != null) { known++; short += p.shortfall; }
+      // each India producer stream's position, computed once per desk load
+      if (!cache.epr) {
+        const streams = (await c.query(`SELECT * FROM epr_stream WHERE active AND regime LIKE 'in\\_%' AND role <> 'recycler'`)).rows;
+        const ys = streams.length ? (await c.query(`SELECT * FROM epr_year WHERE stream_id = ANY($1)`, [streams.map((x) => x.id)])).rows : [];
+        const cs = streams.length ? (await c.query(`SELECT * FROM epr_cert WHERE stream_id = ANY($1)`, [streams.map((x) => x.id)])).rows : [];
+        const to = new Date().getUTCFullYear() + 3;
+        cache.epr = streams.map((st) => eprPositions(
+          { regime: st.regime as EprRegime, role: st.role, category: st.category, avgLife: st.avg_life == null ? null : Number(st.avg_life), targetPct: st.target_pct ?? {}, recyclingPct: st.recycling_pct ?? {}, rcPct: st.rc_pct ?? {}, ecRate: null, certPrice: null, feeRate: null, foodContact: !!st.food_contact },
+          ys.filter((y) => y.stream_id === st.id).map((y) => ({ year: y.year, placed: y.placed == null ? null : Number(y.placed), preConsumer: y.pre_consumer == null ? null : Number(y.pre_consumer), suppliedToPibo: y.supplied == null ? null : Number(y.supplied), recycledTonnes: y.recycled == null ? null : Number(y.recycled), obligationTyped: y.obligation == null ? null : Number(y.obligation) })),
+          cs.filter((x) => x.stream_id === st.id).map((x) => ({ year: x.year, kind: x.kind, direction: x.direction, tonnes: Number(x.tonnes), price: null, generatedYear: x.generated_year })), to));
+      }
+      let short = 0, rcy = 0, rcc = 0, known = 0;
+      for (const list of cache.epr) {
+        const p = list.find((x) => x.year === period);
+        if (p?.shortfall == null) continue;
+        known++; short += p.shortfall; rcy += p.recyclingShortfall ?? 0; rcc += p.rcShortfall ?? 0;
       }
       if (!known) return null;
-      return short < 1e-6 ? { status: 'done', note: `Targets met for ${known} ${known === 1 ? 'stream' : 'streams'}` } : { status: 'in_progress', note: `${short.toLocaleString('en-US', { maximumFractionDigits: 1 })} t short across ${known} ${known === 1 ? 'stream' : 'streams'}` };
+      const f1 = (x: number) => x.toLocaleString('en-US', { maximumFractionDigits: 1 });
+      const gaps = [short > 1e-6 ? `${f1(short)} t short` : '', rcy > 1e-6 ? `${f1(rcy)} t recycling short` : '', rcc > 1e-6 ? `${f1(rcc)} t recycled content short` : ''].filter(Boolean);
+      return !gaps.length ? { status: 'done', note: `Targets met for ${known} ${known === 1 ? 'stream' : 'streams'}` } : { status: 'in_progress', note: `${gaps.join(', ')} across ${known} ${known === 1 ? 'stream' : 'streams'}` };
     }
     if (ob === 'register') { const n = rows.filter((r) => r.registration || r.registered_on).length; return n === rows.length ? { status: 'done', note: `Registered in every member state recorded (${rows.length})` } : n ? { status: 'in_progress', note: `${n} of ${rows.length} registered` } : null; }
   }
@@ -146,12 +157,13 @@ async function load(c: Tx, tenant: string, year: number) {
   const today = await todayOf(c, tenant);
   const regs = REGULATIONS.map((r) => ({ code: r.code, ...r.applies(profile) }));
   const statuses = new Map((await c.query(`SELECT * FROM cp_status`)).rows.map((r) => [`${r.reg}|${r.obligation}|${r.period}`, r]));
+  const cache: AutoCache = {};
   const all = instances(profile, regs, year - 2, year + 2);
   const every = [];   // every instance in reach (for the 90-day window), then those shown for the year
   for (const it of all) {
     const st = statuses.get(`${it.reg}|${it.obligation}|${it.period}`);
     const due = st?.due_override ? iso(st.due_override) : it.due;
-    const a = await auto(c, products, it.reg, it.obligation, it.period);
+    const a = await auto(c, products, it.reg, it.obligation, it.period, cache);
     const R = REGULATION.get(it.reg)!, O = R.obligations.find((o) => o.code === it.obligation)!;
     const applies = regs.find((r) => r.code === it.reg)!.applies;
     // a regulation that may apply, or a recommended step, is never overdue: it is open until settled
