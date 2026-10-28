@@ -29,7 +29,8 @@
     "demo:ccts": "npm run migrate -w @ekotrace/api && npm run demo:ccts -w @ekotrace/api --",
     "demo:brsr": "npm run migrate -w @ekotrace/api && npm run demo:brsr -w @ekotrace/api --",
     "demo:uaemrv": "npm run migrate -w @ekotrace/api && npm run demo:uaemrv -w @ekotrace/api --",
-    "demo:energy": "npm run migrate -w @ekotrace/api && npm run demo:energy -w @ekotrace/api --"
+    "demo:energy": "npm run migrate -w @ekotrace/api && npm run demo:energy -w @ekotrace/api --",
+    "demo:compliance": "npm run migrate -w @ekotrace/api && npm run demo:compliance -w @ekotrace/api --"
   },
   "devDependencies": {
     "@types/node": "22.20.5",

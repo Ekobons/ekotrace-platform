@@ -2,6 +2,15 @@
 
 Newest first.
 
+## 2026-10-28 · Compliance desk
+
+- Package `compliance` (migration 071). Tables: `cp_profile` (the facts that decide applicability, JSON), `cp_status` (per regulation, obligation and period: status, owner, note, evidence document, completed on, date moved), `cp_custom` (the company's own obligations, once or annual). Tenant RLS on all three.
+- `lib/compliance.ts` (pure): library of 11 regulations — EU CSRD (Omnibus I thresholds and first years), EU CBAM importer and producer, SEBI BRSR / BRSR Core (assurance glide path), India CCTS, UAE federal (Decree-Law 11 of 2024, NRCC), Abu Dhabi EAD facility MRV, SGX, Australia AASB S2, California SB 253, UK SECR — each with applies / may apply / does not apply and the reason, and obligations with due dates from the financial year end, first periods and penalties; instances per period; overdue worked out.
+- `compliance.routes.ts` (`/api/compliance…`): desk for a year (obligations due in the year plus last year's still open; facts from the other modules where the profile is empty; status read from BRSR Core, UAE MRV and India CCTS unless a person set one), profile (super admin, admin), status (done needs a date, not applicable and a moved date need a note; clearing goes back to the module), own obligations CRUD, Excel register, `.ics` calendar.
+- Web: Disclose → **Compliance desk** (`/compliance`, `pages/ComplianceDesk.tsx`, `lib/compliance.ts`): KPIs, Position (regulation cards), Obligations register with status drawer, Calendar by month, Company profile drawer, own obligations; console checkbox; its own menu without the GHG inventory.
+- `npm run demo:compliance` (`cli/demoCompliance.ts`): *Gulf-India Metals Group PJSC (demo)* — Abu Dhabi mill, India plant (NSE top 500), German CBAM importer, UK service company; 2025–2026 statuses with one overdue and one date moved. INVENTED.
+- Manual: new chapter Compliance desk; glossary; Getting started → Packages. Test `compliance.test.ts`.
+
 ## 2026-10-28 · Energy management & savings
 
 - Package `energy` (migration 070). Tables: `en_site` (inventory facility link, type, floor area, baseline year, energy modelled, up to two variables, EnPI driver, production unit, tariffs and — without the inventory — emission factors by carrier, EnPI target), `en_month` (production, CDD, HDD, occupancy, typed energy by carrier, note), `en_measure` (category, carrier, status, implemented on, expected and verified kWh a year, IPMVP option, capex, running cost, life, owner, M&V plan), `en_seu` (significant energy uses). Tenant RLS on all four.
