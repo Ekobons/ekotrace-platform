@@ -115,8 +115,9 @@ Besides the plan, the Ekobon team switches on the **packages** the company has, 
 | CBAM Exporter | CBAM only, with a simpler menu; the CBAM pages are also part of the GHG inventory |
 | India CCTS | GEI tracker for obligated entities under India's Carbon Credit Trading Scheme |
 | BRSR Core | SEBI's BRSR Core for listed companies, with the value chain |
+| UAE MRV | Abu Dhabi facility MRV (EAD) and federal reporting (MOCCAE, NRCC) |
 
-India CCTS and BRSR Core are **packages of their own**: they are not included in the GHG inventory. With the GHG inventory they read its approved entries and appear under Disclose. Without it, they open in a small menu of their own (the page, Organisation, People & access, Document vault, Audit log, Help) and every figure is typed. A page of a package the company does not have says so.
+India CCTS, BRSR Core and UAE MRV are **packages of their own**: they are not included in the GHG inventory. With the GHG inventory they read its approved entries and appear under Disclose. Without it, they open in a small menu of their own (the page, Organisation, People & access, Document vault, Audit log, Help) and every figure is typed. A page of a package the company does not have says so.
 
 ## Moving around
 

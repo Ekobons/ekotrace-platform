@@ -27,7 +27,8 @@
     "demo:fin": "npm run migrate -w @ekotrace/api && npm run demo:fin -w @ekotrace/api --",
     "demo:cbam": "npm run migrate -w @ekotrace/api && npm run demo:cbam -w @ekotrace/api --",
     "demo:ccts": "npm run migrate -w @ekotrace/api && npm run demo:ccts -w @ekotrace/api --",
-    "demo:brsr": "npm run migrate -w @ekotrace/api && npm run demo:brsr -w @ekotrace/api --"
+    "demo:brsr": "npm run migrate -w @ekotrace/api && npm run demo:brsr -w @ekotrace/api --",
+    "demo:uaemrv": "npm run migrate -w @ekotrace/api && npm run demo:uaemrv -w @ekotrace/api --"
   },
   "devDependencies": {
     "@types/node": "22.20.5",
