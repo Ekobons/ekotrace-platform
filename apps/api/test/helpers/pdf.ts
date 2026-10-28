@@ -31,3 +31,23 @@ export const SAMPLE_ELECTRICITY: (string | [string, string])[] = [
   ['Total Amount Due', 'AED 19,240.50'],
 ];
 
+
+/** The same bill as a scan: the text PDF drawn to a JPEG at 150 dpi and placed as the only content of a new PDF. */
+export async function makeScanPdf(lines: (string | [string, string])[]): Promise<Uint8Array> {
+  const { getDocument } = await import('pdfjs-dist/legacy/build/pdf.mjs');
+  const task = getDocument({ data: await makePdf(lines), verbosity: 0 });
+  const src = await task.promise;
+  const page = await src.getPage(1);
+  const vp = page.getViewport({ scale: 150 / 72 });
+  const cf = (src as unknown as { canvasFactory: { create: (w: number, h: number) => { canvas: { toBuffer: (t: string, q?: number) => Buffer }; context: { fillStyle: string; fillRect: (...a: number[]) => void } } } }).canvasFactory;
+  const cc = cf.create(Math.ceil(vp.width), Math.ceil(vp.height));
+  cc.context.fillStyle = '#ffffff'; cc.context.fillRect(0, 0, vp.width, vp.height);
+  await page.render({ canvasContext: cc.context as never, viewport: vp, canvas: cc.canvas as never }).promise;
+  const jpg = cc.canvas.toBuffer('image/jpeg', 80);
+  await task.destroy();
+  const doc = await PDFDocument.create();
+  const img = await doc.embedJpg(jpg);
+  const p = doc.addPage([595, 842]);
+  p.drawImage(img, { x: 0, y: 0, width: 595, height: 842 });
+  return doc.save();
+}

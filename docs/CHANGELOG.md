@@ -2,6 +2,13 @@
 
 Newest first.
 
+## 2026-10-28 · Phone menu, dashboard drill-down to entries, OCR for scanned bills
+
+- **Phone menu:** below 1000 px a top bar with a ☰ button slides in the full menu (any package's menu), closing on navigation, outside tap, ✕ or Escape; the icon-only menu is a desktop choice. Closes RFP 8.1 (responsive menu).
+- **Drill-down:** dashboard figures open Entries & results filtered to the entries behind them — months (Overview bars), scopes (scope split), sources (treemap, list, Top 5; purchases by their spend categories; well-to-tank as upstream energy), GHG Protocol categories and category × month cells, facility × month heatmap cells — with the year, period, facilities of the view and status. Entries & results keeps its filters in the URL (`y, status, cat, m, fac, cats, facs, mfrom, mto, scope, item, wtt, from`) and shows where the list came from. Closes RFP 3.5.7.
+- **OCR:** scanned PDFs (no text) are read on the server: PDF.js draws each page (up to 4, ~200 dpi) on @napi-rs/canvas and tesseract.js 7 reads it with the English data shipped in @tesseract.js-data/eng (no download, no outside service); words back into lines with tabs for wide gaps, then the same bill reader. OCR runs before the transaction, one job at a time with a 90 s limit; `found.ocr` keeps the confidence (or the error); the bill screens mark OCR values for checking. `OCR=off` switches it off. Closes RFP 8.2 (OCR of scanned bills).
+- Tests: OCR of a generated scan (`makeScanPdf`), scan upload through the API. Manual: Moving around, Dashboards (from a figure to its entries), Bills (scanned bills), Security.
+
 ## 2026-10-28 · EPR: extended producer responsibility
 
 - Package `epr` (migration 072). Tables: `epr_stream` (regime in_plastic / in_ewaste / in_battery / in_tyre / eu_ppwr / other, role producer / importer / brand owner / recycler, category, registration, average life, food contact, per-year target / recycling / recycled-content overrides, compensation rate, certificate price, EU fee per tonne, currency, PRO), `epr_year` (placed or processed, pre-consumer, supplied to PIBOs, recycled content, obligation typed, annual return status / date / reference / evidence), `epr_cert` (in: bought or generated; out: sold; kind, compliance year, year generated, tonnes, price, number unique per stream, counterparty, end product). Tenant RLS on all three.

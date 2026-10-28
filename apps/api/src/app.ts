@@ -1,6 +1,7 @@
 /**
  * Builds the API application (used by server.ts and by the tests).
  */
+import { stopOcr } from './lib/ocr.js';
 import Fastify, { type FastifyInstance } from 'fastify';
 import fastifyStatic from '@fastify/static';
 import { readFileSync, existsSync } from 'node:fs';
@@ -199,5 +200,6 @@ export async function buildApp(opts: { logger?: boolean; rateLimit?: Limits | nu
       return reply.sendFile('index.html'); // client-side routes
     });
   }
+  app.addHook('onClose', async () => { await stopOcr(); });   // the OCR worker (scanned bills) ends with the server
   return app;
 }

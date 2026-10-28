@@ -5,7 +5,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { PDFDocument } from 'pdf-lib';
-import { makePdf, SAMPLE_ELECTRICITY } from './helpers/pdf.js';
+import { makePdf, makeScanPdf, SAMPLE_ELECTRICITY } from './helpers/pdf.js';
+import { ocrPdf, stopOcr } from '../src/lib/ocr.js';
 import { pdfText } from '../src/lib/pdfText.js';
 import { parseDate, readBill } from '../src/lib/billRead.js';
 
@@ -61,4 +62,19 @@ test('water bill: the same combined electricity & water PDF read for water gives
   assert.deepEqual([w.quantity?.value, w.quantity?.unit, w.quantity?.energy], [1250, 'gal_uk', 'water']);
   assert.deepEqual([readBill(t.text).quantity?.value, readBill(t.text).quantity?.unit], [45500, 'kWh_e']);
   assert.deepEqual([readBill('Water consumption: 3,410 m3\nTotal due 1,000.00', 'water').quantity?.unit, readBill('Water consumption 12 000 IG\n', 'water').quantity?.unit], ['m3', 'kgal_uk']);
+});
+
+test('scanned bill: no text, read by OCR on the server, then the same reader finds the figures', async () => {
+  const scan = await makeScanPdf(SAMPLE_ELECTRICITY);
+  const t = await pdfText(scan);
+  assert.equal(t.scanned, true);
+  try {
+    const o = await ocrPdf(scan);
+    assert.ok(o.confidence > 60, `confidence ${o.confidence}`);
+    const r = readBill(o.text);
+    assert.equal(r.account?.value, '2001458876');
+    assert.equal(r.periodFrom?.value, '2026-03-01'); assert.equal(r.periodTo?.value, '2026-03-31');
+    assert.equal(r.quantity?.value, 45500); assert.equal(r.quantity?.unit, 'kWh_e');
+    assert.equal(r.amount?.value, 19240.5);
+  } finally { await stopOcr(); }
 });

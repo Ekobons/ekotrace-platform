@@ -3,6 +3,7 @@
  * and a drawer showing exactly how each entry was calculated.
  */
 import { useEffect, useRef, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { unitLabel, api, BASIS_LABEL, num, tco2e, type Activity } from '../lib/api';
 import { useApp } from '../App';
 import { ENERGY_UNITS, Result } from '../components/Result';
@@ -13,13 +14,29 @@ import { Evidence } from '../components/Evidence';
 const STATUS: Record<string, [string, string]> = { draft: ['Draft', 'c-n'], submitted: ['Waiting approval', 'c-warn'], approved: ['Approved', 'c-ok'], rejected: ['Sent back', 'c-bad'] };
 
 export function Entries() {
-  const [year, setYear] = useState(new Date().getFullYear());
+  // filters live in the address, so a dashboard figure can open exactly the entries behind it
+  const [sp, setSp] = useSearchParams();
+  const [year, setYear] = useState(() => Number(sp.get('y')) || new Date().getFullYear());
   const [rows, setRows] = useState<Activity[]>([]);
   const [years, setYears] = useState<{ year: number; n: number; approved: number }[]>([]);
-  const [status, setStatus] = useState('');
-  const [cat, setCat] = useState('');
-  const [month, setMonth] = useState('');
-  const [fac, setFac] = useState('');
+  const [status, setStatus] = useState(sp.get('status') ?? '');
+  const [cat, setCat] = useState(sp.get('cat') ?? '');
+  const [month, setMonth] = useState(sp.get('m') ?? '');
+  const [fac, setFac] = useState(sp.get('fac') ?? '');
+  // from a dashboard: the categories, facilities, months, scope, item or upstream energy behind the figure clicked
+  const [drill, setDrill] = useState(() => ({ cats: sp.get('cats')?.split('|').filter(Boolean) ?? [], facs: sp.get('facs')?.split('|').filter(Boolean) ?? [], mfrom: sp.get('mfrom') ?? '', mto: sp.get('mto') ?? '',
+    scope: Number(sp.get('scope')) || 0, item: sp.get('item') ?? '', wtt: sp.get('wtt') === '1', from: sp.get('from') ?? '' }));
+  const drilled = !!(drill.cats.length || drill.facs.length || drill.mfrom || drill.scope || drill.item || drill.wtt);
+  useEffect(() => {
+    const q = new URLSearchParams();
+    q.set('y', String(year));
+    if (status) q.set('status', status); if (cat) q.set('cat', cat); if (month) q.set('m', month); if (fac) q.set('fac', fac);
+    if (drill.cats.length) q.set('cats', drill.cats.join('|')); if (drill.facs.length) q.set('facs', drill.facs.join('|'));
+    if (drill.mfrom) { q.set('mfrom', drill.mfrom); q.set('mto', drill.mto); } if (drill.scope) q.set('scope', String(drill.scope));
+    if (drill.item) q.set('item', drill.item); if (drill.wtt) q.set('wtt', '1'); if (drill.from && (drilled || month)) q.set('from', drill.from);
+    setSp(q, { replace: true });
+  }, [year, status, cat, month, fac, drill]); // eslint-disable-line react-hooks/exhaustive-deps
+  const clearAll = () => { setMonth(''); setFac(''); setCat(''); setStatus(''); setDrill({ cats: [], facs: [], mfrom: '', mto: '', scope: 0, item: '', wtt: false, from: '' }); };
   const [gas, setGas] = useState<Awaited<ReturnType<typeof api.byGas>>['rows']>([]);
   const [open, setOpen] = useState<Awaited<ReturnType<typeof api.activity>> | null>(null);
   const [showGas, toggleGas] = useGasSplit();
@@ -47,8 +64,13 @@ export function Entries() {
   const monthName = (m: string) => new Date(`${m}-01T00:00:00Z`).toLocaleDateString('en-GB', { month: 'long', timeZone: 'UTC' });
   // an entry belongs to a month when its period covers it (a whole-year entry shows in every month)
   const inMonth = (a: Activity) => !month || (a.period_start.slice(0, 7) <= month && a.period_end.slice(0, 7) >= month);
-  const shown = rows.filter((a) => (!cat || a.category === cat) && (!fac || a.facility === fac) && inMonth(a));
-  const filtered = !!(cat || fac || month || status);
+  const inRange = (a: Activity) => !drill.mfrom || (a.period_start.slice(0, 7) <= drill.mto && a.period_end.slice(0, 7) >= drill.mfrom);
+  // a scope holds the entries with emissions in it, as the dashboards count them (Scope 3 includes the upstream part of fuels and energy)
+  const inScope = (a: Activity) => !drill.scope || (drill.scope === 1 ? Number(a.co2e_direct) > 0 : drill.scope === 2 ? Number(a.co2e_scope2 ?? 0) > 0 || Number(a.co2e_scope2_market ?? 0) > 0 : Number(a.co2e_scope3 ?? 0) > 0 || Number(a.co2e_wtt) > 0 || Number(a.co2e_td ?? 0) > 0);
+  const inDrill = (a: Activity) => (!drill.cats.length || drill.cats.includes(a.category_code ?? '')) && (!drill.facs.length || drill.facs.includes(a.facility)) && inRange(a) && inScope(a)
+    && (!drill.item || a.item === drill.item) && (!drill.wtt || Number(a.co2e_wtt) > 0 || Number(a.co2e_td ?? 0) > 0);
+  const shown = rows.filter((a) => (!cat || a.category === cat) && (!fac || a.facility === fac) && inMonth(a) && inDrill(a));
+  const filtered = !!(cat || fac || month || status || drilled);
   const sum = (k: keyof Activity) => shown.reduce((s, a) => s + Number(a[k] ?? 0), 0);
   const yearList = [...new Set([...years.map((y) => y.year), new Date().getFullYear(), year])].sort((a, b) => b - a);
   const other = years.filter((y) => y.year !== year && y.n > 0);
@@ -64,6 +86,15 @@ export function Entries() {
         </label>
       </div>
 
+      {(drilled || (!!drill.from && !!month)) && <div className="drillbar card flush" style={{ marginBottom: 8 }}>
+        <b>From the dashboard:</b> {drill.from || 'selected figure'}
+        {drill.mfrom && <span className="chip grey">{drill.mfrom === drill.mto ? drill.mfrom : `${drill.mfrom} to ${drill.mto}`}</span>}
+        {drill.facs.length > 0 && <span className="chip grey">{drill.facs.length === 1 ? drill.facs[0] : `${drill.facs.length} facilities`}</span>}
+        {drill.scope > 0 && <span className="chip grey">Scope {drill.scope}</span>}
+        {drill.wtt && <span className="chip grey">upstream energy (well-to-tank, grid losses)</span>}
+        <span className="grow" /><Link to="/dashboards" className="linkbtn" onClick={(e) => { e.preventDefault(); window.history.back(); }}>‹ Back to the dashboard</Link>
+        <button className="btn xs ghost" onClick={() => { if (!drilled) setMonth(''); setDrill({ cats: [], facs: [], mfrom: '', mto: '', scope: 0, item: '', wtt: false, from: '' }); }}>Show all entries</button>
+      </div>}
       <div className="row" style={{ gap: 8, flexWrap: 'wrap', alignItems: 'center', margin: '4px 0 12px' }}>
         <select className="input sm" style={{ width: 'auto' }} aria-label="Month" value={month} onChange={(e) => setMonth(e.target.value)}>
           <option value="">All months</option>{months.map((m) => <option key={m} value={m}>{monthName(m)} {year}</option>)}</select>
@@ -73,7 +104,7 @@ export function Entries() {
           <option value="">All categories</option>{cats.map((c) => <option key={c}>{c}</option>)}</select>
         <select className="input sm" style={{ width: 'auto' }} aria-label="Status" value={status} onChange={(e) => setStatus(e.target.value)}>
           <option value="">All statuses</option><option value="approved">Approved</option><option value="submitted">Waiting approval</option><option value="draft">Draft</option><option value="rejected">Sent back</option></select>
-        {filtered && <button className="btn sm ghost" onClick={() => { setMonth(''); setFac(''); setCat(''); setStatus(''); }}>Clear filters</button>}
+        {filtered && <button className="btn sm ghost" onClick={clearAll}>Clear filters</button>}
         <span className="grow" /><span className="muted small">{filtered ? 'Totals below follow the filters' : 'All entries of the year, every status'}</span>
       </div>
       <div className="total">

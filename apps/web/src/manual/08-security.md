@@ -86,6 +86,10 @@ Every table holding company data carries the company id, and PostgreSQL row-leve
 ! Bookings traceable | every entry stores its inputs, factor, source and steps
 ```
 
+## Scanned bills are read on the server
+
+Scanned bills are read by OCR (Tesseract, WebAssembly) on the Ekotrace server; the language data is part of the installation. No page is sent to an outside service and nothing is downloaded at run time. The PDF is drawn by PDF.js, which never runs code from the file. OCR can be switched off with `OCR=off`.
+
 ## Safety checks for meters and bills
 
 ```flow

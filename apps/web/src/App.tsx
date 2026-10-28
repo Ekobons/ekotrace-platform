@@ -241,8 +241,16 @@ function Shell() {
   const logout = async () => { await api.logout().catch(() => {}); setTenant(null); location.href = '/'; };
   const [folded, setFolded] = useState<Set<string>>(() => { try { return new Set(JSON.parse(localStorage.getItem('eko_nav') ?? '[]') as string[]); } catch { return new Set(); } });
   // the whole menu narrowed to icons (as in the prototype), kept on this browser
-  const [mini, setMini] = useState(() => { try { return localStorage.getItem('eko_mini') === '1'; } catch { return false; } });
+  const [miniPref, setMini] = useState(() => { try { return localStorage.getItem('eko_mini') === '1'; } catch { return false; } });
+  // the icon-only menu is a desktop choice; on small screens the menu is the slide-in panel
+  const [small, setSmall] = useState(() => typeof window !== 'undefined' && !!window.matchMedia?.('(max-width: 1000px)').matches);
+  useEffect(() => { const m = window.matchMedia?.('(max-width: 1000px)'); if (!m) return; const f = () => setSmall(m.matches); m.addEventListener('change', f); return () => m.removeEventListener('change', f); }, []);
+  const mini = miniPref && !small;
   const toggleMini = () => setMini((m) => { try { localStorage.setItem('eko_mini', m ? '0' : '1'); } catch { /* not kept */ } return !m; });
+  // phones and small tablets: the menu slides in from a button in the top bar and closes when a page is chosen
+  const [navOpen, setNavOpen] = useState(false);
+  useEffect(() => { setNavOpen(false); }, [path]);
+  useEffect(() => { if (!navOpen) return; const k = (e: KeyboardEvent) => { if (e.key === 'Escape') setNavOpen(false); }; window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k); }, [navOpen]);
   // the products this company has (EKOTRACE, EKOFIN or both) and the one being used, kept on this browser
   // packages the company has; with EKOTRACE, India CCTS and BRSR Core live in its Disclose menu rather than as workspaces
   const owned: Product[] = (tenant?.products?.length ? tenant.products : ['ekotrace']) as Product[];
@@ -300,8 +308,14 @@ function Shell() {
   if (path.startsWith('/scan/')) return <Routes><Route path="/scan/:code" element={<ScanPage />} /></Routes>;
 
   return (
-    <div className={`app${mini ? ' mini' : ''}`}>
-      <aside className="side">
+    <div className={`app${mini ? ' mini' : ''}${navOpen ? ' navopen' : ''}`}>
+      <header className="mbar">
+        <button type="button" className="mbtn" onClick={() => setNavOpen(true)} aria-label="Open the menu" aria-expanded={navOpen} aria-controls="sidenav"><span /><span /><span /></button>
+        <BrandMark /><b className="mtitle">{tenant?.name ?? BRAND.name}</b>
+      </header>
+      {navOpen && <div className="mback" onClick={() => setNavOpen(false)} aria-hidden="true" />}
+      <aside className="side" id="sidenav" aria-label="Menu">
+        <button type="button" className="mclose" onClick={() => setNavOpen(false)} aria-label="Close the menu">✕</button>
         <div className="brand"><BrandMark /><div className="bt"><b>{BRAND.name}</b><small>{BRAND.tagline}</small></div>
           <button type="button" className="minibtn" onClick={toggleMini} aria-label={mini ? 'Expand the menu' : 'Collapse the menu'} title={mini ? 'Expand the menu' : 'Collapse the menu'}>{mini ? '»' : '«'}</button></div>
         <div className="org">

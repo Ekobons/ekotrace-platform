@@ -43,7 +43,7 @@ export function CategoryBills({ category }: { category: string }) {
       try {
         if (f.size > 15 * 1024 * 1024) throw new Error('larger than 15 MB');
         const b = await api.uploadBill(f, category);
-        setQueue((x) => x.map((y, k) => (k === i ? { ...y, state: b.duplicate ? 'duplicate' : 'read', msg: b.duplicate ? `the same file was uploaded before (${TABS.find((t) => t[0] === b.status)?.[1].toLowerCase()}): not added again` : b.scanned ? 'scan: type the figures' : b.found.missing?.length ? `to complete: ${b.found.missing.join(', ')}` : b.meter_id ? `account ${b.account_no} → ${b.meter}` : 'no account matched yet' } : y)));
+        setQueue((x) => x.map((y, k) => (k === i ? { ...y, state: b.duplicate ? 'duplicate' : 'read', msg: b.duplicate ? `the same file was uploaded before (${TABS.find((t) => t[0] === b.status)?.[1].toLowerCase()}): not added again` : b.scanned ? (b.found.ocr && 'confidence' in b.found.ocr ? `scan read by OCR (${b.found.ocr.confidence}%): check every figure` : 'scan: type the figures') : b.found.missing?.length ? `to complete: ${b.found.missing.join(', ')}` : b.meter_id ? `account ${b.account_no} → ${b.meter}` : 'no account matched yet' } : y)));
       } catch (e) { setQueue((x) => x.map((y, k) => (k === i ? { ...y, state: 'error', msg: (e as Error).message } : y))); }
     }
     setTab('to_check'); load();
@@ -77,7 +77,7 @@ export function CategoryBills({ category }: { category: string }) {
                   <td>{b.filename}<div className="muted small">uploaded {b.created_at.slice(0, 10)}{b.bill_no ? ` · no. ${b.bill_no}` : ''}</div></td>
                   <td>{b.supplier ?? <span className="chip warn">?</span>}<div className="muted small mono">{b.account_no ?? '—'}</div></td>
                   <td className="mono small">{b.period_from && b.period_to ? `${b.period_from} – ${b.period_to}` : <span className="chip warn">?</span>}</td>
-                  <td className="num">{b.quantity != null ? <>{num(Number(b.quantity))} <span className="muted small">{unitLabel(b.unit ?? '')}</span></> : b.scanned ? <span className="chip warn">scan</span> : <span className="chip warn">?</span>}</td>
+                  <td className="num">{b.quantity != null ? <>{num(Number(b.quantity))} <span className="muted small">{unitLabel(b.unit ?? '')}</span>{b.scanned && <span className="chip warn" style={{ marginLeft: 4 }} title="Read by OCR from a scan: check against the page">OCR</span>}</> : b.scanned ? <span className="chip warn">scan</span> : <span className="chip warn">?</span>}</td>
                   <td className="num">{b.amount != null ? `${b.currency ?? ''} ${Number(b.amount).toLocaleString('en', { minimumFractionDigits: 2 })}` : '—'}</td>
                   <td>{b.meter ? <>{b.meter}<div className="muted small">{b.facility}</div></> : <span className="chip warn">no account</span>}</td>
                   <td>{b.status === 'confirmed' ? <span className="chip">published</span> : b.status === 'rejected' ? <span className="chip grey">rejected</span> : b.found.missing?.length || !b.meter_id ? <span className="chip warn">to complete</span> : <span className="chip info">to check</span>}</td>

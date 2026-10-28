@@ -1167,7 +1167,7 @@ export interface ApiKey { id: string; name: string; prefix: string; scopes: stri
 export interface Bill {
   id: string; document_id: string; status: 'to_check' | 'checked' | 'confirmed' | 'rejected'; category: string | null; energy: string | null; supplier: string | null; account_no: string | null; bill_no: string | null;
   period_from: string | null; period_to: string | null; issue_date: string | null; quantity: number | null; unit: string | null; amount: number | null; currency: string | null;
-  found: { missing?: string[]; problem?: string | null; matchedBy?: string | null; candidates?: { energy: string; value: number; unit: string; line: string; score: number }[];
+  found: { missing?: string[]; problem?: string | null; matchedBy?: string | null; ocr?: { confidence: number; pages: number } | { error: string } | null; candidates?: { energy: string; value: number; unit: string; line: string; score: number }[];
     supplier?: { value: string; line: string }; account?: { value: string; line: string }; periodFrom?: { value: string; line: string }; quantity?: { value: number; unit: string; line: string }; amount?: { value: number; line: string } };
   scanned: boolean; meter_id: string | null; meter: string | null; facility_id: string | null; facility: string | null; meter_unit: string | null; reading_ts: string | null;
   note: string | null; checked_by_name: string | null; checked_at: string | null; created_at: string; filename: string; size: number;
