@@ -14,7 +14,7 @@ Upload utility bills | 1:03
 > Upload | drop many PDFs at once in the category's Bills tab (up to 15 MB each)
 ! The same file | a file uploaded before is recognised and not stored again (the upload list says so)
 > Text read | supplier, account no., bill no., billing period, bill date, quantity and unit, amount — each with the line of the bill it came from
-? Text in the PDF? | Yes: fields filled in from the bill | No (a scan): flagged — type the figures from the preview
+? Text in the PDF? | Yes: fields filled in from the bill | No (a scan): read by OCR on the server, marked “OCR” — check every figure against the preview
 > Matched to an account | by the account number; or chosen; or “New meter for this account”
 * A person checks | every field against the PDF shown beside it, then “Checked — add to preview”
 > Ready to publish | the preview: quantity, months it is split over (by days), estimated emissions, and anything that stops it
@@ -80,6 +80,14 @@ Publishing turns the bill into one reading of its meter covering the billing per
 
 Reading bills from a mailbox is not offered for now. It would need access to a company mailbox, it opens a route for phishing and malicious attachments, and it needs a separate security review. Dropping the PDFs in one place covers the need. If wanted later: a dedicated inbox that accepts only known utility senders, with files held for review.
 
+## Scanned bills (OCR)
+
+A PDF that is a scan (an image of the page, no text) is read with **optical character recognition on the Ekotrace server itself**. Each page (up to four) is drawn at about 200 dpi and read by Tesseract; the English language data ships with Ekotrace, so nothing is downloaded and **no page leaves the platform** — no outside OCR or AI service is used. The words are put back into lines and the same reader looks for the account, period, quantity and amount.
+
+- The bill is marked **OCR** with the average word confidence, and the review says so: **check every figure against the preview** before “Checked — add to preview”. Low-quality scans, photos at an angle or handwriting may be misread or not read at all.
+- If OCR cannot read the page, or it is switched off on the server (setting `OCR=off`), the scan is flagged and the figures are typed from the preview, as before.
+- Reading takes a few seconds per page. It runs in a separate process with a memory limit, one scan at a time, and is stopped after 90 seconds; a PDF holding an image too large to read safely is not decoded. When several scans are waiting, a further one is flagged for typing (“OCR is busy”) rather than kept waiting.
+
 ## AI reading
 
-Bills are read with fixed rules, inside Ekotrace — no bill leaves the platform. AI reading (for unusual layouts and scans) would only run through an AI service approved by the client, in an approved location, and stays switched off until then.
+Text bills and scans are read with fixed rules, inside Ekotrace — no bill leaves the platform. AI reading (for unusual layouts) would only run through an AI service approved by the client, in an approved location, and stays switched off until then.

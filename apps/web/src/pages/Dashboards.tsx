@@ -12,13 +12,19 @@
  * every facility has data yet are drawn pale, and the change against last year uses only the
  * complete months.
  */
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useApp } from '../App';
 import { api, type CreditData, type DashGroup, type OrgNode, type TargetsData } from '../lib/api';
 import { Icon } from '../components/Icon';
 import { Bars, DCard, Donut, Dot, DStat, HBars, Legend, MN, PAL, SC, Treemap, fmt, fmt0, fmtT, type BarRow, type Part } from '../components/DashCharts';
 import { CONS, S, ViewBar, pc, range, signPct, sum, tot, useView, type Ctx, type Data, type Row } from '../components/ViewBar';
+
+/** Opening the entries behind a figure: Entries & results filtered to the same year, period, facilities and status. */
+type Drill = { cats?: string[]; fid?: string; m?: number; scope?: number; items?: string[]; wtt?: boolean; label: string };
+const DrillCtx = createContext<(o: Drill) => void>(() => {});
+const useDrill = () => useContext(DrillCtx);
+const pad2 = (m: number) => String(m).padStart(2, '0');
 
 type Tab = 'overview' | 'scopes' | 'facilities' | 'energy' | 'water' | 'waste' | 'travel' | 'chain' | 'netzero';
 const DTABS: [Tab, string][] = [['overview', 'Overview'], ['scopes', 'Scopes & categories'], ['facilities', 'Facilities'], ['energy', 'Energy'], ['water', 'Water'], ['waste', 'Waste'], ['travel', 'Mobility & travel'], ['chain', 'Value chain'], ['netzero', 'Net zero']];
@@ -27,7 +33,28 @@ export function Dashboards() {
   const { role } = useApp();
   const { d, c, err, set, pend, name } = v;
   const tab = (v.sp.get('tab') as Tab) || 'overview';
+  const nav = useNavigate();
+  const drill = (o: Drill) => {
+    if (!d || !c) return;
+    const q = new URLSearchParams({ y: String(d.year) });
+    // the dashboard's month rule: an entry under 40 days counts in the month it starts; a longer one only in the full-year view
+    const ms = o.m ? [o.m] : c.months;
+    q.set('dm', ms.join(','));
+    q.set('whole', !o.m && c.ytd && c.nMax === 12 ? '1' : '0');
+    // facilities by id: the view's, without those the consolidation leaves out (weight 0)
+    const fids = o.fid ? [o.fid] : d.facilities.filter((f) => f.weight > 0).map((f) => f.id);
+    if (o.fid || v.kind !== 'COMPANY' || fids.length < d.facilities.length) q.set('fids', fids.join(','));
+    if (d.consolidation === 'equity') q.set('cons', 'equity');
+    if (o.cats?.length) q.set('cats', o.cats.join('|'));
+    if (o.scope) q.set('scope', String(o.scope));
+    if (o.items?.length) q.set('items', o.items.join('|'));
+    if (o.wtt) q.set('wtt', '1');
+    q.set('status', pend ? 'counted' : 'approved');
+    q.set('from', `${o.label} · ${name}`);
+    nav(`/entries?${q}`);
+  };
   return (
+    <DrillCtx.Provider value={drill}>
     <div className="page" style={{ gap: 12 }}>
       <ViewBar v={v} />
       {!d || !c ? <div className="card empty">{err ?? 'Loading…'}</div> : <>
@@ -50,8 +77,10 @@ export function Dashboards() {
           : tab === 'chain' ? <Chain d={d} c={c} />
           : tab === 'netzero' ? <NetZero d={d} c={c} />
           : <Overview d={d} c={c} go={(t) => set({ tab: t })} />}
+        <div className="muted small">Click a month, a scope, a source or a category to open the entries behind it.</div>
       </>}
     </div>
+    </DrillCtx.Provider>
   );
 }
 
@@ -59,10 +88,10 @@ export function Dashboards() {
 
 
 /** 12 bars for the year: empty outside the period, pale where not every facility has data yet. */
-function monthRows(c: Ctx, parts: (rs: Row[]) => Part[], line?: (m: number) => number | null): BarRow[] {
+function monthRows(c: Ctx, parts: (rs: Row[]) => Part[], line?: (m: number) => number | null, go?: (m: number) => void): BarRow[] {
   return MN.map((lbl, i) => {
     const m = i + 1, on = c.months.includes(m);
-    return { lbl, parts: on ? parts(c.cur.filter((r) => r.m === m)) : [], line: line ? line(m) : undefined, dim: on && !c.full(m) };
+    return { lbl, parts: on ? parts(c.cur.filter((r) => r.m === m)) : [], line: line ? line(m) : undefined, dim: on && !c.full(m), go: on && go ? () => go(m) : undefined };
   });
 }
 const yoyTxt = (c: Ctx, y: number) => (c.yoy === null ? (c.cmpOn ? '' : 'no comparison') : <><span style={{ color: c.yoy > 0 ? 'var(--bad)' : 'var(--ok)' }}>{c.yoy > 0 ? '▲ +' : '▼ −'}{fmt(Math.abs(c.yoy), 1)}%</span> vs {y} ({c.nFull ? `${c.nFull} full month${c.nFull === 1 ? '' : 's'}` : 'same months'})</>);
@@ -84,13 +113,23 @@ function ghgName(d: Data, c: Ctx, code: string) {
 const sourceOf = (r: Row) => ((r.cat === 'purchased_goods' || r.cat === 'capital_goods') && r.grp ? r.grp.split(' › ')[0]! : r.item);
 const SHADE: Record<1 | 2 | 3, string[]> = { 1: ['#0E4F3F', '#1F6F5C', '#3E8B76'], 2: ['#1E8C74', '#2BA38A', '#5DBBA4'], 3: ['#C99A2E', '#E9B44C', '#D27A3A', '#B8862C', '#E6C377'] };
 /** Every source with its scope (well-to-tank and grid losses are their own Scope 3 source). */
+const WTT = 'Fuel- and energy-related (well-to-tank, grid losses)';
 function sources(c: Ctx) {
-  const m = new Map<string, { n: string; v: number; s: 1 | 2 | 3 }>();
-  const add = (n: string, s: 1 | 2 | 3, v: number) => { if (!v) return; const k = `${s}|${n}`; const o = m.get(k) ?? { n, v: 0, s }; o.v += v; m.set(k, o); };
-  for (const r of c.cur) { const n = sourceOf(r); add(n, 1, r.s1); add(n, 2, r.s2); add(n, 3, r.s3); add('Fuel- and energy-related (well-to-tank, grid losses)', 3, r.s33); }
+  const m = new Map<string, { n: string; v: number; s: 1 | 2 | 3; cats: Set<string>; items: Set<string>; group: boolean }>();
+  const add = (n: string, s: 1 | 2 | 3, v: number, r: Row) => { if (!v) return; const k = `${s}|${n}`; const o = m.get(k) ?? { n, v: 0, s, cats: new Set<string>(), items: new Set<string>(), group: n !== r.item }; o.v += v; o.cats.add(r.cat); o.items.add(r.item); m.set(k, o); };
+  for (const r of c.cur) { const n = sourceOf(r); add(n, 1, r.s1, r); add(n, 2, r.s2, r); add(n, 3, r.s3, r); add(WTT, 3, r.s33, r); }
   const used = { 1: 0, 2: 0, 3: 0 };
-  return [...m.values()].filter((x) => x.v > 0).sort((a, b) => b.v - a.v).map((x) => ({ n: x.n, v: x.v, s: x.s, c: SHADE[x.s][used[x.s]++ % SHADE[x.s].length]! }));
+  return [...m.values()].filter((x) => x.v > 0).sort((a, b) => b.v - a.v).map((x) => ({ n: x.n, v: x.v, s: x.s, cats: [...x.cats], items: [...x.items], group: x.group, c: SHADE[x.s][used[x.s]++ % SHADE[x.s].length]! }));
 }
+/** What opening a source shows: its item (purchases: the spend categories behind the group), or the entries with upstream energy emissions. */
+const srcDrill = (t: { n: string; s: number; cats: string[]; items: string[] }): Drill =>
+  t.n === WTT ? { wtt: true, label: t.n } : { items: t.items, cats: t.cats, scope: t.s, label: t.n };
+/** The categories behind a GHG Protocol code ('3.3' is the upstream energy part of fuel and energy entries). */
+const codeDrill = (d: Data, k: string, label: string): Drill | null => {
+  if (k === '3.3') return { wtt: true, label };
+  const cats = d.categories.filter((x) => x.ghg === k).map((x) => x.code);
+  return cats.length ? { cats, label } : null;
+};
 function upDown(c: Ctx) {
   const g = { up: new Map<string, number>(), own: new Map<string, number>(), down: new Map<string, number>() };
   for (const r of c.cur) for (const [code, v, s] of ghgParts(c, r)) { const k = s < 3 ? 'own' : Number(code.split('.')[1]) <= 8 ? 'up' : 'down'; g[k].set(code, (g[k].get(code) ?? 0) + v); }
@@ -109,16 +148,17 @@ function useCredits(year: number | null) {
 const CC: Record<string, string> = { avoidance: '#E9B44C', removal_nature: '#3E9B5F', removal_technical: '#6B4FA8' };
 
 function Overview({ d, c, go }: { d: Data; c: Ctx; go: (t: Tab) => void }) {
+  const drill = useDrill();
   const cr = useCredits(d.year), ret = cr?.summary.retired ?? 0, off = Math.min(ret, c.total);
   const nzParts: Part[] = [{ v: Math.max(0, c.total - off), c: 'var(--s2)', n: 'Net emissions' }, ...(off ? [{ v: off, c: '#6B4FA8', n: 'Offset by retired credits' }] : [])];
   const w = (v: number) => pc(v, c.total);
-  const rows = monthRows(c, (rs) => [0, 1, 2].map((i) => ({ v: sum(rs, S[i]!), c: SC[i]!, n: `Scope ${i + 1}` })), c.cmpOn ? c.prevBy : undefined);
+  const rows = monthRows(c, (rs) => [0, 1, 2].map((i) => ({ v: sum(rs, S[i]!), c: SC[i]!, n: `Scope ${i + 1}` })), c.cmpOn ? c.prevBy : undefined, (m) => drill({ m, label: `${MN[m - 1]} ${d.year}` }));
   const parts: Part[] = [0, 1, 2].map((i) => ({ v: c.s[i]!, c: SC[i]!, n: `Scope ${i + 1}` }));
   const nCat = (s: number) => new Set(c.cur.flatMap((r) => ghgParts(c, r).filter((p) => p[2] === s).map((p) => p[0]))).size;
   const big = [0, 1, 2].sort((x, y) => c.s[y]! - c.s[x]!)[0]!;
   const lever = ['fuel switching, fleet electrification and refrigerant leak control', 'renewable electricity (on-site solar, green tariff, I-RECs) and cooling efficiency', 'supplier engagement and waste diversion'][big];
   const tm = sources(c);
-  const tmTop = [...tm.slice(0, 7), ...(tm.length > 7 ? [{ n: `Other ${tm.length - 7} sources`, v: sum(tm.slice(7), (x) => x.v), c: '#9AA7A2', s: 3 as const }] : [])];
+  const tmTop: Part[] = [...tm.slice(0, 7).map((t) => ({ n: t.n, v: t.v, c: t.c, go: () => drill(srcDrill(t)) })), ...(tm.length > 7 ? [{ n: `Other ${tm.length - 7} sources`, v: sum(tm.slice(7), (x) => x.v), c: '#9AA7A2' }] : [])];
   const ud = upDown(c), U = mapSum(ud.up), O = mapSum(ud.own), Dn = mapSum(ud.down), all = U + O + Dn || 1;
   const yy = String(d.cmpYear).slice(2);
   return <>
@@ -140,7 +180,7 @@ function Overview({ d, c, go }: { d: Data; c: Ctx; go: (t: Tab) => void }) {
           <Donut parts={parts} center={fmt0(c.total)} sub="tCO₂e" size={116} />
           <table className="t dt sst"><thead><tr><th /><th className="num">t</th><th className="num">%</th><th className="num">vs {yy}</th></tr></thead>
             <tbody>{[0, 1, 2].map((i) => { const ch = c.yoyS[i]!; return (
-              <tr key={i}><td className="nowrap"><Dot c={SC[i]!} /> S{i + 1} <span className="muted" style={{ fontSize: 10.5 }}>{nCat(i + 1)} cat.</span></td>
+              <tr key={i} className="drill" onClick={() => drill({ scope: i + 1, label: `Scope ${i + 1}` })} title={`Open the Scope ${i + 1} entries`}><td className="nowrap"><Dot c={SC[i]!} /> S{i + 1} <span className="muted" style={{ fontSize: 10.5 }}>{nCat(i + 1)} cat.</span></td>
                 <td className="num"><b>{fmtT(c.s[i]!)}</b></td><td className="num">{w(c.s[i]!)}</td>
                 <td className="num" style={{ color: ch === null ? 'inherit' : ch > 0 ? 'var(--bad)' : 'var(--ok)' }}>{ch === null ? '—' : signPct(ch, 0)}</td></tr>); })}</tbody></table>
         </div>
@@ -151,11 +191,11 @@ function Overview({ d, c, go }: { d: Data; c: Ctx; go: (t: Tab) => void }) {
       <DCard title="Where emissions come from" span={2} sub={`box size = tCO₂e · colour = scope · all ${tm.length} sources listed`}>
         <div className="tmwrap"><div><Treemap items={tmTop} W={320} H={215} /></div>
           <div className="tml">{tm.map((t) => (
-            <div key={`${t.s}${t.n}`}><i style={{ background: t.c }} /><span className="nm" title={`${t.n} · Scope ${t.s}`}>{t.n}</span><b>{t.v < 100 ? fmt(t.v, 1) : fmt0(t.v)} t</b>
+            <div key={`${t.s}${t.n}`} className="drill" onClick={() => drill(srcDrill(t))} title="Open the entries"><i style={{ background: t.c }} /><span className="nm" title={`${t.n} · Scope ${t.s}`}>{t.n}</span><b>{t.v < 100 ? fmt(t.v, 1) : fmt0(t.v)} t</b>
               <span className="muted">{c.total ? ((t.v / c.total) * 100 < 1 ? '<1' : Math.round((t.v / c.total) * 100)) : 0}%</span></div>))}</div></div>
       </DCard>
       <DCard title="Top 5 contributors">
-        {tm.slice(0, 5).map((t, i) => <div key={`${t.s}${t.n}`} className="t5"><span className="rk">{i + 1}</span><span style={{ flex: 1, minWidth: 0 }}><b>{t.n}</b><small>{fmtT(t.v)} t · {w(t.v)}</small></span><i style={{ background: t.c }} /></div>)}
+        {tm.slice(0, 5).map((t, i) => <div key={`${t.s}${t.n}`} className="t5 drill" onClick={() => drill(srcDrill(t))} title="Open the entries"><span className="rk">{i + 1}</span><span style={{ flex: 1, minWidth: 0 }}><b>{t.n}</b><small>{fmtT(t.v)} t · {w(t.v)}</small></span><i style={{ background: t.c }} /></div>)}
       </DCard>
       <DCard title="Upstream · own operations · downstream" span={2}>
         <div className="vchain">
@@ -180,6 +220,8 @@ function Overview({ d, c, go }: { d: Data; c: Ctx; go: (t: Tab) => void }) {
 
 // ---------------------------------------------------- scopes & categories --
 function Scopes({ d, c }: { d: Data; c: Ctx }) {
+  const drill = useDrill();
+  const goCode = (k: string, m?: number) => { const o = codeDrill(d, k, `${k} ${ghgName(d, c, k)}`); return o ? () => drill({ ...o, m, label: m ? `${o.label} · ${MN[m - 1]}` : o.label }) : undefined; };
   const sc: Map<string, number>[] = [new Map(), new Map(), new Map()];
   const codes = new Map<string, number[]>();
   for (const r of c.cur) for (const [code, v, s] of ghgParts(c, r)) {
@@ -192,13 +234,13 @@ function Scopes({ d, c }: { d: Data; c: Ctx }) {
     <DStat cells={[...[0, 1, 2].map((i) => [<><Dot c={SC[i]!} />Scope {i + 1}</>, T(c.s[i]!), `${pc(c.s[i]!, c.total)} of total · ${sc[i]!.size} categories`] as [ReactNode, ReactNode, ReactNode]),
       ['Categories reported', `${allCodes.length} of 22`, 'GHG Protocol codes with data']]} />
     <div className="dgrid">
-      {[0, 1, 2].map((i) => { const parts = [...sc[i]!.entries()].sort((a, b) => b[1] - a[1]).map(([k, v], j) => ({ n: `${k} ${ghgName(d, c, k)}`, v, c: PAL[(j + i + 1) % PAL.length]! })); return (
+      {[0, 1, 2].map((i) => { const parts = [...sc[i]!.entries()].sort((a, b) => b[1] - a[1]).map(([k, v], j) => ({ n: `${k} ${ghgName(d, c, k)}`, v, c: PAL[(j + i + 1) % PAL.length]!, go: goCode(k) })); return (
         <DCard key={i} title={<><Dot c={SC[i]!} />Scope {i + 1}</>}><div className="dsplit"><Donut parts={parts} center={fmt0(c.s[i]!)} sub="t" size={130} /><Legend parts={parts} unit="t" /></div></DCard>); })}
       <DCard title="By GHG Protocol category and month (tCO₂e)" span={3}>
         <div className="scrollx"><table className="t dt"><thead><tr><th>Category</th>{MN.map((m) => <th key={m} className="num">{m}</th>)}{whole.size > 0 && <th className="num">Whole year</th>}<th className="num">Total</th><th className="num">Share</th></tr></thead>
           <tbody>{allCodes.map(({ k, ms, t }) => { const mx = Math.max(...ms) || 1, s = k[0]; return (
-            <tr key={k}><td className="nowrap"><span className={`codechip s${s}`}>{k}</span> {ghgName(d, c, k)}</td>
-              {ms.map((v: number, i: number) => <td key={i} className="num hm" style={{ background: v ? `color-mix(in srgb, var(--s${s}) ${Math.round(10 + (v / mx) * (s === '1' ? 28 : 45))}%, transparent)` : 'transparent' }}>{v ? fmtT(v) : ''}</td>)}
+            <tr key={k}><td className={`nowrap${goCode(k) ? ' drill' : ''}`} onClick={goCode(k)}><span className={`codechip s${s}`}>{k}</span> {ghgName(d, c, k)}</td>
+              {ms.map((v: number, i: number) => <td key={i} className={`num hm${v && goCode(k) ? ' drill' : ''}`} onClick={v ? goCode(k, i + 1) : undefined} style={{ background: v ? `color-mix(in srgb, var(--s${s}) ${Math.round(10 + (v / mx) * (s === '1' ? 28 : 45))}%, transparent)` : 'transparent' }}>{v ? fmtT(v) : ''}</td>)}
               {whole.size > 0 && <td className="num">{whole.get(k) ? fmtT(whole.get(k)!) : ''}</td>}
               <td className="num"><b>{fmtT(t)}</b></td><td className="num">{c.total ? fmt((t / c.total) * 100, 1) : 0}%</td></tr>); })}</tbody></table></div>
       </DCard>
@@ -208,6 +250,7 @@ function Scopes({ d, c }: { d: Data; c: Ctx }) {
 
 // ---------------------------------------------------------------- facilities --
 function Facilities({ d, c, pick }: { d: Data; c: Ctx; pick: (id: string) => void }) {
+  const drill = useDrill();
   const rows = d.facilities.map((f) => { const rs = c.cur.filter((r) => r.f === f.id), t = sum(rs, tot); return { f, t, s: S.map((g) => sum(rs, g)), int: f.employees ? (t * c.k) / f.employees : null, m2: f.area ? (t * c.k * 1000) / f.area : null }; }).sort((a, b) => b.t - a.t);
   const hi = rows.filter((x) => x.int !== null).sort((a, b) => b.int! - a.int!)[0];
   const cell = (f: string, m: number) => sum(c.cur.filter((r) => r.f === f && r.m === m), tot);
@@ -225,7 +268,7 @@ function Facilities({ d, c, pick }: { d: Data; c: Ctx; pick: (id: string) => voi
         <div className="scrollx"><table className="t dt"><thead><tr><th>Facility</th>{MN.map((m) => <th key={m} className="num">{m}</th>)}</tr></thead>
           <tbody>{rows.map((x) => <tr key={x.f.id}><td className="nowrap"><b>{x.f.name}</b></td>{MN.map((_, i) => { const m = i + 1; if (!c.months.includes(m)) return <td key={i} />;
             const v = cell(x.f.id, m), wt = c.waiting.has(`${x.f.id}|${m}`), has = c.filled.has(`${x.f.id}|${m}`);
-            return <td key={i} className="num hm" title={!has ? 'No data yet' : wt ? 'Entries waiting for approval' : 'Approved'} style={{ background: v ? `color-mix(in srgb, var(--primary) ${Math.round(8 + (v / mx) * 62)}%, transparent)` : 'transparent', ...(wt || !has ? { outline: '1.5px dashed var(--warn)', outlineOffset: -3 } : {}) }}>{v ? fmtT(v) : '—'}</td>; })}</tr>)}</tbody></table></div>
+            return <td key={i} className={`num hm${v ? ' drill' : ''}`} onClick={v ? () => drill({ fid: x.f.id, m, label: `${x.f.name} · ${MN[m - 1]}` }) : undefined} title={!has ? 'No data yet' : wt ? 'Entries waiting for approval' : 'Approved — click to open the entries'} style={{ background: v ? `color-mix(in srgb, var(--primary) ${Math.round(8 + (v / mx) * 62)}%, transparent)` : 'transparent', ...(wt || !has ? { outline: '1.5px dashed var(--warn)', outlineOffset: -3 } : {}) }}>{v ? fmtT(v) : '—'}</td>; })}</tr>)}</tbody></table></div>
         <div className="muted" style={{ fontSize: 11.5 }}>Dashed outline = month not fully approved, or no data yet.</div>
       </DCard>
     </div>

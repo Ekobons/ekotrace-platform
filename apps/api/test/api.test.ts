@@ -805,6 +805,12 @@ test('bills: upload a PDF, read, match the account to a meter, check, confirm â†
   assert.equal(Number(bill.quantity), 45500); assert.equal(bill.unit, 'kWh_e'); assert.equal(bill.status, 'to_check');
   const again = await app.inject({ method: 'POST', url: '/api/bills/upload', payload: pdf, headers: { cookie: adminCookie, 'x-tenant-id': tenantA, 'content-type': 'application/octet-stream' } });
   assert.equal(again.json().duplicate, true);
+  // a scan of the April bill: read by OCR, marked for checking
+  const { makeScanPdf } = await import('./helpers/pdf.js');
+  const scan = Buffer.from(await makeScanPdf(lines.map((l) => (Array.isArray(l) && l[0] === 'Bill No:' ? ['Bill No:', 'INV-26-0499999'] as [string, string] : l))));
+  const sc = await app.inject({ method: 'POST', url: '/api/bills/upload', payload: scan, headers: { cookie: adminCookie, 'x-tenant-id': tenantA, 'content-type': 'application/octet-stream', 'x-filename': 'sewa-scan.pdf' } });
+  assert.equal(sc.statusCode, 200, sc.body);
+  assert.equal(sc.json().scanned, true); assert.ok(sc.json().found.ocr?.confidence > 60); assert.equal(Number(sc.json().quantity), 45500);
   const notPdf = await app.inject({ method: 'POST', url: '/api/bills/upload', payload: Buffer.from('hello'), headers: { cookie: adminCookie, 'x-tenant-id': tenantA, 'content-type': 'application/octet-stream' } });
   assert.equal(notPdf.statusCode, 400);
   const doc = await app.inject({ method: 'GET', url: `/api/documents/${bill.document_id}`, headers: { cookie: adminCookie, 'x-tenant-id': tenantA } });

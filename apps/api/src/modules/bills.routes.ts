@@ -4,7 +4,8 @@
  *   Upload    one PDF per request (the screen sends many in a row); checked to be a PDF,
  *             at most 15 MB; the same file twice is recognised. The text is read (PDF.js,
  *             no scripts) and the supplier, account, period, consumption and amount found.
- *             A scan without text is flagged for the figures to be typed in.
+ *             A scan without text is read by OCR on the server (lib/ocr.ts, no outside service); what it reads is marked
+ *             for checking against the page. When OCR is off or fails, the scan is flagged for the figures to be typed in.
  *   Match     the account number on the bill → the meter (utility account) with that
  *             account number.
  *   Check     a person checks every field against the PDF shown beside it, corrects what
@@ -12,6 +13,7 @@
  *   Book      the bill becomes one reading of the meter covering its billing period; the
  *             meter's monthly entries are created / updated (split over months by days).
  */
+import { ocrEnabled, ocrPdf } from '../lib/ocr.js';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { convert, tzOffset } from '@ekotrace/calc';
@@ -62,7 +64,21 @@ async function visible(c: Tx, req: FastifyRequest, b: { facility_id: string | nu
 }
 
 /** Store a PDF and what was read from it; returns the bill id (or the existing one for the same file). */
-export async function createBill(c: Tx, tenant: string, buf: Buffer, filename: string, by: string, category?: string | null): Promise<{ id: string; duplicate: boolean }> {
+/** What OCR read from a scanned PDF, done before the transaction (it takes seconds). */
+export type OcrResult = { text: string; confidence: number; pages: number } | { error: string } | null;
+export async function ocrIfScanned(buf: Buffer): Promise<OcrResult> {
+  if (!ocrEnabled()) return null;
+  try { const t = await pdfText(new Uint8Array(buf)); if (!t.scanned) return null; return await ocrPdf(new Uint8Array(buf)); } catch (e) { return { error: (e as Error).message.slice(0, 160) }; }
+}
+
+/** Whether this file is already a bill of the same kind (electricity / water) in the company. */
+export async function isDuplicateBill(c: Tx, buf: Buffer, category?: string | null) {
+  const water = !!category && category.startsWith('water');
+  const r = await c.query(`SELECT 1 FROM document d JOIN bill b ON b.document_id = d.id WHERE d.sha256 = $1 AND (coalesce(b.category, '') LIKE 'water%') = $2 LIMIT 1`, [sha256(buf.toString('binary')), water]);
+  return !!r.rowCount;
+}
+
+export async function createBill(c: Tx, tenant: string, buf: Buffer, filename: string, by: string, category?: string | null, ocr: OcrResult = null): Promise<{ id: string; duplicate: boolean }> {
   if (buf.subarray(0, 5).toString('latin1') !== '%PDF-') throw new AppError('This is not a PDF file');
   const hash = sha256(buf.toString('binary'));
   // A combined electricity & water bill (DEWA, SEWA…) may be uploaded once for each: the same file is one document, one bill per kind.
@@ -72,11 +88,14 @@ export async function createBill(c: Tx, tenant: string, buf: Buffer, filename: s
   if (dup) return { id: dup.id, duplicate: true };
   let text = '', scanned = false, problem: string | null = null;
   try { const t = await pdfText(new Uint8Array(buf)); text = t.text; scanned = t.scanned; } catch (e) { problem = `The PDF could not be read (${(e as Error).message.slice(0, 120)})`; }
+  // a scan: the text OCR read (marked, to be checked against the page), or nothing to read
+  let ocrInfo: { confidence: number; pages: number } | { error: string } | null = null;
+  if (scanned && ocr) { if ('text' in ocr) { text = ocr.text; ocrInfo = { confidence: ocr.confidence, pages: ocr.pages }; } else ocrInfo = { error: ocr.error }; }
   const r = readBill(text, water ? 'water' : undefined);
   const doc = prior[0] ? { id: prior[0].doc } : (await c.query('INSERT INTO document (tenant_id, kind, filename, content_type, size, sha256, data, uploaded_by) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id',
     [tenant, 'bill', filename, 'application/pdf', buf.length, hash, sealFile(buf), by])).rows[0];
   const meterId = await matchMeter(c, r.account?.value, water);
-  const found = { ...r, problem, matchedBy: meterId ? 'account number' : null };
+  const found = { ...r, problem, matchedBy: meterId ? 'account number' : null, ocr: ocrInfo };
   const b = (await c.query(
     `INSERT INTO bill (tenant_id, document_id, energy, supplier, account_no, bill_no, period_from, period_to, issue_date, quantity, unit, amount, currency, found, text_excerpt, scanned, meter_id, created_by, category)
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19) RETURNING id`,
@@ -177,11 +196,14 @@ export async function billRoutes(app: FastifyInstance) {
     if (buf.subarray(0, 5).toString('latin1') !== '%PDF-') throw new AppError('This is not a PDF file');
     const filename = decodeURIComponent(String(req.headers['x-filename'] ?? 'bill.pdf')).replace(/[^\w.\- ()]/g, '_').slice(0, 160);
     const category = req.headers['x-category'] ? z.string().regex(/^[a-z_]{3,40}$/).parse(String(req.headers['x-category'])) : null;
+    // OCR (seconds) before the transaction, and only for a file not uploaded before
+    const dup = await tenantTx(tenant, (c) => isDuplicateBill(c, buf, category));
+    const ocr = dup ? null : await ocrIfScanned(buf);
     return tenantTx(tenant, async (c) => {
-      const r = await createBill(c, tenant, buf, filename, req.user.id, category);
+      const r = await createBill(c, tenant, buf, filename, req.user.id, category, ocr);
       if (!r.duplicate) {
         const x = (await c.query('SELECT scanned, found FROM bill WHERE id = $1', [r.id])).rows[0];
-        await audit(c, req, 'bill.upload', 'bill', r.id, { filename, size: buf.length, scanned: x.scanned, missing: x.found.missing });
+        await audit(c, req, 'bill.upload', 'bill', r.id, { filename, size: buf.length, scanned: x.scanned, ocr: x.found.ocr ?? null, missing: x.found.missing });
       }
       return { duplicate: r.duplicate, ...(await c.query(`${SELECT_BILL} WHERE b.id = $1`, [r.id])).rows[0] };
     });

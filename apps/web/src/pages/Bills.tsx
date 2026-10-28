@@ -36,7 +36,7 @@ export function Bills() {
       try {
         if (f.size > 15 * 1024 * 1024) throw new Error('larger than 15 MB');
         const b = await api.uploadBill(f);
-        setQueue((x) => x.map((y, k) => (k === i ? { ...y, state: b.duplicate ? 'duplicate' : 'done', msg: b.duplicate ? `already uploaded (${STATUS[b.status]})` : b.scanned ? 'scan: enter the figures' : b.found.missing?.length ? `to complete: ${b.found.missing.join(', ')}` : 'read' } : y)));
+        setQueue((x) => x.map((y, k) => (k === i ? { ...y, state: b.duplicate ? 'duplicate' : 'done', msg: b.duplicate ? `already uploaded (${STATUS[b.status]})` : b.scanned ? (b.found.ocr && 'confidence' in b.found.ocr ? `scan read by OCR (${b.found.ocr.confidence}%): check every figure` : 'scan: enter the figures') : b.found.missing?.length ? `to complete: ${b.found.missing.join(', ')}` : 'read' } : y)));
       } catch (e) { setQueue((x) => x.map((y, k) => (k === i ? { ...y, state: 'error', msg: (e as Error).message } : y))); }
     }
     setStatus('to_check'); load();
@@ -71,7 +71,7 @@ export function Bills() {
                 <td>{b.filename}<div className="muted small">uploaded {b.created_at.slice(0, 10)}{b.bill_no ? ` · no. ${b.bill_no}` : ''}</div></td>
                 <td>{b.supplier ?? <span className="chip warn">?</span>}<div className="muted small mono">{b.account_no ?? '—'}</div></td>
                 <td className="mono small">{b.period_from && b.period_to ? `${b.period_from} – ${b.period_to}` : <span className="chip warn">?</span>}</td>
-                <td className="num">{b.quantity != null ? <>{num(Number(b.quantity))} <span className="muted small">{unitLabel(b.unit ?? '')}</span></> : b.scanned ? <span className="chip warn">scan</span> : <span className="chip warn">?</span>}</td>
+                <td className="num">{b.quantity != null ? <>{num(Number(b.quantity))} <span className="muted small">{unitLabel(b.unit ?? '')}</span>{b.scanned && b.found.ocr && 'confidence' in b.found.ocr && <span className="chip warn" style={{ marginLeft: 4 }} title="Read by OCR from a scan: check against the page">OCR</span>}</> : b.scanned ? <span className="chip warn">scan</span> : <span className="chip warn">?</span>}</td>
                 <td className="num">{b.amount != null ? `${b.currency ?? ''} ${Number(b.amount).toLocaleString('en', { minimumFractionDigits: 2 })}` : '—'}</td>
                 <td>{b.meter ? <>{b.meter}<div className="muted small">{b.facility}</div></> : <span className="chip warn">no meter</span>}</td>
                 <td>{b.status === 'confirmed' ? <span className="chip">booked</span> : b.status === 'rejected' ? <span className="chip grey">rejected</span> : b.found.missing?.length || !b.meter_id ? <span className="chip warn">to complete</span> : <span className="chip info">ready to check</span>}</td>
@@ -128,7 +128,9 @@ export function BillReview({ id, onChanged, onClose, category }: { id: string; o
         <div className="row"><div className="grow"><div className="eyebrow">{STATUS[b.status]}</div><h2>{b.filename}</h2></div>
           <button className="btn ghost" onClick={onClose} aria-label="Close"><Icon name="x" /></button></div>
         {b.found.problem && <div className="note bad">{b.found.problem}</div>}
-        {b.scanned && <div className="note warn">This PDF is a scan (an image, no text): type the figures from the preview.</div>}
+        {b.scanned && (b.found.ocr && 'confidence' in b.found.ocr
+          ? <div className="note warn">This PDF is a scan: the figures were read by OCR on the server (word confidence {b.found.ocr.confidence}%). Check every figure against the preview before publishing.{(b.found.missing?.length ?? 0) > 0 && !locked ? ` Not found: ${b.found.missing!.join(', ')}.` : ''}</div>
+          : <div className="note warn">This PDF is a scan (an image, no text){b.found.ocr && 'error' in b.found.ocr ? ` and OCR could not read it (${b.found.ocr.error})` : ''}: type the figures from the preview.</div>)}
         {!b.scanned && (b.found.missing?.length ?? 0) > 0 && !locked && <div className="note warn">Not found on the bill: {b.found.missing!.join(', ')}. Please fill in from the preview.</div>}
         {b.status === 'checked' && <div className="note info">Checked by {b.checked_by_name ?? 'a user'}: waiting in “Ready to publish”. A change sends it back to check.</div>}
         {b.status === 'confirmed' && <div className="note ok">Published by {b.checked_by_name ?? 'a user'} on {b.checked_at?.slice(0, 10)}.</div>}

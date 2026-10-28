@@ -27,8 +27,8 @@ export const fmt = (v: number, d = 0) => (Number.isFinite(v) ? v.toLocaleString(
 export const fmt0 = (v: number) => fmt(Math.round(v));
 export const fmtT = (v: number) => (Math.abs(v) < 10 ? fmt(v, Math.abs(v) < 1 ? 2 : 1) : fmt0(v));
 
-export interface Part { v: number; c: string; n: string }
-export interface BarRow { lbl: string; parts: Part[]; line?: number | null; line2?: number | null; dim?: boolean }
+export interface Part { v: number; c: string; n: string; go?: () => void }   // go: open the entries behind it
+export interface BarRow { lbl: string; parts: Part[]; line?: number | null; line2?: number | null; dim?: boolean; go?: () => void }
 
 export function Bars({ rows, unit = 't', h = 170, label = 'Chart' }: { rows: BarRow[]; unit?: string; h?: number; w?: number; label?: string }) {
   return <Fit minH={Math.round(h * 1.3)}>{(w, hh) => <BarsSvg rows={rows} unit={unit} W={w} H={hh} label={label} />}</Fit>;
@@ -53,7 +53,8 @@ function BarsSvg({ rows, unit, W, H, label }: { rows: BarRow[]; unit: string; W:
         const w = Math.min(bw * 0.64, 72), x = L + i * bw + (bw - w) / 2;
         let acc = 0;
         return (
-          <g key={r.lbl + i}>
+          <g key={r.lbl + i} className={r.go ? 'drill' : undefined} onClick={r.go} role={r.go ? 'link' : undefined} tabIndex={r.go ? 0 : undefined} onKeyDown={r.go ? (e) => { if (e.key === 'Enter') r.go!(); } : undefined} aria-label={r.go ? `${r.lbl}: open the entries` : undefined}>
+            {r.go && <rect x={L + i * bw} y={T} width={bw} height={H - T - B} fill="transparent" />}
             {r.parts.map((p, k) => { const hh = ((p.v || 0) / mx) * (H - T - B); if (hh <= 0) return null; const y = yy(0) - acc - hh; acc += hh;
               return <rect key={k} x={x} y={y} width={w} height={hh} fill={p.c} opacity={r.dim ? 0.4 : 1}><title>{`${r.lbl}${p.n ? ` · ${p.n}` : ''}: ${fmtT(p.v)} ${unit}`}</title></rect>; })}
             <text x={x + w / 2} y={H - 6} fontSize="12.5" textAnchor="middle" fill="var(--fg2)">{r.lbl}</text>
@@ -87,7 +88,7 @@ export function Donut({ parts, center, sub, size: size0 = 150 }: { parts: Part[]
 export function Legend({ parts, unit, tot }: { parts: Part[]; unit?: string; tot?: number }) {
   const T = tot || parts.reduce((a, p) => a + (p.v || 0), 0) || 1;
   return <div className="dleg">{parts.filter((p) => p.v > 0).map((p) => (
-    <div key={p.n}><i style={{ background: p.c }} /><span className="nm" title={p.n}>{p.n}</span><b>{p.v < 100 ? fmt(p.v, p.v < 10 ? 2 : 1) : fmt0(p.v)}{unit ? ` ${unit}` : ''}</b><span className="muted">{Math.round((p.v / T) * 100)}%</span></div>))}</div>;
+    <div key={p.n} className={p.go ? 'drill' : undefined} onClick={p.go} role={p.go ? 'link' : undefined} tabIndex={p.go ? 0 : undefined} onKeyDown={p.go ? (e) => { if (e.key === 'Enter') p.go!(); } : undefined}><i style={{ background: p.c }} /><span className="nm" title={p.go ? `${p.n} — open the entries` : p.n}>{p.n}</span><b>{p.v < 100 ? fmt(p.v, p.v < 10 ? 2 : 1) : fmt0(p.v)}{unit ? ` ${unit}` : ''}</b><span className="muted">{Math.round((p.v / T) * 100)}%</span></div>))}</div>;
 }
 
 export function Treemap({ items, H = 210 }: { items: Part[]; W?: number; H?: number }) {
@@ -112,7 +113,7 @@ function TreemapSvg({ items, W, H }: { items: Part[]; W: number; H: number }) {
   return (
     <svg viewBox={`0 0 ${W} ${H}`} width={W} height={H} role="img" aria-label="Treemap">
       {out.map(({ it, x, y, w, h }, i) => (
-        <g key={i}>
+        <g key={i} className={it.go ? 'drill' : undefined} onClick={it.go}>
           <rect x={x + 1} y={y + 1} width={Math.max(0, w - 2)} height={Math.max(0, h - 2)} rx="4" fill={it.c}><title>{`${it.n}: ${fmtT(it.v)} t (${Math.round((it.v / tot0) * 100)}%)`}</title></rect>
           {w > 80 && h > 40 ? <>
             <text x={x + 8} y={y + 19} fontSize="13" fontWeight="600" fill="#fff">{it.n.length > w / 7.5 ? `${it.n.slice(0, Math.floor(w / 7.5))}…` : it.n}</text>

@@ -126,6 +126,8 @@ India CCTS, BRSR Core, UAE MRV, Energy management, the Compliance desk and EPR a
 
 The menu on the left is grouped into coloured sections — Capture, Value chain, Net zero, Disclose, Setup and Help. Click a section title to fold or open it (the section of the page you are on always stays open).
 
+On a **phone or small tablet** the menu is hidden behind the **☰** button in the bar at the top: tap it to slide the menu in, choose a page, and it closes by itself (tap outside it, ✕ or Escape also closes it).
+
 Some menu entries hold related pages, shown as **tabs at the top of the page** (the menu entry's count adds up the counts of its tabs):
 
 | Menu entry | Tabs |
