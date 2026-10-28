@@ -15,6 +15,6 @@ export async function loadBrand(): Promise<void> {
   } catch { /* keep the default */ }
 }
 
-export type ProductCode = 'ekotrace' | 'ekofin' | 'cbam' | 'ccts' | 'brsr' | 'uaemrv' | 'energy';
+export type ProductCode = 'ekotrace' | 'ekofin' | 'cbam' | 'ccts' | 'brsr' | 'uaemrv' | 'energy' | 'compliance';
 /** The products' names: EKOTRACE / EKOFIN under the Ekotrace brand; elsewhere the brand's name and "Financed emissions" (a module); CBAM Exporter, India CCTS, BRSR Core and UAE MRV under every brand. */
-export const productName = (p: ProductCode) => (p === 'cbam' ? 'CBAM Exporter' : p === 'ccts' ? 'India CCTS' : p === 'brsr' ? 'BRSR Core' : p === 'uaemrv' ? 'UAE MRV' : p === 'energy' ? 'Energy management' : BRAND.name.toLowerCase() === 'ekotrace' ? (p === 'ekofin' ? 'EKOFIN' : 'EKOTRACE') : p === 'ekofin' ? 'Financed emissions' : BRAND.name);
+export const productName = (p: ProductCode) => (p === 'cbam' ? 'CBAM Exporter' : p === 'ccts' ? 'India CCTS' : p === 'brsr' ? 'BRSR Core' : p === 'uaemrv' ? 'UAE MRV' : p === 'energy' ? 'Energy management' : p === 'compliance' ? 'Compliance desk' : BRAND.name.toLowerCase() === 'ekotrace' ? (p === 'ekofin' ? 'EKOFIN' : 'EKOTRACE') : p === 'ekofin' ? 'Financed emissions' : BRAND.name);

@@ -163,3 +163,15 @@
 | SEU | significant energy use: a use with substantial energy or potential to save (ISO 50001) |
 | EUI | energy use intensity: kWh per m² of floor area a year |
 
+## Compliance desk
+
+| Term | Meaning |
+|---|---|
+| Applicability | whether a regulation applies to the company: applies, may apply (a fact is missing from the profile) or does not apply |
+| Obligation | something a regulation requires by a date: a filing, a registration, an assurance, a surrender |
+| Period | the financial or calendar year an obligation covers; it can differ from the year it is due |
+| Authorised CBAM declarant | the status an EU importer needs to import more than 50 t of CBAM goods a year from 2026 |
+| Omnibus I | the 2026 EU directive that narrowed CSRD to companies with more than 1,000 employees and €450 million turnover |
+| IEQT | the UAE national MRV system where designated sources report Scope 1 and 2 |
+| SECR | Streamlined Energy and Carbon Reporting: UK energy and carbon figures in the directors' report |
+| .ics | calendar file format that Outlook, Google Calendar and Apple Calendar import |

@@ -1630,3 +1630,15 @@ table.brsrtable td, table.brsrtable th { padding-left: 8px; padding-right: 8px; 
 table.brsrtable td.brsrlbl { min-width: 220px; max-width: 320px; }
 fieldset.plain { border: 0; margin: 0; padding: 0; min-width: 0; }
 .ok-t { color: var(--ok); }
+/* Compliance desk */
+.bad-t { color: var(--bad, #B3261E); }
+.cpgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
+.cpcard { border-left: 4px solid var(--line2); }
+.cpcard.applies { border-left-color: #E9B44C; } .cpcard.may_apply { border-left-color: #5B8DEF; } .cpcard.not_applicable { opacity: .75; }
+.cpcal { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+@media (max-width: 1000px) { .cpcal { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .cpcal, .cpgrid { grid-template-columns: 1fr; } }
+.cpmonth { min-height: 110px; display: grid; gap: 6px; align-content: start; } .cpmonth.now { outline: 2px solid var(--primary); }
+.cpitem { display: flex; gap: 6px; align-items: start; text-align: left; background: none; border: 0; padding: 4px; border-radius: 6px; cursor: pointer; color: inherit; font: inherit; width: 100%; }
+.cpitem:hover { background: var(--bg); } .cpitem .dot { margin-top: 5px; flex: none; background: var(--line2); }
+.cpitem .dot.done { background: var(--primary); } .cpitem .dot.in_progress { background: #5B8DEF; } .cpitem .dot.overdue { background: #C2523C; } .cpitem .dot.not_applicable { background: transparent; border: 1px solid var(--line2); }
