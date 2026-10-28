@@ -11,6 +11,7 @@ export interface Profile {
   indiaTop: 'top150' | 'top250' | 'top500' | 'top1000' | 'listed_other' | 'none'; cctsObligated: boolean | null; cbamImportTonnes: number | null; cbamExporter: boolean | null;
   uaeDesignated: 'yes' | 'no' | 'unknown'; uaeScope12: number | null; eadFacility: boolean | null; usRevenueUsd: number | null; californiaBusiness: boolean;
   auGroup: 'group1' | 'group2' | 'group3' | 'none'; ukQuoted: boolean; ukLarge: boolean;
+  eprIndia: boolean | null; ppwrProducer: boolean | null;
 }
 export interface Regulation { code: string; name: string; jurisdiction: string; authority: string; source: string; summary: string; applies: Applies; reason: string; counts: { total: number; done: number; overdue: number; open: number } }
 export interface Obligation {

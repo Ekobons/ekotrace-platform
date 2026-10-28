@@ -52,6 +52,7 @@ npm run demo:ccts         # optional: India CCTS demo (an Indian cement works an
 npm run demo:brsr         # optional: SEBI BRSR Core demo (an Indian listed auto-components maker, invented figures)
 npm run demo:uaemrv       # optional: UAE MRV demo (an Abu Dhabi steel maker: EAD facility report and federal figures, invented)
 npm run demo:energy       # optional: Energy management demo (UAE cold store, office tower, hotel, bakery: baselines and savings, invented)
+npm run demo:epr          # optional: EPR demo (Indian brand owner: plastic, e-waste, EU packaging, a recycling plant selling certificates, invented)
 npm run demo:compliance   # optional: Compliance desk demo (UAE / India metals group exporting to the EU: regulations, deadlines, statuses, invented)
 
 # 5. Start (builds the screens and starts everything)

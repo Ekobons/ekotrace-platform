@@ -23,11 +23,13 @@ export interface Profile {
   usRevenueUsd: number | null; californiaBusiness: boolean;
   auGroup: 'group1' | 'group2' | 'group3' | 'none';
   ukQuoted: boolean; ukLarge: boolean;
+  eprIndia: boolean | null;                 // places plastic packaging, EEE, batteries or tyres on the Indian market (or recycles them)
+  ppwrProducer: boolean | null;             // first makes packaging available in an EU member state
 }
 export const DEFAULT_PROFILE: Profile = {
   fyEndMonth: 12, countries: [], employees: null, turnoverEur: null, euTurnoverEur: null, euSubsidiaryTurnoverEur: null, euEntity: false,
   listed: 'none', sgxSti: false, sgxCapOver1bn: false, indiaTop: 'none', cctsObligated: null, cbamImportTonnes: null, cbamExporter: null,
-  uaeDesignated: 'unknown', uaeScope12: null, eadFacility: null, usRevenueUsd: null, californiaBusiness: false, auGroup: 'none', ukQuoted: false, ukLarge: false,
+  uaeDesignated: 'unknown', uaeScope12: null, eadFacility: null, usRevenueUsd: null, californiaBusiness: false, auGroup: 'none', ukQuoted: false, ukLarge: false, eprIndia: null, ppwrProducer: null,
 };
 
 const iso = (y: number, m: number, d: number) => `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
@@ -205,6 +207,26 @@ export const REGULATIONS: Regulation[] = [
     applies: (p) => (p.ukQuoted ? yes('UK quoted company') : p.ukLarge ? yes('Large UK unquoted company or LLP') : (has(p, 'GB') ? maybe('UK operations: applies to quoted and large unquoted companies (2 of: turnover, balance sheet, 250+ employees)') : no('No UK operations'))),
     obligations: [
       { code: 'report', title: 'Energy and carbon report in the directors\' report', detail: 'Filed with the annual accounts.', due: (y, p) => afterFyEnd(y, p.fyEndMonth, p.ukQuoted ? 6 : 9), from: 2019, dueNote: 'With the accounts: 6 months for public, 9 months for private companies', module: { route: '/reports', label: 'Reports (SECR)' } },
+    ],
+  },
+  {
+    code: 'in_epr', name: 'India Extended Producer Responsibility (plastic packaging, e-waste, batteries, tyres)', jurisdiction: 'India', authority: 'Central Pollution Control Board', periodOf: 'india_fy',
+    source: 'https://eprplastic.cpcb.gov.in/', summary: 'Producers, importers and brand owners register on the CPCB portals, meet their EPR targets with certificates from registered recyclers and file annual returns; plastic packaging also carries recycled-content (from FY 2025-26) and reuse targets (G.S.R. 237(E), 31 March 2026). Shortfalls attract environmental compensation.',
+    applies: (p) => (p.eprIndia ? yes('Places products under EPR on the Indian market, or recycles them') : p.eprIndia === false ? no('No products under EPR in India') : (has(p, 'IN') ? maybe('Operates in India: plastic packaging, electronics, batteries or tyres placed on the market are under EPR') : no('No operations in India'))),
+    obligations: [
+      { code: 'return', title: 'EPR annual returns on the CPCB portals', detail: 'Quantities placed on the market, certificates applied and recycled content, for each registration.', due: (y) => iso(y, 6, 30), from: 2023, dueNote: 'By 30 June (often extended by CPCB notice)', penalty: 'Environmental compensation for unmet targets', module: { route: '/epr', label: 'EPR' } },
+      { code: 'targets', title: 'EPR targets met with certificates', detail: 'Certificates bought and applied for the year\'s obligation; any shortfall carried with compensation.', due: (y) => iso(y, 6, 30), from: 2023, module: { route: '/epr', label: 'EPR' } },
+    ],
+  },
+  {
+    code: 'eu_ppwr', name: 'EU Packaging and Packaging Waste Regulation (EU) 2025/40', jurisdiction: 'EU', authority: 'European Commission; national producer registers', periodOf: 'calendar',
+    source: 'https://eur-lex.europa.eu/eli/reg/2025/40/oj', summary: 'Applies from 12 August 2026: registration in each member state where packaging is first made available, EPR through a producer responsibility organisation, harmonised labelling from 12 August 2028, recyclability grade C or better and recycled content in plastic packaging from 2030.',
+    applies: (p) => (p.ppwrProducer ? yes('First makes packaging available in an EU member state') : p.ppwrProducer === false ? no('Does not place packaging on the EU market') : (has(p, 'EU') ? maybe('Operates in the EU: placing packaged goods on the market makes the company a producer') : no('No EU market recorded'))),
+    obligations: [
+      { code: 'register', title: 'Registration in each member state\'s producer register', detail: 'Before making packaging available; through an authorised representative where the company is not established there.', due: () => '2026-08-12', from: 2026, once: true, module: { route: '/epr', label: 'EPR' } },
+      { code: 'report', title: 'Packaging placed on the market reported to the register and the PRO', detail: 'Tonnes by material, with the fees owed.', due: (y) => iso(y + 1, 5, 15), from: 2026, dueNote: 'National schedule (e.g. Germany: declaration of completeness by 15 May)', module: { route: '/epr', label: 'EPR' } },
+      { code: 'labelling', title: 'Harmonised packaging labels', detail: 'Material composition labels and pictograms; packaging made before the date may be sold for three more years.', due: () => '2028-08-12', from: 2028, once: true },
+      { code: 'recycled_content', title: 'Minimum recycled content in plastic packaging', detail: 'Contact-sensitive PET 30%, other contact-sensitive 10%, single-use beverage bottles 30%, other plastic 35% (2040: 50 / 25 / 65 / 65%).', due: () => '2030-01-01', from: 2030, once: true, module: { route: '/epr', label: 'EPR' } },
     ],
   },
 ];

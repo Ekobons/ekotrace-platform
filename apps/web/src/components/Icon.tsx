@@ -43,6 +43,7 @@ const P: Record<string, string> = {
   download: 'M12 3v12M7 10l5 5 5-5M4 19h16',
   paste: 'M8 4h8v4H8zM6 6H4v14h16V6h-2',
   feed: 'M6 9V3M18 9V3M4 9h16v3a8 8 0 0 1-16 0zM12 20v2',
+  cycle: 'M4 12a8 8 0 0 1 14-5.3M20 12a8 8 0 0 1-14 5.3M18 3v4h-4M6 21v-4h4',
 };
 export function Icon({ name, size = 18 }: { name: keyof typeof P | string; size?: number }) {
   return (

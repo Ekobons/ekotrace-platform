@@ -15,7 +15,7 @@ const APPLIES: Record<Applies, [string, string]> = { applies: ['warn', 'Applies'
 const STATUS: Record<Status, [string, string]> = { not_started: ['grey', 'Not started'], in_progress: ['info', 'In progress'], done: ['', 'Done'], not_applicable: ['grey', 'Not applicable'], overdue: ['bad', 'Overdue'] };
 const MON = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 /** A module link only when the company has the package behind it. */
-const NEED: [string, string[]][] = [['/brsr', ['brsr']], ['/ccts', ['ccts']], ['/uae-mrv', ['uaemrv']], ['/cbam', ['ekotrace', 'cbam']], ['/vault', []]];
+const NEED: [string, string[]][] = [['/brsr', ['brsr']], ['/ccts', ['ccts']], ['/uae-mrv', ['uaemrv']], ['/epr', ['epr']], ['/cbam', ['ekotrace', 'cbam']], ['/vault', []]];
 const linkOf = (o: Obligation, products: string[]) => { if (!o.module) return null; const n = NEED.find(([r]) => o.module!.route.startsWith(r)); const need = n ? n[1] : ['ekotrace']; return !need.length || need.some((x) => products.includes(x)) ? o.module : null; };
 const daysTo = (due: string, today: string) => Math.round((new Date(`${due}T00:00:00Z`).getTime() - new Date(`${today}T00:00:00Z`).getTime()) / 86_400_000);
 
@@ -202,7 +202,7 @@ function ProfileDrawer({ d, onClose, onDone }: { d: Desk; onClose: () => void; o
   useEffect(() => { dlg.current?.showModal(); }, []);
   const S = d.stored, F = d.facts;
   // start from what people typed: facts the modules know stay empty here (shown as hints) so they keep following the modules
-  const [p, setP] = useState<Profile>({ ...d.profile, countries: (S.countries ?? []) as string[], cctsObligated: S.cctsObligated ?? null, cbamExporter: S.cbamExporter ?? null, eadFacility: S.eadFacility ?? null, uaeDesignated: S.uaeDesignated ?? 'unknown' });
+  const [p, setP] = useState<Profile>({ ...d.profile, countries: (S.countries ?? []) as string[], cctsObligated: S.cctsObligated ?? null, cbamExporter: S.cbamExporter ?? null, eadFacility: S.eadFacility ?? null, uaeDesignated: S.uaeDesignated ?? 'unknown', eprIndia: S.eprIndia ?? null, ppwrProducer: S.ppwrProducer ?? null });
   const [n, setN] = useState({ employees: S.employees ?? '', turnoverEur: S.turnoverEur ?? '', euTurnoverEur: S.euTurnoverEur ?? '', euSubsidiaryTurnoverEur: S.euSubsidiaryTurnoverEur ?? '', cbamImportTonnes: S.cbamImportTonnes ?? '', uaeScope12: S.uaeScope12 ?? '', usRevenueUsd: S.usRevenueUsd ?? '', countries: (S.countries ?? []).join(', ') } as Record<string, string | number>);
   const up = (x: Partial<Profile>) => setP((v) => ({ ...v, ...x }));
   const num = (k: string) => { const v = String(n[k] ?? '').replace(/,/g, '').trim(); return v === '' ? null : Number(v); };
@@ -239,6 +239,9 @@ function ProfileDrawer({ d, onClose, onDone }: { d: Desk; onClose: () => void; o
         <label className="field"><span>UAE: designated as a source{hint('uaeDesignated')}</span><select className="input" value={p.uaeDesignated} onChange={(e) => up({ uaeDesignated: e.target.value as Profile['uaeDesignated'] })}><option value="unknown">Not known</option><option value="yes">Yes</option><option value="no">No</option></select></label>
         {t('uaeScope12', 'UAE Scope 1 + 2, tCO₂e a year')}
         <label className="field"><span>Abu Dhabi facility at or above 25,000 t in a covered sector{hint('eadFacility')}</span><select className="input" value={tri(p.eadFacility)} onChange={(e) => up({ eadFacility: fromTri(e.target.value) })}><option value="">Not known</option><option value="yes">Yes</option><option value="no">No</option></select></label>
+        <h3 className="span2" style={{ margin: '8px 0 0' }}>Producer responsibility</h3>
+        <label className="field"><span>Places plastic packaging, electronics, batteries or tyres on the Indian market (or recycles them){hint('eprIndia')}</span><select className="input" value={tri(p.eprIndia)} onChange={(e) => up({ eprIndia: fromTri(e.target.value) })}><option value="">Not known</option><option value="yes">Yes</option><option value="no">No</option></select></label>
+        <label className="field"><span>First makes packaging available in an EU member state{hint('ppwrProducer')}</span><select className="input" value={tri(p.ppwrProducer)} onChange={(e) => up({ ppwrProducer: fromTri(e.target.value) })}><option value="">Not known</option><option value="yes">Yes</option><option value="no">No</option></select></label>
         <h3 className="span2" style={{ margin: '8px 0 0' }}>United States, Australia, United Kingdom</h3>
         {t('usRevenueUsd', 'Revenue, USD (US-based entity)')}<div className="field">{chk('californiaBusiness', 'Does business in California')}</div>
         <label className="field"><span>Australia: AASB S2 group</span><select className="input" value={p.auGroup} onChange={(e) => up({ auGroup: e.target.value as Profile['auGroup'] })}><option value="none">Not an Australian reporting entity</option><option value="group1">Group 1 (from 1 Jan 2025)</option><option value="group2">Group 2 (from 1 Jul 2026)</option><option value="group3">Group 3 (from 1 Jul 2027)</option></select></label>
