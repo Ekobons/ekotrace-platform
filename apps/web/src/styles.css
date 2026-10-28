@@ -1614,3 +1614,18 @@ table.t tr.on td { background: var(--ok-bg); }
 table.cctsgrid td { padding-top: 4px; padding-bottom: 4px; }
 table.cctsgrid input.input.sm { padding: 4px 6px; text-align: right; }
 table.cctsgrid tfoot td { border-top: 2px solid var(--line2); background: var(--bg); }
+
+/* BRSR Core: attribute list beside the KPI table */
+.brsrgrid { display: grid; grid-template-columns: 240px minmax(0, 1fr); gap: 12px; margin-top: 12px; align-items: start; }
+@media (max-width: 980px) { .brsrgrid { grid-template-columns: 1fr; } }
+.brsrnav { display: grid; padding: 6px; }
+.brsrnav button { display: flex; align-items: center; gap: 10px; text-align: left; font: inherit; font-size: 13px; color: var(--fg); background: none; border: 0; border-radius: 8px; padding: 8px 10px; cursor: pointer; }
+.brsrnav button:hover { background: var(--bg); }
+.brsrnav button.on { background: var(--primary-soft); color: var(--ink); font-weight: 600; }
+.brsrnav .n { width: 22px; height: 22px; border-radius: 50%; background: var(--bg); display: grid; place-items: center; font-size: 11px; font-weight: 700; flex: none; }
+.brsrnav button.on .n { background: var(--primary); color: var(--primary-ink); }
+table.brsrtable tr.grp td { background: var(--bg); padding-top: 6px; padding-bottom: 6px; }
+table.brsrtable tr.derived td { background: #F7FBF9; }
+table.brsrtable td, table.brsrtable th { padding-left: 8px; padding-right: 8px; }
+table.brsrtable td.brsrlbl { min-width: 220px; max-width: 320px; }
+fieldset.plain { border: 0; margin: 0; padding: 0; min-width: 0; }

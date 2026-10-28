@@ -43,6 +43,7 @@ import { Surveys } from './pages/Surveys';
 import { MetricRegistry } from './pages/MetricRegistry';
 import { CarbonCredits } from './pages/CarbonCredits';
 import { Ccts } from './pages/Ccts';
+import { Brsr } from './pages/Brsr';
 import { ProductLca } from './pages/ProductLca';
 import { Cbam } from './pages/Cbam';
 import { CbamPrint } from './pages/CbamComm';
@@ -154,7 +155,7 @@ const EKO_NAV: { group?: string; items: NavItem[] }[] = [
     { to: '/lca', label: 'Product LCA', icon: 'leaf', roles: ['super_admin', 'admin', 'manager', 'preparer', 'verifier'] },
   ] },
   { group: 'Net zero', items: [{ to: '/targets', label: 'Targets & actions', icon: 'target' }, { to: '/credits', label: 'Carbon credits', icon: 'leaf' }] },
-  { group: 'Disclose', items: [{ to: '/reports', label: 'Reports', icon: 'doc' }, { to: '/cbam', label: 'CBAM', icon: 'scale', roles: ['super_admin', 'admin', 'manager', 'verifier'] }, { to: '/ccts', label: 'India CCTS', icon: 'gauge', roles: ['super_admin', 'admin', 'manager', 'verifier'] }, { to: '/esg', label: 'ESG & materiality', icon: 'grid', roles: ['super_admin', 'admin', 'manager', 'verifier'] }, { to: '/assurance', label: 'Audit & assurance', icon: 'shield', roles: ['super_admin', 'admin', 'manager', 'verifier'] }] },
+  { group: 'Disclose', items: [{ to: '/reports', label: 'Reports', icon: 'doc' }, { to: '/cbam', label: 'CBAM', icon: 'scale', roles: ['super_admin', 'admin', 'manager', 'verifier'] }, { to: '/ccts', label: 'India CCTS', icon: 'gauge', roles: ['super_admin', 'admin', 'manager', 'verifier'] }, { to: '/brsr', label: 'BRSR Core', icon: 'list', roles: ['super_admin', 'admin', 'manager', 'preparer', 'verifier'] }, { to: '/esg', label: 'ESG & materiality', icon: 'grid', roles: ['super_admin', 'admin', 'manager', 'verifier'] }, { to: '/assurance', label: 'Audit & assurance', icon: 'shield', roles: ['super_admin', 'admin', 'manager', 'verifier'] }] },
   { group: 'Setup', items: [
     { to: '/organisation', label: 'Organisation & groups', icon: 'tree' },
     { to: '/people', label: 'People & access', icon: 'users', roles: ['super_admin', 'admin', 'manager'] },
@@ -352,6 +353,7 @@ function Shell() {
           <Route path="/metrics" element={<NeedCo><MetricRegistry /></NeedCo>} />
           <Route path="/credits" element={<NeedCo><CarbonCredits /></NeedCo>} />
           <Route path="/ccts" element={<NeedCo><Ccts /></NeedCo>} />
+          <Route path="/brsr" element={<NeedCo><Brsr /></NeedCo>} />
           <Route path="/lca" element={<NeedCo><ProductLca /></NeedCo>} />
           <Route path="/cbam" element={product === 'cbam' ? <Navigate to="/cbam/home" replace /> : <NeedCo><Cbam /></NeedCo>} />
           <Route path="/cbam/home" element={<NeedCbam><CbamHomeByRole /></NeedCbam>} />

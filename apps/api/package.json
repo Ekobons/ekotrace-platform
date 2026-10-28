@@ -19,6 +19,7 @@
     "demo:fin": "tsx src/cli/demoFin.ts",
     "demo:cbam": "tsx src/cli/demoCbamTool.ts",
     "demo:ccts": "tsx src/cli/demoCcts.ts",
+    "demo:brsr": "tsx src/cli/demoBrsr.ts",
     "testfiles": "tsx src/cli/makeTestFiles.ts"
   },
   "dependencies": {
