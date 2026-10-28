@@ -6,8 +6,8 @@
  *    baseline year's months, with up to two relevant variables (production, cooling or heating degree days, occupancy).
  *    Quality as ASHRAE Guideline 14 asks for monthly models: CV(RMSE) ≤ 15%, NMBE within ±5%; R² and t-statistics shown.
  *  - Reporting period: adjusted baseline (what the model says the site would have used) − actual = avoided energy;
- *    CUSUM of the differences; a month flagged when it is off the model, after its neighbouring months' saving, by more
- *    than 2 standard errors and 5%.
+ *    CUSUM of the differences; a month flagged when it is off the model, after the saving of the months before it and
+ *    of the months after it, by more than 2 standard errors and 5% (a one-off, not the step of a new measure).
  *  - Energy performance indicators (ISO 50001 / 50006): kWh per unit of the driver; normalised against the baseline.
  *  - Measures: annual saving, cost saving at the site's tariff, simple payback, NPV over the life, cost per tCO2e.
  */
@@ -39,10 +39,11 @@ export interface Model {
 /** Solve A·x = b (small dense system) by Gaussian elimination with partial pivoting; null when singular. */
 function solve(A: number[][], b: number[]): number[] | null {
   const n = b.length, M = A.map((r, i) => [...r, b[i]!]);
+  const scale = Math.max(...A.map((r, i) => Math.abs(r[i]!)), 1);   // tolerance relative to the matrix
   for (let c = 0; c < n; c++) {
     let p = c;
     for (let r = c + 1; r < n; r++) if (Math.abs(M[r]![c]!) > Math.abs(M[p]![c]!)) p = r;
-    if (Math.abs(M[p]![c]!) < 1e-12) return null;
+    if (Math.abs(M[p]![c]!) < 1e-9 * scale) return null;
     [M[c], M[p]] = [M[p]!, M[c]!];
     for (let r = 0; r < n; r++) {
       if (r === c) continue;
@@ -65,6 +66,10 @@ export function fit(rows: MonthRow[], target: ModelTarget, vars: Variable[]): Mo
   const problems: string[] = [];
   const empty: Model = { vars, coef: [], n, r2: null, cvrmse: null, nmbe: null, se: null, t: [], valid: false, problems, mean: null };
   if (n < Math.max(9, p + 3)) { problems.push(`The baseline needs at least ${Math.max(9, p + 3)} months with energy${p ? ' and every variable' : ''} (${n} now)`); return empty; }
+  for (const v of vars) {
+    const xs = use.map((r) => r[v]!), mx = xs.reduce((a, b) => a + b, 0) / n;
+    if (xs.every((x) => Math.abs(x - mx) <= 1e-9 * Math.max(1, Math.abs(mx)))) { problems.push(`${VARIABLE_LABEL[v]} does not change over the baseline months: leave it out`); return empty; }
+  }
   const X = use.map((r) => [1, ...vars.map((v) => r[v]!)]), y = use.map((r) => energyOf(r, target)!);
   const XtX = Array.from({ length: p + 1 }, (_, i) => Array.from({ length: p + 1 }, (_, j) => X.reduce((a, row) => a + row[i]! * row[j]!, 0)));
   const Xty = Array.from({ length: p + 1 }, (_, i) => X.reduce((a, row, k) => a + row[i]! * y[k]!, 0));
@@ -97,21 +102,22 @@ export interface Period { month: string; actual: number | null; expected: number
  */
 export function compare(rows: MonthRow[], prior: MonthRow[], target: ModelTarget, m: Model, enpiVar: Variable | null): Period[] {
   let cum = 0, any = false;
-  // savings are the new normal: each month is judged against the ratio to the model of its neighbours (two months either
-  // side), so a measure that starts mid-year does not flag the months around it
+  // savings are the new normal: a month is flagged only when it is off the ratio to the model of the months before it
+  // AND of the months after it (two each side, where they exist) — a one-off, not the step of a measure starting
   const ratio = rows.map((r) => { const a = energyOf(r, target), e = m.coef.length ? predict(m, r) : null; return a != null && e ? a / e : null; });
-  const med = (xs: number[]) => { const v = [...xs].sort((x, y) => x - y); return v.length ? (v[Math.floor((v.length - 1) / 2)]! + v[Math.ceil((v.length - 1) / 2)]!) / 2 : 1; };
+  const med = (xs: number[]) => { const v = [...xs].sort((x, y) => x - y); return (v[Math.floor((v.length - 1) / 2)]! + v[Math.ceil((v.length - 1) / 2)]!) / 2; };
+  const side = (i: number, from: number, to: number) => { const xs = ratio.slice(Math.max(0, from), Math.max(0, to)).filter((x): x is number => x != null); return xs.length ? med(xs) : null; };
   return rows.map((r, i) => {
     const actual = energyOf(r, target), expected = m.coef.length ? predict(m, r) : null;
     const saving = actual != null && expected != null ? expected - actual : null;
     if (saving != null) { cum += saving; any = true; }
     let anomaly: string | null = null;
-    const near = ratio.filter((x, j) => x != null && j !== i && Math.abs(j - i) <= 2) as number[];
-    const typical = near.length >= 2 ? med(near) : 1;
     if (actual != null && expected != null && m.se) {
-      const off = actual - typical * expected, z = off / m.se;
-      // off by more than 2 standard errors and by a material amount (5% of the expected month)
-      if (Math.abs(z) > 2 && Math.abs(off) > 0.05 * expected) anomaly = `${z > 0 ? 'More' : 'Less'} energy than the model and the neighbouring months suggest: ${Math.abs(off).toFixed(0)} kWh (${Math.abs(z).toFixed(1)} standard errors)`;
+      const sides = [side(i, i - 2, i), side(i, i + 1, i + 3)].filter((x): x is number => x != null);
+      const offs = (sides.length ? sides : [1]).map((t) => actual - t * expected);
+      // off by more than 2 standard errors and 5% of the expected month, against every side
+      const out = offs.every((o) => Math.abs(o) / m.se! > 2 && Math.abs(o) > 0.05 * expected) && offs.every((o) => Math.sign(o) === Math.sign(offs[0]!));
+      if (out) { const off = offs.reduce((a, o) => (Math.abs(o) < Math.abs(a) ? o : a)); anomaly = `${off > 0 ? 'More' : 'Less'} energy than the model and the months around it suggest: ${Math.abs(off).toFixed(0)} kWh (${(Math.abs(off) / m.se).toFixed(1)} standard errors)`; }
     } else if (actual != null) {
       const last = prior.find((p) => p.month.slice(5) === r.month.slice(5));
       const before = last ? energyOf(last, target) : null;

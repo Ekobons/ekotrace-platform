@@ -46,7 +46,7 @@ export const CATEGORIES: Record<string, string> = { lighting: 'Lighting (LED, co
 /** The last complete calendar year in the company's time zone is not known here: the last complete calendar year in UTC. */
 const lastYear = () => new Date().getUTCFullYear() - 1;
 
-const siteBody = z.object({
+const siteBody0 = z.object({
   name: z.string().trim().min(2).max(200), nodeId: uuid.nullable().default(null), siteType: z.enum(Object.keys(SITE_TYPES) as [string, ...string[]]).default('other'),
   floorM2: z.number().positive().max(1e8).nullable().default(null), baselineYear: z.number().int().min(2000).max(2100).nullable().default(null),
   modelTarget: z.enum(['total', ...CARRIERS]).default('total'), modelVars: z.array(z.enum(VARIABLES)).max(2).default([]).transform((v) => [...new Set(v)]),
@@ -54,6 +54,9 @@ const siteBody = z.object({
   tariffs: perCarrier(1000), factors: perCarrier(10), targetPct: z.number().gt(0).lt(100).nullable().default(null), targetYear: z.number().int().min(2000).max(2100).nullable().default(null),
   notes: z.string().trim().max(4000).default(''),
 });
+const siteBody = siteBody0
+  .refine((b) => !(b.targetYear && b.baselineYear && b.targetYear <= b.baselineYear), { message: 'The target year must be after the baseline year', path: ['targetYear'] })
+  .refine((b) => b.enpiVar !== 'floor' || b.floorM2 != null, { message: 'An EnPI per m² needs the floor area', path: ['floorM2'] });
 type SiteBody = z.infer<typeof siteBody>;
 const siteView = (s: any) => ({
   id: s.id as string, name: s.name as string, nodeId: s.node_id as string | null, siteType: s.site_type as string, floorM2: num(s.floor_m2), baselineYear: s.baseline_year as number | null,
@@ -91,7 +94,7 @@ async function fromEntries(c: Tx, nodeId: string, first: number, last: number) {
   const rows = (await c.query(
     `WITH m AS (SELECT generate_series($2::date, $3::date, interval '1 month')::date AS ms)
      SELECT to_char(m.ms, 'YYYY-MM') AS month, cat.code AS cat, i.id AS iid, i.name AS item, sc.name AS sub, a.unit,
-            sum(a.quantity * s.share)::float8 AS qty, sum((a.co2e_direct + a.co2e_scope2) * s.share)::float8 AS kg, count(*)::int AS n
+            sum(a.quantity * s.share)::float8 AS qty, sum((a.co2e_direct + a.co2e_scope2) * s.share)::float8 AS kg, array_agg(DISTINCT a.id::text) AS ids
        FROM m JOIN activity a ON a.period_start <= (m.ms + interval '1 month' - interval '1 day')::date AND a.period_end >= m.ms
        CROSS JOIN LATERAL (SELECT ((least(a.period_end, (m.ms + interval '1 month' - interval '1 day')::date) - greatest(a.period_start, m.ms) + 1)::numeric / (a.period_end - a.period_start + 1)) AS share) s
        JOIN category cat ON cat.id = a.category_id JOIN item i ON i.id = a.item_id JOIN subcategory sc ON sc.id = i.subcategory_id
@@ -100,18 +103,19 @@ async function fromEntries(c: Tx, nodeId: string, first: number, last: number) {
   const ref = await refdata();
   const units = new Map(ref.unitList.map((u) => [u.code, { dimension: u.dimension, to_base: Number(u.toBase) }]));
   const out = new Map<string, { energy: Partial<Record<Carrier, number>>; kg: Partial<Record<Carrier, number>> }>();
-  const missing = new Map<string, number>();
+  const missing = new Map<string, Set<string>>();
   for (const r of rows) {
+    if (!r.qty) continue;   // nothing used
     const u = units.get(r.unit);
     const carrier: Carrier = r.cat === 'mobile_combustion' ? 'transport' : r.cat === 'stationary_combustion' ? 'fuel' : u?.dimension === 'heat' ? 'heat' : u?.dimension === 'cooling' ? 'cooling' : 'electricity';
     let kwh = await kwhOf(c, units, r.iid, `${r.item} ${r.sub}`, r.unit, r.qty, Number(r.month.slice(0, 4)), carrier === 'fuel' || carrier === 'transport');
     if (kwh != null && u?.dimension === 'energy_gross') kwh *= /natural gas|lpg|propane|butane|biogas|methane/i.test(`${r.item} ${r.sub}`) ? 0.9 : 0.95;   // to net
-    if (kwh == null) { missing.set(`${r.item} (${r.unit})`, (missing.get(`${r.item} (${r.unit})`) ?? 0) + r.n); continue; }
+    if (kwh == null) { const k = `${r.item} (${r.unit})`; const set = missing.get(k) ?? new Set<string>(); for (const id of r.ids as string[]) set.add(id); missing.set(k, set); continue; }
     const o = out.get(r.month) ?? { energy: {}, kg: {} };
     o.energy[carrier] = (o.energy[carrier] ?? 0) + kwh; o.kg[carrier] = (o.kg[carrier] ?? 0) + r.kg;
     out.set(r.month, o);
   }
-  return { months: out, missing: [...missing].map(([what, n]) => `${what}: ${n} ${n === 1 ? 'entry' : 'entries'} without energy content left out`) };
+  return { months: out, missing: [...missing].map(([what, ids]) => `${what}: ${ids.size} ${ids.size === 1 ? 'entry' : 'entries'} without energy content left out`) };
 }
 
 /** The site's rows for some years: entries merged with typed months (a typed carrier replaces the entries' figure). */
@@ -155,10 +159,17 @@ async function siteYear(c: Tx, s: SiteV, year: number, eko: boolean) {
   const totals = Object.fromEntries(CARRIERS.map((k) => [k, sumC(cur, k)])) as Record<Carrier, number>;
   const total = CARRIERS.reduce((a, k) => a + totals[k], 0);
   const monthsIn = cur.filter((r) => energyOf(r, 'total') != null).length;
-  const driverSum = (rs: MonthRow[]) => (s.enpiVar === 'floor' ? s.floorM2 : s.enpiVar ? rs.reduce((a, r) => a + ((r as any)[s.enpiVar!] ?? 0), 0) : null);
-  const enpiOf = (rs: MonthRow[]) => { const e = rs.reduce((a, r) => a + (energyOf(r, s.modelTarget) ?? 0), 0), d = driverSum(rs); return d ? e / d : null; };
-  // compare like with like: the baseline months that have data in the year
-  const inYear = cur.map((r, i) => (energyOf(r, s.modelTarget) != null ? i : -1)).filter((i) => i >= 0);
+  // EnPI over the months that have both energy and the driver (floor area: every month with energy, annualised to the months)
+  const hasDriver = (r: MonthRow) => s.enpiVar === 'floor' || (s.enpiVar != null && (r as any)[s.enpiVar] != null);
+  const enpiOf = (rs: MonthRow[]) => {
+    if (!s.enpiVar || (s.enpiVar === 'floor' && !s.floorM2)) return null;
+    const e = rs.reduce((a, r) => a + (energyOf(r, s.modelTarget) ?? 0), 0);
+    const d = s.enpiVar === 'floor' ? s.floorM2! * (rs.length / 12) : rs.reduce((a, r) => a + ((r as any)[s.enpiVar!] ?? 0), 0);
+    return d ? e / d : null;
+  };
+  // compare like with like: the months with data in the year, and the same months of the baseline
+  const inYear = cur.map((r, i) => (energyOf(r, s.modelTarget) != null && hasDriver(r) && (!base || (energyOf(baseRows[i]!, s.modelTarget) != null && hasDriver(baseRows[i]!))) ? i : -1)).filter((i) => i >= 0);
+  const withData = cur.map((r, i) => (energyOf(r, 'total') != null ? i : -1)).filter((i) => i >= 0);
   const enpi = enpiOf(cur.filter((_, i) => inYear.includes(i))), enpiBase = base ? enpiOf(baseRows.filter((_, i) => inYear.includes(i))) : null;
   const kgPerKwh = intensity([...cur, ...prior], s, eko);
   const tariff = (k: Carrier) => s.tariffs[k] ?? null;
@@ -173,6 +184,7 @@ async function siteYear(c: Tx, s: SiteV, year: number, eko: boolean) {
   if (!base) problems.push(s.baselineYear ? `The baseline year (${s.baselineYear}) must be before ${year}` : 'Choose a baseline year to measure savings');
   if (model && !model.valid) problems.push('The baseline model does not meet ASHRAE Guideline 14: savings are indicative');
   if (s.enpiVar && s.enpiVar !== 'floor' && cur.some((r) => energyOf(r, s.modelTarget) != null && (r as any)[s.enpiVar!] == null)) problems.push(`Months with energy but no ${VARIABLE_LABEL[s.enpiVar]}: the EnPI leaves them out`);
+  if (s.enpiVar === 'floor' && !s.floorM2) problems.push('The EnPI is per m²: give the floor area');
   if (s.modelVars.some((v) => periods.some((p, i) => p.actual != null && (cur[i] as any)[v] == null))) problems.push(`Months with energy but missing ${s.modelVars.map((v) => VARIABLE_LABEL[v]).join(' or ')}: no expected value for them`);
   return {
     months: cur.map((r, i) => ({ ...r, kg: undefined, ...periods[i]! })), base, model, totals, total, monthsIn, enpi, enpiBase, enpiChange: enpiChange(enpi, enpiBase),
@@ -180,7 +192,8 @@ async function siteYear(c: Tx, s: SiteV, year: number, eko: boolean) {
     savingCost: savedMonths && tSave != null ? saving * tSave : null, savingT: savedMonths && kgSave != null ? (saving * kgSave) / 1000 : null,
     anomalies: periods.filter((p) => p.anomaly).length, problems,
     target: s.targetPct && s.targetYear && enpiBase != null ? { pct: s.targetPct, year: s.targetYear, enpi: enpiBase * (1 - s.targetPct / 100), onTrack: enpi != null ? enpi <= enpiBase * (1 - (s.targetPct / 100) * Math.min(1, Math.max(0, (year - base!) / Math.max(1, s.targetYear - base!)))) : null } : null,
-    priorTotal: prior.some((r) => energyOf(r, 'total') != null) ? CARRIERS.reduce((a, k) => a + sumC(prior.filter((_, i) => inYear.includes(i)), k), 0) : null,
+    // last year on the same months (months with energy in both years)
+    ...(() => { const both = withData.filter((i) => energyOf(prior[i]!, 'total') != null); return both.length ? { priorTotal: both.reduce((a, i) => a + energyOf(prior[i]!, 'total')!, 0), sameTotal: both.reduce((a, i) => a + energyOf(cur[i]!, 'total')!, 0) } : { priorTotal: null, sameTotal: null }; })(),
   };
 }
 
@@ -201,7 +214,7 @@ export async function energyMgmtRoutes(app: FastifyInstance) {
       for (const r of (await c.query(`SELECT * FROM en_site ORDER BY name`)).rows) {
         const s = siteView(r), y = await siteYear(c, s, year, eko);
         y.months.forEach((m, i) => { for (const k of CARRIERS) monthly[i]![k] += m.energy[k] ?? 0; });
-        sites.push({ ...s, year: { total: y.total, totals: y.totals, monthsIn: y.monthsIn, enpi: y.enpi, enpiBase: y.enpiBase, enpiChange: y.enpiChange, saving: y.saving, savingCost: y.savingCost, savingT: y.savingT, cost: y.cost, anomalies: y.anomalies, modelValid: y.model?.valid ?? null, cvrmse: y.model?.cvrmse ?? null, problems: y.problems.length, priorTotal: y.priorTotal, target: y.target, eui: s.floorM2 && y.monthsIn === 12 ? y.total / s.floorM2 : null } });
+        sites.push({ ...s, year: { total: y.total, totals: y.totals, monthsIn: y.monthsIn, enpi: y.enpi, enpiBase: y.enpiBase, enpiChange: y.enpiChange, saving: y.saving, savingCost: y.savingCost, savingT: y.savingT, cost: y.cost, anomalies: y.anomalies, modelValid: y.model?.valid ?? null, cvrmse: y.model?.cvrmse ?? null, problems: y.problems.length, priorTotal: y.priorTotal, sameTotal: y.sameTotal, target: y.target, eui: s.floorM2 && y.monthsIn === 12 ? y.total / s.floorM2 : null } });
         for (const m of allM.filter((x) => x.siteId === s.id)) measures.push({ ...m, site: s.name, econ: measureEcon(m, s, y.kgPerKwh) });
       }
       return {
@@ -277,7 +290,7 @@ export async function energyMgmtRoutes(app: FastifyInstance) {
     requireRole(req, 'super_admin', 'admin', 'manager', 'preparer');
     const id = idOf(req);
     const b = z.object({ months: z.array(z.object({
-      month: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/), production: z.number().min(0).max(1e12).nullable().default(null), cdd: z.number().min(0).max(5000).nullable().default(null),
+      month: z.string().regex(/^(20\d\d|2100)-(0[1-9]|1[0-2])$/), production: z.number().min(0).max(1e12).nullable().default(null), cdd: z.number().min(0).max(5000).nullable().default(null),
       hdd: z.number().min(0).max(5000).nullable().default(null), occupancy: z.number().min(0).max(1e7).nullable().default(null), energy: perCarrier(1e12), note: z.string().trim().max(500).default(''),
     })).min(1).max(60) }).parse(req.body);
     return tenantTx(tenant, async (c) => {
@@ -420,8 +433,8 @@ export async function energyMgmtRoutes(app: FastifyInstance) {
     for (const line of [
       `Prepared in ${PRODUCT}. Energy ${d.eko && s.nodeId ? 'from the approved inventory entries of the linked facility (fuels by their net calorific values; gross-basis units × 0.9 for gases, × 0.95 for others), split by days across months; typed months replace them' : 'typed by month'}.`,
       'Savings: IPMVP Option C (whole facility). Baseline model by ordinary least squares over the baseline year; expected energy = the model with the reporting month\'s variables; avoided energy = expected − actual.',
-      'Model quality per ASHRAE Guideline 14 for monthly data: CV(RMSE) ≤ 15% and NMBE within ±5%; variables with |t| < 2 are flagged. Months more than 2 standard errors off the model are flagged.',
-      'EnPI (ISO 50006): energy of the modelled carrier per unit of the chosen driver, over the months with data, compared with the same months of the baseline year.',
+      'Model quality per ASHRAE Guideline 14 for monthly data: CV(RMSE) ≤ 15% and NMBE within ±5%; variables with |t| < 2 are flagged. A month is flagged when it is off the model, after the saving of the two months before it and of the two after it, by more than 2 standard errors and 5% of the expected month.',
+      'EnPI (ISO 50006): energy of the modelled carrier per unit of the chosen driver, over the months with both energy and the driver, compared with the same months of the baseline year (per m²: the floor area for the months covered).',
       'Measures: saving a year at the site tariff (verified if given, else expected) less extra running cost; simple payback; NPV at 8% over the life; tCO₂e a year at the carrier\'s intensity.',
       ...(y.problems.length ? ['', 'Checks:', ...y.problems] : []),
     ]) mt.addRow([line]);

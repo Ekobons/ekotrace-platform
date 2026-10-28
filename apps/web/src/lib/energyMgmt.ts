@@ -25,7 +25,7 @@ export type SeuBody = Omit<Seu, 'id'>;
 export interface Target { pct: number; year: number; enpi: number; onTrack: boolean | null }
 export interface YearSummary {
   total: number; totals: Record<Carrier, number>; monthsIn: number; enpi: number | null; enpiBase: number | null; enpiChange: number | null; saving: number | null; savingCost: number | null; savingT: number | null;
-  cost: number | null; anomalies: number; modelValid: boolean | null; cvrmse: number | null; problems: number; priorTotal: number | null; target: Target | null; eui: number | null;
+  cost: number | null; anomalies: number; modelValid: boolean | null; cvrmse: number | null; problems: number; priorTotal: number | null; sameTotal: number | null; target: Target | null; eui: number | null;
 }
 export interface Overview {
   year: number; sites: (Site & { year: YearSummary })[]; monthly: ({ month: string } & Record<Carrier, number>)[]; measures: Measure[];

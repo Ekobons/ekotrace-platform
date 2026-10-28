@@ -56,21 +56,21 @@ The model is fitted by ordinary least squares on the baseline year's months: kWh
 
 A model that misses the limits gives **indicative** savings. At least 9 baseline months with energy and every variable are needed.
 
-Each month of the year viewed, the model gives the **expected** energy with that month's variables; **avoided energy = expected − actual**. The CUSUM is the running sum of the avoided energy: a rising line means savings are holding. Avoided energy is valued at the site's tariff and at the carrier's emission intensity (from the inventory's emissions over its energy, or the factor typed on the site); a total-energy model uses the energy-weighted average of the carriers.
+Each month of the year viewed, the model gives the **expected** energy with that month's variables; **avoided energy = expected − actual**. The CUSUM is the running sum of the avoided energy: a rising line means savings are holding. Avoided energy is valued at the site's tariff and at the carrier's emission intensity (from the inventory's emissions over its energy, or — for a site not linked or a carrier typed — the factor typed on the site); a total-energy model uses the energy-weighted average of the carriers.
 
-A month is **flagged** when it is off the model, after the saving of its neighbouring months (two either side), by more than 2 standard errors and by more than 5% of the expected month — a fault, a change in operation, or a data error. A measure that starts mid-year may flag the month just before it. Without a model, a month 25% off the same month of the year before is flagged.
+A month is **flagged** when it is off the model, after the saving of the two months before it and of the two months after it, by more than 2 standard errors and by more than 5% of the expected month — a one-off such as a fault, a change in operation or a data error, not the step of a measure that starts mid-year. Without a model, a month 25% off the same month of the year before is flagged.
 
 Degree days come from a weather service for the site's location; base 18 °C is common in the Gulf.
 
 ## Energy performance indicators
 
-The EnPI is the energy modelled divided by the chosen driver, over the months with data, compared with the same months of the baseline year (ISO 50006). Set a target (% reduction by a year): the site shows whether it is on track, with the reduction expected to grow evenly from the baseline year to the target year.
+The EnPI is the energy modelled divided by the chosen driver, over the months that have both energy and the driver, compared with the same months of the baseline year (ISO 50006). Per m², the floor area counts for the months covered, so a full year gives kWh/m² a year. Set a target (% reduction by a year): the site shows whether it is on track, with the reduction expected to grow evenly from the baseline year to the target year.
 
 ## The page
 
 | Part | What it shows |
 |---|---|
-| Portfolio | energy and cost of every site, change on last year, avoided energy, money and tCO₂e, energy by month and carrier, kWh/m² a year (full years with a floor area), each site's EnPI change, model quality, target and flags |
+| Portfolio | energy and cost of every site, change on last year (sites with both years, same months), avoided energy, money and tCO₂e, energy by month and carrier, kWh/m² a year (full years with a floor area), each site's EnPI change, model quality, target and flags |
 | Site | the year's energy, EnPI and target, avoided energy, model quality; the chart of actual (bars), expected (line) and CUSUM (dashed); months to type or paste; the model's equation and statistics; measures; energy review |
 | Measures | all measures with expected and verified savings a year, cost saving, capex, payback, NPV and tCO₂e a year |
 

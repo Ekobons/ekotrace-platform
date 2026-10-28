@@ -32,6 +32,9 @@ test('baseline model: least squares recovers the line; quality per ASHRAE Guidel
   const noisy = rows.map((r, i) => ({ ...r, energy: { electricity: (r.energy.electricity ?? 0) * (i % 2 ? 1.4 : 0.6) } }));
   const mn = fit(noisy, 'electricity', ['cdd']);
   assert.equal(mn.valid, false); assert.ok(mn.problems.some((p) => p.includes('CV(RMSE)')));
+  // a variable that never changes is refused, not fitted
+  const flat = fit(rows.map((r) => ({ ...r, production: 1234.567 })), 'electricity', ['production']);
+  assert.equal(flat.valid, false); assert.equal(flat.coef.length, 0); assert.ok(flat.problems[0]!.includes('does not change'));
 });
 
 test('savings: expected − actual, CUSUM, anomalies; measure economics', () => {
@@ -43,6 +46,9 @@ test('savings: expected − actual, CUSUM, anomalies; measure economics', () => 
   near(p[11]!.cusum, p.reduce((a, x) => a + x.saving!, 0));
   assert.ok(p[6]!.anomaly?.startsWith('More')); assert.equal(p[0]!.anomaly, null);   // a steady 10% saving is not flagged
   near(p[0]!.enpi, cur[0]!.energy.electricity! / 120);
+  // a measure starting in July (a 15% step) flags neither June nor July
+  const step: MonthRow[] = monthsOf(2025).map((mo, i) => ({ month: mo, energy: { electricity: (i >= 6 ? 0.85 : 1) * (20_000 + 100 * CDD[i]!) }, cdd: CDD[i] }));
+  assert.equal(compare(step, base, 'electricity', m, 'cdd').filter((x) => x.anomaly).length, 0);
   const e = economics({ kwhYear: 100_000, tariff: 0.4, capex: 120_000, lifeYears: 10, kgPerKwh: 0.4 });
   near(e.saveYear, 40_000); near(e.payback, 3); near(e.tYear, 40);
   near(e.npv, -120_000 + 40_000 * ((1 - 1.08 ** -10) / 0.08));
@@ -114,6 +120,8 @@ test('API: a package of its own; sites by super admin or admin', async () => {
   const r = await call('GET', '/api/energy', undefined, off);
   assert.equal(r.status, 403); assert.equal(r.body.error, 'PRODUCT_OFF');
   assert.equal((await call('POST', '/api/energy/sites', { name: 'Cold store' }, co, mgr)).status, 403);
+  assert.equal((await call('POST', '/api/energy/sites', { name: 'Bad target', baselineYear: 2024, targetPct: 10, targetYear: 2024 }, co)).status, 400);
+  assert.equal((await call('POST', '/api/energy/sites', { name: 'No floor', enpiVar: 'floor' }, co)).status, 400);
   const s = await call('POST', '/api/energy/sites', { name: 'Cold store Jebel Ali', nodeId: plant, siteType: 'warehouse', floorM2: 12_000, baselineYear: 2024, modelTarget: 'electricity', modelVars: ['cdd'], enpiVar: 'floor', tariffs: { electricity: 0.38 }, targetPct: 15, targetYear: 2028 }, co);
   assert.equal(s.status, 200, s.text); site = s.body.id;
 });
@@ -136,6 +144,7 @@ test('API: energy from entries (approved, split by days), degree days typed, bas
   const d2 = (await call('GET', `/api/energy/sites/${site}?year=2025`, undefined, co)).body;
   assert.equal(d2.months[0].energy.electricity, 50_000); assert.equal(d2.months[0].source.electricity, 'typed'); assert.ok(d2.months[0].anomaly);
   await call('PUT', `/api/energy/sites/${site}/months`, { months: [{ month: '2025-01', cdd: CDD[0], energy: {} }] }, co, mgr);
+  assert.equal((await call('PUT', `/api/energy/sites/${site}/months`, { months: [{ month: '0000-01' }] }, co, mgr)).status, 400);
 });
 
 test('API: measures (economics, verified needs IPMVP), energy review, Excel, standalone typed', async () => {

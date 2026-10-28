@@ -68,7 +68,9 @@ export function EnergyMgmt() {
 
 // ------------------------------------------------------------------------------------------ portfolio --
 function Portfolio({ o, open }: { o: Overview; open: (id: string) => void }) {
-  const total = o.sites.reduce((a, x) => a + x.year.total, 0), prior = o.sites.reduce((a, x) => a + (x.year.priorTotal ?? 0), 0);
+  const total = o.sites.reduce((a, x) => a + x.year.total, 0);
+  const comparable = o.sites.filter((x) => x.year.priorTotal != null && x.year.sameTotal != null);
+  const prior = comparable.reduce((a, x) => a + x.year.priorTotal!, 0), same = comparable.reduce((a, x) => a + x.year.sameTotal!, 0);
   const saving = o.sites.reduce((a, x) => a + (x.year.saving ?? 0), 0), saveCost = o.sites.reduce((a, x) => a + (x.year.savingCost ?? 0), 0), saveT = o.sites.reduce((a, x) => a + (x.year.savingT ?? 0), 0);
   const cost = o.sites.reduce((a, x) => a + (x.year.cost ?? 0), 0);
   const flagged = o.sites.filter((x) => x.year.anomalies > 0).length;
@@ -79,7 +81,7 @@ function Portfolio({ o, open }: { o: Overview; open: (id: string) => void }) {
     <>
       <div className="kgrid4">
         <div className="card kpi"><span className="muted small">Energy, {o.year}</span><b>{mwh(total)} <small className="muted">MWh</small></b>
-          <span className="muted small">{prior ? `${pc((total - prior) / prior)} on the same months of ${o.year - 1}` : 'No comparison year'}</span></div>
+          <span className="muted small">{prior ? `${pc((same - prior) / prior)} on the same months of ${o.year - 1}${comparable.length < o.sites.length ? ` (${comparable.length} of ${o.sites.length} sites)` : ''}` : 'No comparison year'}</span></div>
         <div className="card kpi"><span className="muted small">Energy cost</span><b>{f0(cost || null)} <small className="muted">{o.currency}</small></b><span className="muted small">At the sites' tariffs</span></div>
         <div className="card kpi"><span className="muted small">Avoided against the baselines</span><b>{mwh(saving || null)} <small className="muted">MWh</small></b>
           <span className="muted small">{saveCost ? `${f0(saveCost)} ${o.currency}` : '—'} · {saveT ? `${f1(saveT)} tCO₂e` : '—'} · weather- and production-adjusted</span></div>
@@ -118,7 +120,8 @@ function SiteTab({ o, id, year, pick, onChanged }: { o: Overview; id: string; ye
   const [tick, setTick] = useState(0);
   const [editing, setEditing] = useState(false);
   const reload = () => { setTick((x) => x + 1); onChanged(); };
-  useEffect(() => { let live = true; enApi.detail(id, year).then((x) => { if (live) setD(x); }).catch((e) => toast((e as Error).message)); return () => { live = false; }; }, [id, year, tick]); // eslint-disable-line react-hooks/exhaustive-deps
+  // the grid starts from the data it is given: drop the old site before fetching the new figures
+  useEffect(() => { let live = true; setD(null); enApi.detail(id, year).then((x) => { if (live) setD(x); }).catch((e) => toast((e as Error).message)); return () => { live = false; }; }, [id, year, tick]); // eslint-disable-line react-hooks/exhaustive-deps
   if (!d) return <div className="card empty">Loading…</div>;
   const S = d.site, M = d.model;
   const unit = S.enpiVar === 'floor' ? 'm²' : S.enpiVar === 'production' ? S.productionUnit ?? 'unit' : S.enpiVar ? o.variables[S.enpiVar] : null;
@@ -154,7 +157,7 @@ function SiteTab({ o, id, year, pick, onChanged }: { o: Overview; id: string; ye
       {sub === 'model' && <ModelCard o={o} d={d} />}
       {sub === 'measures' && <MeasureList o={o} list={d.measures} sites={[S]} canEdit={d.canMeasures} onSaved={reload} />}
       {sub === 'seu' && <SeuList o={o} d={d} onSaved={reload} />}
-      {editing && <SiteDrawer o={o} site={S} onClose={() => setEditing(false)} onDone={() => { setEditing(false); reload(); }} />}
+      {editing && <SiteDrawer o={o} site={S} onClose={() => setEditing(false)} onDone={(id) => { setEditing(false); if (id === '') { const n = new URLSearchParams(sp); n.delete('s'); setSp(n, { replace: true }); onChanged(); } else reload(); }} />}
     </>);
 }
 
@@ -199,7 +202,7 @@ function MonthsGrid({ o, d, onSaved }: { o: Overview; d: Detail; onSaved: () => 
   const ok = rows.every((r) => Object.entries(r).every(([k, v]) => k === 'month' || k === 'note' || okNum(v)));
   const up = (i: number, k: string, v: string) => setRows((x) => x.map((r, j) => (j === i ? { ...r, [k]: v } : r)));
   const paste = (i: number, k: string, text: string) => {
-    const vals = text.split(/\r?\n/).map((x) => x.split('\t')[0]!.trim()).filter((x) => x !== '');
+    const vals = text.replace(/(\r?\n)+$/, '').split(/\r?\n/).map((x) => x.split('\t')[0]!.trim());   // blanks stay in place
     if (vals.length < 2) return false;
     setRows((x) => x.map((r, j) => (j >= i && j - i < vals.length ? { ...r, [k]: vals[j - i]!.replace(/,/g, '') } : r)));
     return true;
@@ -264,7 +267,7 @@ function ModelCard({ o, d }: { o: Overview; d: Detail }) {
           <li>IPMVP Option C (whole facility): the model is fitted on the baseline year's months by least squares.</li>
           <li>Each month of {d.year}, the model gives the energy the site would have used with that month's {M.vars.length ? M.vars.map((v) => o.variables[v].toLowerCase()).join(' and ') : 'conditions (no variable: the baseline average)'}.</li>
           <li>Avoided energy = expected − actual; CUSUM is the running sum. Valued at the site tariff and the carrier's emission intensity{d.kgPerKwh[S.modelTarget === 'total' ? 'electricity' : S.modelTarget] != null ? '' : ' (no intensity set)'}.</li>
-          <li>A month is flagged when it is off the model, after the saving of its neighbouring months (two either side), by more than 2 standard errors and by more than 5% of the expected month.</li>
+          <li>A month is flagged when it is off the model, after the saving of the two months before it and of the two after it, by more than 2 standard errors and 5% of the expected month: a one-off, not the step of a new measure.</li>
           <li>Change the energy modelled, the variables or the baseline year under Site &amp; model. Use variables with |t| ≥ 2; leave out those that are not significant.</li>
         </ul></div>
     </div>);
@@ -382,7 +385,7 @@ function SiteDrawer({ o, site, onClose, onDone }: { o: Overview; site: Site | nu
   const dlg = useRef<HTMLDialogElement>(null);
   useEffect(() => { dlg.current?.showModal(); }, []);
   const [f, setF] = useState({
-    name: site?.name ?? '', nodeId: site?.nodeId ?? '', siteType: site?.siteType ?? 'office', floorM2: s(site?.floorM2), baselineYear: s(site?.baselineYear ?? lastYear() - 1), modelTarget: site?.modelTarget ?? 'total',
+    name: site?.name ?? '', nodeId: site?.nodeId ?? '', siteType: site?.siteType ?? 'office', floorM2: s(site?.floorM2), baselineYear: site ? s(site.baselineYear) : s(lastYear() - 1), modelTarget: site?.modelTarget ?? 'total',
     modelVars: site?.modelVars ?? [] as Variable[], enpiVar: site?.enpiVar ?? '', productionUnit: site?.productionUnit ?? '', targetPct: s(site?.targetPct), targetYear: s(site?.targetYear), notes: site?.notes ?? '',
     tariffs: Object.fromEntries(CARRIERS.map((k) => [k, s(site?.tariffs[k])])) as Record<Carrier, string>, factors: Object.fromEntries(CARRIERS.map((k) => [k, s(site?.factors[k])])) as Record<Carrier, string>,
   });
@@ -394,10 +397,10 @@ function SiteDrawer({ o, site, onClose, onDone }: { o: Overview; site: Site | nu
   const body = (): SiteBody => ({
     name: f.name.trim(), nodeId: f.nodeId || null, siteType: f.siteType, floorM2: parse(f.floorM2), baselineYear: parse(f.baselineYear), modelTarget: f.modelTarget as SiteBody['modelTarget'], modelVars: f.modelVars,
     enpiVar: (f.enpiVar || null) as SiteBody['enpiVar'], productionUnit: f.productionUnit.trim() || null, targetPct: parse(f.targetPct), targetYear: parse(f.targetYear), notes: f.notes.trim(),
-    tariffs: Object.fromEntries(CARRIERS.map((k) => [k, parse(f.tariffs[k])])), factors: o.ekotrace ? site?.factors ?? {} : Object.fromEntries(CARRIERS.map((k) => [k, parse(f.factors[k])])),
+    tariffs: Object.fromEntries(CARRIERS.map((k) => [k, parse(f.tariffs[k])])), factors: Object.fromEntries(CARRIERS.map((k) => [k, parse(f.factors[k])])),
   });
   const save = async () => { try { if (site) { await enApi.saveSite(site.id, body()); onDone(); } else onDone((await enApi.addSite(body())).id); toast('Saved'); } catch (e) { toast((e as Error).message); } };
-  const del = async () => { if (!site) return; try { await enApi.deleteSite(site.id); toast('Removed'); onDone(); } catch (e) { toast((e as Error).message); } };
+  const del = async () => { if (!site) return; try { await enApi.deleteSite(site.id); toast('Removed'); onDone(''); } catch (e) { toast((e as Error).message); } };
   return (
     <dialog ref={dlg} className="drawer wide" onClose={onClose}><div className="in">
       <div className="row"><div className="grow"><div className="eyebrow">Energy management</div><h2>{site ? site.name : 'Add a site'}</h2></div><button className="btn ghost" onClick={() => dlg.current?.close()} aria-label="Close"><Icon name="x" /></button></div>
@@ -416,8 +419,8 @@ function SiteDrawer({ o, site, onClose, onDone }: { o: Overview; site: Site | nu
         <label className="field"><span>Target year</span><input className="input num" value={f.targetYear} onChange={(e) => up({ targetYear: e.target.value })} /></label>
         <div className="field span2"><span>Tariffs, {o.currency} per kWh</span>
           <div className="row small" style={{ gap: 10, flexWrap: 'wrap', marginTop: 4 }}>{CARRIERS.map((k) => <label key={k} className="field" style={{ width: 150 }}><span>{o.carriers[k]}</span><input className="input num" value={f.tariffs[k]} onChange={(e) => up({ tariffs: { ...f.tariffs, [k]: e.target.value } })} /></label>)}</div></div>
-        {!o.ekotrace && <div className="field span2"><span>Emission factors, kgCO₂e per kWh (to value savings in tCO₂e)</span>
-          <div className="row small" style={{ gap: 10, flexWrap: 'wrap', marginTop: 4 }}>{CARRIERS.map((k) => <label key={k} className="field" style={{ width: 150 }}><span>{o.carriers[k]}</span><input className="input num" value={f.factors[k]} onChange={(e) => up({ factors: { ...f.factors, [k]: e.target.value } })} /></label>)}</div></div>}
+        <div className="field span2"><span>Emission factors, kgCO₂e per kWh (to value savings in tCO₂e{o.ekotrace && f.nodeId ? '; used only for carriers typed rather than taken from the entries' : ''})</span>
+          <div className="row small" style={{ gap: 10, flexWrap: 'wrap', marginTop: 4 }}>{CARRIERS.map((k) => <label key={k} className="field" style={{ width: 150 }}><span>{o.carriers[k]}</span><input className="input num" value={f.factors[k]} onChange={(e) => up({ factors: { ...f.factors, [k]: e.target.value } })} /></label>)}</div></div>
         <label className="field span2"><span>Notes</span><textarea className="input" rows={2} value={f.notes} onChange={(e) => up({ notes: e.target.value })} /></label>
       </div>
       <div className="row">{site && <button className="btn" onClick={del}>Remove</button>}<span className="grow" /><button className="btn" onClick={() => dlg.current?.close()}>Cancel</button><button className="btn p" disabled={!ok} onClick={save}>Save</button></div>
