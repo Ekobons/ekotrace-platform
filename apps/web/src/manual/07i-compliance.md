@@ -52,6 +52,8 @@ The rest is typed: financial year end, employees and turnover, EU turnover and t
 | Australia (AASB S2) | Group 1, 2 or 3 | with the annual report (3 months after year end for ASX-listed, 4 months for others); years starting from 1 January 2025 (Group 1), 1 July 2026 (Group 2), 1 July 2027 (Group 3) |
 | California SB 253 | US entity with more than US$1bn revenue doing business in California | Scope 1 and 2 by 10 November 2026; later dates set by CARB |
 | UK SECR | UK quoted company, or large unquoted company or LLP | with the accounts: 6 months (public) or 9 months (private) after year end |
+| India EPR | places plastic packaging, electronics, batteries or tyres on the Indian market | annual returns and targets by 30 June after each financial year |
+| EU PPWR | first makes packaging available in an EU member state | registration from 12 August 2026; labelling 12 August 2028; recycled content in plastic from 2030 |
 
 The first year of a regime counts from the **first financial year starting on or after** its start date, so a June or March year end begins a year later than a December one (CSRD, SGX, AASB S2).
 
@@ -75,6 +77,7 @@ Statuses read from the modules carry **·auto**:
 | UAE IEQT report | UAE MRV federal tab: IEQT submitted or verified is done |
 | EAD report, verification notice, monitoring plan | UAE MRV: done when every Abu Dhabi facility has it |
 | India CCTS Form A | India CCTS: months entered is in progress |
+| India EPR returns and targets, EU registration | EPR: returns filed, no shortfall, registration recorded for every stream |
 
 A status set by a person takes over from the module. Saving an owner, a note or evidence without choosing a status (*As the module says*) keeps the module's status. **Clear** drops the status set by a person and goes back to the module's, keeping the owner, note and evidence. **Date moved to** records an extension; it needs a note, and the moved date is used for overdue and on the calendar. Link the evidence (a filing receipt, a letter) from the Document vault.
 

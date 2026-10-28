@@ -197,7 +197,7 @@ export function positions(s: StreamSettings, rowList: YearRow[], certs: Cert[], 
       if (shortfall < 1e-9) shortfall = 0;
     }
     // recycled content: required share of what was placed this year
-    const rcPct = pick(s.rcPct, y) ?? R.recycledContent?.(y, s.category) ?? null;
+    const rcPct = s.role === 'recycler' ? null : pick(s.rcPct, y) ?? R.recycledContent?.(y, s.category) ?? null;
     const rcRequired = rcPct != null && row?.placed != null ? (row.placed * rcPct) / 100 : null;
     const rcActual = row?.recycledTonnes ?? null;
     const rcIn = mine.filter((c) => c.kind === 'recycled_content').reduce((t, c) => t + c.tonnes, 0);   // importers: certificates from surplus PIBOs

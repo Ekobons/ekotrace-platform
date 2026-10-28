@@ -23,6 +23,7 @@
     "demo:uaemrv": "tsx src/cli/demoUaeMrv.ts",
     "demo:energy": "tsx src/cli/demoEnergy.ts",
     "demo:compliance": "tsx src/cli/demoCompliance.ts",
+    "demo:epr": "tsx src/cli/demoEpr.ts",
     "testfiles": "tsx src/cli/makeTestFiles.ts"
   },
   "dependencies": {

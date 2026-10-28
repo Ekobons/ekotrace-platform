@@ -2,6 +2,16 @@
 
 Newest first.
 
+## 2026-10-28 · EPR: extended producer responsibility
+
+- Package `epr` (migration 072). Tables: `epr_stream` (regime in_plastic / in_ewaste / in_battery / in_tyre / eu_ppwr / other, role producer / importer / brand owner / recycler, category, registration, average life, food contact, per-year target / recycling / recycled-content overrides, compensation rate, certificate price, EU fee per tonne, currency, PRO), `epr_year` (placed or processed, pre-consumer, supplied to PIBOs, recycled content, obligation typed, annual return status / date / reference / evidence), `epr_cert` (in: bought or generated; out: sold; kind, compliance year, year generated, tonnes, price, number unique per stream, counterparty, end product). Tenant RLS on all three.
+- `lib/epr.ts` (pure): regime library — India plastic packaging (average of the two previous years, 25 / 70 / 100%, recycling share by category, recycled content per G.S.R. 237(E) of 31 March 2026 with the food-contact three-year carry at one-third a year), e-waste (one average life earlier × 60 / 70 / 80%), batteries (portal target typed; recycled content), tyres (two years earlier × 35 / 70 / 100%; certificates valid two years; liability + 10% cap), EU PPWR (fees; recycled content 2030 / 2040 by plastic type), other (typed); `positions()` year by year: base, obligation, carried shortfalls cleared oldest first and forfeited after three years, recycling minimum, compensation exposure, cost to close, recycler generated / sold.
+- `epr.routes.ts` (`/api/epr…`): overview, stream CRUD (set-up by super admin / admin; a filed stream cannot be deleted), years (preparers; filed years locked, 409), annual return, certificates (managers; no sale above stock, no removal under sales, validity, number once), Excel position.
+- Compliance desk: regulations *India EPR* (returns and targets by 30 June) and *EU PPWR* (registration 12 August 2026, reporting, labelling 2028, recycled content 2030); profile facts `eprIndia`, `ppwrProducer` from EPR streams; return, target and registration status read from EPR.
+- Web: Disclose → **EPR** (`/epr`, `pages/Epr.tsx`, `lib/epr.ts`): KPIs, stream cards, stream view (year-by-year grid with optional columns, certificates, return drawer, settings), certificates list; console checkbox; its own menu without the GHG inventory. Page headers wrap on phones.
+- `npm run demo:epr` (`cli/demoEpr.ts`): *Sahyog Consumer Goods Ltd (demo)* — plastic Categories I–III, e-waste, EU packaging in DE and NL, a film recycling plant, the UAE pilot. INVENTED.
+- Manual: new chapter EPR; glossary; Getting started → Packages; Compliance desk. Test `epr.test.ts`.
+
 ## 2026-10-28 · Compliance desk
 
 - Package `compliance` (migration 071). Tables: `cp_profile` (the facts that decide applicability, JSON), `cp_status` (per regulation, obligation and period: status, owner, note, evidence document, completed on, date moved), `cp_custom` (the company's own obligations, once or annual). Tenant RLS on all three.

@@ -19,6 +19,7 @@ import { AppError, notFound } from '../lib/errors.js';
 import { PRODUCT, PRODUCT_SLUG } from '../lib/brand.js';
 import { sendWorkbook, styleHeader } from '../lib/xlsx.js';
 import { needProduct, productsOf } from '../lib/products.js';
+import { positions as eprPositions, type Regime as EprRegime } from '../lib/epr.js';
 import { DEFAULT_PROFILE, REGULATION, REGULATIONS, effective, instances, sameDay, type Applies, type Profile, type Status } from '../lib/compliance.js';
 
 const uuid = z.string().uuid();
@@ -110,6 +111,19 @@ async function auto(c: Tx, products: string[], reg: string, ob: string, period: 
     const rows = (await c.query(`SELECT s.name, y.return_status, s.registered_on, s.registration FROM epr_stream s LEFT JOIN epr_year y ON y.stream_id = s.id AND y.year = $1 WHERE s.active AND ${like}`, [period])).rows;
     if (!rows.length) return null;
     if (ob === 'return' || ob === 'report') { const n = rows.filter((r) => r.return_status === 'filed').length; return n === rows.length ? { status: 'done', note: `Filed for all ${rows.length} ${rows.length === 1 ? 'stream' : 'streams'}` } : rows.some((r) => r.return_status && r.return_status !== 'not_started') ? { status: 'in_progress', note: `${n} of ${rows.length} filed` } : null; }
+    if (ob === 'targets') {
+      // each India producer stream's position for the year, as the EPR module computes it
+      const streams = (await c.query(`SELECT * FROM epr_stream WHERE active AND regime LIKE 'in\\_%' AND role <> 'recycler'`)).rows;
+      let short = 0, known = 0;
+      for (const st of streams) {
+        const ys = (await c.query(`SELECT * FROM epr_year WHERE stream_id = $1`, [st.id])).rows.map((y) => ({ year: y.year, placed: y.placed == null ? null : Number(y.placed), preConsumer: y.pre_consumer == null ? null : Number(y.pre_consumer), suppliedToPibo: y.supplied == null ? null : Number(y.supplied), recycledTonnes: y.recycled == null ? null : Number(y.recycled), obligationTyped: y.obligation == null ? null : Number(y.obligation) }));
+        const cs = (await c.query(`SELECT * FROM epr_cert WHERE stream_id = $1`, [st.id])).rows.map((x) => ({ year: x.year, kind: x.kind, direction: x.direction, tonnes: Number(x.tonnes), price: null, generatedYear: x.generated_year }));
+        const p = eprPositions({ regime: st.regime as EprRegime, role: st.role, category: st.category, avgLife: st.avg_life == null ? null : Number(st.avg_life), targetPct: st.target_pct ?? {}, recyclingPct: st.recycling_pct ?? {}, rcPct: st.rc_pct ?? {}, ecRate: null, certPrice: null, feeRate: null, foodContact: !!st.food_contact }, ys, cs, period).find((x) => x.year === period);
+        if (p?.shortfall != null) { known++; short += p.shortfall; }
+      }
+      if (!known) return null;
+      return short < 1e-6 ? { status: 'done', note: `Targets met for ${known} ${known === 1 ? 'stream' : 'streams'}` } : { status: 'in_progress', note: `${short.toLocaleString('en-US', { maximumFractionDigits: 1 })} t short across ${known} ${known === 1 ? 'stream' : 'streams'}` };
+    }
     if (ob === 'register') { const n = rows.filter((r) => r.registration || r.registered_on).length; return n === rows.length ? { status: 'done', note: `Registered in every member state recorded (${rows.length})` } : n ? { status: 'in_progress', note: `${n} of ${rows.length} registered` } : null; }
   }
   if (reg === 'in_ccts' && products.includes('ccts') && await hasTable(c, 'ccts_month')) {

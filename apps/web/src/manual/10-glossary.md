@@ -175,3 +175,17 @@
 | IEQT | the UAE national MRV system where designated sources report Scope 1 and 2 |
 | SECR | Streamlined Energy and Carbon Reporting: UK energy and carbon figures in the directors' report |
 | .ics | calendar file format that Outlook, Google Calendar and Apple Calendar import |
+
+## EPR
+
+| Term | Meaning |
+|---|---|
+| EPR | extended producer responsibility: producers pay for or arrange the collection and recycling of what they place on the market |
+| PIBO | producer, importer or brand owner of plastic packaging (India) |
+| PWP | plastic waste processor: a registered recycler or end-of-life operator that generates EPR certificates |
+| EPR certificate | proof that a tonnage was recycled or processed, bought by producers to meet their target |
+| End-of-life disposal | co-processing, waste-to-energy, waste-to-oil or road building, for plastic that cannot be recycled |
+| Recycled content | the share of recycled material in packaging or products placed on the market |
+| Environmental compensation | the charge for an unmet EPR target; paying it does not cancel the obligation |
+| PRO | producer responsibility organisation: collects fees from producers and organises collection and recycling (EU) |
+| PPWR | the EU Packaging and Packaging Waste Regulation (EU) 2025/40, applying from 12 August 2026 |
