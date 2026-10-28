@@ -118,3 +118,15 @@
 | ACVA | accredited carbon verification agency, which verifies the emissions report (Form B) |
 | Form A | Performance Assessment Document sent to BEE by 31 July after the compliance year |
 | ICM registry | the Indian Carbon Market registry, run by Grid-India, where CCCs are held |
+
+## BRSR Core
+
+| Term | Meaning |
+|---|---|
+| BRSR | Business Responsibility and Sustainability Report, required by SEBI from the top 1000 listed companies in India |
+| BRSR Core | the subset of BRSR KPIs, in nine attributes, that must carry reasonable assurance or assessment |
+| PPP | purchasing power parity: revenue in ₹ divided by the IMF's PPP rate, so intensities compare across countries |
+| LTIFR | lost-time injury frequency rate: lost-time injuries per one million person-hours worked |
+| POSH | the Sexual Harassment of Women at Workplace (Prevention, Prohibition and Redressal) Act, 2013 |
+| Value-chain partner | a supplier or customer with 2% or more of purchases or sales by value, disclosed until 75% is covered |
+| ISF | Industry Standards Forum (ASSOCHAM, CII, FICCI), which published the standards for reporting BRSR Core |

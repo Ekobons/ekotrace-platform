@@ -49,6 +49,7 @@ npm run admin:reset -- --email you@ekobon.com        # new temporary password, s
 # 4. Optional: demo company "BEEAH Group (demo)" with one login per role, 21 months of fuel data and a vehicle fleet
 npm run demo              # add "-- --reset" to delete the demo company and create it again
 npm run demo:ccts         # optional: India CCTS demo (an Indian cement works and spinning mill, invented figures)
+npm run demo:brsr         # optional: SEBI BRSR Core demo (an Indian listed auto-components maker, invented figures)
 
 # 5. Start (builds the screens and starts everything)
 npm run app

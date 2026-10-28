@@ -176,7 +176,7 @@ export async function brsrRoutes(app: FastifyInstance) {
     return tenantTx(tenant, async (c) => {
       const cur = await yearData(c, tenant, fy), prev = await yearData(c, tenant, fy - 1);
       const partners = cur.report ? (await c.query(`SELECT * FROM brsr_partner WHERE report_id = $1 ORDER BY side, amount_inr DESC NULLS LAST, name`, [cur.report.id])).rows.map(partnerView) : [];
-      const core = cur.rows.filter((r) => KPI.get(r.code)!.inCore && KPI.get(r.code)!.kind !== 'derived');
+      const core = cur.rows.filter((r) => KPI.get(r.code)!.inCore);
       const enterable = cur.rows.filter((r) => KPI.get(r.code)!.kind !== 'derived');
       return {
         report: reportView(cur.report, fy), attributes: ATTRIBUTES, kpis: KPIS,
