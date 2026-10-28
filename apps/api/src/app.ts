@@ -54,6 +54,7 @@ import { brsrRoutes } from './modules/brsr.routes.js';
 import { uaeMrvRoutes } from './modules/uaeMrv.routes.js';
 import { energyMgmtRoutes } from './modules/energyMgmt.routes.js';
 import { complianceRoutes } from './modules/compliance.routes.js';
+import { eprRoutes } from './modules/epr.routes.js';
 import { lcaRoutes } from './modules/lca.routes.js';
 import { cbamRoutes } from './modules/cbam.routes.js';
 import { cbamCommRoutes } from './modules/cbamComm.routes.js';
@@ -146,6 +147,7 @@ export async function buildApp(opts: { logger?: boolean; rateLimit?: Limits | nu
     await secured.register(uaeMrvRoutes);
     await secured.register(energyMgmtRoutes);
     await secured.register(complianceRoutes);
+    await secured.register(eprRoutes);
     await secured.register(lcaRoutes);
     await secured.register(cbamRoutes);
     await secured.register(cbamCommRoutes);

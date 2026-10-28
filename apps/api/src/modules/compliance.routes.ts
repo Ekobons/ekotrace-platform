@@ -43,6 +43,7 @@ const profileBody = z.object({
   cbamImportTonnes: z.number().min(0).max(1e9).nullable(), cbamExporter: z.boolean().nullable(),
   uaeDesignated: z.enum(['yes', 'no', 'unknown']), uaeScope12: z.number().min(0).max(1e10).nullable(), eadFacility: z.boolean().nullable(),
   usRevenueUsd: z.number().min(0).max(1e13).nullable(), californiaBusiness: z.boolean(), auGroup: z.enum(['group1', 'group2', 'group3', 'none']), ukQuoted: z.boolean(), ukLarge: z.boolean(),
+  eprIndia: z.boolean().nullable().default(null), ppwrProducer: z.boolean().nullable().default(null),
 });
 
 const hasTable = async (c: Tx, t: string) => !!(await c.query(`SELECT to_regclass($1) AS t`, [t])).rows[0].t;
@@ -64,6 +65,11 @@ async function facts(c: Tx, tenant: string, products: string[]) {
     if ((await c.query(`SELECT 1 FROM mrv_facility WHERE emirate = 'AZ' AND sector <> 'other' LIMIT 1`)).rowCount) { f.eadFacility = true; f.sources.eadFacility = 'Abu Dhabi facility in a covered sector in UAE MRV (threshold not checked)'; }
     const y = (await c.query(`SELECT designated, s1_typed, s2_typed, year FROM mrv_company_year ORDER BY year DESC LIMIT 1`)).rows[0];
     if (y && y.designated !== 'unknown') { f.uaeDesignated = y.designated; f.sources.uaeDesignated = `UAE MRV federal position ${y.year}`; }
+  }
+  if (products.includes('epr') && await hasTable(c, 'epr_stream')) {
+    const r = (await c.query(`SELECT count(*) FILTER (WHERE regime LIKE 'in\\_%')::int AS india, count(*) FILTER (WHERE regime = 'eu_ppwr')::int AS eu FROM epr_stream WHERE active`)).rows[0];
+    if (r.india) { f.eprIndia = true; f.sources.eprIndia = `${r.india} India EPR ${r.india === 1 ? 'stream' : 'streams'} in EPR`; }
+    if (r.eu) { f.ppwrProducer = true; f.sources.ppwrProducer = `${r.eu} EU packaging ${r.eu === 1 ? 'stream' : 'streams'} in EPR`; }
   }
   return f;
 }
@@ -98,6 +104,13 @@ async function auto(c: Tx, products: string[], reg: string, ob: string, period: 
     if (ob === 'report') { const done = rows.filter((r) => ['submitted', 'verified'].includes(r.status)).length; return done === rows.length ? { status: 'done', note: `All ${rows.length} Abu Dhabi facility reports submitted` } : rows.some((r) => r.status) ? { status: 'in_progress', note: `${done} of ${rows.length} facility reports submitted` } : null; }
     if (ob === 'notify') { const n = rows.filter((r) => r.verif_notified).length; return n === rows.length ? { status: 'done', note: 'Verification notified for every facility' } : n ? { status: 'in_progress', note: `${n} of ${rows.length} notified` } : null; }
     if (ob === 'registration') { const n = rows.filter((r) => r.mp_submitted && iso(r.mp_submitted)! >= `${period - 1}-04-01` && iso(r.mp_submitted)! <= `${period}-03-31`).length; return n === rows.length ? { status: 'done', note: 'Monitoring plans submitted for every facility' } : n ? { status: 'in_progress', note: `${n} of ${rows.length} monitoring plans` } : null; }
+  }
+  if ((reg === 'in_epr' || reg === 'eu_ppwr') && products.includes('epr') && await hasTable(c, 'epr_stream')) {
+    const like = reg === 'in_epr' ? `regime LIKE 'in\\_%' AND role <> 'recycler'` : `regime = 'eu_ppwr'`;
+    const rows = (await c.query(`SELECT s.name, y.return_status, s.registered_on, s.registration FROM epr_stream s LEFT JOIN epr_year y ON y.stream_id = s.id AND y.year = $1 WHERE s.active AND ${like}`, [period])).rows;
+    if (!rows.length) return null;
+    if (ob === 'return' || ob === 'report') { const n = rows.filter((r) => r.return_status === 'filed').length; return n === rows.length ? { status: 'done', note: `Filed for all ${rows.length} ${rows.length === 1 ? 'stream' : 'streams'}` } : rows.some((r) => r.return_status && r.return_status !== 'not_started') ? { status: 'in_progress', note: `${n} of ${rows.length} filed` } : null; }
+    if (ob === 'register') { const n = rows.filter((r) => r.registration || r.registered_on).length; return n === rows.length ? { status: 'done', note: `Registered in every member state recorded (${rows.length})` } : n ? { status: 'in_progress', note: `${n} of ${rows.length} registered` } : null; }
   }
   if (reg === 'in_ccts' && products.includes('ccts') && await hasTable(c, 'ccts_month')) {
     if (ob === 'form_a') { const n = Number((await c.query(`SELECT count(*)::int AS n FROM ccts_month WHERE month >= $1 AND month <= $2`, [`${period - 1}-04-01`, `${period}-03-01`])).rows[0].n); return n ? { status: 'in_progress', note: `${n} entity-months entered` } : null; }
