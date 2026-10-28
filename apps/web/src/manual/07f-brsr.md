@@ -35,7 +35,7 @@ The reporting year is the Indian financial year, **April to March** (FY 2025-26 
 | Output and unit | for the per-unit-of-output intensities (tonnes, pieces, MWh…) |
 | Facilities | which facilities are inside the BRSR boundary; none ticked = all |
 | Provider and approach | the assurance or assessment provider, and reasonable assurance, assessment or none yet |
-| Status | Draft → Ready → **Final**. Final locks every value of the year |
+| Status | Draft → Ready → **Final**. Final freezes the figures from entries as they are at that moment and locks the year: values, reviews, value-chain partners and these settings. To change anything, set the status back to Draft or Ready first |
 
 Revenue adjusted for PPP = revenue (₹) ÷ PPP rate, shown in USD million. The intensities are then per USD million (PPP) — comparable across countries, as SEBI asks.
 
@@ -49,7 +49,7 @@ Revenue adjusted for PPP = revenue (₹) ÷ PPP rate, shown in USD million. The 
 | 4 Waste | waste entries in tonnes, by category A–H (Waste Management Rules, 2016) from the waste type, and by route from the entry's method: recycling, re-use, other recovery, incineration (with or without energy recovery), landfill, other disposal. Radioactive waste (F) is typed |
 | 5–9 | typed: wellbeing spend, injuries and hours, wages, POSH complaints, MSME and local sourcing, wages by location, data breaches, payables, purchase and sales concentration, related-party shares |
 
-An entry that spans the year boundary counts by the days inside the year. Only **approved** entries count. Each row shows its source: *From entries*, *Entered*, *Override* (an entry figure replaced, with the reason) or *Worked out*.
+An entry that spans the year boundary counts by the days inside the year. Only **approved** entries count. With no entries of a kind (no water entries, say), its rows show as missing, not zero. Water consumption is withdrawal − discharge as they stand, after any replaced figure, unless consumption itself is replaced. Each row shows its source: *From entries*, *Entered*, *Override* (an entry figure replaced, with the reason) or *Worked out*.
 
 ## Worked-out rows
 
@@ -77,11 +77,11 @@ The inputs of these rows are listed with them, marked *input*; they are not BRSR
 | Core rows filled | BRSR Core rows with a value this year, and how many inputs are reviewed or carry evidence |
 | Scope 1 + 2, Energy | the year's headline figures and intensities |
 | Assurance | the year's status and provider, revenue and PPP rate |
-| Checks | discharge split not adding up to the total, discharge larger than withdrawal, more waste recovered and disposed of than generated, a share larger than its total, renewable energy above total energy |
+| Checks | discharge split not adding up to the total, discharge larger than withdrawal, more waste recovered and disposed of than generated, a share larger than its total, renewable energy above total energy, fuel entries without a calorific value (energy incomplete) |
 | Attributes | the nine attributes on the left with rows filled; the table on the right with this year and last year |
 | Detail | below the table: Scope 1 by gas, water by line, energy by source, waste by category and route |
 
-In the table, type a value straight into an *Entered* row and **Save**. **Replace / note…** on a row opens it: replace an entry figure (a note is required), add a note, link a document from the vault, name the owner. Tick rows and use **Mark ready** or **Mark reviewed**. Changing a value sets its review back to *Open*. You cannot review a row you changed yourself; such rows are skipped.
+In the table, type a value straight into an *Entered* row and **Save**. **Replace / note…** on a row opens it: replace an entry figure (a note is required), add a note, link a document from the vault, name the owner. Tick rows and use **Mark ready** or **Mark reviewed**. Changing a value sets its review back to *Open*. A reviewed figure from entries that changes afterwards (an entry approved or corrected later) shows **Changed** and needs reviewing again. You cannot review a row you changed yourself; such rows are skipped.
 
 ## Value chain
 

@@ -118,12 +118,13 @@ async function main() {
   await settings(2024, 38_400_000_000, 182_000, 'draft');
   await s('PUT', '/api/brsr/2024/values', { values: typed(2024, 0.92) });
   await settings(2024, 38_400_000_000, 182_000, 'final');
-  await s('PUT', '/api/brsr/2025/values', { values: typed(2025, 1).filter((x) => !['open.loans', 'open.rp_loans', 'fair.payables'].includes(x.kpi)) });  // a few still to come
-  // reviews: HR marks its figures ready; the ESG head (who did not enter them) reviews the safety rows
+  const SAFETY = ['emp.lti_wkr', 'emp.hours_wkr', 'emp.lti_emp', 'emp.hours_emp'];
+  await s('PUT', '/api/brsr/2025/values', { values: typed(2025, 1).filter((x) => ![...SAFETY, 'open.loans', 'open.rp_loans', 'fair.payables'].includes(x.kpi)) });  // a few still to come
+  // reviews: HR enters the safety figures and marks its rows ready; the ESG head (who did not enter them) reviews the safety rows
   const hr = await session('hr@sahyadri.demo', pw), fin = await session('finance@sahyadri.demo', pw);
-  await hr('PUT', '/api/brsr/2025/values', { values: [{ kpi: 'emp.lti_wkr', value: 4, note: 'Two hand injuries, one fall, one burn (DEMO)', documentId: null, owner: 'Plant EHS' }] });
+  await hr('PUT', '/api/brsr/2025/values', { values: typed(2025, 1).filter((x) => SAFETY.includes(x.kpi)).map((x) => (x.kpi === 'emp.lti_wkr' ? { ...x, value: 4, note: 'Two hand injuries, one fall, one burn (DEMO)' } : x)) });
   await hr('POST', '/api/brsr/2025/review', { kpis: ['emp.lti_wkr', 'emp.hours_wkr', 'emp.lti_emp', 'emp.hours_emp', 'gender.wages_female', 'gender.wages_total'], review: 'ready' });
-  await s('POST', '/api/brsr/2025/review', { kpis: ['emp.lti_wkr', 'emp.hours_wkr', 'emp.lti_emp', 'emp.hours_emp'], review: 'reviewed' });
+  await s('POST', '/api/brsr/2025/review', { kpis: SAFETY, review: 'reviewed' });
   await fin('POST', '/api/brsr/2025/review', { kpis: ['ghg.s1', 'ghg.s2', 'energy.total', 'energy.renewable', 'water.consumption', 'water.withdrawal', 'water.discharge'], review: 'reviewed' });
   // value chain
   for (const p of [

@@ -94,7 +94,12 @@ function Attribute({ d, attr, onSaved }: { d: BrsrData; attr: number; onSaved: (
   const init = () => Object.fromEntries(kpis.filter((k) => k.kind === 'typed').map((k) => [k.code, rows.get(k.code)!.value == null ? '' : String(rows.get(k.code)!.value)]));
   const [draft, setDraft] = useState<Record<string, string>>(init);
   const orig = useMemo(init, [d]); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => { setDraft(init()); }, [d]); // eslint-disable-line react-hooks/exhaustive-deps
+  const prevOrig = useRef(orig);
+  // on reload keep what the user typed and has not saved; refresh the rest
+  useEffect(() => {
+    const was = prevOrig.current; prevOrig.current = orig;
+    setDraft((cur) => Object.fromEntries(Object.keys(orig).map((k) => [k, cur[k] !== undefined && cur[k] !== was[k] ? cur[k]! : orig[k]!])));
+  }, [orig]);
   const [open, setOpen] = useState<Kpi | null>(null);
   const [sel, setSel] = useState<Set<string>>(new Set());
   const dirty = Object.keys(draft).filter((k) => draft[k] !== orig[k]);
@@ -146,7 +151,7 @@ function Attribute({ d, attr, onSaved }: { d: BrsrData; attr: number; onSaved: (
                   <td className="small nowrap"><span className={r.source === 'missing' ? 'warn-t' : r.source === 'override' ? 'warn-t' : 'muted'}>{SRC[r.source]}</span>
                     {r.document && <div title={r.document}><Icon name="doc" /> evidence</div>}{r.owner && <div className="muted">{r.owner}</div>}
                     {k.kind !== 'derived' && d.canEdit && !final && <div><button className="linkbtn small" onClick={() => setOpen(k)}>{k.kind === 'auto' ? 'Replace / note…' : 'Note & evidence…'}</button></div>}</td>
-                  <td className="ctr">{k.kind !== 'derived' && <span className={`chip ${REVIEW[r.review][0]}`} title={r.reviewedName ? `Reviewed by ${r.reviewedName}` : undefined}>{REVIEW[r.review][1]}</span>}</td>
+                  <td className="ctr">{k.kind !== 'derived' && <span className={`chip ${REVIEW[r.review][0]}`} title={r.changedSinceReview ? 'The entries changed after it was reviewed: review it again' : r.reviewedName ? `Reviewed by ${r.reviewedName}` : undefined}>{r.changedSinceReview ? 'Changed' : REVIEW[r.review][1]}</span>}</td>
                 </tr>);
             })}</Fragment>))}
         </tbody>
@@ -210,11 +215,13 @@ function Settings({ d, onClose, onDone }: { d: BrsrData; onClose: () => void; on
     try { await brsrApi.saveReport(R.fy, b); toast('Saved'); onDone(); } catch (e) { toast((e as Error).message); }
   };
   const rev = parse(f.revenueInr), ppp = parse(f.pppFactor);
+  const locked = R.status === 'final';
   return (
     <dialog ref={dlg} className="drawer wide" onClose={onClose}><div className="in">
       <div className="row"><div className="grow"><div className="eyebrow">BRSR Core</div><h2>{R.label} settings</h2></div><button className="btn ghost" onClick={() => dlg.current?.close()} aria-label="Close"><Icon name="x" /></button></div>
       {!d.canSetup && <div className="note info small">Only a super admin or admin changes these.</div>}
-      <div className="vform">
+      {locked && <div className="note warn small">{R.label} is final: its figures are frozen. To change anything, set the status back to Draft or Ready and save; then change the settings.</div>}
+      <fieldset className="vform plain" disabled={locked}>
         <label className="field"><span>Revenue from operations (₹, audited P&amp;L, excluding other income)</span><input className="input num" inputMode="decimal" value={f.revenueInr} onChange={(e) => up({ revenueInr: e.target.value })} /></label>
         <label className="field"><span>PPP conversion rate (₹ per international $, IMF)</span><input className="input num" inputMode="decimal" value={f.pppFactor} onChange={(e) => up({ pppFactor: e.target.value })} /></label>
         <div className="field span2 muted small">{rev != null && ppp ? `Revenue adjusted for PPP: USD ${fmt(rev / ppp / 1e6, 2)} million. ` : ''}The Industry Standards use the IMF implied PPP conversion rate (22.4 as of April 2024). Use the latest IMF value and disclose it.</div>
@@ -227,13 +234,16 @@ function Settings({ d, onClose, onDone }: { d: BrsrData; onClose: () => void; on
         <label className="field"><span>Assessment or assurance</span><select className="input" value={f.approach} onChange={(e) => up({ approach: e.target.value as ReportBody['approach'] })}>
           <option value="assurance">Reasonable assurance</option><option value="assessment">Assessment (ISF standards)</option><option value="none">None this year</option></select></label>
         <label className="field"><span>Provider</span><input className="input" value={f.provider} onChange={(e) => up({ provider: e.target.value })} /></label>
+      </fieldset>
+      <div className="vform">
         <label className="field"><span>Status</span><select className="input" value={f.status} onChange={(e) => up({ status: e.target.value as ReportBody['status'] })}>
-          <option value="draft">Draft</option><option value="ready">Ready for the provider</option><option value="final">Final (locks the values)</option></select></label>
-        <div className="field" />
-        <label className="field span2"><span>Notes (scope, estimates, restated comparatives)</span><textarea className="input" rows={3} value={f.notes} onChange={(e) => up({ notes: e.target.value })} /></label>
+          <option value="draft">Draft</option><option value="ready">Ready for the provider</option><option value="final">Final (freezes the figures and locks the year)</option></select></label>
       </div>
+      <fieldset className="vform plain" disabled={locked}>
+        <label className="field span2"><span>Notes (scope, estimates, restated comparatives)</span><textarea className="input" rows={3} value={f.notes} onChange={(e) => up({ notes: e.target.value })} /></label>
+      </fieldset>
       <div className="row"><span className="grow" /><button className="btn" onClick={() => dlg.current?.close()}>Cancel</button>
-        <button className="btn p" disabled={!d.canSetup || ![f.revenueInr, f.pppFactor, f.outputQty].every(okNum) || (!f.all && !f.facilityIds.length)} onClick={save}>Save</button></div>
+        <button className="btn p" disabled={!d.canSetup || (locked && f.status === 'final') || ![f.revenueInr, f.pppFactor, f.outputQty].every(okNum) || (!f.all && !f.facilityIds.length)} onClick={save}>Save</button></div>
     </div></dialog>);
 }
 
@@ -243,6 +253,7 @@ function ValueChain({ d, onSaved }: { d: BrsrData; onSaved: () => void }) {
   const [edit, setEdit] = useState<Partner | { side: 'upstream' | 'downstream' } | null>(null);
   const [sug, setSug] = useState<Awaited<ReturnType<typeof brsrApi.suggest>> | null>(null);
   const vcK = d.kpis.filter((k) => k.vc);
+  const final = d.report.status === 'final';
   const loadSug = async () => { try { setSug(await brsrApi.suggest(d.report.fy)); } catch (e) { toast((e as Error).message); } };
   const add = async (s: { supplierId: string; name: string }) => {
     try { await brsrApi.addPartner(d.report.fy, { side: 'upstream', name: s.name, supplierId: s.supplierId, amountInr: null, attributable: null, values: {}, note: '' }); toast(`Added ${s.name}`); onSaved(); }
@@ -254,12 +265,12 @@ function ValueChain({ d, onSaved }: { d: BrsrData; onSaved: () => void }) {
       <div className="card flush" style={{ marginBottom: 12 }}>
         <div className="row vfilters"><div className="grow"><b>{s === 'upstream' ? 'Upstream — suppliers' : 'Downstream — customers, dealers, distributors'}</b>
           <div className="muted small">{S.total ? `${fmt((S.coverage ?? 0) * 100, 1)}% of ${s === 'upstream' ? 'purchases' : 'sales'} covered (${inr(S.amount)} of ${inr(S.total)})` : `Enter total ${s === 'upstream' ? 'purchases (attribute 7)' : 'sales (attribute 9)'} to see the coverage`}</div></div>
-          {s === 'upstream' && d.canEdit && <button className="btn sm" onClick={loadSug}>Suggest from purchase files</button>}
-          {d.canEdit && <button className="btn sm p" onClick={() => setEdit({ side: s })}>+ Partner</button>}</div>
+          {s === 'upstream' && d.canEdit && !final && <button className="btn sm" onClick={loadSug}>Suggest from purchase files</button>}
+          {d.canEdit && !final && <button className="btn sm p" onClick={() => setEdit({ side: s })}>+ Partner</button>}</div>
         {s === 'upstream' && sug && (
           <div style={{ padding: '0 14px 10px' }}>{sug.suggestions.length ? <table className="t small"><thead><tr><th>Supplier (≥ 2% of spend)</th><th className="num">Share</th><th className="num">Cumulative</th><th /></tr></thead>
             <tbody>{sug.suggestions.map((x) => <tr key={x.supplierId}><td>{x.name}</td><td className="num">{fmt(x.share * 100, 1)}%</td><td className="num">{fmt(x.cumulative * 100, 1)}%</td>
-              <td>{S.partners.some((p) => p.supplierId === x.supplierId) ? <span className="muted">added</span> : <button className="btn sm" onClick={() => add(x)}>Add</button>}</td></tr>)}</tbody></table>
+              <td>{S.partners.some((p) => p.supplierId === x.supplierId) ? <span className="muted">added</span> : final ? null : <button className="btn sm" onClick={() => add(x)}>Add</button>}</td></tr>)}</tbody></table>
             : <span className="muted small">No published purchase lines in {fyLabel(d.report.fy)} with a supplier above 2% of spend.</span>}</div>)}
         {!S.partners.length ? <div className="empty" style={{ padding: 18 }}>No {s} partners yet.</div> : (
           <div className="scrollx"><table className="t">
@@ -269,7 +280,7 @@ function ValueChain({ d, onSaved }: { d: BrsrData; onSaved: () => void }) {
                 <td className="num small">{p.share != null ? <span className={p.belowTwo ? 'warn-t' : ''} title={p.belowTwo ? 'Below the 2% threshold' : undefined}>{fmt(p.share * 100, 1)}%</span> : '—'}</td>
                 <td className="num small">{fmt((p.attributable ?? 1) * 100, 0)}%</td>
                 {vcK.map((k) => <td key={k.code} className="num small">{fmt(p.values[k.code], k.dp)}</td>)}
-                <td>{d.canEdit && <button className="btn sm" onClick={() => setEdit(p)}>Edit</button>}</td></tr>))}</tbody>
+                <td>{d.canEdit && !final && <button className="btn sm" onClick={() => setEdit(p)}>Edit</button>}</td></tr>))}</tbody>
             <tfoot><tr><td><b>Attributable to the company</b></td><td className="num"><b>{inr(S.amount)}</b></td><td className="num">{S.coverage != null ? `${fmt(S.coverage * 100, 1)}%` : ''}</td><td />
               {vcK.map((k) => <td key={k.code} className="num"><b>{fmt(S.attributable[k.code], k.dp)}</b></td>)}<td /></tr></tfoot>
           </table></div>)}

@@ -142,7 +142,8 @@ test('API: environmental KPIs from approved entries for April–March, split by 
   assert.ok(v('energy.total') >= (1_100_000 * 0.0036) - 1e-6);   // electricity alone = 3,960 GJ
   assert.equal(v('ghg.int_ppp'), null);                         // no revenue yet
   assert.ok(d.gases.some((g: { gas: string }) => g.gas === 'CO2'));
-  assert.equal((await call('GET', '/api/brsr?fy=2025', undefined, other)).body.rows.find((r: { code: string }) => r.code === 'ghg.s1').value, 0);
+  const o = (await call('GET', '/api/brsr?fy=2025', undefined, other)).body.rows.find((r: { code: string }) => r.code === 'ghg.s1');
+  assert.equal(o.value, null); assert.equal(o.source, 'missing');   // another company, no entries: missing, not zero
 });
 
 test('API: settings, boundary, typed values, overrides need a note, PPP intensity', async () => {
@@ -165,7 +166,7 @@ test('API: settings, boundary, typed values, overrides need a note, PPP intensit
   const r = (c: string) => d.rows.find((x: { code: string }) => x.code === c);
   assert.equal(r('ghg.s1').value, 300); assert.equal(r('ghg.s1').source, 'override'); assert.ok(r('ghg.s1').auto > 270);
   near(r('emp.ltifr_wkr').value, 2); near(r('gender.wages_pct').value, 25);
-  assert.deepEqual(d.problems, []);
+  assert.equal(d.problems.length, 1); assert.match(d.problems[0], /3 fuel or energy entries have no calorific value/);   // the test fuels carry no calorific value
 });
 
 test('API: review — preparers mark ready; reviewer is someone else; a change reopens; final locks', async () => {
@@ -207,4 +208,43 @@ test('API: value chain partners, coverage and attributable figures; Excel export
   let ltifr: unknown; core.eachRow((r) => { if (String(r.getCell(3).value).includes('LTIFR — workers')) ltifr = r.getCell(5).value; });
   near(ltifr as number, 4 / 1.5);
   assert.equal((await call('GET', '/api/brsr?fy=2025', undefined, other)).body.valueChain.upstream.partners.length, 0);
+});
+
+test('API: Final freezes the figures and locks settings and partners; reviews follow user ids; consumption after overrides', async () => {
+  const S = { revenueInr: 10_000e6, pppFactor: 22.4, outputQty: 2000, outputUnit: 't', facilityIds: [plant], provider: 'Test Assurer LLP', approach: 'assurance', status: 'draft' };
+  const get = async () => (await call('GET', '/api/brsr?fy=2025', undefined, co)).body;
+  const row = (d: { rows: { code: string }[] }, c: string) => d.rows.find((x) => x.code === c) as unknown as { value: number; review: string; changedSinceReview: boolean; source: string };
+  // overriding discharge moves consumption with it
+  await call('PUT', '/api/brsr/2025/values', { values: [{ kpi: 'water.discharge', value: 25_000, note: 'Meter recalibrated' }] }, co, mgr);
+  let d = await get();
+  near(row(d, 'water.consumption').value, 25_000);
+  await call('PUT', '/api/brsr/2025/values', { values: [{ kpi: 'water.discharge', value: null }] }, co, mgr);
+  // a reviewed figure from entries that later changes needs reviewing again
+  assert.equal((await call('POST', '/api/brsr/2025/review', { kpis: ['ghg.s2'], review: 'reviewed' }, co, sa)).status, 200);
+  assert.equal(row(await get(), 'ghg.s2').review, 'reviewed');
+  const p = new pg.Client({ connectionString: url }); await p.connect();
+  await p.query(`SELECT set_config('app.platform','on',false)`);
+  await p.query(`UPDATE activity SET co2e_scope2 = co2e_scope2 * 2 WHERE facility_id = $1 AND co2e_scope2 > 0`, [plant]);
+  d = await get();
+  near(row(d, 'ghg.s2').value, 1432); assert.equal(row(d, 'ghg.s2').review, 'open'); assert.equal(row(d, 'ghg.s2').changedSinceReview, true);
+  // review by user id: a renamed person still cannot review their own change
+  await call('PUT', '/api/brsr/2025/values', { values: [{ kpi: 'fair.procured', value: 730 }] }, co, sa);
+  await p.query(`UPDATE app_user SET name = 'Renamed head' WHERE email = 'head@listed.test'`);
+  assert.equal((await call('POST', '/api/brsr/2025/review', { kpis: ['fair.procured'], review: 'reviewed' }, co, sa)).body.skipped, 1);
+  // Final: figures frozen, settings and partners locked
+  assert.equal((await call('PUT', '/api/brsr/2025', { ...S, status: 'final' }, co)).status, 200);
+  await p.query(`UPDATE activity SET co2e_scope2 = co2e_scope2 * 3 WHERE facility_id = $1 AND co2e_scope2 > 0`, [plant]);
+  near(row(await get(), 'ghg.s2').value, 1432);
+  assert.equal((await call('PUT', '/api/brsr/2025', { ...S, revenueInr: 20_000e6, status: 'final' }, co)).status, 409);
+  const pid = (await get()).valueChain.upstream.partners[0].id;
+  assert.equal((await call('POST', '/api/brsr/2025/partners', { side: 'upstream', name: 'Late add' }, co, mgr)).status, 409);
+  assert.equal((await call('PUT', `/api/brsr/partners/${pid}`, { side: 'upstream', name: 'Renamed' }, co, mgr)).status, 409);
+  assert.equal((await call('DELETE', `/api/brsr/partners/${pid}`, undefined, co, mgr)).status, 409);
+  // reopening keeps the settings and unfreezes
+  const re = await call('PUT', '/api/brsr/2025', { ...S, revenueInr: 1, status: 'draft' }, co);
+  assert.equal(re.status, 200, re.text);
+  d = await get();
+  assert.equal(d.report.revenueInr, 10_000e6); near(row(d, 'ghg.s2').value, 716 * 6);
+  await p.query(`UPDATE activity SET co2e_scope2 = co2e_scope2 / 6 WHERE facility_id = $1 AND co2e_scope2 > 0`, [plant]);
+  await p.end();
 });

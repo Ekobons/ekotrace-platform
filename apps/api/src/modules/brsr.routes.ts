@@ -29,11 +29,19 @@ const FY = z.coerce.number().int().min(2020).max(2100);
 const fyOf = (req: FastifyRequest) => FY.parse((req.params as { fy: string }).fy);
 const currentFy = () => { const [y, m] = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit' }).format(new Date()).split('-').map(Number); return m! >= 4 ? y! - 1 : y! - 2; }; // the last completed year
 const num = (x: unknown) => (x == null ? null : Number(x));
+const same = (a: number | null, b: number | null) => (a == null || b == null ? a === b : Math.abs(a - b) <= Math.max(1e-6, Math.abs(b) * 1e-9));
 const canEdit = (req: FastifyRequest) => ['super_admin', 'admin', 'manager', 'preparer', 'platform_admin'].includes(req.user.role);
 const canSetup = (req: FastifyRequest) => ['super_admin', 'admin', 'platform_admin'].includes(req.user.role);
 const AUTO = new Set(KPIS.filter((k) => k.kind === 'auto').map((k) => k.code));
 const ENTERABLE = new Set(KPIS.filter((k) => k.kind !== 'derived').map((k) => k.code));
 
+const finalErr = (fy: number) => new AppError(`${fyLabel(fy)} is marked final; a super admin or admin reopens it first`, 409, 'FINAL');
+/** The partner exists and its year is not Final. */
+async function partnerOpen(c: Tx, pid: string) {
+  const r = (await c.query(`SELECT r.status, r.fy FROM brsr_partner p JOIN brsr_report r ON r.id = p.report_id WHERE p.id = $1 FOR UPDATE OF p`, [pid])).rows[0];
+  if (!r) throw notFound('Value-chain partner');
+  if (r.status === 'final') throw finalErr(r.fy);
+}
 async function report(c: Tx, tenant: string, fy: number) {
   return (await c.query(`SELECT * FROM brsr_report WHERE tenant_id = $1 AND fy = $2`, [tenant, fy])).rows[0] ?? null;
 }
@@ -65,20 +73,24 @@ export async function fromEntries(c: Tx, tenant: string, fy: number, facilityIds
       GROUP BY 1 ORDER BY 2 DESC`, [facs, from, to])).rows.map((r) => ({ gas: r.family as string, t: r.t as number }));
   const ref = await refdata();
   const units = new Map(ref.unitList.map((u) => [u.code, { dimension: u.dimension, to_base: Number(u.toBase) }]));
-  const v: Values = { 'ghg.s1': 0, 'ghg.s2': 0, 'water.withdrawal': 0, 'water.discharge': 0, 'energy.total': 0, 'energy.renewable': 0,
-    'waste.a': 0, 'waste.b': 0, 'waste.c': 0, 'waste.d': 0, 'waste.e': 0, 'waste.g': 0, 'waste.h': 0,
-    'waste.recycled': 0, 'waste.reused': 0, 'waste.other_recovery': 0, 'waste.incineration': 0, 'waste.landfill': 0, 'waste.other_disposal': 0 };
+  // a figure exists only when entries of its kind exist: no entries = missing, not zero
+  const v: Values = {};
+  const GROUPS: Record<string, string[]> = {
+    ghg: ['ghg.s1', 'ghg.s2'], energy: ['energy.total', 'energy.renewable'],
+    waste: ['waste.a', 'waste.b', 'waste.c', 'waste.d', 'waste.e', 'waste.g', 'waste.h', 'waste.recycled', 'waste.reused', 'waste.other_recovery', 'waste.incineration', 'waste.landfill', 'waste.other_disposal'],
+  };
+  const open = (g: string) => { for (const k of GROUPS[g]!) v[k] ??= 0; };
   const add = (k: string, x: number) => { v[k] = (v[k] ?? 0) + x; };
   const detail = { energy: new Map<string, { gj: number; renewable: boolean }>(), water: new Map<string, number>(), waste: new Map<string, number>(), entries: { ghg: 0, energy: 0, water: 0, waste: 0 }, missingEnergy: 0 };
   const addD = <T>(m: Map<string, T>, k: string, f: (old: T | undefined) => T) => m.set(k, f(m.get(k)));
   for (const r of rows) {
-    add('ghg.s1', r.s1); add('ghg.s2', r.s2);
-    if (r.s1 || r.s2) detail.entries.ghg += r.n;
+    if (r.s1 || r.s2) { open('ghg'); add('ghg.s1', r.s1 ?? 0); add('ghg.s2', r.s2 ?? 0); detail.entries.ghg += r.n; }
     const u = units.get(r.unit);
     const fuel = r.cat === 'stationary_combustion' || r.cat === 'mobile_combustion';
     if (fuel || r.cat === 'purchased_electricity') {
       const kwh = await kwhOf(c, units, r.iid, `${r.item} ${r.sub}`, r.unit, r.qty, fy, fuel);
       if (kwh == null) { detail.missingEnergy += r.n; continue; }
+      open('energy');
       const gj = kwh * 0.0036, recGj = Math.min(gj, r.rec * 0.0036);
       const renewable = fuel ? !!r.bio : false;
       add('energy.total', gj); add('energy.renewable', renewable ? gj : recGj);
@@ -94,13 +106,14 @@ export async function fromEntries(c: Tx, tenant: string, fy: number, facilityIds
       detail.entries.water += r.n;
     } else if (r.cat === 'waste_generated') {
       const tonnes = u ? (r.qty * u.to_base) / 1000 : 0;  // kg → t
+      open('waste');
       const cat = wasteCategory(r.sub, r.item, r.haz), route = wasteRoute(r.wgri, (r.attrs?.route as string) ?? null);
       add(`waste.${cat}`, tonnes); add(`waste.${route}`, tonnes);
       addD(detail.waste, `${cat}|${route}`, (o) => (o ?? 0) + tonnes);
       detail.entries.waste += r.n;
     }
   }
-  v['water.consumption'] = (v['water.withdrawal'] ?? 0) - (v['water.discharge'] ?? 0);
+  if (v['water.withdrawal'] != null) v['water.consumption'] = v['water.withdrawal']! - (v['water.discharge'] ?? 0);
   return {
     values: v, gases,
     detail: {
@@ -121,7 +134,8 @@ const SOURCE: Record<string, string> = {
 /** The whole year: base values (auto, overridden or typed), derived values, sources and review state. */
 async function yearData(c: Tx, tenant: string, fy: number) {
   const r = await report(c, tenant, fy);
-  const auto = await fromEntries(c, tenant, fy, r?.facility_ids ?? null);
+  // a Final year shows the figures frozen when it was set Final
+  const auto: Awaited<ReturnType<typeof fromEntries>> = r?.status === 'final' && r.frozen ? r.frozen : await fromEntries(c, tenant, fy, r?.facility_ids ?? null);
   const stored = r ? (await c.query(`SELECT v.*, d.filename FROM brsr_value v LEFT JOIN document d ON d.id = v.document_id WHERE v.report_id = $1`, [r.id])).rows : [];
   const S = new Map(stored.map((x) => [x.kpi as string, x]));
   const base: Values = {};
@@ -130,19 +144,25 @@ async function yearData(c: Tx, tenant: string, fy: number) {
     const s = S.get(k.code);
     base[k.code] = s?.value != null ? Number(s.value) : k.kind === 'auto' ? (auto.values[k.code] ?? null) : null;
   }
+  // consumption follows withdrawal and discharge as they stand (after overrides), unless it is overridden itself
+  if (S.get('water.consumption')?.value == null) base['water.consumption'] = base['water.withdrawal'] != null ? base['water.withdrawal']! - (base['water.discharge'] ?? 0) : null;
   const ctx = { revenue: num(r?.revenue_inr), ppp: num(r?.ppp_factor) ?? PPP_DEFAULT, output: num(r?.output_qty) };
   const all = derive(base, ctx);
   const rows = KPIS.map((k) => {
     const s = S.get(k.code);
     const overridden = k.kind === 'auto' && s?.value != null;
+    // a figure from entries reviewed at another value has changed since: it needs reviewing again
+    const stale = s?.review === 'reviewed' && k.kind === 'auto' && !overridden && !same(num(s.reviewed_value), all[k.code] ?? null);
     return {
       code: k.code, value: all[k.code] ?? null, auto: k.kind === 'auto' ? auto.values[k.code] ?? null : null, overridden,
-      source: k.kind === 'derived' ? 'derived' : overridden ? 'override' : k.kind === 'auto' ? 'entries' : s?.value != null ? 'typed' : 'missing',
+      source: k.kind === 'derived' ? 'derived' : overridden ? 'override' : k.kind === 'auto' ? (all[k.code] != null ? 'entries' : 'missing') : s?.value != null ? 'typed' : 'missing',
       note: s?.note ?? '', documentId: s?.document_id ?? null, document: s?.filename ?? null, owner: s?.owner_name ?? null,
-      review: (s?.review ?? 'open') as 'open' | 'ready' | 'reviewed', reviewedName: s?.reviewed_name ?? null, reviewedAt: s?.reviewed_at ?? null, updatedName: s?.updated_name ?? null, updatedAt: s?.updated_at ?? null,
+      review: (stale ? 'open' : s?.review ?? 'open') as 'open' | 'ready' | 'reviewed', changedSinceReview: stale, reviewedName: s?.reviewed_name ?? null, reviewedAt: s?.reviewed_at ?? null, updatedName: s?.updated_name ?? null, updatedAt: s?.updated_at ?? null,
     };
   });
-  return { report: r, ctx, values: all, rows, auto, problems: checks(all) };
+  const problems = checks(all);
+  if (auto.detail.missingEnergy) problems.push(`${auto.detail.missingEnergy} fuel or energy ${auto.detail.missingEnergy === 1 ? 'entry has' : 'entries have'} no calorific value or energy unit: total energy is incomplete`);
+  return { report: r, ctx, values: all, rows, auto, problems };
 }
 
 const reportView = (r: any, fy: number) => ({
@@ -211,8 +231,19 @@ export async function brsrRoutes(app: FastifyInstance) {
         if (n !== new Set(b.facilityIds).size) throw new AppError('One of the facilities was not found');
       }
       const r = await ensure(c, tenant, fy, req.user.name);
+      if (r.status === 'final') {
+        // a Final year changes only by reopening it; its settings stay as they were
+        if (b.status === 'final') throw new AppError(`${fyLabel(fy)} is marked final: reopen it (status Draft or Ready) before changing its settings`, 409, 'FINAL');
+        await c.query(`UPDATE brsr_report SET status = $2, frozen = NULL, updated_name = $3, updated_at = now() WHERE id = $1`, [r.id, b.status, req.user.name]);
+        await audit(c, req, 'brsr.report.reopen', 'brsr_report', r.id, { fy, status: b.status });
+        return { ok: true };
+      }
       await c.query(`UPDATE brsr_report SET revenue_inr=$2, ppp_factor=$3, output_qty=$4, output_unit=$5, facility_ids=$6, provider=$7, approach=$8, status=$9, notes=$10, updated_name=$11, updated_at=now() WHERE id = $1`,
         [r.id, b.revenueInr, b.pppFactor, b.outputQty, b.outputUnit || null, b.facilityIds?.length ? [...new Set(b.facilityIds)] : null, b.provider || null, b.approach, b.status, b.notes, req.user.name]);
+      if (b.status === 'final') {
+        const frozen = await fromEntries(c, tenant, fy, b.facilityIds?.length ? [...new Set(b.facilityIds)] : null);
+        await c.query(`UPDATE brsr_report SET frozen = $2 WHERE id = $1`, [r.id, JSON.stringify(frozen)]);
+      }
       await audit(c, req, 'brsr.report', 'brsr_report', r.id, { fy, ...b });
       return { ok: true };
     });
@@ -239,10 +270,10 @@ export async function brsrRoutes(app: FastifyInstance) {
         if (x.value == null && !x.note && !x.documentId && !x.owner) { await c.query(`DELETE FROM brsr_value WHERE report_id = $1 AND kpi = $2`, [r.id, x.kpi]); continue; }
         // any change sends the KPI back to open: it must be reviewed again
         await c.query(
-          `INSERT INTO brsr_value (tenant_id, report_id, kpi, value, note, document_id, owner_name, updated_name) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+          `INSERT INTO brsr_value (tenant_id, report_id, kpi, value, note, document_id, owner_name, updated_name, updated_by) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
            ON CONFLICT (report_id, kpi) DO UPDATE SET value = EXCLUDED.value, note = EXCLUDED.note, document_id = EXCLUDED.document_id, owner_name = EXCLUDED.owner_name,
-             updated_name = EXCLUDED.updated_name, updated_at = now(), review = 'open', reviewed_name = NULL, reviewed_at = NULL`,
-          [tenant, r.id, x.kpi, x.value, x.note, x.documentId, x.owner || null, req.user.name]);
+             updated_name = EXCLUDED.updated_name, updated_by = EXCLUDED.updated_by, updated_at = now(), review = 'open', reviewed_name = NULL, reviewed_by = NULL, reviewed_at = NULL, reviewed_value = NULL`,
+          [tenant, r.id, x.kpi, x.value, x.note, x.documentId, x.owner || null, req.user.name, req.user.id]);
       }
       await audit(c, req, 'brsr.values', 'brsr_report', r.id, { fy, values: b.values.map((x) => ({ kpi: x.kpi, value: x.value })) });
       return { ok: true };
@@ -259,13 +290,16 @@ export async function brsrRoutes(app: FastifyInstance) {
       const r = await ensure(c, tenant, fy, req.user.name);
       if (r.status === 'final') throw new AppError(`${fyLabel(fy)} is marked final`, 409, 'FINAL');
       let skipped = 0;
+      const shown = b.review === 'reviewed' ? (await yearData(c, tenant, fy)).values : {};
       for (const k of b.kpis) {
-        const prev = (await c.query(`SELECT updated_name FROM brsr_value WHERE report_id = $1 AND kpi = $2`, [r.id, k])).rows[0];
-        if (b.review === 'reviewed' && prev?.updated_name === req.user.name) { skipped++; continue; }   // never review your own entry
+        const prev = (await c.query(`SELECT updated_by FROM brsr_value WHERE report_id = $1 AND kpi = $2`, [r.id, k])).rows[0];
+        if (b.review === 'reviewed' && prev?.updated_by && prev.updated_by === req.user.id) { skipped++; continue; }   // never review your own entry
+        const rv = b.review === 'reviewed';
         await c.query(
-          `INSERT INTO brsr_value (tenant_id, report_id, kpi, review, reviewed_name, reviewed_at, updated_name) VALUES ($1,$2,$3,$4,$5,$6,$7)
-           ON CONFLICT (report_id, kpi) DO UPDATE SET review = EXCLUDED.review, reviewed_name = EXCLUDED.reviewed_name, reviewed_at = EXCLUDED.reviewed_at`,
-          [tenant, r.id, k, b.review, b.review === 'reviewed' ? req.user.name : null, b.review === 'reviewed' ? new Date() : null, prev ? prev.updated_name : null]);
+          `INSERT INTO brsr_value (tenant_id, report_id, kpi, review, reviewed_name, reviewed_by, reviewed_at, reviewed_value) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+           ON CONFLICT (report_id, kpi) DO UPDATE SET review = EXCLUDED.review, reviewed_name = EXCLUDED.reviewed_name, reviewed_by = EXCLUDED.reviewed_by,
+             reviewed_at = EXCLUDED.reviewed_at, reviewed_value = EXCLUDED.reviewed_value`,
+          [tenant, r.id, k, b.review, rv ? req.user.name : null, rv ? req.user.id : null, rv ? new Date() : null, rv ? shown[k] ?? null : null]);
       }
       await audit(c, req, `brsr.review.${b.review}`, 'brsr_report', r.id, { fy, kpis: b.kpis, skipped });
       return { ok: true, skipped };
@@ -294,37 +328,38 @@ export async function brsrRoutes(app: FastifyInstance) {
   });
   app.post('/api/brsr/:fy/partners', async (req) => {
     const tenant = requireTenant(req);
-    requireRole(req, 'super_admin', 'admin', 'manager');
+    requireRole(req, 'super_admin', 'admin', 'manager', 'preparer');
     const fy = fyOf(req), b = partnerBody.parse(req.body);
     return tenantTx(tenant, async (c) => {
       if (b.supplierId && !(await c.query(`SELECT 1 FROM supplier WHERE id = $1`, [b.supplierId])).rowCount) throw notFound('Supplier');
       const r = await ensure(c, tenant, fy, req.user.name);
-      const p = (await c.query(`INSERT INTO brsr_partner (tenant_id, report_id, side, name, supplier_id, amount_inr, attributable, values, note, updated_name) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING id`,
-        [tenant, r.id, b.side, b.name, b.supplierId, b.amountInr, b.attributable, JSON.stringify(b.values), b.note, req.user.name])).rows[0];
+      if (r.status === 'final') throw finalErr(fy);
+      const p = (await c.query(`INSERT INTO brsr_partner (tenant_id, report_id, side, name, supplier_id, amount_inr, attributable, values, note, updated_name, updated_by) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING id`,
+        [tenant, r.id, b.side, b.name, b.supplierId, b.amountInr, b.attributable, JSON.stringify(b.values), b.note, req.user.name, req.user.id])).rows[0];
       await audit(c, req, 'brsr.partner.create', 'brsr_partner', p.id, { fy, ...b });
       return { id: p.id };
     });
   });
   app.put('/api/brsr/partners/:pid', async (req) => {
     const tenant = requireTenant(req);
-    requireRole(req, 'super_admin', 'admin', 'manager');
+    requireRole(req, 'super_admin', 'admin', 'manager', 'preparer');
     const pid = z.string().uuid().parse((req.params as { pid: string }).pid), b = partnerBody.parse(req.body);
     return tenantTx(tenant, async (c) => {
       if (b.supplierId && !(await c.query(`SELECT 1 FROM supplier WHERE id = $1`, [b.supplierId])).rowCount) throw notFound('Supplier');
-      const r = await c.query(`UPDATE brsr_partner SET side=$2, name=$3, supplier_id=$4, amount_inr=$5, attributable=$6, values=$7, note=$8, updated_name=$9, updated_at=now() WHERE id = $1`,
-        [pid, b.side, b.name, b.supplierId, b.amountInr, b.attributable, JSON.stringify(b.values), b.note, req.user.name]);
-      if (!r.rowCount) throw notFound('Value-chain partner');
+      await partnerOpen(c, pid);
+      await c.query(`UPDATE brsr_partner SET side=$2, name=$3, supplier_id=$4, amount_inr=$5, attributable=$6, values=$7, note=$8, updated_name=$9, updated_by=$10, updated_at=now() WHERE id = $1`,
+        [pid, b.side, b.name, b.supplierId, b.amountInr, b.attributable, JSON.stringify(b.values), b.note, req.user.name, req.user.id]);
       await audit(c, req, 'brsr.partner.update', 'brsr_partner', pid, b);
       return { ok: true };
     });
   });
   app.delete('/api/brsr/partners/:pid', async (req) => {
     const tenant = requireTenant(req);
-    requireRole(req, 'super_admin', 'admin', 'manager');
+    requireRole(req, 'super_admin', 'admin', 'manager', 'preparer');
     const pid = z.string().uuid().parse((req.params as { pid: string }).pid);
     return tenantTx(tenant, async (c) => {
+      await partnerOpen(c, pid);
       const r = await c.query(`DELETE FROM brsr_partner WHERE id = $1 RETURNING name`, [pid]);
-      if (!r.rowCount) throw notFound('Value-chain partner');
       await audit(c, req, 'brsr.partner.delete', 'brsr_partner', pid, { name: r.rows[0].name });
       return { ok: true };
     });

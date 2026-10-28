@@ -8,7 +8,7 @@ export interface Kpi { code: string; attr: number; label: string; unit: string; 
 export type Review = 'open' | 'ready' | 'reviewed';
 export interface Row {
   code: string; value: number | null; previous: number | null; auto: number | null; overridden: boolean; source: 'entries' | 'override' | 'typed' | 'missing' | 'derived';
-  note: string; documentId: string | null; document: string | null; owner: string | null; review: Review; reviewedName: string | null; reviewedAt: string | null; updatedName: string | null; updatedAt: string | null;
+  note: string; documentId: string | null; document: string | null; owner: string | null; review: Review; changedSinceReview?: boolean; reviewedName: string | null; reviewedAt: string | null; updatedName: string | null; updatedAt: string | null;
 }
 export interface Report {
   fy: number; label: string; exists: boolean; revenueInr: number | null; pppFactor: number; outputQty: number | null; outputUnit: string | null; facilityIds: string[] | null;
