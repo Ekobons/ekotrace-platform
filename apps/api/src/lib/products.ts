@@ -2,17 +2,17 @@
  * The packages a company has (tenant.products), chosen one by one in the platform console:
  *   ekotrace  own GHG inventory (the full tool)          ekofin  financed emissions
  *   cbam      CBAM Exporter (CBAM only)                  ccts    India CCTS / GEI tracker
- *   brsr      SEBI BRSR Core
- * India CCTS and BRSR Core are packages of their own: they are not part of EKOTRACE. With EKOTRACE they read its
+ *   brsr      SEBI BRSR Core                             uaemrv  UAE MRV (Abu Dhabi facility MRV, federal reporting)
+ * India CCTS, BRSR Core and UAE MRV are packages of their own: they are not part of EKOTRACE. With EKOTRACE they read its
  * approved entries; alone, their environmental figures are typed.
  */
 import type { FastifyInstance } from 'fastify';
 import { tenantTx, type Tx } from '../db/pool.js';
 import { AppError } from './errors.js';
 
-export const PRODUCTS = ['ekotrace', 'ekofin', 'cbam', 'ccts', 'brsr'] as const;
+export const PRODUCTS = ['ekotrace', 'ekofin', 'cbam', 'ccts', 'brsr', 'uaemrv'] as const;
 export type ProductCode = (typeof PRODUCTS)[number];
-const NAMES: Record<ProductCode, string> = { ekotrace: 'EKOTRACE', ekofin: 'EKOFIN', cbam: 'CBAM Exporter', ccts: 'India CCTS', brsr: 'BRSR Core' };
+const NAMES: Record<ProductCode, string> = { ekotrace: 'EKOTRACE', ekofin: 'EKOFIN', cbam: 'CBAM Exporter', ccts: 'India CCTS', brsr: 'BRSR Core', uaemrv: 'UAE MRV' };
 
 export async function productsOf(c: Tx, tenant: string): Promise<string[]> {
   return ((await c.query(`SELECT products FROM tenant WHERE id = $1`, [tenant])).rows[0]?.products as string[] | undefined) ?? [];

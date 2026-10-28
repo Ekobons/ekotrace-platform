@@ -20,6 +20,7 @@
     "demo:cbam": "tsx src/cli/demoCbamTool.ts",
     "demo:ccts": "tsx src/cli/demoCcts.ts",
     "demo:brsr": "tsx src/cli/demoBrsr.ts",
+    "demo:uaemrv": "tsx src/cli/demoUaeMrv.ts",
     "testfiles": "tsx src/cli/makeTestFiles.ts"
   },
   "dependencies": {

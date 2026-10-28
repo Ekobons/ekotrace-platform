@@ -130,3 +130,20 @@
 | POSH | the Sexual Harassment of Women at Workplace (Prevention, Prohibition and Redressal) Act, 2013 |
 | Value-chain partner | a supplier or customer with 2% or more of purchases or sales by value, disclosed until 75% is covered |
 | ISF | Industry Standards Forum (ASSOCHAM, CII, FICCI), which published the standards for reporting BRSR Core |
+
+## UAE MRV
+
+| Term | Meaning |
+|---|---|
+| MRV | measurement, reporting and verification of emissions |
+| EAD | Environment Agency – Abu Dhabi, which runs the Abu Dhabi facility MRV programme |
+| MOCCAE | Ministry of Climate Change and Environment (UAE) |
+| IEQT | Integrated Emissions Quantification Tool: the national MRV system where designated sources report |
+| NRCC | National Register for Carbon Credits (Cabinet Resolution No. 67 of 2024), for companies with 0.5 MtCO₂e or more of Scope 1 + 2 |
+| Source stream | a fuel or material whose use releases greenhouse gases, or a measured emission source |
+| Tier | the level of accuracy of a stream's activity data: Tier 1 ±7.5% down to Tier 4 ±1.5% |
+| De minimis / minor / major | classes of source streams by their share of the facility's emissions; major streams need Tier 2 |
+| Fallback approach | a method below Tier 1, allowed when no tier is feasible; the facility's uncertainty must stay within ±7.5% |
+| NCV | net calorific value: the energy in a fuel, in TJ per tonne or per thousand Nm³ |
+| Oxidation factor | the share of a fuel's carbon that burns to CO₂ (1 unless shown otherwise) |
+
