@@ -25,7 +25,7 @@ const ENERGY_DIMS = new Set(['energy_net', 'energy_gross', 'electricity', 'heat'
 const cvCache = new Map<string, number | null>();
 /** A vehicle entered by litres or kg: the calorific value of the same fuel burned on site. */
 const SAME_FUEL: [RegExp, string][] = [[/diesel|gas ?oil/i, 'Diesel (100% mineral diesel)'], [/petrol|gasoline/i, 'Petrol (100% mineral petrol)'], [/lpg/i, 'LPG'], [/cng/i, 'CNG']];
-async function kwhOf(c: Tx, units: Map<string, { dimension: string; to_base: number }>, itemId: number, text: string, unit: string, qty: number, year: number, fuel: boolean) {
+export async function kwhOf(c: Tx, units: Map<string, { dimension: string; to_base: number }>, itemId: number, text: string, unit: string, qty: number, year: number, fuel: boolean) {
   const u = units.get(unit);
   if (!u || !qty) return null;
   if (ENERGY_DIMS.has(u.dimension)) return qty * u.to_base;
