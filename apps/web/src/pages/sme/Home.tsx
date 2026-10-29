@@ -77,7 +77,8 @@ export function SmeHome() {
           const fig = HUB_FIG[g.key]?.(r);
           return <div key={g.key} className="sme-hub" style={{ '--gc': g.color, '--gs': g.soft } as CSSProperties}>
             <Link to={`/sme/${pages[0] ?? g.pages[0]}`} className="sme-hub-h"><span className="sme-hub-i"><Icon name={g.icon} /></span><span className="grow"><b>{g.title}</b><small>{g.sub}</small></span>{fig && <span className="sme-hub-f"><b>{fig[0]}</b><small>{fig[1]}</small></span>}</Link>
-            <div className="sme-hub-l">{pages.map((k) => <Link key={k} to={`/sme/${k}`}><Icon name={SME_PAGES[k]!.icon} />{SME_PAGES[k]!.title}</Link>)}</div>
+            <div className="sme-hub-l">{pages.map((k) => <Link key={k} to={`/sme/${k}`}><Icon name={SME_PAGES[k]!.icon} />{SME_PAGES[k]!.title}</Link>)}
+              {!pages.length && <span className="muted sme-hub-none">Not needed for you now: your Profile says you do not export to the EU or UK. <Link to="/sme/profile">Change</Link></span>}</div>
           </div>;
         })}
       </div>
