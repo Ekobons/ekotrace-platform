@@ -1,0 +1,92 @@
+/* EKOTRACE SME screens. Built on the platform tokens (styles.css); only what the SME pages add. */
+.sme-head { display: flex; gap: 14px; align-items: flex-start; flex-wrap: wrap; }
+.sme-picon { width: 44px; height: 44px; border-radius: 12px; background: var(--primary-soft); color: var(--primary); display: grid; place-items: center; flex: none; }
+.sme-picon svg { width: 22px; height: 22px; }
+.sme-lede { margin: 4px 0 0; max-width: 72ch; }
+.sme-grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; align-items: start; }
+.sme-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.sme-kpi { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; display: grid; gap: 2px; min-width: 0; }
+.sme-kpi b { font-size: 22px; line-height: 1.2; overflow-wrap: anywhere; }
+.sme-kpi small { font-size: 12px; color: var(--muted); }
+.sme-kpi.good b { color: var(--ok); }
+.sme-field { display: grid; grid-template-columns: minmax(0, 1fr) 160px; gap: 6px 12px; align-items: center; padding: 9px 0; border-top: 1px solid var(--line); }
+.card > .sme-field:first-of-type, .sme-fields > .sme-field:first-child { border-top: 0; }
+.sme-field.wide { grid-template-columns: 1fr; }
+.sme-field label { font-size: 13.5px; min-width: 0; }
+.sme-field label small, .sme-toggle label small { display: block; color: var(--muted); font-size: 12px; }
+.sme-field .input { width: 100%; }
+.sme-unit { position: relative; }
+.sme-unit span { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); font-size: 11px; color: var(--muted); pointer-events: none; }
+.sme-unit .input { padding-right: 46px; text-align: right; }
+.sme-out { grid-column: 1 / -1; text-align: right; font-size: 12px; color: var(--muted); margin-top: -4px; font-variant-numeric: tabular-nums; }
+.sme-toggle { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0; border-top: 1px solid var(--line); }
+.sme-toggle label { font-size: 13.5px; }
+.sme-sw { position: relative; width: 44px; height: 26px; flex: none; }
+.sme-sw input { opacity: 0; position: absolute; inset: 0; margin: 0; cursor: pointer; z-index: 1; }
+.sme-sw i { position: absolute; inset: 0; background: var(--line2); border-radius: 13px; transition: background .15s; }
+.sme-sw i::after { content: ""; position: absolute; left: 3px; top: 3px; width: 20px; height: 20px; border-radius: 50%; background: var(--surface); transition: transform .15s; }
+.sme-sw input:checked + i { background: var(--primary); }
+.sme-sw input:checked + i::after { transform: translateX(18px); }
+.sme-sw input:focus-visible + i { outline: 2px solid var(--primary); outline-offset: 2px; }
+.sme-sw input:disabled + i { opacity: .5; }
+.sme-req { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; padding: 12px 0; border-top: 1px solid var(--line); }
+.sme-req:first-child { border-top: 0; }
+.sme-req h3 { font-size: 14px; }
+.sme-req p { grid-column: 1 / -1; margin: 0; color: var(--muted); font-size: 13.5px; }
+.sme-act { grid-column: 1 / -1; font-size: 13px; }
+.sme-tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
+.sme-tbl th { text-align: left; font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); padding: 6px 8px 6px 0; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.sme-tbl td { padding: 9px 8px 9px 0; border-top: 1px solid var(--line); vertical-align: top; }
+.sme-tbl tr:first-child td { border-top: 0; }
+.sme-tbl .num, .sme-tbl td.r, .sme-tbl th.r { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.sme-tbl tr.tot td { font-weight: 700; border-top: 2px solid var(--fg); }
+.sme-tbl tr.me td { background: var(--primary-soft); }
+.sme-scroll { overflow-x: auto; width: 0; min-width: 100%; }
+.sme-callout { border-left: 3px solid var(--primary); background: var(--primary-soft); padding: 10px 12px; border-radius: 0 10px 10px 0; font-size: 13.5px; }
+.sme-callout.warn { border-color: var(--warn); background: var(--warn-bg); }
+.sme-sample { margin-left: 6px; }
+/* overview hero */
+.sme-hero { background: linear-gradient(135deg, #10231C, #1B3A30); color: #EAF1ED; border-radius: 20px; padding: 24px; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 20px; align-items: center; }
+.sme-hero h1 { color: #EAF1ED; font-size: 26px; }
+.sme-hero .lbl, .sme-hero p { color: #9DB3A8; }
+.sme-hero p { margin: 4px 0 0; }
+.sme-hstats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 18px; }
+.sme-hstats div { background: rgba(255, 255, 255, .06); border-radius: 12px; padding: 12px; min-width: 0; }
+.sme-hstats span { display: block; font-size: 10.5px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: #9DB3A8; }
+.sme-hstats b { display: block; font-size: 22px; margin-top: 4px; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.sme-hstats small { color: #9DB3A8; font-size: 11.5px; }
+.sme-ring { display: flex; flex-direction: column; gap: 8px; align-items: center; }
+.sme-ring svg { width: 140px; height: 140px; }
+.sme-ring .chip2 { font-size: 11.5px; font-weight: 600; background: rgba(255, 255, 255, .1); padding: 4px 10px; border-radius: 99px; white-space: nowrap; }
+.sme-bar { display: flex; height: 14px; border-radius: 4px; overflow: hidden; background: var(--line); }
+.sme-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 12px; color: var(--muted); margin-top: 8px; }
+.sme-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
+.sme-ladder { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; align-items: end; height: 92px; margin-top: 10px; }
+.sme-ladder div { background: var(--line); border-radius: 4px 4px 0 0; display: flex; justify-content: center; padding-top: 4px; font-weight: 700; color: var(--muted); }
+.sme-ladder div.on { background: var(--primary); color: #fff; }
+.sme-ladder-l { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; font-size: 10.5px; color: var(--muted); text-align: center; margin-top: 4px; }
+.sme-secbar { display: grid; grid-template-columns: 96px 1fr 48px; gap: 10px; align-items: center; font-size: 13px; }
+.sme-track { height: 8px; background: var(--line); border-radius: 4px; overflow: hidden; position: relative; }
+.sme-track b { display: block; height: 100%; background: var(--primary); }
+.sme-track em { position: absolute; left: 30%; top: -3px; bottom: -3px; width: 1px; background: var(--fg); opacity: .4; }
+.sme-mods { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px; }
+.sme-mod { display: flex; gap: 12px; align-items: center; padding: 12px; border-radius: 14px; background: var(--surface); border: 1px solid var(--line); text-decoration: none; color: var(--fg); }
+.sme-mod:hover { border-color: var(--primary); }
+.sme-mod .mi { width: 36px; height: 36px; border-radius: 10px; background: var(--primary-soft); color: var(--primary); display: grid; place-items: center; flex: none; }
+.sme-mod .mi svg { width: 18px; height: 18px; }
+.sme-mod b { display: block; font-size: 13.5px; }
+.sme-mod small { color: var(--muted); font-size: 12px; }
+@media (max-width: 700px) {
+  .sme-hero { grid-template-columns: 1fr; padding: 18px; }
+  .sme-ring { flex-direction: row; justify-content: flex-start; } .sme-ring svg { width: 92px; height: 92px; }
+  .sme-hstats { grid-template-columns: 1fr 1fr; } .sme-hstats div:last-child { grid-column: 1 / -1; }
+  .sme-field { grid-template-columns: minmax(0, 1fr) 132px; }
+}
+/* the SME sign-in page's brand side */
+.smesb { background: linear-gradient(160deg, #142A22, #2E5D4B); }
+.smesb .sb-copy h2 { color: #F2F7F4; }
+.smesb-list { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; color: #CFE1D8; font-size: 14.5px; }
+.smesb-list li { display: flex; gap: 10px; align-items: flex-start; }
+.smesb-list svg { width: 18px; height: 18px; flex: none; margin-top: 2px; color: var(--lime); }
+.sme-cats { display: flex; flex-wrap: wrap; gap: 8px; }
+.smesb .sb-chart { margin-top: 18px; }

@@ -1,0 +1,38 @@
+/** Every SME page: its menu section, title, icon and one-line description. Paths are /sme/<key>. */
+export const SME_PAGES: Record<string, { title: string; sub: string; icon: string }> = {
+  home: { title: 'Overview', sub: 'Your snapshot', icon: 'home' },
+  profile: { title: 'Profile', sub: 'About your company', icon: 'building' },
+  applies: { title: 'What applies', sub: 'Rules for you', icon: 'list' },
+  emissions: { title: 'Emissions', sub: 'Scope 1, 2, 3', icon: 'flame' },
+  esg: { title: 'ESG', sub: 'Readiness score', icon: 'gauge' },
+  srmm: { title: 'SRMM', sub: 'ICAI maturity level', icon: 'target' },
+  footprint: { title: 'Product footprint', sub: 'Per product', icon: 'scale' },
+  certs: { title: 'Certifications', sub: 'ZED, ISO', icon: 'shield' },
+  bills: { title: 'Bill analyser', sub: 'Power bill savings', icon: 'bolt' },
+  solar: { title: 'Solar', sub: 'Rooftop payback', icon: 'spark' },
+  schemes: { title: 'Schemes', sub: 'Subsidies for you', icon: 'book' },
+  scrap: { title: 'Scrap market', sub: 'Sell waste', icon: 'cycle' },
+  credits: { title: 'Carbon credits', sub: 'Pooled projects', icon: 'leaf' },
+  calendar: { title: 'Calendar', sub: 'Due dates', icon: 'calendar' },
+  epr: { title: 'EPR', sub: 'Plastic, e-waste', icon: 'bin' },
+  dpdp: { title: 'DPDP', sub: 'Data privacy', icon: 'lock' },
+  people: { title: 'People & safety', sub: 'Safety, POSH, QR', icon: 'users' },
+  csr: { title: 'CSR', sub: '2% spend', icon: 'drop' },
+  cbam: { title: 'CBAM', sub: 'EU & UK', icon: 'truck' },
+  eudr: { title: 'EUDR', sub: 'Deforestation', icon: 'tree' },
+  scan: { title: 'Bill scan', sub: 'PDF to data', icon: 'upload' },
+  questionnaire: { title: 'Questionnaire', sub: 'Auto-answer', icon: 'paste' },
+  whatsapp: { title: 'WhatsApp', sub: 'Chat & reminders', icon: 'chat' },
+  share: { title: 'Share & validate', sub: 'Consent, CA', icon: 'feed' },
+  loan: { title: 'Green loan', sub: 'Bank pack', icon: 'doc' },
+};
+export const SME_GROUPS: { key: string; title: string; pages: string[] }[] = [
+  { key: 'home', title: 'Home', pages: ['home'] },
+  { key: 'carbon', title: 'Carbon & ESG', pages: ['profile', 'applies', 'emissions', 'esg', 'srmm', 'footprint', 'certs'] },
+  { key: 'save', title: 'Save money', pages: ['bills', 'solar', 'schemes', 'scrap', 'credits'] },
+  { key: 'comply', title: 'Compliance', pages: ['calendar', 'epr', 'dpdp', 'people', 'csr'] },
+  { key: 'export', title: 'Exports', pages: ['cbam', 'eudr'] },
+  { key: 'ai', title: 'Assist', pages: ['scan', 'questionnaire', 'whatsapp'] },
+  { key: 'share', title: 'Share', pages: ['share', 'loan'] },
+];
+export const groupOf = (page: string) => SME_GROUPS.find((g) => g.pages.includes(page)) ?? SME_GROUPS[0]!;

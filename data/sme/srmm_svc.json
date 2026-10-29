@@ -1,0 +1,2189 @@
+{
+"label": "Version 3.2 · Service sector",
+"short": "v3.2 Service",
+"source": "ICAI SRMM self-evaluation utility (xlsx)",
+"items": [
+{
+"id": "A1",
+"s": "A",
+"cat": "General disclosures",
+"q": "Does the entity disclose general information such as CIN, registered office address, financial year, sectors of operation as per NIC code, listed/unlisted status, Paid-up capital, Reporting boundary and number of operational locations?",
+"c": "3 for complete disclosure of all applicable details; 2 for partial disclosure; 0 for insufficient or no information available",
+"note": "",
+"max": 3,
+"o": [
+[
+3,
+"complete disclosure of all applicable details"
+],
+[
+2,
+"partial disclosure"
+],
+[
+0,
+"insufficient or no information available"
+]
+]
+},
+{
+"id": "A2",
+"s": "A",
+"cat": "General disclosures",
+"q": "Whether the entity has a specified Board, Committee, Directors, or designated officials responsible for decision-making on sustainability-related matters?",
+"c": "2 for entity has a specified Board, Committee, Directors, or designated officials and discloses their composition and/or clear allocation of responsibilities; 1 for sustainability governance structure exists and is disclosed without clear composition details or responsibility allocation; 0 for no disclosure on sustainability-related governance responsibility",
+"note": "",
+"max": 2,
+"o": [
+[
+2,
+"entity has a specified Board, Committee, Directors, or designated officials and discloses their composition and/or clear allocation of responsibilities"
+],
+[
+1,
+"sustainability governance structure exists and is disclosed without clear composition details or responsibility allocation"
+],
+[
+0,
+"no disclosure on sustainability-related governance responsibility"
+]
+]
+},
+{
+"id": "A3",
+"s": "A",
+"cat": "General disclosures",
+"q": "Does the entity identify and disclose the highest authority responsible for oversight and implementation of the sustainability policy?",
+"c": "1 for the entity clearly identifies and discloses the highest authority responsible for oversight and implementation of the sustainability policy (e.g., Board, Committee, or designated senior leadership role); 0 for no disclosure or incomplete disclosure",
+"note": "",
+"max": 1,
+"o": [
+[
+1,
+"the entity clearly identifies and discloses the highest authority responsible for oversight and implementation of the sustainability policy (e.g., Board, Committee, or designated senior leadership role)"
+],
+[
+0,
+"no disclosure or incomplete disclosure"
+]
+]
+},
+{
+"id": "A4",
+"s": "A",
+"cat": "General disclosures",
+"q": "How frequently are the ESG policies reviewed by the entity?",
+"c": "3 for half-yearly; 2 for annual review; 1 for ad-hoc review; 0 for no review mechanism or not reported",
+"note": "",
+"max": 3,
+"o": [
+[
+3,
+"half-yearly"
+],
+[
+2,
+"annual review"
+],
+[
+1,
+"ad-hoc review"
+],
+[
+0,
+"no review mechanism or not reported"
+]
+]
+},
+{
+"id": "A5",
+"s": "A",
+"cat": "General disclosures",
+"q": "What level of assurance and independent assessment has been obtained for the BRSR/Sustainability Report and sustainability-related policies/programs?",
+"c": "3 for reasonable assurance and external assessment/audit report available in the public domain; 2 for limited assurance and/or external assessment not available in the public domain; 1 for internal assessment only; 0 for no assurance/assessment or not reported",
+"note": "",
+"max": 3,
+"o": [
+[
+3,
+"reasonable assurance and external assessment/audit report available in the public domain"
+],
+[
+2,
+"limited assurance and/or external assessment not available in the public domain"
+],
+[
+1,
+"internal assessment only"
+],
+[
+0,
+"no assurance/assessment or not reported"
+]
+]
+},
+{
+"id": "A6",
+"s": "A",
+"cat": "General disclosures",
+"q": "What percentage of the total employees are differently abled employees?",
+"c": "3 for >5%; 2 for 2% to 5%; 1 for <2% (including zero representation if disclosed); 0 for data not disclosed / not available",
+"note": "",
+"max": 3,
+"o": [
+[
+3,
+">5%"
+],
+[
+2,
+"2% to 5%"
+],
+[
+1,
+"<2% (including zero representation if disclosed)"
+],
+[
+0,
+"data not disclosed / not available"
+]
+]
+},
+{
+"id": "A7",
+"s": "A",
+"cat": "General disclosures",
+"q": "What percentage of the total workforce, including contractual and temporary workers, consists of persons with disabilities (PwDs)?",
+"c": "3 for >5%; 2 for 2% to 5%; 1 for <2% (including 0% if disclosed); 0 for data not disclosed / not available",
+"note": "",
+"max": 3,
+"o": [
+[
+3,
+">5%"
+],
+[
+2,
+"2% to 5%"
+],
+[
+1,
+"<2% (including 0% if disclosed)"
+],
+[
+0,
+"data not disclosed / not available"
+]
+]
+},
+{
+"id": "A8",
+"s": "A",
+"cat": "General disclosures",
+"q": "What percentage of the total workforce comprises women employees?",
+"c": "2 for more than 30%; 1 for between 10% and 30%; 0 for less than 10% or data not disclosed.",
+"note": "",
+"max": 2,
+"o": [
+[
+2,
+"more than 30%"
+],
+[
+1,
+"between 10% and 30%"
+],
+[
+0,
+"less than 10% or data not disclosed."
+]
+]
+},
+{
+"id": "A9",
+"s": "A",
+"cat": "General disclosures",
+"q": "What has been the average employee turnover rate for permanent employees during the past three financial years?",
+"c": "2 for less than 10%; 1 for between 10% and 15%; 0 for greater than 15% or data not disclosed",
+"note": "",
+"max": 2,
+"o": [
+[
+2,
+"less than 10%"
+],
+[
+1,
+"between 10% and 15%"
+],
+[
+0,
+"greater than 15% or data not disclosed"
+]
+]
+},
+{
+"id": "A10",
+"s": "A",
+"cat": "General disclosures",
+"q": "Does the entity establish a grievance/redressal mechanism for addressing stakeholder complaints relating to responsible business conduct?",
+"c": "3 for no complaints or >80% resolved; 2 for 60–80% resolved; 1 for <60% resolved and if there is any mechanism in place; 0 for no mechanism in place",
+"note": "",
+"max": 3,
+"o": [
+[
+3,
+"no complaints or >80% resolved"
+],
+[
+2,
+"60–80% resolved"
+],
+[
+1,
+"<60% resolved and if there is any mechanism in place"
+],
+[
+0,
+"no mechanism in place"
+]
+]
+},
+{
+"id": "A11",
+"s": "A",
+"cat": "General disclosures",
+"q": "Does the entity conduct risk assessments covering environmental, social, and governance (ESG) matters in alignment with TCFD recommendations?(now consolidated into IFRS S2/ISSB climate disclosures, which BRSR is progressively aligning with)?",
+"c": "3 for full assessment with financial implications and mitigation; 2 for assessment done but not addressed; 1 for partial assessment; 0 for not reported",
+"note": "",
+"max": 3,
+"o": [
+[
+3,
+"full assessment with financial implications and mitigation"
+],
+[
+2,
+"assessment done but not addressed"
+],
+[
+1,
+"partial assessment"
+],
+[
+0,
+"not reported"
+]
+]
+},
+{
+"id": "A12",
+"s": "A",
+"cat": "General disclosures",
+"q": "Do subsidiaries participate in and align with the parent entity's Business Responsibility initiatives?",
+"c": "4 if subsidiaries have aligned ESG targets, KPIs and implementation mechanisms with the parent entity; 2 if partially aligned; 0 if no alignment framework exists.",
+"note": "",
+"max": 4,
+"o": [
+[
+4,
+"subsidiaries have aligned ESG targets, KPIs and implementation mechanisms with the parent entity"
+],
+[
+2,
+"partially aligned"
+],
+[
+0,
+"no alignment framework exists."
+]
+]
+},
+{
+"id": "A13",
+"s": "A",
+"cat": "General disclosures",
+"q": "Does the entity establish sustainability-related commitments, goals, and targets along with defined timelines?",
+"c": "3 for comprehensive commitments, measurable goals, and clearly defined timelines; 2 for partial commitments/goals with limited timelines or coverage; 1 for broad sustainability commitments without clearly defined targets or timelines; 0 for no defined commitments, goals, or timelines available.",
+"note": "",
+"max": 3,
+"o": [
+[
+3,
+"comprehensive commitments, measurable goals, and clearly defined timelines"
+],
+[
+2,
+"partial commitments/goals with limited timelines or coverage"
+],
+[
+1,
+"broad sustainability commitments without clearly defined targets or timelines"
+],
+[
+0,
+"no defined commitments, goals, or timelines available."
+]
+]
+},
+{
+"id": "A14",
+"s": "A",
+"cat": "General disclosures",
+"q": "What percentage of the entity's disclosed ESG commitments and targets were achieved during the reporting period?",
+"c": "3 for more than 75% of disclosed ESG targets achieved, with explanations for unmet targets; 2 for 50%–75% of disclosed ESG targets achieved; 1 for up to 50% of disclosed ESG targets achieved; 0 for no ESG targets disclosed or progress not reported.",
+"note": "",
+"max": 3,
+"o": [
+[
+3,
+"more than 75% of disclosed ESG targets achieved, with explanations for unmet targets"
+],
+[
+2,
+"50%–75% of disclosed ESG targets achieved"
+],
+[
+1,
+"up to 50% of disclosed ESG targets achieved"
+],
+[
+0,
+"no ESG targets disclosed or progress not reported."
+]
+]
+},
+{
+"id": "A15",
+"s": "A",
+"cat": "General disclosures",
+"q": "Does the entity disclose a statement from the Director or responsible officer highlighting the entity's ESG challenges, commitments, targets, and key achievements?",
+"c": "2 for a statement covering ESG challenges, commitments, targets, and key achievements; 1 for statement disclosed with partial coverage; 0 for no such statement disclosed.",
+"note": "",
+"max": 2,
+"o": [
+[
+2,
+"a statement covering ESG challenges, commitments, targets, and key achievements"
+],
+[
+1,
+"statement disclosed with partial coverage"
+],
+[
+0,
+"no such statement disclosed."
+]
+]
+},
+{
+"id": "B1",
+"s": "B",
+"cat": "Ethics, Governance & Anti-Corruption",
+"q": "Does the entity have a formally documented anti-corruption and anti-bribery policy, and has the same been disclosed?",
+"c": "2 for formally documented anti-corruption and anti-bribery policy in place and disclosed; 1 for general disclosure on anti-corruption or anti-bribery practices provided, but no formal policy disclosed; 0 for no disclosure provided on anti-corruption or anti-bribery policy/practices.",
+"note": "",
+"max": 2,
+"o": [
+[
+2,
+"formally documented anti-corruption and anti-bribery policy in place and disclosed"
+],
+[
+1,
+"general disclosure on anti-corruption or anti-bribery practices provided, but no formal policy disclosed"
+],
+[
+0,
+"no disclosure provided on anti-corruption or anti-bribery policy/practices."
+]
+]
+},
+{
+"id": "B2",
+"s": "B",
+"cat": "Ethics, Governance & Anti-Corruption",
+"q": "Does the entity report any cases of disciplinary action taken against Directors, KMPs, or employees for bribery or corruption during the financial year?",
+"c": "2 for entity reports no cases of disciplinary action; 1 for entity reports cases along with actions taken/resolution status; 0 for no disclosure provided on bribery or corruption-related disciplinary actions.",
+"note": "",
+"max": 2,
+"o": [
+[
+2,
+"entity reports no cases of disciplinary action"
+],
+[
+1,
+"entity reports cases along with actions taken/resolution status"
+],
+[
+0,
+"no disclosure provided on bribery or corruption-related disciplinary actions."
+]
+]
+},
+{
+"id": "B3",
+"s": "B",
+"cat": "Ethics, Governance & Anti-Corruption",
+"q": "Does the entity disclose the number of conflicts of interest complaints received against Directors/KMPs and the status of their resolution?",
+"c": "2 for entity discloses that no conflicts of interest complaints were received; 1 for entity discloses the number received and the status of their resolution; 0 for no disclosure provided on conflicts of interest complaints or resolution status.",
+"note": "",
+"max": 2,
+"o": [
+[
+2,
+"entity discloses that no conflicts of interest complaints were received"
+],
+[
+1,
+"entity discloses the number received and the status of their resolution"
+],
+[
+0,
+"no disclosure provided on conflicts of interest complaints or resolution status."
+]
+]
+},
+{
+"id": "B4",
+"s": "B",
+"cat": "Ethics, Governance & Anti-Corruption",
+"q": "Does the entity report details of monetary and non-monetary fines, penalties, or punishments imposed during the financial year?",
+"c": "2 for entity discloses that no monetary or non-monetary fines, penalties, or punishments were imposed; 1 for entity discloses details of fines, penalties, or punishments imposed; 0 for no disclosure provided.",
+"note": "",
+"max": 2,
+"o": [
+[
+2,
+"entity discloses that no monetary or non-monetary fines, penalties, or punishments were imposed"
+],
+[
+1,
+"entity discloses details of fines, penalties, or punishments imposed"
+],
+[
+0,
+"no disclosure provided."
+]
+]
+},
+{
+"id": "B5",
+"s": "B",
+"cat": "Ethics, Governance & Anti-Corruption",
+"q": "Does the entity disclose corrective actions taken in response to regulatory or judicial orders relating to corruption or conflicts of interest?",
+"c": "2 for entity discloses orders along with corrective actions taken in response; 1 for entity discloses orders but without details of corrective actions taken; 0 for no disclosure provided on such regulatory or judicial orders or corrective actions.",
+"note": "",
+"max": 2,
+"o": [
+[
+2,
+"entity discloses orders along with corrective actions taken in response"
+],
+[
+1,
+"entity discloses orders but without details of corrective actions taken"
+],
+[
+0,
+"no disclosure provided on such regulatory or judicial orders or corrective actions."
+]
+]
+},
+{
+"id": "B6",
+"s": "B",
+"cat": "Ethics, Governance & Anti-Corruption",
+"q": "Are training and awareness programs on ethics conducted for Directors, KMPs, employees, and workers across the entity?",
+"c": "3 for training conducted for all 4 categories (Directors, KMPs, employees, and workers); 2 for training conducted for any 3 categories; 1 for training conducted for any 1 or 2 categories; 0 for no training conducted or not reported.",
+"note": "",
+"max": 3,
+"o": [
+[
+3,
+"training conducted for all 4 categories (Directors, KMPs, employees, and workers)"
+],
+[
+2,
+"training conducted for any 3 categories"
+],
+[
+1,
+"training conducted for any 1 or 2 categories"
+],
+[
+0,
+"no training conducted or not reported."
+]
+]
+},
+{
+"id": "B7",
+"s": "B",
+"cat": "Responsible Business & Value Chain",
+"q": "What percentage of the entity's R&D and innovation expenditure is directed towards improving the environmental and social performance of its services and delivery processes?",
+"c": "3 for more than 5% of R&D/innovation expenditure directed towards sustainability-related improvement; 2 for 2% to 5% directed towards sustainability-related improvements; 1 for up to 2% directed towards sustainability-related improvements; 0 for no disclosure provided",
+"note": "",
+"max": 3,
+"o": [
+[
+3,
+"more than 5% of R&D/innovation expenditure directed towards sustainability-related improvement"
+],
+[
+2,
+"2% to 5% directed towards sustainability-related improvements"
+],
+[
+1,
+"up to 2% directed towards sustainability-related improvements"
+],
+[
+0,
+"no disclosure provided"
+]
+]
+},
+{
+"id": "B8",
+"s": "B",
+"cat": "Responsible Business & Value Chain",
+"q": "Does the entity have defined sustainable procurement or vendor selection procedures, and what proportion of total procurement is covered under these sustainable sourcing practices?",
+"c": "5 for sustainable sourcing procedures established and more than 30% of procurement sourced sustainably; 4 for 20%–30%; 3 for 10%–20%; 2 for less than 10%; 1 for general disclosure on sustainable sourcing without quantitative data; 0 for no disclosure on sustainable sourcing procedures or practices.",
+"note": "",
+"max": 5,
+"o": [
+[
+5,
+"sustainable sourcing procedures established and more than 30% of procurement sourced sustainably"
+],
+[
+4,
+"20%–30%"
+],
+[
+3,
+"10%–20%"
+],
+[
+2,
+"less than 10%"
+],
+[
+1,
+"general disclosure on sustainable sourcing without quantitative data"
+],
+[
+0,
+"no disclosure on sustainable sourcing procedures or practices."
+]
+]
+},
+{
+"id": "B9",
+"s": "B",
+"cat": "Responsible Business & Value Chain",
+"q": "Does the entity have a defined process for managing electronic waste (e-waste) from IT assets, office equipment, and data centre hardware, including disposal, refurbishment, or certified recycling?",
+"c": "5 for a defined and structured e-waste management process exists and is clearly reported with certified recycling/refurbishment evidence; 2 for general reference to e-waste or IT asset disposal practices without a defined process; 0 for no information provided on e-waste management.",
+"note": "",
+"max": 5,
+"o": [
+[
+5,
+"a defined and structured e-waste management process exists and is clearly reported with certified recycling/refurbishment evidence"
+],
+[
+2,
+"general reference to e-waste or IT asset disposal practices without a defined process"
+],
+[
+0,
+"no information provided on e-waste management."
+]
+]
+},
+{
+"id": "B10",
+"s": "B",
+"cat": "Responsible Business & Value Chain",
+"q": "What is the total waste (including paper, e-waste, and consumables) generated by the entity, disaggregated by type, and how is it disposed of across different disposal methods?",
+"c": "3 for full disclosure by waste type and disposal route; 2 for total waste reported without type/disposal breakdown; 0 for not reported.",
+"note": "",
+"max": 3,
+"o": [
+[
+3,
+"full disclosure by waste type and disposal route"
+],
+[
+2,
+"total waste reported without type/disposal breakdown"
+],
+[
+0,
+"not reported."
+]
+]
+},
+{
+"id": "B11",
+"s": "B",
+"cat": "Responsible Business & Value Chain",
+"q": "Has the entity adopted or disclosed any national or international sustainability-related codes, certifications, labels, or management system standards relevant to its operations, such as ISO 9001, ISO 14001, ISO 45001, ISO 27001, SA 8000, GreenCo, LEED, GRIHA, or equivalent frameworks?",
+"c": "3 for adoption and disclosure of multiple recognised certifications/standards including scope and validity; 2 for adoption/disclosure of atleast one recognized certifications or standards; 1 for general mention of certifications or standards without adequate supporting details; 0 for no information available.",
+"note": "",
+"max": 3,
+"o": [
+[
+3,
+"adoption and disclosure of multiple recognised certifications/standards including scope and validity"
+],
+[
+2,
+"adoption/disclosure of atleast one recognized certifications or standards"
+],
+[
+1,
+"general mention of certifications or standards without adequate supporting details"
+],
+[
+0,
+"no information available."
+]
+]
+},
+{
+"id": "B12",
+"s": "B",
+"cat": "Workforce Wellbeing, Safety & Inclusion",
+"q": "Does the entity provide health benefits, accident coverage, maternity/ paternity benefits, and flexible work or remote work facilities for its employees?",
+"c": "Each benefit category (health benefits, accident coverage, maternity/paternity benefits, and flexible/remote work facilities) is assessed separately: 2 for more than 75% covered; 1 for 50% to 75% covered; 0 for less than 50% coverage or not provided. Maximum 8 points across all 4 categories.",
+"note": "",
+"max": 8,
+"o": null,
+"parts": [
+[
+"h",
+"Health benefits"
+],
+[
+"a",
+"Accident coverage"
+],
+[
+"m",
+"Maternity / paternity benefits"
+],
+[
+"f",
+"Flexible / remote work"
+]
+]
+},
+{
+"id": "B13",
+"s": "B",
+"cat": "Workforce Wellbeing, Safety & Inclusion",
+"q": "Is the coverage of PF, gratuity, and ESI deductions for employees, along with confirmation of deposit with relevant authorities, disclosed by the entity?",
+"c": "3 for entity discloses coverage of PF, gratuity, and ESI for employees along with confirmation that deductions are duly deposited with relevant government authorities; 0 for no disclosure or incomplete disclosure on coverage and/or deposit compliance.",
+"note": "",
+"max": 3,
+"o": [
+[
+3,
+"entity discloses coverage of PF, gratuity, and ESI for employees along with confirmation that deductions are duly deposited with relevant government authorities"
+],
+[
+0,
+"no disclosure or incomplete disclosure on coverage and/or deposit compliance."
+]
+]
+},
+{
+"id": "B14",
+"s": "B",
+"cat": "Workforce Wellbeing, Safety & Inclusion",
+"q": "Are offices and delivery premises accessible to differently abled employees and clients, and are measures implemented in line with the Rights of Persons with Disabilities Act, 2016?",
+"c": "3 for full accessibility provided across major premises with documented measures aligned to the RPwD Act, 2016; 2 for partial accessibility and/or basic measures implemented with limited coverage or documentation; 0 for no disclosure or no measures implemented.",
+"note": "",
+"max": 3,
+"o": [
+[
+3,
+"full accessibility provided across major premises with documented measures aligned to the RPwD Act, 2016"
+],
+[
+2,
+"partial accessibility and/or basic measures implemented with limited coverage or documentation"
+],
+[
+0,
+"no disclosure or no measures implemented."
+]
+]
+},
+{
+"id": "B15",
+"s": "B",
+"cat": "Workforce Wellbeing, Safety & Inclusion",
+"q": "Does the entity have an Occupational Health & Safety (OHS) and employee mental well-being management system, and what is the extent of its coverage and implementation?",
+"c": "3 for comprehensive OHS and mental well-being programme covering operations with defined implementation and monitoring mechanisms; 2 for OHS/well-being system exists but with partial coverage or limited implementation details; 0 for no OHS/well-being system disclosed.",
+"note": "",
+"max": 3,
+"o": [
+[
+3,
+"comprehensive OHS and mental well-being programme covering operations with defined implementation and monitoring mechanisms"
+],
+[
+2,
+"OHS/well-being system exists but with partial coverage or limited implementation details"
+],
+[
+0,
+"no OHS/well-being system disclosed."
+]
+]
+},
+{
+"id": "B16",
+"s": "B",
+"cat": "Workforce Wellbeing, Safety & Inclusion",
+"q": "Does the entity have a defined process for employees to report workplace hazards, psychosocial risks, or unsafe working conditions?",
+"c": "3 for formal and structured mechanism for reporting workplace hazards and psychosocial risks is established and disclosed; 1 for general or informal process disclosed without a clearly defined mechanism; 0 for no disclosure provided on hazard reporting mechanisms.",
+"note": "",
+"max": 3,
+"o": [
+[
+3,
+"formal and structured mechanism for reporting workplace hazards and psychosocial risks is established and disclosed"
+],
+[
+1,
+"general or informal process disclosed without a clearly defined mechanism"
+],
+[
+0,
+"no disclosure provided on hazard reporting mechanisms."
+]
+]
+},
+{
+"id": "B17",
+"s": "B",
+"cat": "Workforce Wellbeing, Safety & Inclusion",
+"q": "Does the entity provide life insurance or compensatory benefits to employees in the event of death or permanent disability?",
+"c": "2 for entity provides and discloses life insurance or compensatory benefits to employees in the event of death or permanent disability; 0 for no information provided on such benefits.",
+"note": "",
+"max": 2,
+"o": [
+[
+2,
+"entity provides and discloses life insurance or compensatory benefits to employees in the event of death or permanent disability"
+],
+[
+0,
+"no information provided on such benefits."
+]
+]
+},
+{
+"id": "B18",
+"s": "B",
+"cat": "Workforce Wellbeing, Safety & Inclusion",
+"q": "Does the entity disclose transition assistance programs that support continued employability and career transition arising from retirement or termination of employment?",
+"c": "3 for entity discloses transition assistance programs supporting continued employability and career transition; 0 for no information provided on such transition assistance programs.",
+"note": "",
+"max": 3,
+"o": [
+[
+3,
+"entity discloses transition assistance programs supporting continued employability and career transition"
+],
+[
+0,
+"no information provided on such transition assistance programs."
+]
+]
+},
+{
+"id": "B19",
+"s": "B",
+"cat": "Workforce Wellbeing, Safety & Inclusion",
+"q": "Does the entity disclose recordable work-related injuries, illness rates, and fatalities, along with year-on-year performance trends or reduction measures?",
+"c": "4 for nil fatalities reported and injury/illness rates maintained at negligible levels during the reporting period; 3 for injury rates, illness, and fatalities disclosed with demonstrated year-on-year reduction/improvement; 2 for injury rates and fatalities disclosed without clear evidence of year-on-year reduction; 1 for partial disclosure of safety performance indicators; 0 for no disclosure provided.",
+"note": "",
+"max": 4,
+"o": [
+[
+4,
+"nil fatalities reported and injury/illness rates maintained at negligible levels during the reporting period"
+],
+[
+3,
+"injury rates, illness, and fatalities disclosed with demonstrated year-on-year reduction/improvement"
+],
+[
+2,
+"injury rates and fatalities disclosed without clear evidence of year-on-year reduction"
+],
+[
+1,
+"partial disclosure of safety performance indicators"
+],
+[
+0,
+"no disclosure provided."
+]
+]
+},
+{
+"id": "B20",
+"s": "B",
+"cat": "Workforce Wellbeing, Safety & Inclusion",
+"q": "What percentage of employees are trained in health, safety, digital skills, and professional skill upgradation?",
+"c": "4 for more than or equal to 80% of employees trained; 2 for more than or equal to 60% and less than 80% of employees trained; 1 for less than 60% of employees trained; 0 for no disclosure provided on training coverage.",
+"note": "",
+"max": 4,
+"o": [
+[
+4,
+"more than or equal to 80% of employees trained"
+],
+[
+2,
+"more than or equal to 60% and less than 80% of employees trained"
+],
+[
+1,
+"less than 60% of employees trained"
+],
+[
+0,
+"no disclosure provided on training coverage."
+]
+]
+},
+{
+"id": "B21",
+"s": "B",
+"cat": "Workforce Wellbeing, Safety & Inclusion",
+"q": "Does the entity disclose return-to-work and retention rates for employees who took parental leave?",
+"c": "4 for return-to-work and retention rates for employees availing parental leave are disclosed; 0 for no disclosure provided on return-to-work and retention rates.",
+"note": "",
+"max": 4,
+"o": [
+[
+4,
+"return-to-work and retention rates for employees availing parental leave are disclosed"
+],
+[
+0,
+"no disclosure provided on return-to-work and retention rates."
+]
+]
+},
+{
+"id": "B22",
+"s": "B",
+"cat": "Workforce Wellbeing, Safety & Inclusion",
+"q": "What percentage of apprentices or interns engaged by the entity are subsequently offered full-time employment?",
+"c": "2 for 50% or more of apprentices/interns engaged during the reporting period subsequently offered full-time employment; 1 for 20% to less than 50% subsequently offered full-time employment; 0 for less than 20% subsequently offered full-time employment, or where no disclosure is provided on the conversion rate.",
+"note": "",
+"max": 2,
+"o": [
+[
+2,
+"50% or more of apprentices/interns engaged during the reporting period subsequently offered full-time employment"
+],
+[
+1,
+"20% to less than 50% subsequently offered full-time employment"
+],
+[
+0,
+"less than 20% subsequently offered full-time employment, or where no disclosure is provided on the conversion rate."
+]
+]
+},
+{
+"id": "B23",
+"s": "B",
+"cat": "Stakeholder Engagement & Human Rights",
+"q": "Does the entity disclose the process for identifying key stakeholder groups and the frequency of stakeholder engagement?",
+"c": "4 for entity discloses both the process for identifying key stakeholder groups and the frequency of engagement; 2 for entity discloses either the stakeholder identification process or the frequency of engagement; 0 for no disclosure provided on stakeholder identification or engagement frequency.",
+"note": "",
+"max": 4,
+"o": [
+[
+4,
+"entity discloses both the process for identifying key stakeholder groups and the frequency of engagement"
+],
+[
+2,
+"entity discloses either the stakeholder identification process or the frequency of engagement"
+],
+[
+0,
+"no disclosure provided on stakeholder identification or engagement frequency."
+]
+]
+},
+{
+"id": "B24",
+"s": "B",
+"cat": "Stakeholder Engagement & Human Rights",
+"q": "Does the entity disclose processes for stakeholder consultation with the Board on economic, environmental, and social matters, including mechanisms for communicating feedback to the Board where consultation is delegated?",
+"c": "2 for disclosure provided on stakeholder consultation processes and feedback communication mechanisms with the Board; 0 for no disclosure provided on stakeholder consultation or feedback mechanisms",
+"note": "",
+"max": 2,
+"o": [
+[
+2,
+"disclosure provided on stakeholder consultation processes and feedback communication mechanisms with the Board"
+],
+[
+0,
+"no disclosure provided on stakeholder consultation or feedback mechanisms"
+]
+]
+},
+{
+"id": "B25",
+"s": "B",
+"cat": "Stakeholder Engagement & Human Rights",
+"q": "What percentage of employees are trained in human rights issues and related policies?",
+"c": "2 for 80% to 100% of employees trained on human rights issues and policies; 1 for 60% to less than 80% trained; 0 for less than 60% trained or no disclosure provided.",
+"note": "",
+"max": 2,
+"o": [
+[
+2,
+"80% to 100% of employees trained on human rights issues and policies"
+],
+[
+1,
+"60% to less than 80% trained"
+],
+[
+0,
+"less than 60% trained or no disclosure provided."
+]
+]
+},
+{
+"id": "B26",
+"s": "B",
+"cat": "Stakeholder Engagement & Human Rights",
+"q": "Does the entity disclose details of minimum wages paid to employees, including compliance with applicable minimum wage requirements?",
+"c": "5 for all employees and workers are paid wages higher than the applicable minimum wage; 3 for all permanent employees and workers are paid wages higher than the applicable minimum wage, and at least 50% of contractual or temporary workers are also paid higher than the minimum wage; 1 for All employees and workers are paid at least the applicable minimum wage, but not all are paid above the minimum wage; 0 for the entity does not provide the required disclosure or does not meet the above criteria.",
+"note": "",
+"max": 5,
+"o": [
+[
+5,
+"all employees and workers are paid wages higher than the applicable minimum wage"
+],
+[
+3,
+"all permanent employees and workers are paid wages higher than the applicable minimum wage, and at least 50% of contractual or temporary workers are also paid higher than the minimum wage"
+],
+[
+1,
+"All employees and workers are paid at least the applicable minimum wage, but not all are paid above the minimum wage"
+],
+[
+0,
+"the entity does not provide the required disclosure or does not meet the above criteria."
+]
+]
+},
+{
+"id": "B27",
+"s": "B",
+"cat": "Stakeholder Engagement & Human Rights",
+"q": "Does the entity disclose details of complaints and grievances related to sexual harassment, discrimination and other related human rights issues, along with their resolution status?",
+"c": "4 for entity discloses that no complaints or grievances related to sexual harassment, discrimination or related human rights issues were reported during the reporting period; 2 for entity discloses complaints/grievances received along with their resolution status; 0 for no disclosure provided.",
+"note": "",
+"max": 4,
+"o": [
+[
+4,
+"entity discloses that no complaints or grievances related to sexual harassment, discrimination or related human rights issues were reported during the reporting period"
+],
+[
+2,
+"entity discloses complaints/grievances received along with their resolution status"
+],
+[
+0,
+"no disclosure provided."
+]
+]
+},
+{
+"id": "B28",
+"s": "B",
+"cat": "Stakeholder Engagement & Human Rights",
+"q": "Has the entity assessed its operations and service delivery partners for risks related to forced or compulsory labour, unfair working conditions and exploitative labour practices in outsourced functions?",
+"c": "3 for risk assessments conducted across operations and/or service delivery partners, with findings and actions disclosed; 2 for risk assessment conducted with limited disclosure on findings or actions taken; 1 for general statement without detailed assessment disclosure; 0 for no disclosure provided.",
+"note": "",
+"max": 3,
+"o": [
+[
+3,
+"risk assessments conducted across operations and/or service delivery partners, with findings and actions disclosed"
+],
+[
+2,
+"risk assessment conducted with limited disclosure on findings or actions taken"
+],
+[
+1,
+"general statement without detailed assessment disclosure"
+],
+[
+0,
+"no disclosure provided."
+]
+]
+},
+{
+"id": "B29",
+"s": "B",
+"cat": "Stakeholder Engagement & Human Rights",
+"q": "What is the scope and coverage of the entity's human rights due diligence process, including coverage across its value chain and outsourced partners?",
+"c": "3 for human rights due diligence process disclosed with coverage of more than 60% of the value chain; 2 for human rights due diligence process disclosed with coverage of up to 60% of the value chain; 1 for general disclosure on human rights due diligence without clear value chain coverage details; 0 for no disclosure provided.",
+"note": "",
+"max": 3,
+"o": [
+[
+3,
+"human rights due diligence process disclosed with coverage of more than 60% of the value chain"
+],
+[
+2,
+"human rights due diligence process disclosed with coverage of up to 60% of the value chain"
+],
+[
+1,
+"general disclosure on human rights due diligence without clear value chain coverage details"
+],
+[
+0,
+"no disclosure provided."
+]
+]
+},
+{
+"id": "B30",
+"s": "B",
+"cat": "Stakeholder Engagement & Human Rights",
+"q": "Has the entity designated a focal point, individual, or committee responsible for addressing human rights impacts or issues caused or contributed to by the business?",
+"c": "3 for a dedicated focal point, individual, or committee with clearly defined roles and responsibilities for human rights oversight is identified and publicly disclosed; 2 for responsibility for human rights is formally assigned within the organisation but is not publicly disclosed or lacks clearly defined governance arrangements; 1 for human rights responsibilities are addressed informally or integrated into broader ESG, legal, compliance, or HR functions without a dedicated focal point; 0 for no responsibility or governance mechanism for human rights is identified or disclosed.",
+"note": "",
+"max": 3,
+"o": [
+[
+3,
+"a dedicated focal point, individual, or committee with clearly defined roles and responsibilities for human rights oversight is identified and publicly disclosed"
+],
+[
+2,
+"responsibility for human rights is formally assigned within the organisation but is not publicly disclosed or lacks clearly defined governance arrangements"
+],
+[
+1,
+"human rights responsibilities are addressed informally or integrated into broader ESG, legal, compliance, or HR functions without a dedicated focal point"
+],
+[
+0,
+"no responsibility or governance mechanism for human rights is identified or disclosed."
+]
+]
+},
+{
+"id": "B31",
+"s": "B",
+"cat": "Stakeholder Engagement & Human Rights",
+"q": "Does the entity have internal mechanisms in place to redress grievances related to human rights issues?",
+"c": "2 for internal grievance redressal mechanism for human rights issues is established and disclosed; 0 for no disclosure provided on such mechanism",
+"note": "",
+"max": 2,
+"o": [
+[
+2,
+"internal grievance redressal mechanism for human rights issues is established and disclosed"
+],
+[
+0,
+"no disclosure provided on such mechanism"
+]
+]
+},
+{
+"id": "B32",
+"s": "B",
+"cat": "Environmental Performance & Climate Action",
+"q": "Does the entity disclose total energy consumption, energy intensity per unit of service output, and initiatives undertaken for energy efficiency in office and data centre operations?",
+"c": "3 for energy consumption and intensity data disclosed with external assurance and evidence of energy efficiency initiatives; 2 for energy consumption and intensity data disclosed without assurance; 1 for energy consumption data disclosed without intensity metrics or efficiency initiatives; 0 for no disclosure provided on energy consumption.",
+"note": "",
+"max": 3,
+"o": [
+[
+3,
+"energy consumption and intensity data disclosed with external assurance and evidence of energy efficiency initiatives"
+],
+[
+2,
+"energy consumption and intensity data disclosed without assurance"
+],
+[
+1,
+"energy consumption data disclosed without intensity metrics or efficiency initiatives"
+],
+[
+0,
+"no disclosure provided on energy consumption."
+]
+]
+},
+{
+"id": "B33",
+"s": "B",
+"cat": "Environmental Performance & Climate Action",
+"q": "What percentage of the entity's total energy consumption is derived from renewable energy sources?",
+"c": "5 for more than 10%; 3 for 5% to 10% derived from renewable energy sources; 1 for less than 5% derived from renewable energy sources; 0 for no disclosure provided on renewable energy consumption.",
+"note": "",
+"max": 5,
+"o": [
+[
+5,
+"more than 10%"
+],
+[
+3,
+"5% to 10% derived from renewable energy sources"
+],
+[
+1,
+"less than 5% derived from renewable energy sources"
+],
+[
+0,
+"no disclosure provided on renewable energy consumption."
+]
+]
+},
+{
+"id": "B34",
+"s": "B",
+"cat": "Environmental Performance & Climate Action",
+"q": "Does the entity disclose total water consumption and water intensity using a relevant operational metric, such as per employee, per unit of service output, per customer, or other sector-specific metric, along with the status of external assurance?",
+"c": "4 for water consumption and intensity disclosed with external assurance; 2 for water consumption and intensity disclosed without external assurance; 0 for no disclosure provided on water consumption or intensity.",
+"note": "",
+"max": 4,
+"o": [
+[
+4,
+"water consumption and intensity disclosed with external assurance"
+],
+[
+2,
+"water consumption and intensity disclosed without external assurance"
+],
+[
+0,
+"no disclosure provided on water consumption or intensity."
+]
+]
+},
+{
+"id": "B35",
+"s": "B",
+"cat": "Environmental Performance & Climate Action",
+"q": "Does the entity disclose water withdrawal by source, water recycling practices in its facilities, and identify operations in water-stressed areas?",
+"c": "5 for water withdrawal by source disclosed, water recycling practices and operations in water-stressed areas identified, and disclosure externally verified/assured; 3 for water withdrawal by source disclosed, including identification of operations in water-stressed areas; 1 for only total water withdrawal disclosed without source-wise breakup or water-stressed area identification; 0 for no disclosure provided.",
+"note": "",
+"max": 5,
+"o": [
+[
+5,
+"water withdrawal by source disclosed, water recycling practices and operations in water-stressed areas identified, and disclosure externally verified/assured"
+],
+[
+3,
+"water withdrawal by source disclosed, including identification of operations in water-stressed areas"
+],
+[
+1,
+"only total water withdrawal disclosed without source-wise breakup or water-stressed area identification"
+],
+[
+0,
+"no disclosure provided."
+]
+]
+},
+{
+"id": "B36",
+"s": "B",
+"cat": "Environmental Performance & Climate Action",
+"q": "Does the entity disclose GHG emissions from office/facility operations (Scope 1 and Scope 2), emission intensity, and year-on-year reduction performance?",
+"c": "5 for Scope 1 and Scope 2 emissions, intensity, and reduction trends disclosed with external assurance; 3 for Scope 1 and Scope 2 emissions, intensity, and reduction trends disclosed without external assurance; 1 for Scope 1 and Scope 2 emissions disclosed without reduction trends or intensity metrics; 0 for no disclosure provided.",
+"note": "",
+"max": 5,
+"o": [
+[
+5,
+"Scope 1 and Scope 2 emissions, intensity, and reduction trends disclosed with external assurance"
+],
+[
+3,
+"Scope 1 and Scope 2 emissions, intensity, and reduction trends disclosed without external assurance"
+],
+[
+1,
+"Scope 1 and Scope 2 emissions disclosed without reduction trends or intensity metrics"
+],
+[
+0,
+"no disclosure provided."
+]
+]
+},
+{
+"id": "B37",
+"s": "B",
+"cat": "Environmental Performance & Climate Action",
+"q": "Does the entity disclose Scope 3 GHG emissions, including emissions from business travel, employee commuting, digital infrastructure, outsourced activities, and the broader value chain?",
+"c": "5 for Scope 3 emissions disclosed with category-wise breakup and emission intensity metrics; 3 for Scope 3 emissions disclosed with partial category-wise breakup or limited intensity disclosure; 1 for general disclosure on Scope 3 emissions without detailed breakup or intensity metrics; 0 for no disclosure provided.",
+"note": "",
+"max": 5,
+"o": [
+[
+5,
+"Scope 3 emissions disclosed with category-wise breakup and emission intensity metrics"
+],
+[
+3,
+"Scope 3 emissions disclosed with partial category-wise breakup or limited intensity disclosure"
+],
+[
+1,
+"general disclosure on Scope 3 emissions without detailed breakup or intensity metrics"
+],
+[
+0,
+"no disclosure provided."
+]
+]
+},
+{
+"id": "B38",
+"s": "B",
+"cat": "Environmental Performance & Climate Action",
+"q": "Does the entity disclose its digital carbon footprint including data centre energy use, cloud infrastructure emissions, and IT device lifecycle environmental impacts?",
+"c": "5 for digital carbon footprint disclosed with category-wise breakup, and evidence of reduction initiatives with external assurance; 3 for digital carbon footprint partially disclosed without assurance; 0 for no disclosure provided on digital carbon footprint.",
+"note": "",
+"max": 5,
+"o": [
+[
+5,
+"digital carbon footprint disclosed with category-wise breakup, and evidence of reduction initiatives with external assurance"
+],
+[
+3,
+"digital carbon footprint partially disclosed without assurance"
+],
+[
+0,
+"no disclosure provided on digital carbon footprint."
+]
+]
+},
+{
+"id": "B39",
+"s": "B",
+"cat": "Environmental Performance & Climate Action",
+"q": "Does the entity have and disclose a green building or sustainable facility certification for its primary office locations?",
+"c": "5 for LEED Platinum / IGBC Platinum or equivalent certification for primary offices; 3 for LEED Gold / IGBC Gold or equivalent certification; 1 for certification in progress or general green building initiatives disclosed; 0 for no certification or disclosure.",
+"note": "",
+"max": 5,
+"o": [
+[
+5,
+"LEED Platinum / IGBC Platinum or equivalent certification for primary offices"
+],
+[
+3,
+"LEED Gold / IGBC Gold or equivalent certification"
+],
+[
+1,
+"certification in progress or general green building initiatives disclosed"
+],
+[
+0,
+"no certification or disclosure."
+]
+]
+},
+{
+"id": "B40",
+"s": "B",
+"cat": "Environmental Performance & Climate Action",
+"q": "Has the entity adopted innovative technologies or digital solutions to improve sustainability outcomes in its operations and service delivery?",
+"c": "6 for dedicated sustainability/ESG innovation programme in place with quantified outcomes (such as emissions reduced, energy saved, paper eliminated, or remote service adoption); 4 for sustainability-related technologies adopted with reported outcomes, but without a formal innovation programme; 2 for sustainability initiatives or pilot projects underway without quantified outcomes; 0 for no disclosure provided.",
+"note": "",
+"max": 6,
+"o": [
+[
+6,
+"dedicated sustainability/ESG innovation programme in place with quantified outcomes (such as emissions reduced, energy saved, paper eliminated, or remote service adoption)"
+],
+[
+4,
+"sustainability-related technologies adopted with reported outcomes, but without a formal innovation programme"
+],
+[
+2,
+"sustainability initiatives or pilot projects underway without quantified outcomes"
+],
+[
+0,
+"no disclosure provided."
+]
+]
+},
+{
+"id": "B41",
+"s": "B",
+"cat": "Environmental Performance & Climate Action",
+"q": "Does the entity have a business continuity and disaster management plan in place, including cyber incident response?",
+"c": "3 for business continuity, disaster management, and cyber incident response plan disclosed; 0 for no disclosure provided on such plans.",
+"note": "",
+"max": 3,
+"o": [
+[
+3,
+"business continuity, disaster management, and cyber incident response plan disclosed"
+],
+[
+0,
+"no disclosure provided on such plans."
+]
+]
+},
+{
+"id": "B42",
+"s": "B",
+"cat": "Consumer Responsibility, Public Policy & Inclusive Growth",
+"q": "Does the entity disclose adverse judicial or regulatory orders relating to anti-competitive conduct, along with corrective actions taken?",
+"c": "3 for entity reports no adverse judicial or regulatory orders relating to anti-competitive conduct during the reporting period; 2 for adverse orders disclosed along with corrective actions taken; 1 for adverse orders disclosed without details of corrective actions; 0 for no disclosure provided.",
+"note": "",
+"max": 3,
+"o": [
+[
+3,
+"entity reports no adverse judicial or regulatory orders relating to anti-competitive conduct during the reporting period"
+],
+[
+2,
+"adverse orders disclosed along with corrective actions taken"
+],
+[
+1,
+"adverse orders disclosed without details of corrective actions"
+],
+[
+0,
+"no disclosure provided."
+]
+]
+},
+{
+"id": "B43",
+"s": "B",
+"cat": "Consumer Responsibility, Public Policy & Inclusive Growth",
+"q": "Has the entity conducted Social Impact Assessments (SIA) or Client/Community Impact Assessments during the financial year?",
+"c": "6 for SIA conducted by an independent external agency; 4 for internal SIA conducted by the entity; 0 for no disclosure provided on SIA conducted during the financial year. Full marks applicable where SIA requirement is not relevant/applicable to the entity and appropriate justification is disclosed.",
+"note": "",
+"max": 6,
+"o": [
+[
+6,
+"SIA conducted by an independent external agency"
+],
+[
+4,
+"internal SIA conducted by the entity"
+],
+[
+0,
+"no disclosure provided on SIA conducted during the financial year. Full marks applicable where SIA requirement is not relevant/applicable to the entity and appropriate justification is disclosed."
+]
+]
+},
+{
+"id": "B44",
+"s": "B",
+"cat": "Consumer Responsibility, Public Policy & Inclusive Growth",
+"q": "What percentage of the entity's total procurement inputs (by value) is sourced from MSMEs and small service providers?",
+"c": "3 for more than 30% of total procurement inputs sourced from MSMEs and small service providers; 2 for 25% to 30%; 1 for 15% to less than 25%; 0 for less than 15% sourced or no disclosure provided.",
+"note": "",
+"max": 3,
+"o": [
+[
+3,
+"more than 30% of total procurement inputs sourced from MSMEs and small service providers"
+],
+[
+2,
+"25% to 30%"
+],
+[
+1,
+"15% to less than 25%"
+],
+[
+0,
+"less than 15% sourced or no disclosure provided."
+]
+]
+},
+{
+"id": "B45",
+"s": "B",
+"cat": "Consumer Responsibility, Public Policy & Inclusive Growth",
+"q": "What percentage of total employment generated by the entity is in Tier-2/Tier-3 cities, rural, and semi-urban areas?",
+"c": "4 for employment in Tier-2/3 cities, rural and semi-urban areas exceed 10% of total employment; 3 for 5% to 10%; less than 5%; 0 for no disclosure provided.",
+"note": "",
+"max": 4,
+"o": [
+[
+4,
+"employment in Tier-2/3 cities, rural and semi-urban areas exceed 10% of total employment"
+],
+[
+3,
+"5% to 10%; less than 5%"
+],
+[
+0,
+"no disclosure provided."
+]
+]
+},
+{
+"id": "B46",
+"s": "B",
+"cat": "Consumer Responsibility, Public Policy & Inclusive Growth",
+"q": "What actions has the entity taken to mitigate negative social impacts identified through Social Impact Assessments?",
+"c": "5 for corrective actions implemented for all identified negative social impacts, or requirement reported as not applicable with justification; 3 for corrective actions initiated or partially implemented for identified impacts; 1 for general commitments or limited actions disclosed without clear implementation details; 0 for no disclosure provided.",
+"note": "",
+"max": 5,
+"o": [
+[
+5,
+"corrective actions implemented for all identified negative social impacts, or requirement reported as not applicable with justification"
+],
+[
+3,
+"corrective actions initiated or partially implemented for identified impacts"
+],
+[
+1,
+"general commitments or limited actions disclosed without clear implementation details"
+],
+[
+0,
+"no disclosure provided."
+]
+]
+},
+{
+"id": "B47",
+"s": "B",
+"cat": "Consumer Responsibility, Public Policy & Inclusive Growth",
+"q": "Does the entity provide accessible and transparent information about its service terms, pricing, and data usage policies over and above what is legally mandated?",
+"c": "3 for comprehensive and accessible disclosure of service terms, pricing and data usage information beyond applicable legal requirements; 2 for disclosure of additional information beyond legal requirements, but with limited coverage; 0 for no disclosure provided on additional transparency initiatives.",
+"note": "",
+"max": 3,
+"o": [
+[
+3,
+"comprehensive and accessible disclosure of service terms, pricing and data usage information beyond applicable legal requirements"
+],
+[
+2,
+"disclosure of additional information beyond legal requirements, but with limited coverage"
+],
+[
+0,
+"no disclosure provided on additional transparency initiatives."
+]
+]
+},
+{
+"id": "B48",
+"s": "B",
+"cat": "Consumer Responsibility, Public Policy & Inclusive Growth",
+"q": "Has the entity taken steps to inform and educate clients or end-users about the safe, responsible, and ethical use of its services, including digital and data safety?",
+"c": "4 for steps taken to educate clients or end-users on safe and responsible usage are disclosed; 0 for no disclosure provided on client awareness or education initiatives.",
+"note": "",
+"max": 4,
+"o": [
+[
+4,
+"steps taken to educate clients or end-users on safe and responsible usage are disclosed"
+],
+[
+0,
+"no disclosure provided on client awareness or education initiatives."
+]
+]
+},
+{
+"id": "B49",
+"s": "B",
+"cat": "Consumer Responsibility, Public Policy & Inclusive Growth",
+"q": "What percentage of client or customer complaints relating to service quality, data privacy, cybersecurity, or billing were resolved during the reporting period?",
+"c": "5 for 90% to 100% of client/customer complaints resolved during the reporting period; 4 for 80% to less than 90% of such complaints resolved; 3 for 70% to less than 80% of such complaints resolved; 2 for 50% to less than 70% of such complaints resolved; 1 for less than 50% of such complaints resolved, with disclosure of the resolution status; 0 for no disclosure provided on complaint resolution status.",
+"note": "",
+"max": 5,
+"o": [
+[
+5,
+"90% to 100% of client/customer complaints resolved during the reporting period"
+],
+[
+4,
+"80% to less than 90% of such complaints resolved"
+],
+[
+3,
+"70% to less than 80% of such complaints resolved"
+],
+[
+2,
+"50% to less than 70% of such complaints resolved"
+],
+[
+1,
+"less than 50% of such complaints resolved, with disclosure of the resolution status"
+],
+[
+0,
+"no disclosure provided on complaint resolution status."
+]
+]
+},
+{
+"id": "B50",
+"s": "B",
+"cat": "Consumer Responsibility, Public Policy & Inclusive Growth",
+"q": "Does the entity have a cybersecurity, data privacy, and information security management framework or policy in place (e.g., ISO 27001, SOC 2, compliance with DPDP Act, STQC certification)?",
+"c": "5 for cybersecurity and data privacy framework/policy established, disclosed, and independently certified (e.g., ISO 27001, SOC 2); 3 for framework/policy established and disclosed but not independently certified; 0 for no disclosure provided on cybersecurity or data privacy framework/policy.",
+"note": "",
+"max": 5,
+"o": [
+[
+5,
+"cybersecurity and data privacy framework/policy established, disclosed, and independently certified (e.g., ISO 27001, SOC 2)"
+],
+[
+3,
+"framework/policy established and disclosed but not independently certified"
+],
+[
+0,
+"no disclosure provided on cybersecurity or data privacy framework/policy."
+]
+]
+},
+{
+"id": "B51",
+"s": "B",
+"cat": "Consumer Responsibility, Public Policy & Inclusive Growth",
+"q": "Does the entity disclose incidents of data breaches, service outages affecting clients, or cybersecurity violations, along with corrective actions taken?",
+"c": "5 for no data breach or cybersecurity incidents reported during the reporting period, with clear disclosure provided; 3 for incidents disclosed along with details of corrective actions taken; 2 for general disclosure on incidents without adequate details; 0 for no disclosure provided.",
+"note": "",
+"max": 5,
+"o": [
+[
+5,
+"no data breach or cybersecurity incidents reported during the reporting period, with clear disclosure provided"
+],
+[
+3,
+"incidents disclosed along with details of corrective actions taken"
+],
+[
+2,
+"general disclosure on incidents without adequate details"
+],
+[
+0,
+"no disclosure provided."
+]
+]
+},
+{
+"id": "B52",
+"s": "B",
+"cat": "Consumer Responsibility, Public Policy & Inclusive Growth",
+"q": "What percentage of consumer complaints relating to unfair trade practices, misleading advertising, or service misrepresentation were resolved during the reporting period?",
+"c": "3 for 80% to 100% of complaints resolved, or no complaints reported during the reporting period with appropriate disclosure; 2 for 50% to less than 80% of complaints resolved; 1 for less than 50% of complaints resolved; 0 for no disclosure provided.",
+"note": "",
+"max": 3,
+"o": [
+[
+3,
+"80% to 100% of complaints resolved, or no complaints reported during the reporting period with appropriate disclosure"
+],
+[
+2,
+"50% to less than 80% of complaints resolved"
+],
+[
+1,
+"less than 50% of complaints resolved"
+],
+[
+0,
+"no disclosure provided."
+]
+]
+},
+{
+"id": "B53",
+"s": "B",
+"cat": "Diversity, Equality & Community Engagement",
+"q": "Does the entity disclose diversity information for governance bodies and employees, including gender, age group, and minority group representation?",
+"c": "2 for comprehensive diversity information disclosed for both governance bodies and employees; 1 for partial diversity information disclosed for governance bodies and/or employees; 0 for no disclosure provided on diversity composition.",
+"note": "",
+"max": 2,
+"o": [
+[
+2,
+"comprehensive diversity information disclosed for both governance bodies and employees"
+],
+[
+1,
+"partial diversity information disclosed for governance bodies and/or employees"
+],
+[
+0,
+"no disclosure provided on diversity composition."
+]
+]
+},
+{
+"id": "B54",
+"s": "B",
+"cat": "Diversity, Equality & Community Engagement",
+"q": "Does the entity disclose incidents of discrimination during the reporting period, along with corrective actions taken?",
+"c": "3 for no incidents of discrimination reported during the reporting period, with disclosure provided; 1 for incidents of discrimination disclosed along with corrective actions or resolution measures; 0 for no disclosure provided on discrimination-related incidents or actions taken.",
+"note": "",
+"max": 3,
+"o": [
+[
+3,
+"no incidents of discrimination reported during the reporting period, with disclosure provided"
+],
+[
+1,
+"incidents of discrimination disclosed along with corrective actions or resolution measures"
+],
+[
+0,
+"no disclosure provided on discrimination-related incidents or actions taken."
+]
+]
+},
+{
+"id": "B55",
+"s": "B",
+"cat": "Diversity, Equality & Community Engagement",
+"q": "Does the entity undertake local community engagement, digital literacy programmes, skill development initiatives, or development activities in areas of operation?",
+"c": "4 for structured community engagement and digital literacy/skill development programmes in place with impact assessments and measurable outcomes disclosed; 2 for community engagement and development initiatives disclosed with limited outcome reporting; 1 for general disclosure on community engagement or development initiatives without structured assessment details; 0 for no disclosure provided.",
+"note": "",
+"max": 4,
+"o": [
+[
+4,
+"structured community engagement and digital literacy/skill development programmes in place with impact assessments and measurable outcomes disclosed"
+],
+[
+2,
+"community engagement and development initiatives disclosed with limited outcome reporting"
+],
+[
+1,
+"general disclosure on community engagement or development initiatives without structured assessment details"
+],
+[
+0,
+"no disclosure provided."
+]
+]
+},
+{
+"id": "C1",
+"s": "C",
+"cat": "Leadership & strategy",
+"q": "Has the entity assessed climate change-related physical risks and opportunities relevant to service delivery locations, including risks such as flooding, extreme heat, and infrastructure disruption?",
+"c": "3 for physical climate risks/opportunities assessed, quantified, and financial implications disclosed; 2 for physical climate risks/opportunities assessed and disclosed; 1 for qualitative discussion provided without detailed assessment or quantification; 0 for no disclosure provided.",
+"note": "",
+"max": 3,
+"o": [
+[
+3,
+"physical climate risks/opportunities assessed, quantified, and financial implications disclosed"
+],
+[
+2,
+"physical climate risks/opportunities assessed and disclosed"
+],
+[
+1,
+"qualitative discussion provided without detailed assessment or quantification"
+],
+[
+0,
+"no disclosure provided."
+]
+]
+},
+{
+"id": "C2",
+"s": "C",
+"cat": "Leadership & strategy",
+"q": "Has the entity assessed climate change-related transition risks and opportunities, including policy, market, technology, and reputational risks relevant to service sector operations?",
+"c": "3 for transition climate risks and opportunities assessed, quantified, and related financial impacts disclosed\n2 for transition climate risks and opportunities assessed and disclose; 1 for general discussion provided without detailed assessment or financial quantification; 0 for no disclosure provided",
+"note": "",
+"max": 3,
+"o": [
+[
+3,
+"transition climate risks and opportunities assessed, quantified, and related financial impacts disclosed\n2 for transition climate risks and opportunities assessed and disclose"
+],
+[
+1,
+"general discussion provided without detailed assessment or financial quantification"
+],
+[
+0,
+"no disclosure provided"
+]
+]
+},
+{
+"id": "C3",
+"s": "C",
+"cat": "Leadership & strategy",
+"q": "Has the entity adopted Science-Based Targets (SBTi), Net Zero commitments, or climate targets aligned with a recognised decarbonisation pathway relevant to service sector emissions?",
+"c": "4 for SBTi-validated targets adopted and disclosed; 3 for Net Zero commitment disclosed with an approved or clearly defined transition pathway; 2 for internal climate targets aligned to a 1.5°C pathway disclosed; 1 for general Net Zero commitment stated without a defined pathway or target framework; 0 for no disclosure provided.",
+"note": "",
+"max": 4,
+"o": [
+[
+4,
+"SBTi-validated targets adopted and disclosed"
+],
+[
+3,
+"Net Zero commitment disclosed with an approved or clearly defined transition pathway"
+],
+[
+2,
+"internal climate targets aligned to a 1.5°C pathway disclosed"
+],
+[
+1,
+"general Net Zero commitment stated without a defined pathway or target framework"
+],
+[
+0,
+"no disclosure provided."
+]
+]
+},
+{
+"id": "C4",
+"s": "C",
+"cat": "Leadership & strategy",
+"q": "Does the entity disclose the use of carbon credits or offsets in support of carbon neutrality or emissions reduction claims?",
+"c": "4 for certified carbon offsets/credits used with detailed disclosure on quantity, certification standard, and application; 2 for carbon offsets/credits used but without certification details or adequate disclosure; 1 for general reference to carbon neutrality or offsets without supporting details; 0 for no disclosure provided.",
+"note": "",
+"max": 4,
+"o": [
+[
+4,
+"certified carbon offsets/credits used with detailed disclosure on quantity, certification standard, and application"
+],
+[
+2,
+"carbon offsets/credits used but without certification details or adequate disclosure"
+],
+[
+1,
+"general reference to carbon neutrality or offsets without supporting details"
+],
+[
+0,
+"no disclosure provided."
+]
+]
+},
+{
+"id": "C5",
+"s": "C",
+"cat": "Leadership & strategy",
+"q": "Does the entity have a circular economy or responsible digital economy strategy covering paperless operations, device lifecycle management, or resource loop-closing initiatives?",
+"c": "4 for circular/digital economy strategy disclosed with quantified outcomes or measurable impacts; 2 for relevant initiatives disclosed without quantified outcomes; 1 for general policy intent or commitment towards circular/digital economy disclosed; 0 for no disclosure provided.",
+"note": "",
+"max": 4,
+"o": [
+[
+4,
+"circular/digital economy strategy disclosed with quantified outcomes or measurable impacts"
+],
+[
+2,
+"relevant initiatives disclosed without quantified outcomes"
+],
+[
+1,
+"general policy intent or commitment towards circular/digital economy disclosed"
+],
+[
+0,
+"no disclosure provided."
+]
+]
+},
+{
+"id": "C6",
+"s": "C",
+"cat": "Leadership & strategy",
+"q": "Has the entity conducted Service Lifecycle Assessments (SLA) or similar environmental footprint analyses for key services or digital products?",
+"c": "4 for service/product lifecycle assessment conducted by an external agency, with results available in the public domain; 3 for lifecycle assessment conducted by an independent external agency; 2 for internal lifecycle assessment conducted by the entity; 1 for partial or limited assessment conducted/disclosed; 0 for no disclosure provided.",
+"note": "",
+"max": 4,
+"o": [
+[
+4,
+"service/product lifecycle assessment conducted by an external agency, with results available in the public domain"
+],
+[
+3,
+"lifecycle assessment conducted by an independent external agency"
+],
+[
+2,
+"internal lifecycle assessment conducted by the entity"
+],
+[
+1,
+"partial or limited assessment conducted/disclosed"
+],
+[
+0,
+"no disclosure provided."
+]
+]
+},
+{
+"id": "C7",
+"s": "C",
+"cat": "Leadership & strategy",
+"q": "What percentage of the entity's IT hardware, office equipment, and infrastructure is refurbished, reused, or certified for end-of-life responsible disposal?",
+"c": "4 for more than 20% of IT hardware/equipment being refurbished, reused, or responsibly disposed of through certified processes; 3 for 15% to 20%; 2 for 10% to less than 15%; 1 for less than 10% or partial initiatives disclosed; 0 for no disclosure provided.",
+"note": "",
+"max": 4,
+"o": [
+[
+4,
+"more than 20% of IT hardware/equipment being refurbished, reused, or responsibly disposed of through certified processes"
+],
+[
+3,
+"15% to 20%"
+],
+[
+2,
+"10% to less than 15%"
+],
+[
+1,
+"less than 10% or partial initiatives disclosed"
+],
+[
+0,
+"no disclosure provided."
+]
+]
+},
+{
+"id": "C8",
+"s": "C",
+"cat": "Leadership & strategy",
+"q": "What percentage of total water consumption is recycled or reused within the entity's facilities?",
+"c": "3 for more than 50% of water recycled/reused within facilities; 2 for 25% to 50% recycled/reused; 1 for less than 25% recycled/reused; 0 for no disclosure provided on water recycling or reuse practices.",
+"note": "",
+"max": 3,
+"o": [
+[
+3,
+"more than 50% of water recycled/reused within facilities"
+],
+[
+2,
+"25% to 50% recycled/reused"
+],
+[
+1,
+"less than 25% recycled/reused"
+],
+[
+0,
+"no disclosure provided on water recycling or reuse practices."
+]
+]
+},
+{
+"id": "C9",
+"s": "C",
+"cat": "Leadership & strategy",
+"q": "Does the entity have a Supplier/Vendor ESG Code of Conduct or Responsible Sourcing Policy covering its value chain and outsourced service partners?",
+"c": "3 for supplier ESG Code/Responsible Sourcing Policy mandatory for all suppliers and outsourced partners, with compliance monitoring/tracking mechanisms; 2 for supplier ESG Code/Responsible Sourcing Policy established and communicated; 1 for general supplier sustainability policy disclosed without implementation or communication details; 0 for no disclosure provided.",
+"note": "",
+"max": 3,
+"o": [
+[
+3,
+"supplier ESG Code/Responsible Sourcing Policy mandatory for all suppliers and outsourced partners, with compliance monitoring/tracking mechanisms"
+],
+[
+2,
+"supplier ESG Code/Responsible Sourcing Policy established and communicated"
+],
+[
+1,
+"general supplier sustainability policy disclosed without implementation or communication details"
+],
+[
+0,
+"no disclosure provided."
+]
+]
+},
+{
+"id": "C10",
+"s": "C",
+"cat": "Leadership & strategy",
+"q": "Does the entity disclose assessments of value chain partners and outsourced service providers with respect to working conditions, data security, and labour practices?",
+"c": "3 for assessments of value chain partners and outsourced providers on working conditions, data security, and labour practices disclosed; 0 for no disclosure provided on such assessments.",
+"note": "",
+"max": 3,
+"o": [
+[
+3,
+"assessments of value chain partners and outsourced providers on working conditions, data security, and labour practices disclosed"
+],
+[
+0,
+"no disclosure provided on such assessments."
+]
+]
+},
+{
+"id": "C11",
+"s": "C",
+"cat": "Leadership & strategy",
+"q": "What percentage of suppliers/vendors, by procurement value, have been assessed or audited against ESG criteria?",
+"c": "4 for more than 75% of suppliers/vendors assessed/audited against ESG criteria; 3 for 50% to 75% assessed/audited; 2 for 25% to less than 50% assessed/audited; 1 for less than 25% assessed/audited; 0 for no disclosure provided.",
+"note": "",
+"max": 4,
+"o": [
+[
+4,
+"more than 75% of suppliers/vendors assessed/audited against ESG criteria"
+],
+[
+3,
+"50% to 75% assessed/audited"
+],
+[
+2,
+"25% to less than 50% assessed/audited"
+],
+[
+1,
+"less than 25% assessed/audited"
+],
+[
+0,
+"no disclosure provided."
+]
+]
+},
+{
+"id": "C12",
+"s": "C",
+"cat": "Leadership & strategy",
+"q": "Does the entity undertake supplier/vendor capacity-building initiatives on sustainability, data governance, and ethical business practices?",
+"c": "3 for structured supplier sustainability training or technical support programmes conducted with measurable outcomes disclosed; 1 for general awareness programmes or sustainability communication initiatives disclosed; 0 for no disclosure provided.",
+"note": "",
+"max": 3,
+"o": [
+[
+3,
+"structured supplier sustainability training or technical support programmes conducted with measurable outcomes disclosed"
+],
+[
+1,
+"general awareness programmes or sustainability communication initiatives disclosed"
+],
+[
+0,
+"no disclosure provided."
+]
+]
+},
+{
+"id": "C13",
+"s": "C",
+"cat": "Leadership & strategy",
+"q": "Does the entity disclose the traceability of key third-party service components, software, and technology providers against ESG and ethical sourcing criteria?",
+"c": "3 for more than 50% of key third-party service components traceable to source against ESG criteria; 2 for up to 50% traceable; 1 for limited or partial traceability initiatives disclosed without percentage coverage; 0 for no disclosure provided.",
+"note": "",
+"max": 3,
+"o": [
+[
+3,
+"more than 50% of key third-party service components traceable to source against ESG criteria"
+],
+[
+2,
+"up to 50% traceable"
+],
+[
+1,
+"limited or partial traceability initiatives disclosed without percentage coverage"
+],
+[
+0,
+"no disclosure provided."
+]
+]
+},
+{
+"id": "C14",
+"s": "C",
+"cat": "Leadership & strategy",
+"q": "Does the entity disclose CSR expenditure as a percentage of the average net profit of the last three financial years, along with key CSR focus areas or themes?",
+"c": "4 for CSR expenditure of 2% or more along with disclosure of strategic themes aligned to sustainability or SDG priorities; 3 for disclosure of CSR expenditure of 2% or more; 1 for CSR expenditure below 2% but disclosed; 0 for no information available.",
+"note": "",
+"max": 4,
+"o": [
+[
+4,
+"CSR expenditure of 2% or more along with disclosure of strategic themes aligned to sustainability or SDG priorities"
+],
+[
+3,
+"disclosure of CSR expenditure of 2% or more"
+],
+[
+1,
+"CSR expenditure below 2% but disclosed"
+],
+[
+0,
+"no information available."
+]
+]
+},
+{
+"id": "C15",
+"s": "C",
+"cat": "Leadership & strategy",
+"q": "Does the entity disclose sustainability-linked financial instruments, green financing initiatives, or integration of ESG considerations into capital allocation decisions?",
+"c": "3 for clear disclosures provided with quantified financial linkage or measurable allocation towards sustainability initiatives; 1 for sustainability-related disclosure provided but without quantified financial linkage or measurable allocation; 0 for no information disclosed.",
+"note": "",
+"max": 3,
+"o": [
+[
+3,
+"clear disclosures provided with quantified financial linkage or measurable allocation towards sustainability initiatives"
+],
+[
+1,
+"sustainability-related disclosure provided but without quantified financial linkage or measurable allocation"
+],
+[
+0,
+"no information disclosed."
+]
+]
+},
+{
+"id": "C16",
+"s": "C",
+"cat": "Leadership & strategy",
+"q": "Are ESG risks, including digital risks, data governance risks, and cybersecurity risks, integrated within the entity's Enterprise Risk Management (ERM) framework?",
+"c": "5 for ESG and digital/cyber risks are fully integrated into the company's risk management process, reviewed by the Board, financially assessed, and supported with mitigation plans; 3 for ESG risks included in the risk register with mitigation measures, but financial impact assessment is not provided; 1 for ESG risks identified and discussed broadly, but not formally integrated into the risk management framework; 0 for no disclosure on ESG risks or their management.",
+"note": "",
+"max": 5,
+"o": [
+[
+5,
+"ESG and digital/cyber risks are fully integrated into the company's risk management process, reviewed by the Board, financially assessed, and supported with mitigation plans"
+],
+[
+3,
+"ESG risks included in the risk register with mitigation measures, but financial impact assessment is not provided"
+],
+[
+1,
+"ESG risks identified and discussed broadly, but not formally integrated into the risk management framework"
+],
+[
+0,
+"no disclosure on ESG risks or their management."
+]
+]
+},
+{
+"id": "C17",
+"s": "C",
+"cat": "Leadership & strategy",
+"q": "Does the entity align its ESG reporting and sustainability initiatives with the United Nations Sustainable Development Goals (UN SDGs)?",
+"c": "3 for comprehensive mapping with performance data; 2 for mapping without performance data; 1 for mentioned but not mapped; 0 for not reported.",
+"note": "",
+"max": 3,
+"o": [
+[
+3,
+"comprehensive mapping with performance data"
+],
+[
+2,
+"mapping without performance data"
+],
+[
+1,
+"mentioned but not mapped"
+],
+[
+0,
+"not reported."
+]
+]
+}
+]
+}

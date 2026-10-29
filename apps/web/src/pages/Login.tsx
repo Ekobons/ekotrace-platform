@@ -4,6 +4,7 @@ import { api } from '../lib/api';
 import { BRAND } from '../lib/brand';
 import { BrandMark } from '../components/BrandMark';
 import { CbamBrandSide } from './CbamPublic';
+import { SmeBrandSide } from './sme/SmePublic';
 
 export function Login({ onDone }: { onDone: () => void }) {
   // a bin's QR label opened before signing in: a contractor goes to the portal with that bin chosen
@@ -40,9 +41,11 @@ export function Login({ onDone }: { onDone: () => void }) {
   }
   // the CBAM tool's own sign-in page
   const cbam = /^\/cbam(\/|$)/.test(window.location.pathname);
+  // EKOTRACE SME's own sign-in page (and its partners')
+  const sme = /^\/sme(\/|-net|$)/.test(window.location.pathname);
   return (
     <div className="signin">
-      {cbam ? <CbamBrandSide /> : <BrandSide />}
+      {sme ? <SmeBrandSide /> : cbam ? <CbamBrandSide /> : <BrandSide />}
       <main className="signin-form">
         <form className="sf" onSubmit={submit}>
           {mode === 'code' ? <>
@@ -72,7 +75,10 @@ export function Login({ onDone }: { onDone: () => void }) {
             <button className="btn p sf-go" disabled={busy}>{busy ? 'Checking…' : 'Sign in'}</button>
             <button type="button" className="btn sf-sso" onClick={() => { setMode('sso'); setErr(null); }}>Sign in with your company account</button>
             <p className="sf-note">Forgot your password? Your company's super admin or admin can reset it.</p>
-            {cbam ? <div className="sf-other">
+            {sme ? <div className="sf-other">
+              <span>New here?</span>
+              <a href="/sme-signup">Create your company's account</a>
+            </div> : cbam ? <div className="sf-other">
               <span>New here?</span>
               <a href="/cbam-signup">Create a free account</a>
               <a href="/cbam-supplier">Suppliers: answer a CBAM data request with your access code</a>

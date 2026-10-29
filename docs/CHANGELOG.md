@@ -2,6 +2,15 @@
 
 Newest first.
 
+## 2026-10-29 · EKOTRACE SME: a dedicated tool for Indian MSMEs
+
+- Packages `sme` (the SME tool) and `smenet` (buyers, clusters, banks, CA firms) — migration 073: `sme_company`, `sme_doc` (one JSON document per module and financial year, versioned), `sme_result` (figures per company and year, for partners and the benchmark), `sme_scrap`, `sme_grievance`, `sme_credit`, `sme_partner`, `sme_link` (consent per partner), `sme_ca_request`, `sme_setting` (versioned settings), `sme_signup`. Tenant RLS; links and CA requests visible to both sides.
+- `lib/sme/engine.ts` (pure): Scope 1/2/3 from yearly totals, intensity, MSME class, ESG readiness (E/S/G with the 30% floor), ICAI SRMM v3.1 / v3.2 scoring with suggestions from the company's data, CBAM cost, power-bill findings, rooftop solar, carbon credits, CSR, EPR, DPDP, safety, product footprint, compliance calendar, what applies, schemes, questionnaire answers. Settings from `sme_setting` (first versions from `lib/sme/defaults.ts` and `data/sme/srmm_*.json`).
+- API: `/api/sme…` (data per module and year, company, answer, bill scan with OCR, scrap, recyclers, grievances, links and consent, CA requests, credit projects), `/api/sme-net…` (partner overview by kind, invite, remind, CA review), `/api/platform/sme…` (SME console), `/api/public/sme…` (sign-up with e-mail confirmation behind `SME_SIGNUP=on`; anonymous grievance page).
+- Web: own sign-in page `/sme`, own menu and screens `/sme/<page>` (25 screens), partner screens `/sme-net`, open pages `/sme-signup`, `/sme-start`, `/sme-grievance`; platform admin **SME console** (`/console/sme`).
+- `npm run demo:sme` (`cli/demoSme.ts`): *Shree Ganesh Fasteners (demo)* with two years of data, five cluster members, a buyer, a cluster, a bank and a CA firm. INVENTED.
+- Manual: new chapter EKOTRACE SME. Test `sme.test.ts`.
+
 ## 2026-10-28 · Phone menu, dashboard drill-down to entries, OCR for scanned bills
 
 - **Phone menu:** below 1000 px a top bar with a ☰ button slides in the full menu (any package's menu), closing on navigation, outside tap, ✕ or Escape; the icon-only menu is a desktop choice. Closes RFP 8.1 (responsive menu).

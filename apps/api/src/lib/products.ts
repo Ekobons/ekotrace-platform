@@ -6,6 +6,8 @@
  *   energy    Energy management & savings (baselines, M&V, measures, ISO 50001 energy review)
  *   compliance  Compliance Position Desk (which regulations apply, obligations, deadlines, status)
  *   epr       Extended Producer Responsibility (India plastic, e-waste, batteries, tyres; EU PPWR; other schemes)
+ *   sme       EKOTRACE SME: the India SME tool (own sign-in page /sme, SME-only screens)
+ *   smenet    SME network: a buyer, cluster, bank or CA firm that SMEs share data with
  * India CCTS, BRSR Core, UAE MRV and Energy management are packages of their own: they are not part of EKOTRACE. With EKOTRACE they read its
  * approved entries; alone, their environmental figures are typed.
  */
@@ -13,9 +15,9 @@ import type { FastifyInstance } from 'fastify';
 import { tenantTx, type Tx } from '../db/pool.js';
 import { AppError } from './errors.js';
 
-export const PRODUCTS = ['ekotrace', 'ekofin', 'cbam', 'ccts', 'brsr', 'uaemrv', 'energy', 'compliance', 'epr'] as const;
+export const PRODUCTS = ['ekotrace', 'ekofin', 'cbam', 'ccts', 'brsr', 'uaemrv', 'energy', 'compliance', 'epr', 'sme', 'smenet'] as const;
 export type ProductCode = (typeof PRODUCTS)[number];
-const NAMES: Record<ProductCode, string> = { ekotrace: 'EKOTRACE', ekofin: 'EKOFIN', cbam: 'CBAM Exporter', ccts: 'India CCTS', brsr: 'BRSR Core', uaemrv: 'UAE MRV', energy: 'Energy management', compliance: 'Compliance desk', epr: 'EPR' };
+const NAMES: Record<ProductCode, string> = { ekotrace: 'EKOTRACE', ekofin: 'EKOFIN', cbam: 'CBAM Exporter', ccts: 'India CCTS', brsr: 'BRSR Core', uaemrv: 'UAE MRV', energy: 'Energy management', compliance: 'Compliance desk', epr: 'EPR', sme: 'EKOTRACE SME', smenet: 'SME network' };
 
 export async function productsOf(c: Tx, tenant: string): Promise<string[]> {
   return ((await c.query(`SELECT products FROM tenant WHERE id = $1`, [tenant])).rows[0]?.products as string[] | undefined) ?? [];

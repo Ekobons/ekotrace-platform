@@ -54,6 +54,7 @@ npm run demo:uaemrv       # optional: UAE MRV demo (an Abu Dhabi steel maker: EA
 npm run demo:energy       # optional: Energy management demo (UAE cold store, office tower, hotel, bakery: baselines and savings, invented)
 npm run demo:epr          # optional: EPR demo (Indian brand owner: plastic, e-waste, EU packaging, a recycling plant selling certificates, invented)
 npm run demo:compliance   # optional: Compliance desk demo (UAE / India metals group exporting to the EU: regulations, deadlines, statuses, invented)
+npm run demo:sme          # optional: EKOTRACE SME demo (Pune fastener maker + buyer, cluster, bank, CA firm; sign in at /sme, invented)
 
 # 5. Start (builds the screens and starts everything)
 npm run app

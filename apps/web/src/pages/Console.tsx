@@ -85,8 +85,8 @@ export function Console() {
   );
 }
 
-type Prod = 'ekotrace' | 'ekofin' | 'cbam' | 'ccts' | 'brsr' | 'uaemrv' | 'energy' | 'compliance' | 'epr';
-const PRODUCT_LABEL: Record<Prod, string> = { get ekotrace() { return productName('ekotrace'); }, get ekofin() { return productName('ekofin'); }, get cbam() { return productName('cbam'); }, ccts: 'India CCTS', brsr: 'BRSR Core', uaemrv: 'UAE MRV', energy: 'Energy management', compliance: 'Compliance desk', epr: 'EPR' };
+type Prod = 'ekotrace' | 'ekofin' | 'cbam' | 'ccts' | 'brsr' | 'uaemrv' | 'energy' | 'compliance' | 'epr' | 'sme' | 'smenet';
+const PRODUCT_LABEL: Record<Prod, string> = { get ekotrace() { return productName('ekotrace'); }, get ekofin() { return productName('ekofin'); }, get cbam() { return productName('cbam'); }, ccts: 'India CCTS', brsr: 'BRSR Core', uaemrv: 'UAE MRV', energy: 'Energy management', compliance: 'Compliance desk', epr: 'EPR', get sme() { return productName('sme'); }, smenet: 'SME network' };
 /** The packages the company has, chosen one by one: EKOTRACE (own GHG inventory), EKOFIN (financed emissions), CBAM Exporter, India CCTS, BRSR Core, UAE MRV — in any mix. */
 function ProductBoxes({ value, onChange }: { value: Prod[]; onChange: (v: Prod[]) => void }) {
   const flip = (p: Prod) => onChange(value.includes(p) ? value.filter((x) => x !== p) : [...value, p]);
@@ -102,6 +102,8 @@ function ProductBoxes({ value, onChange }: { value: Prod[]; onChange: (v: Prod[]
         <label className="row chkline" style={{ gap: 6 }}><input type="checkbox" checked={value.includes('energy')} onChange={() => flip('energy')} />Energy management · baselines, savings, measures, ISO 50001</label>
         <label className="row chkline" style={{ gap: 6 }}><input type="checkbox" checked={value.includes('compliance')} onChange={() => flip('compliance')} />Compliance desk · which regulations apply, obligations and deadlines</label>
         <label className="row chkline" style={{ gap: 6 }}><input type="checkbox" checked={value.includes('epr')} onChange={() => flip('epr')} />EPR · plastic, e-waste, battery and tyre obligations, EU packaging, certificates</label>
+        <label className="row chkline" style={{ gap: 6 }}><input type="checkbox" checked={value.includes('sme')} onChange={() => flip('sme')} />{productName('sme')} · the simple tool for Indian MSMEs (own sign-in page /sme)</label>
+        <label className="row chkline" style={{ gap: 6 }}><input type="checkbox" checked={value.includes('smenet')} onChange={() => flip('smenet')} />SME network · buyer, cluster, bank or CA firm following SMEs (set the kind in the SME console)</label>
       </div>
       {(['ccts', 'brsr', 'uaemrv', 'energy', 'compliance', 'epr'] as Prod[]).some((p) => value.includes(p)) && <small className="muted">{value.includes('ekotrace') ? `With ${productName('ekotrace')}, the add-on packages read its approved entries and sit in its menu.` : `Without ${productName('ekotrace')}, each add-on package has a small menu of its own and its figures are typed.`}</small>}
       {!value.length && <small className="bad">Choose at least one</small>}

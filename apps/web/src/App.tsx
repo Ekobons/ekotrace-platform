@@ -67,6 +67,11 @@ import { FinDashboard } from './pages/fin/FinDashboard';
 import { FinPortfolios } from './pages/fin/FinPortfolios';
 import { FinCounterparties, FinCounterpartyProfile } from './pages/fin/FinCounterparties';
 import { FinFactors } from './pages/fin/FinFactors';
+import { SmeApp } from './pages/sme/SmeApp';
+import { SME_GROUPS, SME_PAGES } from './pages/sme/nav';
+import { SmeNet } from './pages/sme/SmeNet';
+import { SmeConsole } from './pages/sme/SmeConsole';
+import { SmeGrievancePage, SmeSignup, SmeStart } from './pages/sme/SmePublic';
 
 interface Ctx {
   me: Me;
@@ -146,9 +151,28 @@ function packNav(p: 'ccts' | 'brsr' | 'uaemrv' | 'energy' | 'compliance' | 'epr'
     { group: 'Help', items: [{ to: '/help', label: 'User manual', icon: 'book' }] },
   ];
 }
-type Product = 'ekotrace' | 'ekofin' | 'cbam' | 'ccts' | 'brsr' | 'uaemrv' | 'energy' | 'compliance' | 'epr';
-const HOME: Record<Product, string> = { ekotrace: '/home', ekofin: '/fin', cbam: '/cbam/home', ccts: '/ccts', brsr: '/brsr', uaemrv: '/uae-mrv', energy: '/energy-mgmt', compliance: '/compliance', epr: '/epr' };
-const SHORT: Record<Product, string> = { ekotrace: 'TRC', ekofin: 'FIN', cbam: 'CBM', ccts: 'CCT', brsr: 'BRS', uaemrv: 'MRV', energy: 'NRG', compliance: 'CMP', epr: 'EPR' };
+/** EKOTRACE SME: its own menu (the SME tool's sections), then people and help. */
+const SME_C: Record<string, string> = { 'Carbon & ESG': '#7FD3B9', 'Save money': '#F2C46D', Compliance: '#8EC5FF', Exports: '#C9A7F5', Assist: '#B6E36B', Share: '#F7A8B8' };
+const SME_NAV: { group?: string; items: NavItem[] }[] = [
+  ...SME_GROUPS.map((g) => ({ group: g.key === 'home' ? undefined : g.title, items: g.pages.map((k) => ({ to: `/sme/${k}`, label: SME_PAGES[k]!.title, icon: SME_PAGES[k]!.icon })) })),
+  { group: 'Setup', items: [
+    { to: '/people', label: 'People & access', icon: 'users', roles: ['super_admin', 'admin', 'manager'] },
+    { to: '/audit', label: 'Security & audit log', icon: 'lock', roles: ['super_admin', 'admin', 'verifier'] },
+  ] },
+  { group: 'Help', items: [{ to: '/help', label: 'User manual', icon: 'book' }] },
+];
+/** SME network partners (buyers, clusters, banks, CA firms). */
+const SMENET_NAV: { group?: string; items: NavItem[] }[] = [
+  { items: [{ to: '/sme-net', label: 'SME network', icon: 'feed' }] },
+  { group: 'Setup', items: [
+    { to: '/people', label: 'People & access', icon: 'users', roles: ['super_admin', 'admin', 'manager'] },
+    { to: '/audit', label: 'Security & audit log', icon: 'lock', roles: ['super_admin', 'admin', 'verifier'] },
+  ] },
+  { group: 'Help', items: [{ to: '/help', label: 'User manual', icon: 'book' }] },
+];
+type Product = 'ekotrace' | 'ekofin' | 'cbam' | 'ccts' | 'brsr' | 'uaemrv' | 'energy' | 'compliance' | 'epr' | 'sme' | 'smenet';
+const HOME: Record<Product, string> = { ekotrace: '/home', ekofin: '/fin', cbam: '/cbam/home', ccts: '/ccts', brsr: '/brsr', uaemrv: '/uae-mrv', energy: '/energy-mgmt', compliance: '/compliance', epr: '/epr', sme: '/sme/home', smenet: '/sme-net' };
+const SHORT: Record<Product, string> = { ekotrace: 'TRC', ekofin: 'FIN', cbam: 'CBM', ccts: 'CCT', brsr: 'BRS', uaemrv: 'MRV', energy: 'NRG', compliance: 'CMP', epr: 'EPR', sme: 'SME', smenet: 'NET' };
 /** Packages that sit inside EKOTRACE's Disclose menu when the company has EKOTRACE. */
 const ADDONS: Product[] = ['ccts', 'brsr', 'uaemrv', 'energy', 'compliance', 'epr'];
 /** Short side-menu name of the financed-emissions factor library (EKOFIN EFs / Financed EFs). */
@@ -197,7 +221,7 @@ export function App() {
     catch (e) { const code = (e as { code?: string }).code; if (code === 'MUST_CHANGE_PASSWORD') setMustChange(true); setMe(null); }
   }, []);
   // public pages (survey, contractor and supplier portals) have no staff session to look up
-  const isPublic = ['/survey', '/contractor', '/supplier', '/cbam-signup', '/cbam-start', '/cbam-supplier', '/cbam-calculator'].includes(window.location.pathname);
+  const isPublic = ['/sme-signup', '/sme-start', '/sme-grievance', '/survey', '/contractor', '/supplier', '/cbam-signup', '/cbam-start', '/cbam-supplier', '/cbam-calculator'].includes(window.location.pathname);
   useEffect(() => { whenLoggedOut(() => setMe(null)); if (!isPublic) reload(); }, [reload, isPublic]);
   useEffect(() => {
     api.brand().then((b) => { document.title = b.productName ?? b.name; if (b.colors?.primary) document.documentElement.style.setProperty('--primary', b.colors.primary); }).catch(() => {});
@@ -215,6 +239,10 @@ export function App() {
   if (window.location.pathname === '/cbam-start') return <CbamStart />;
   if (window.location.pathname === '/cbam-supplier') return <CbamSupplierPage />;
   if (window.location.pathname === '/cbam-calculator') return <CbamCalculator />;
+  // EKOTRACE SME's open pages: sign-up, confirmation, the workers' grievance page behind the QR code
+  if (window.location.pathname === '/sme-signup') return <SmeSignup />;
+  if (window.location.pathname === '/sme-start') return <SmeStart />;
+  if (window.location.pathname === '/sme-grievance') return <SmeGrievancePage />;
   if (me === 'loading') return <div className="empty">Loading…</div>;
   if (me === null) return <Login onDone={reload} />;
   if (me.user.mustChangePassword || mustChange) return <ChangePassword forced onDone={reload} />;
@@ -264,9 +292,9 @@ function Shell() {
   const owned: Product[] = (tenant?.products?.length ? tenant.products : ['ekotrace']) as Product[];
   const products: Product[] = owned.includes('ekotrace') ? owned.filter((p) => !ADDONS.includes(p)) : owned;
   const [picked, setPicked] = useState<Product>(() => { try { return (localStorage.getItem('eko_product') as Product) || 'ekotrace'; } catch { return 'ekotrace'; } });
-  const product: Product = path.startsWith('/fin') && products.includes('ekofin') ? 'ekofin' : path.startsWith('/ccts') && products.includes('ccts') ? 'ccts' : path.startsWith('/brsr') && products.includes('brsr') ? 'brsr' : path.startsWith('/uae-mrv') && products.includes('uaemrv') ? 'uaemrv' : path.startsWith('/energy-mgmt') && products.includes('energy') ? 'energy' : path.startsWith('/compliance') && products.includes('compliance') ? 'compliance' : path.startsWith('/epr') && products.includes('epr') ? 'epr' : path.startsWith('/cbam/') && products.includes('cbam') && (picked === 'cbam' || !products.includes('ekotrace')) ? 'cbam' : products.includes(picked) ? picked : products[0]!;
+  const product: Product = path.startsWith('/sme/') && products.includes('sme') ? 'sme' : path.startsWith('/sme-net') && products.includes('smenet') ? 'smenet' : path.startsWith('/fin') && products.includes('ekofin') ? 'ekofin' : path.startsWith('/ccts') && products.includes('ccts') ? 'ccts' : path.startsWith('/brsr') && products.includes('brsr') ? 'brsr' : path.startsWith('/uae-mrv') && products.includes('uaemrv') ? 'uaemrv' : path.startsWith('/energy-mgmt') && products.includes('energy') ? 'energy' : path.startsWith('/compliance') && products.includes('compliance') ? 'compliance' : path.startsWith('/epr') && products.includes('epr') ? 'epr' : path.startsWith('/cbam/') && products.includes('cbam') && (picked === 'cbam' || !products.includes('ekotrace')) ? 'cbam' : products.includes(picked) ? picked : products[0]!;
   const cbamRole = useCbamRole(product === 'cbam');
-  const NAV = product === 'ekofin' ? FIN_NAV : product === 'cbam' ? cbamNav(cbamRole ?? 'both') : product === 'ccts' || product === 'brsr' || product === 'uaemrv' || product === 'energy' || product === 'compliance' || product === 'epr' ? packNav(product) : EKO_NAV;
+  const NAV = product === 'sme' ? SME_NAV : product === 'smenet' ? SMENET_NAV : product === 'ekofin' ? FIN_NAV : product === 'cbam' ? cbamNav(cbamRole ?? 'both') : product === 'ccts' || product === 'brsr' || product === 'uaemrv' || product === 'energy' || product === 'compliance' || product === 'epr' ? packNav(product) : EKO_NAV;
   const switchTo = (p: Product) => { setPicked(p); try { localStorage.setItem('eko_product', p); } catch { /* not kept */ } nav(HOME[p]); };
   const allGroups = NAV.flatMap((g) => (g.group ? [g.group] : []));
   const allClosed = allGroups.every((g) => folded.has(g));
@@ -316,7 +344,7 @@ function Shell() {
   if (path.startsWith('/scan/')) return <Routes><Route path="/scan/:code" element={<ScanPage />} /></Routes>;
 
   return (
-    <div className={`app${mini ? ' mini' : ''}${navOpen ? ' navopen' : ''}`}>
+    <div className={`app${mini ? ' mini' : ''}${navOpen ? ' navopen' : ''}${product === 'sme' || product === 'smenet' ? ' sme-shell' : ''}`}>
       <header className="mbar">
         <button type="button" className="mbtn" onClick={() => setNavOpen(true)} aria-label="Open the menu" aria-expanded={navOpen} aria-controls="sidenav"><span /><span /><span /></button>
         <BrandMark /><b className="mtitle">{tenant?.name ?? BRAND.name}</b>
@@ -325,7 +353,7 @@ function Shell() {
       <aside className="side" id="sidenav" aria-label="Menu" inert={small && !navOpen}
         onClick={(e) => { if (small && (e.target as Element).closest('a')) setNavOpen(false); }}>
         <button type="button" className="mclose" onClick={() => setNavOpen(false)} aria-label="Close the menu">✕</button>
-        <div className="brand"><BrandMark /><div className="bt"><b>{BRAND.name}</b><small>{BRAND.tagline}</small></div>
+        <div className="brand"><BrandMark /><div className="bt"><b>{product === 'sme' || product === 'smenet' ? `${BRAND.name} SME` : BRAND.name}</b><small>{product === 'sme' ? 'Carbon, ESG & compliance for MSMEs' : product === 'smenet' ? 'Your SME network' : BRAND.tagline}</small></div>
           <button type="button" className="minibtn" onClick={toggleMini} aria-label={mini ? 'Expand the menu' : 'Collapse the menu'} title={mini ? 'Expand the menu' : 'Collapse the menu'}>{mini ? '»' : '«'}</button></div>
         <div className="org">
           {role === 'platform_admin' ? (
@@ -345,7 +373,8 @@ function Shell() {
           : <div className="prodsw" role="tablist" aria-label="Product">{products.map((p) => <button key={p} type="button" role="tab" aria-selected={p === product} className={p === product ? 'on' : ''} onClick={() => p !== product && switchTo(p)}>{PRODUCT_NAME[p]}</button>)}</div>)}
         {tenant && !mini && <div className="navtools"><button type="button" onClick={foldAll} title={allClosed ? 'Expand all sections' : 'Collapse all sections'}>{allClosed ? '▸▸ Expand all' : '▾▾ Collapse all'}</button></div>}
         <nav className="nav">
-          {role === 'platform_admin' && <NavLink to="/console" title={mini ? 'Platform console' : undefined}><Icon name="gear" /><span className="nl">Platform console</span>{!tenant && alertN > 0 && <span className="navb red" title="Platform security alerts">{alertN}</span>}</NavLink>}
+          {role === 'platform_admin' && <NavLink to="/console" end title={mini ? 'Platform console' : undefined}><Icon name="gear" /><span className="nl">Platform console</span>{!tenant && alertN > 0 && <span className="navb red" title="Platform security alerts">{alertN}</span>}</NavLink>}
+          {role === 'platform_admin' && <NavLink to="/console/sme" title={mini ? 'SME console' : undefined}><Icon name="building" /><span className="nl">SME console</span></NavLink>}
           {role === 'platform_admin' && <NavLink to="/updates" title={mini ? 'Weekly updates' : undefined}><Icon name="feed" /><span className="nl">Weekly updates</span>{updN > 0 && <span className="navb amber" title="Updates and drafts to review">{updN}</span>}</NavLink>}
           {role === 'platform_admin' && <NavLink to="/library" title={mini ? 'Emission factors' : undefined}><Icon name="book" /><span className="nl">Emission factors</span></NavLink>}
           {role === 'platform_admin' && !tenant && <NavLink to="/fin/factors" title={mini ? FIN_EF : undefined}><Icon name="book" /><span className="nl">{FIN_EF}</span></NavLink>}
@@ -353,7 +382,7 @@ function Shell() {
           {tenant && NAV.map((g, gi) => {
             const items = g.items.filter(visible);
             if (!items.length) return null;
-            const sc = SEC_C[g.group ?? ''] ?? '#fff';
+            const sc = (product === 'sme' ? SME_C[g.group ?? ''] : undefined) ?? SEC_C[g.group ?? ''] ?? '#fff';
             const on = items.some(isOn);
             const open = mini || !g.group || !folded.has(g.group) || on;
             return (
@@ -390,6 +419,10 @@ function Shell() {
           <Route path="/fin/counterparties" element={<NeedFin><FinCounterparties /></NeedFin>} />
           <Route path="/fin/counterparties/:id" element={<NeedFin><FinCounterpartyProfile /></NeedFin>} />
           <Route path="/fin/factors" element={role === 'platform_admin' && !tenant ? <FinFactors /> : <NeedFin><FinFactors /></NeedFin>} />
+          <Route path="/sme" element={<Navigate to="/sme/home" replace />} />
+          <Route path="/sme/*" element={<NeedCo><NeedPack has={owned.includes('sme')} name="EKOTRACE SME"><SmeApp /></NeedPack></NeedCo>} />
+          <Route path="/sme-net" element={<NeedCo><NeedPack has={owned.includes('smenet')} name="SME network"><SmeNet /></NeedPack></NeedCo>} />
+          <Route path="/console/sme" element={<Gate ok={role === 'platform_admin'}><SmeConsole /></Gate>} />
           <Route path="/console" element={<Gate ok={role === 'platform_admin'}><Console /></Gate>} />
           <Route path="/updates" element={<Gate ok={role === 'platform_admin'}><Updates /></Gate>} />
           <Route path="/messages" element={role === 'platform_admin' ? <Messages /> : <NeedCo><Messages /></NeedCo>} />

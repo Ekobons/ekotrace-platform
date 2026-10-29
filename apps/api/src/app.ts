@@ -69,6 +69,10 @@ import { ekofinRoutes } from './modules/ekofin.routes.js';
 import { batchRoutes } from './modules/batches.routes.js';
 import { supplierPortalRoutes, supplierPublicRoutes } from './modules/supplierPortal.routes.js';
 import { supplierEngagementRoutes } from './modules/supplierEngagement.routes.js';
+import { smeRoutes } from './modules/sme.routes.js';
+import { smeNetRoutes } from './modules/smeNet.routes.js';
+import { smeAdminRoutes } from './modules/smeAdmin.routes.js';
+import { smePublicRoutes } from './modules/smePublic.routes.js';
 import { logTransfers } from './lib/integrations.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -129,6 +133,7 @@ export async function buildApp(opts: { logger?: boolean; rateLimit?: Limits | nu
   await app.register(contractorPublicRoutes);
   await app.register(supplierPublicRoutes);
   await app.register(cbamPublicRoutes);
+  await app.register(smePublicRoutes);
   await app.register(auditApiRoutes);
   await app.register(scimRoutes);
   await app.register(async (secured) => {
@@ -161,6 +166,9 @@ export async function buildApp(opts: { logger?: boolean; rateLimit?: Limits | nu
     await secured.register(batchRoutes);
     await secured.register(supplierPortalRoutes);
     await secured.register(supplierEngagementRoutes);
+    await secured.register(smeRoutes);
+    await secured.register(smeNetRoutes);
+    await secured.register(smeAdminRoutes);
     await secured.register(qrRoutes);
     await secured.register(contractorRoutes);
     await secured.register(assuranceRoutes);
