@@ -246,17 +246,16 @@ function CaQueue() {
       {!data.firms.length && <div className="sme-callout warn">No active CA firm yet. Set a partner’s kind to “CA firm” in Partners.</div>}
       {!data.requests.length ? <div className="empty">No validation requests yet.</div> : (
         <div className="sme-scroll">
-          <table className="sme-tbl"><thead><tr><th>Company</th><th>Year</th><th className="r">Self-assessed</th><th>Status</th><th>CA firm</th><th className="r">Result</th><th style={{ minWidth: 260 }}>Action</th></tr></thead>
+          <table className="sme-tbl"><thead><tr><th>Company</th><th className="r">Self-assessed</th><th>Status</th><th>CA firm</th><th className="r">Result</th><th style={{ minWidth: 250 }}>Action</th></tr></thead>
             <tbody>{data.requests.map((r: any) => {
               const open = r.status === 'requested' || r.status === 'assigned';
               const firm = pick[r.id] ?? r.ca_tenant ?? '';
               return (
                 <tr key={r.id}>
-                  <td className="net-name"><b>{r.company}</b><small>{[r.state, r.srmm_version === 'svc' ? 'SRMM v3.2 Services' : 'SRMM v3.1 Manufacturing'].filter(Boolean).join(' · ')} · asked {dmy(r.created_at)}</small></td>
-                  <td>{r.fy}</td>
+                  <td className="net-name"><b>{r.company}</b><small>{r.fy} · {r.srmm_version === 'svc' ? 'SRMM v3.2 Services' : 'SRMM v3.1 Manufacturing'}<br />{[r.state, `asked ${dmy(r.created_at)}`].filter(Boolean).join(' · ')}</small></td>
                   <td className="r">{r.self_pct == null ? dash : `${f1(r.self_pct)}%`}</td>
                   <td><CaStatus s={r.status} />{r.publish_on_icai && <div className="muted small">Publish on ICAI</div>}</td>
-                  <td>{r.ca_firm ?? <span className="muted">Not assigned</span>}{r.reviewer_name && <div className="muted small">{r.reviewer_name}</div>}</td>
+                  <td style={{ minWidth: 150 }}>{r.ca_firm ?? <span className="muted">Not assigned</span>}{r.reviewer_name && <div className="muted small">{r.reviewer_name}</div>}</td>
                   <td className="r">{r.validated_pct == null ? dash : `${f1(r.validated_pct)}% · L${r.validated_level ?? 0}`}</td>
                   <td>{!open ? <span className="muted small">{r.notes || (r.status === 'in_review' ? 'The firm is reviewing.' : '')}</span> : rej?.id === r.id ? (
                     <div className="net-sec" style={{ gap: 6 }}>
@@ -264,7 +263,7 @@ function CaQueue() {
                       <div className="row"><button className="btn sm danger" disabled={!rej?.notes.trim() || busy === r.id} onClick={() => run(r.id, { status: 'rejected', notes: rej?.notes.trim() ?? '' }, 'Request rejected')}>Reject</button><button className="btn sm ghost" onClick={() => setRej(null)}>Cancel</button></div>
                     </div>) : (
                     <div className="row" style={{ gap: 6 }}>
-                      <select className="input sm" aria-label={`CA firm for ${r.company}`} value={firm} onChange={(e) => setPick({ ...pick, [r.id]: e.target.value })}>
+                      <select className="input sm" style={{ maxWidth: 230 }} aria-label={`CA firm for ${r.company}`} value={firm} onChange={(e) => setPick({ ...pick, [r.id]: e.target.value })}>
                         <option value="">Choose a firm…</option>{data.firms.map((f) => <option key={f.id} value={f.id}>{f.name}{f.city ? `, ${f.city}` : ''}</option>)}</select>
                       <button className="btn sm p" disabled={!firm || firm === r.ca_tenant || busy === r.id} onClick={() => run(r.id, { caTenant: firm }, 'CA firm assigned')}>{r.ca_tenant ? 'Reassign' : 'Assign'}</button>
                       <button className="btn sm ghost danger" onClick={() => setRej({ id: r.id, notes: '' })}>Reject…</button>

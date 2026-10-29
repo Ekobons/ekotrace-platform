@@ -165,6 +165,12 @@ test('API: a cluster sees aggregates only, and only from five sharing members', 
 });
 
 test('API: CA validation — request, assign, validate; levels from the score and the 30% rule', async () => {
+  // not before the self-assessment is eligible (each section ≥ 30%)
+  const ne = await call('POST', `/api/sme/ca-requests?fy=${FY}`, { publish: false }, owner);
+  assert.equal(ne.status, 400); assert.equal(ne.body.error, 'NOT_ELIGIBLE');
+  const scores: Record<string, number> = {}, multi: Record<string, number> = {};
+  for (const q of (mfg as any).items) { if (q.parts) for (const [k] of q.parts) multi[`mfg_${q.id}_${k}`] = 1; else scores[`mfg_${q.id}`] = Math.round(q.max * 0.6); }
+  assert.equal((await call('PUT', `/api/sme/data/srmm?fy=${FY}`, { data: { version: 'mfg', scores, multi, remarks: {} } }, owner)).status, 200);
   const r = await call('POST', `/api/sme/ca-requests?fy=${FY}`, { publish: false }, owner);
   assert.equal(r.status, 200);
   assert.equal((await call('POST', `/api/sme/ca-requests?fy=${FY}`, {}, owner)).status, 409);
