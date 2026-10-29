@@ -1,0 +1,82 @@
+/* EKOTRACE SME look: larger type, section colours, calmer navigation. Loaded after every other SME stylesheet. */
+
+/* ---------- larger, easier type everywhere in the SME tool (screens and partner pages) ---------- */
+.sme-shell .main { zoom: 1.12; }
+@media (max-width: 700px) { .sme-shell .main { zoom: 1.05; } }
+.sme-shell .main .lbl { font-size: 12px; letter-spacing: .06em; }
+.sme-shell .main .t th, .sme-shell .main .sme-tbl th { font-size: 11.5px; }
+.sme-shell .main .muted, .sme-shell .main small { line-height: 1.45; }
+.page.sme h1 { font-size: 26px; letter-spacing: -.01em; }
+.page.sme h2 { font-size: 17px; }
+.page.sme .card { border-radius: 18px; padding: 20px; box-shadow: 0 1px 2px #10201C0A; }
+
+/* ---------- side menu: bigger entries, a coloured icon chip per section ---------- */
+.sme-shell .nav a { font-size: 15px; padding: 9px 10px; gap: 12px; }
+.sme-shell .nav a[style*="--ic"] > svg { width: 30px; height: 30px; padding: 6px; box-sizing: border-box; border-radius: 9px; background: #FFFFFF; color: var(--ic); opacity: 1; }
+.sme-shell .nav a[style*="--ic"].active { box-shadow: inset 3px 0 0 #FFFFFF; background: #FFFFFF26; }
+.sme-shell .navsec + .navsec { margin-top: 6px; }
+
+/* ---------- section bar with page tabs ---------- */
+.sme-tabs { display: flex; align-items: center; gap: 14px 22px; flex-wrap: wrap; background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 10px 12px; margin-bottom: 4px; box-shadow: inset 4px 0 0 var(--gc); }
+.sme-tabs-h { display: flex; align-items: center; gap: 10px; padding-left: 6px; }
+.sme-tabs-h b { display: block; font-size: 15px; }
+.sme-tabs-h small { display: block; font-size: 12px; color: var(--muted); }
+.sme-tabs-i { width: 38px; height: 38px; border-radius: 11px; background: var(--gs); color: var(--gc); display: grid; place-items: center; flex: none; }
+.sme-tabs-i svg { width: 20px; height: 20px; }
+.sme-tabs-l { display: flex; gap: 6px; flex-wrap: wrap; flex: 1; justify-content: flex-end; }
+.sme-tab { display: inline-flex; align-items: center; gap: 7px; height: 38px; padding: 0 14px; border-radius: 99px; border: 1px solid var(--line); background: var(--surface); color: var(--fg2); font: 600 14px var(--f-ui); text-decoration: none; cursor: pointer; white-space: nowrap; }
+.sme-tab svg { width: 16px; height: 16px; color: var(--gc); }
+.sme-tab:hover { border-color: var(--gc); color: var(--fg); }
+.sme-tab.on { background: var(--gc); border-color: var(--gc); color: #FFFFFF; }
+.sme-tab.on svg { color: #FFFFFF; }
+.sme-tab.na { opacity: .7; border-style: dashed; }
+.sme-tab.more { background: transparent; border-style: dashed; color: var(--muted); font-weight: 500; }
+@media (max-width: 700px) {
+  .sme-tabs { padding: 10px; }
+  .sme-tabs-l { justify-content: flex-start; flex-wrap: nowrap; overflow-x: auto; margin: 0 -10px; padding: 0 10px 2px; scrollbar-width: none; }
+  .sme-tabs-l::-webkit-scrollbar { display: none; }
+}
+
+/* ---------- page heading and figure tiles take the section colour ---------- */
+.page.sme .sme-picon { background: var(--gs, var(--primary-soft)); color: var(--gc, var(--primary)); width: 50px; height: 50px; border-radius: 14px; }
+.page.sme .sme-picon svg { width: 24px; height: 24px; }
+.page.sme .sme-head .lbl { color: var(--gc, var(--muted)); }
+.page.sme .sme-lede { font-size: 15px; color: var(--fg2); }
+.page.sme .sme-kpi { border-radius: 16px; padding: 14px 16px; position: relative; overflow: hidden; }
+.page.sme .sme-kpi::before { content: ""; position: absolute; left: 0; top: 0; right: 0; height: 4px; background: var(--gc, var(--primary)); opacity: .85; }
+.page.sme .sme-kpi b { font-size: 26px; }
+.page.sme .sme-kpi .lbl { font-size: 11.5px; }
+
+/* ---------- overview: start checklist ---------- */
+.sme-steps h2 { font-size: 19px; }
+.sme-steps p { margin: 2px 0 0; }
+.sme-steps-bar { width: 180px; height: 10px; border-radius: 99px; background: #E6EDE9; overflow: hidden; }
+.sme-steps-bar b { display: block; height: 100%; background: linear-gradient(90deg, #0E7C66, #2BA38A); border-radius: 99px; }
+.sme-steps ol { list-style: none; margin: 14px 0 0; padding: 0; display: grid; gap: 8px; }
+.sme-steps li { display: flex; align-items: center; gap: 14px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 14px; }
+.sme-steps li b { display: block; font-size: 15.5px; }
+.sme-steps li small { display: block; color: var(--muted); font-size: 13px; }
+.sme-steps .n { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; background: #EEF2EF; color: var(--muted); flex: none; }
+.sme-steps li.done { background: #F6FAF8; }
+.sme-steps li.done b { color: var(--muted); font-weight: 600; text-decoration: line-through; text-decoration-color: #9DB3A8; }
+.sme-steps li.done .n { background: var(--ok-bg); color: var(--ok); }
+.sme-steps li.next { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-soft); }
+.sme-steps li.next .n { background: var(--primary); color: #FFFFFF; }
+@media (max-width: 700px) { .sme-steps-bar { width: 100%; margin-top: 8px; } .sme-steps .row { flex-wrap: wrap; } .sme-steps li { flex-wrap: wrap; } .sme-steps li .btn { margin-left: 46px; } }
+
+/* ---------- overview: one card per section ---------- */
+.sme-hubs { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 14px; }
+.sme-hub { background: var(--surface); border: 1px solid var(--line); border-radius: 18px; overflow: hidden; display: flex; flex-direction: column; }
+.sme-hub-h { display: flex; align-items: center; gap: 12px; padding: 16px; background: linear-gradient(135deg, var(--gs), #FFFFFF 90%); color: var(--fg); text-decoration: none; border-bottom: 1px solid var(--line); }
+.sme-hub-h:hover b { color: var(--gc); }
+.sme-hub-h b { display: block; font-size: 16.5px; }
+.sme-hub-h small { display: block; color: var(--muted); font-size: 12.5px; }
+.sme-hub-i { width: 44px; height: 44px; border-radius: 13px; background: var(--gc); color: #FFFFFF; display: grid; place-items: center; flex: none; box-shadow: 0 4px 12px -4px var(--gc); }
+.sme-hub-i svg { width: 22px; height: 22px; }
+.sme-hub-f { text-align: right; }
+.sme-hub-f b { font-size: 19px; color: var(--gc); font-variant-numeric: tabular-nums; }
+.sme-hub-f small { font-size: 11.5px; }
+.sme-hub-l { display: flex; flex-wrap: wrap; gap: 6px; padding: 12px 14px 14px; }
+.sme-hub-l a { display: inline-flex; align-items: center; gap: 6px; padding: 6px 11px; border-radius: 99px; background: #F4F7F5; color: var(--fg2); text-decoration: none; font-size: 13.5px; font-weight: 500; }
+.sme-hub-l a svg { width: 15px; height: 15px; color: var(--gc); }
+.sme-hub-l a:hover { background: var(--gs); color: var(--fg); }

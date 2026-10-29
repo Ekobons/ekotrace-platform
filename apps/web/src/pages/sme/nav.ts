@@ -26,13 +26,31 @@ export const SME_PAGES: Record<string, { title: string; sub: string; icon: strin
   share: { title: 'Share & validate', sub: 'Consent, CA', icon: 'feed' },
   loan: { title: 'Green loan', sub: 'Bank pack', icon: 'doc' },
 };
-export const SME_GROUPS: { key: string; title: string; pages: string[] }[] = [
-  { key: 'home', title: 'Home', pages: ['home'] },
-  { key: 'carbon', title: 'Carbon & ESG', pages: ['profile', 'applies', 'emissions', 'esg', 'srmm', 'footprint', 'certs'] },
-  { key: 'save', title: 'Save money', pages: ['bills', 'solar', 'schemes', 'scrap', 'credits'] },
-  { key: 'comply', title: 'Compliance', pages: ['calendar', 'epr', 'dpdp', 'people', 'csr'] },
-  { key: 'export', title: 'Exports', pages: ['cbam', 'eudr'] },
-  { key: 'ai', title: 'Assist', pages: ['scan', 'questionnaire', 'whatsapp'] },
-  { key: 'share', title: 'Share', pages: ['share', 'loan'] },
+export interface SmeGroup { key: string; title: string; sub: string; icon: string; color: string; soft: string; pages: string[] }
+/** Sections of the tool: one menu entry each; their pages are tabs at the top of the page. */
+export const SME_GROUPS: SmeGroup[] = [
+  { key: 'home', title: 'Home', sub: 'Your snapshot', icon: 'home', color: '#0E7C66', soft: '#E3F3EC', pages: ['home'] },
+  { key: 'carbon', title: 'Carbon & ESG', sub: 'Your footprint and scores', icon: 'leaf', color: '#0E7C66', soft: '#E1F2EA', pages: ['profile', 'applies', 'emissions', 'esg', 'srmm', 'footprint', 'certs'] },
+  { key: 'save', title: 'Save money', sub: 'Lower bills, earn more', icon: 'bolt', color: '#A86207', soft: '#FBEFD9', pages: ['bills', 'solar', 'schemes', 'scrap', 'credits'] },
+  { key: 'comply', title: 'Compliance', sub: 'Dates and checklists', icon: 'calendar', color: '#1F5F99', soft: '#E2EEF8', pages: ['calendar', 'epr', 'dpdp', 'people', 'csr'] },
+  { key: 'export', title: 'Exports', sub: 'EU and UK rules', icon: 'truck', color: '#6B46B0', soft: '#EEE7F8', pages: ['cbam', 'eudr'] },
+  { key: 'ai', title: 'Quick tools', sub: 'Scan, answer, remind', icon: 'paste', color: '#4E7A12', soft: '#ECF4DE', pages: ['scan', 'questionnaire', 'whatsapp'] },
+  { key: 'share', title: 'Share', sub: 'Buyers, banks, your CA', icon: 'feed', color: '#B23A64', soft: '#F9E4EC', pages: ['share', 'loan'] },
 ];
 export const groupOf = (page: string) => SME_GROUPS.find((g) => g.pages.includes(page)) ?? SME_GROUPS[0]!;
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/**
+ * Whether a page matters for this company, from its Profile answers: pages that do not are tucked away
+ * (still one click away under "Show all") so a small company is not faced with rules that are not theirs.
+ */
+export function relevant(page: string, data: Record<string, any> | undefined, results: Record<string, any> | undefined): boolean {
+  const p = data?.profile ?? {};
+  switch (page) {
+    case 'cbam': return !!(p.euExport || p.ukExport);
+    case 'eudr': return !!p.eudr && p.eudr !== 'none';
+    case 'epr': return !!(p.plastics || p.ewaste || p.battery);
+    case 'csr': return !!results?.csr?.applies;
+    default: return true;
+  }
+}

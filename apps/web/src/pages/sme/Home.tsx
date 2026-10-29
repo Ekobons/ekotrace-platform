@@ -3,8 +3,19 @@ import { Link } from 'react-router-dom';
 import { Icon } from '../../components/Icon';
 import { useSme } from './store';
 import { Pill, Req, Sample } from './ui';
-import { SME_GROUPS, SME_PAGES } from './nav';
+import { SME_GROUPS, SME_PAGES, relevant } from './nav';
+import type { CSSProperties } from 'react';
 import { dmy, f0, f1, lakh } from '../../lib/sme';
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/** The one figure shown on each section's card. */
+const HUB_FIG: Record<string, (r: any) => [string, string] | null> = {
+  carbon: (r) => (r.emissions.total > 0 ? [f1(r.emissions.total), 'tCO₂e'] : null),
+  save: (r) => (r.money.savingsFound > 0 ? [lakh(r.money.savingsFound), 'a year'] : null),
+  comply: (r) => { const n = (r.calendar as { status: string }[]).filter((x) => x.status === 'overdue' || x.status === 'soon').length; return [String(n), n === 1 ? 'due soon' : 'due soon']; },
+  export: (r) => (r.cbam.applies ? [lakh(r.money.cbamAvoidedInr), 'saved for buyer'] : null),
+  share: (r) => (r.srmm.pct > 0 ? [`${f1(r.srmm.pct * 100)}%`, 'SRMM'] : null),
+};
 
 export function SmeHome() {
   const { d, error } = useSme();
@@ -12,10 +23,19 @@ export function SmeHome() {
   if (!d) return <div className="card empty">Loading your data…</div>;
   const r = d.results, C = 2 * Math.PI * 52, pct = Math.round(r.esg.overall);
   const due = (r.calendar as { id: string; title: string; date: string; status: string; days: number }[]).filter((x) => x.status !== 'done').slice(0, 4);
-  const attention = (r.requirements as { key: string; status: string; label: string; title: string; detail: string; action: string; go: string | null }[]).filter((x) => x.status === 'apply' || x.status === 'likely').slice(0, 6);
+  const attention = (r.requirements as { key: string; status: string; label: string; title: string; detail: string; action: string; go: string | null }[]).filter((x) => x.status === 'apply' || x.status === 'likely').slice(0, 4);
   const w = r.emissions.withS3 || 1;
   const top = (r.emissions.rows as { key: string; label: string; tco2e: number }[]).filter((x) => x.tco2e > 0).sort((a, b) => b.tco2e - a.tco2e).slice(0, 5);
   const empty = Object.keys(d.meta).length === 0;
+  const prof = d.data.profile ?? {};
+  const steps = [
+    { title: 'Tell us about your company', why: 'Six answers decide which rules apply to you', to: '/sme/profile', done: !!(prof.employees && prof.turnover) },
+    { title: 'Add your yearly bills', why: 'Electricity, diesel and LPG give your carbon footprint', to: '/sme/emissions', done: r.emissions.total > 0 },
+    { title: 'Answer the ESG questions', why: 'Water, waste, people and policies give your readiness score', to: '/sme/esg', done: !!d.meta.esg },
+    { title: 'Check your power bill', why: 'Most factories find penalties they can stop paying', to: '/sme/bills', done: !!d.meta.bills },
+    { title: 'Score your SRMM level', why: 'The ICAI maturity level buyers and banks ask for', to: '/sme/srmm', done: !!r.srmm.eligible },
+  ];
+  const stepsDone = steps.filter((x) => x.done).length, firstOpen = steps.findIndex((x) => !x.done);
   return (
     <>
       <section className="sme-hero">
@@ -43,7 +63,24 @@ export function SmeHome() {
         </div>
       </section>
 
-      {empty && <div className="sme-callout">Start with <Link to="/sme/profile">Profile</Link> (six answers decide what applies to you), then add your yearly bills in <Link to="/sme/emissions">Emissions</Link>.</div>}
+      {stepsDone < steps.length && <div className="card sme-steps">
+        <div className="row"><div className="grow"><h2>{empty ? 'Get started in five steps' : 'Your next steps'}</h2><p className="muted">{stepsDone} of {steps.length} done · each takes a few minutes</p></div>
+          <div className="sme-steps-bar" aria-hidden="true"><b style={{ width: `${(stepsDone / steps.length) * 100}%` }} /></div></div>
+        <ol>{steps.map((x, i) => <li key={x.to} className={x.done ? 'done' : i === firstOpen ? 'next' : ''}>
+          <span className="n">{x.done ? '✓' : i + 1}</span><div className="grow"><b>{x.title}</b><small>{x.why}</small></div>
+          {!x.done && <Link className={`btn${i === firstOpen ? ' p' : ''}`} to={x.to}>{i === firstOpen ? 'Start' : 'Open'}</Link>}</li>)}</ol>
+      </div>}
+
+      <div className="sme-hubs">
+        {SME_GROUPS.slice(1).map((g) => {
+          const pages = g.pages.filter((k) => relevant(k, d.data, r));
+          const fig = HUB_FIG[g.key]?.(r);
+          return <div key={g.key} className="sme-hub" style={{ '--gc': g.color, '--gs': g.soft } as CSSProperties}>
+            <Link to={`/sme/${pages[0] ?? g.pages[0]}`} className="sme-hub-h"><span className="sme-hub-i"><Icon name={g.icon} /></span><span className="grow"><b>{g.title}</b><small>{g.sub}</small></span>{fig && <span className="sme-hub-f"><b>{fig[0]}</b><small>{fig[1]}</small></span>}</Link>
+            <div className="sme-hub-l">{pages.map((k) => <Link key={k} to={`/sme/${k}`}><Icon name={SME_PAGES[k]!.icon} />{SME_PAGES[k]!.title}</Link>)}</div>
+          </div>;
+        })}
+      </div>
 
       <div className="sme-grid2">
         <div className="card"><div className="row"><h2 className="grow">Due next</h2><Link to="/sme/calendar">Full calendar</Link></div>
@@ -84,16 +121,10 @@ export function SmeHome() {
         </div>
       </div>
 
-      <div className="card"><div className="row"><h2 className="grow">Needs attention</h2><span className="muted">{attention.length} items</span></div>
+      <div className="card"><div className="row"><h2 className="grow">Needs attention</h2><Link to="/sme/applies">Everything that applies</Link></div>
         {attention.map((x) => <Req key={x.key} title={x.title} pill={x.label} kind={x.status} action={x.action ? <><b>Next:</b> {x.action} {x.go && <Link to={`/sme/${x.go}`}>Open</Link>}</> : null}>{x.detail}</Req>)}
         {!attention.length && <p className="muted">Nothing urgent.</p>}
       </div>
 
-      <div className="card"><h2>All modules</h2>
-        {SME_GROUPS.slice(1).map((g) => (
-          <div key={g.key} style={{ marginTop: 12 }}><span className="lbl">{g.title}</span>
-            <div className="sme-mods" style={{ marginTop: 8 }}>{g.pages.map((k) => <Link key={k} className="sme-mod" to={`/sme/${k}`}><span className="mi"><Icon name={SME_PAGES[k]!.icon} /></span><span><b>{SME_PAGES[k]!.title}</b><small>{SME_PAGES[k]!.sub}</small></span></Link>)}</div>
-          </div>))}
-      </div>
     </>);
 }

@@ -151,16 +151,18 @@ function packNav(p: 'ccts' | 'brsr' | 'uaemrv' | 'energy' | 'compliance' | 'epr'
     { group: 'Help', items: [{ to: '/help', label: 'User manual', icon: 'book' }] },
   ];
 }
-/** EKOTRACE SME: its own menu (the SME tool's sections), then people and help. */
-const SME_C: Record<string, string> = { 'Carbon & ESG': '#7FD3B9', 'Save money': '#F2C46D', Compliance: '#8EC5FF', Exports: '#C9A7F5', Assist: '#B6E36B', Share: '#F7A8B8' };
+/** EKOTRACE SME: a short menu — Home and one entry per section; a section's pages are tabs on the page itself. */
 const SME_NAV: { group?: string; items: NavItem[] }[] = [
-  ...SME_GROUPS.map((g) => ({ group: g.key === 'home' ? undefined : g.title, items: g.pages.map((k) => ({ to: `/sme/${k}`, label: SME_PAGES[k]!.title, icon: SME_PAGES[k]!.icon })) })),
+  { items: SME_GROUPS.map((g) => (g.key === 'home'
+    ? { to: '/sme/home', label: 'Home', icon: 'home' }
+    : { label: g.title, icon: g.icon, tabs: g.pages.map((k) => ({ to: `/sme/${k}`, label: SME_PAGES[k]!.title })) })) },
   { group: 'Setup', items: [
     { to: '/people', label: 'People & access', icon: 'users', roles: ['super_admin', 'admin', 'manager'] },
     { to: '/audit', label: 'Security & audit log', icon: 'lock', roles: ['super_admin', 'admin', 'verifier'] },
   ] },
   { group: 'Help', items: [{ to: '/help', label: 'User manual', icon: 'book' }] },
 ];
+const SME_C: Record<string, string> = Object.fromEntries(SME_GROUPS.map((g) => [g.title, g.color]));
 /** SME network partners (buyers, clusters, banks, CA firms). */
 const SMENET_NAV: { group?: string; items: NavItem[] }[] = [
   { items: [{ to: '/sme-net', label: 'SME network', icon: 'feed' }] },
@@ -390,7 +392,7 @@ function Shell() {
                 {g.group && <button type="button" className={`sech${open ? ' open' : ''}${on ? ' has' : ''}`} aria-expanded={open} title={g.group} onClick={() => !mini && fold(g.group!)}>
                   <i className="sdot" /><span>{g.group.toUpperCase()}</span><span className="chev">{open ? '▾' : '▸'}</span></button>}
                 {open && <div className="secitems">{items.map((i) => hrefOf(i)
-                  ? <NavLink key={i.label} to={hrefOf(i)!} title={mini ? labelOf(i) : undefined} className={() => (isOn(i) ? 'active' : '')}><Icon name={i.icon} /><span className="nl">{labelOf(i)}</span>
+                  ? <NavLink key={i.label} to={hrefOf(i)!} title={mini ? labelOf(i) : undefined} className={() => (isOn(i) ? 'active' : '')} style={product === 'sme' && SME_C[i.label] ? { '--ic': SME_C[i.label] } as CSSProperties : undefined}><Icon name={i.icon} /><span className="nl">{labelOf(i)}</span>
                     {(() => { const ts = i.tabs ? tabsOf(i).map((t) => t.to) : [i.to!]; const amber = ts.reduce((a, t) => a + badge(t), 0);
                       return <>{amber > 0 && <span className="navb amber" title={ts.includes('/approvals') ? 'Waiting for your approval' : 'Unread notices, things to do and messages'}>{amber}</span>}
                         {i.to === '/audit' && alertN > 0 && <span className="navb red" title="Security alerts to review">{alertN}</span>}</>; })()}</NavLink>
@@ -408,7 +410,7 @@ function Shell() {
         </div>
       </aside>
       <main className="main">
-        {section && tabsOf(section).length > 1 && <nav className="sectabs" aria-label={section.label}>
+        {section && product !== 'sme' && tabsOf(section).length > 1 && <nav className="sectabs" aria-label={section.label}>
           <span className="sectl"><Icon name={section.icon} size={16} />{section.label}</span>
           {tabsOf(section).map((t) => <NavLink key={t.to} to={t.to} className={() => (path === t.to ? 'on' : '')}>{t.label}{badge(t.to) > 0 && <span className="navb amber">{badge(t.to)}</span>}</NavLink>)}
         </nav>}

@@ -2,6 +2,10 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
 import './sme.css';
 import { SmeProvider } from './store';
+import { SmeTabs } from './Tabs';
+import { groupOf } from './nav';
+import { useLocation } from 'react-router-dom';
+import type { CSSProperties, ReactNode } from 'react';
 import { SmeHome } from './Home';
 import { SmeEmissions } from './Emissions';
 import { SmeProfile } from './Profile';
@@ -28,10 +32,14 @@ import { SmeWhatsapp } from './Whatsapp';
 import { SmeShare } from './Share';
 import { SmeLoan } from './Loan';
 
+// last, so the SME look wins over each screen's own styles
+import './look.css';
+
 export function SmeApp() {
   return (
     <SmeProvider>
-      <div className="page sme">
+      <SmePage>
+        <SmeTabs />
         <Routes>
         <Route path="home" element={<SmeHome />} />
         <Route path="emissions" element={<SmeEmissions />} />
@@ -60,6 +68,12 @@ export function SmeApp() {
         <Route path="loan" element={<SmeLoan />} />
         <Route path="*" element={<Navigate to="/sme/home" replace />} />
         </Routes>
-      </div>
+      </SmePage>
     </SmeProvider>);
+}
+
+/** The page frame, coloured by its section. */
+function SmePage({ children }: { children: ReactNode }) {
+  const g = groupOf(useLocation().pathname.split('/')[2] ?? 'home');
+  return <div className={`page sme g-${g.key}`} style={{ '--gc': g.color, '--gs': g.soft } as CSSProperties}>{children}</div>;
 }
