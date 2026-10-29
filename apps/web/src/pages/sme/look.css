@@ -140,3 +140,22 @@
 .page.sme .sme-field label, .page.sme .sme-toggle label { font-size: 14.5px; font-weight: 500; }
 .page.sme .chip { font-size: 12.5px; padding: 3px 10px; }
 @media (max-width: 700px) { .sme-hub2 { padding: 10px; gap: 8px; } .sme-hub2 b, .sme-hub2 small { white-space: normal; } .sme-hub2 .i { width: 34px; height: 34px; } }
+
+/* ---------- overview: sections as tabs, the open one lists its pages ---------- */
+.page.sme .sme-sp { padding: 0; overflow: hidden; }
+.sme-sp-tabs { display: flex; gap: 4px; padding: 8px 8px 0; background: #F5F8F6; border-bottom: 1px solid var(--line); overflow-x: auto; scrollbar-width: none; }
+.sme-sp-tabs::-webkit-scrollbar { display: none; }
+.sme-sp-tabs button { display: inline-flex; align-items: center; gap: 8px; padding: 11px 16px 12px; border: 1px solid transparent; border-bottom: 0; border-radius: 12px 12px 0 0; background: none; color: var(--fg2); font: 600 14.5px var(--f-ui); cursor: pointer; white-space: nowrap; margin-bottom: -1px; }
+.sme-sp-tabs button svg { width: 18px; height: 18px; color: var(--tc); }
+.sme-sp-tabs button:hover { color: var(--fg); background: #FFFFFF99; }
+.sme-sp-tabs button.on { background: var(--surface); border-color: var(--line); color: var(--fg); box-shadow: inset 0 3px 0 var(--tc); }
+.sme-sp-body { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; padding: 16px; }
+.sme-sp-item { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 14px; text-decoration: none; color: var(--fg); min-width: 0; }
+.sme-sp-item:hover { border-color: var(--gc); background: var(--gs); }
+.sme-sp-item .i { width: 40px; height: 40px; border-radius: 11px; background: var(--gs); color: var(--gc); display: grid; place-items: center; flex: none; }
+.sme-sp-item .i svg { width: 20px; height: 20px; }
+.sme-sp-item .t { flex: 1; min-width: 0; }
+.sme-sp-item b { display: block; font-size: 15px; }
+.sme-sp-item small { display: block; font-size: 13.5px; color: #3D4F49; font-weight: 500; }
+.sme-sp-item .go { font-size: 22px; color: var(--gc); line-height: 1; }
+@media (max-width: 700px) { .sme-sp-tabs button { padding: 10px 12px; font-size: 13.5px; } .sme-sp-body { padding: 12px; grid-template-columns: 1fr; } }

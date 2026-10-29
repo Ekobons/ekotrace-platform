@@ -3,8 +3,8 @@ import { Link } from 'react-router-dom';
 import { Icon } from '../../components/Icon';
 import { useSme } from './store';
 import { Pill, Req, Sample } from './ui';
-import { SME_GROUPS, relevant } from './nav';
-import type { CSSProperties } from 'react';
+import { SME_GROUPS, SME_PAGES, relevant } from './nav';
+import { useState, type CSSProperties } from 'react';
 import { dmy, f0, f1, lakh } from '../../lib/sme';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -64,16 +64,7 @@ export function SmeHome() {
           {!x.done && <Link className={`btn${i === firstOpen ? ' p' : ''}`} to={x.to}>{i === firstOpen ? 'Start' : 'Open'}</Link>}</li>)}</ol>
       </div>}
 
-      <div className="sme-hubs2">
-        {SME_GROUPS.slice(1).map((g) => {
-          const pages = g.pages.filter((k) => relevant(k, d.data, r));
-          const fig = HUB_FIG[g.key]?.(r);
-          return <Link key={g.key} to={`/sme/${pages[0] ?? g.pages[0]}`} className="sme-hub2" style={{ '--gc': g.color, '--gs': g.soft } as CSSProperties}>
-            <span className="i"><Icon name={g.icon} /></span>
-            <span className="t"><b>{g.title}</b><small>{fig ? <><em>{fig[0]}</em> {fig[1]}</> : pages.length ? `${pages.length} pages` : 'Not needed now'}</small></span>
-          </Link>;
-        })}
-      </div>
+      <SectionPanel />
 
       <div className="sme-grid2">
         <div className="card"><div className="row"><h2 className="grow">Due next</h2><Link to="/sme/calendar">Full calendar</Link></div>
@@ -120,4 +111,57 @@ export function SmeHome() {
       </div>
 
     </>);
+}
+
+/** One line about where each page stands, from the results. */
+const PAGE_LINE: Record<string, (r: any, d: any) => string | null> = {
+  profile: (_r, d) => (d.data.profile?.employees ? 'Filled in' : 'Six quick answers'),
+  applies: (r) => { const n = (r.requirements as { status: string }[]).filter((x) => x.status === 'apply').length; return `${n} rule${n === 1 ? '' : 's'} apply now`; },
+  emissions: (r) => (r.emissions.total > 0 ? `${f1(r.emissions.total)} tCO₂e (Scope 1 + 2)` : 'Add your yearly bills'),
+  esg: (r) => `${Math.round(r.esg.overall)}% · ${r.esg.level ? `Level ${r.esg.level}` : 'not yet rated'}`,
+  srmm: (r) => `${f1(r.srmm.pct * 100)}% · ${r.srmm.open} to score`,
+  footprint: (_r, d) => { const n = (d.data.footprint?.products ?? []).length; return n ? `${n} product${n === 1 ? '' : 's'}` : 'Per product'; },
+  certs: (_r, d) => { const n = (d.data.certs ?? []).filter((c: any) => c.level && c.level !== 'none').length; return `${n} held`; },
+  bills: (r) => (r.money.bills > 0 ? `${lakh(r.money.bills)} a year to save` : 'Check one month’s bill'),
+  solar: (r) => (r.solar.kw > 0 ? `${f0(r.solar.kw)} kWp · ${lakh(r.money.solar)} a year` : 'Add your roof area'),
+  schemes: (r) => { const n = (r.schemes as { eligible: boolean }[]).filter((x) => x.eligible).length; return `${n} likely for you`; },
+  scrap: (r) => (r.money.scrap > 0 ? `${lakh(r.money.scrap)} listed` : 'Sell waste'),
+  credits: (r) => (r.money.credits > 0 ? `${lakh(r.money.credits)} a year` : 'Pooled projects'),
+  calendar: (r) => { const n = (r.calendar as { status: string }[]).filter((x) => x.status === 'overdue' || x.status === 'soon').length; return n ? `${n} due soon` : 'Nothing due soon'; },
+  epr: () => 'Plastic, e-waste, batteries',
+  dpdp: (r) => `${Math.round(r.dpdpPct)}% of checklist done`,
+  people: (r) => `LTIFR ${f1(r.safety.ltifr)} · POSH`,
+  csr: (r) => (r.csr.applies ? 'Applies to you' : 'Not required'),
+  cbam: (r) => (r.cbam.applies ? `${f1(r.cbam.see)} tCO₂e per tonne` : 'EU and UK'),
+  eudr: () => 'Plot locations and documents',
+  scan: () => 'PDF bill to figures',
+  questionnaire: () => 'Answer buyer questions',
+  whatsapp: () => 'Message for your team',
+  share: () => 'Consent and CA validation',
+  loan: () => 'Bank-ready pack',
+};
+
+/** The sections as tabs; the open tab shows its pages with where each stands. */
+function SectionPanel() {
+  const { d } = useSme();
+  const [tab, setTab] = useState<string>(() => { try { return localStorage.getItem('eko_sme_hometab') ?? 'carbon'; } catch { return 'carbon'; } });
+  if (!d) return null;
+  const r = d.results;
+  const groups = SME_GROUPS.slice(1);
+  const g = groups.find((x) => x.key === tab) ?? groups[0]!;
+  const pick = (k: string) => { setTab(k); try { localStorage.setItem('eko_sme_hometab', k); } catch { /* not kept */ } };
+  const pages = g.pages.filter((k) => relevant(k, d.data, r));
+  return (
+    <section className="card sme-sp" style={{ '--gc': g.color, '--gs': g.soft } as CSSProperties}>
+      <div className="sme-sp-tabs" role="tablist" aria-label="Sections">
+        {groups.map((x) => <button key={x.key} type="button" role="tab" aria-selected={x.key === g.key} className={x.key === g.key ? 'on' : ''} style={{ '--tc': x.color, '--ts': x.soft } as CSSProperties} onClick={() => pick(x.key)}><Icon name={x.icon} />{x.title}</button>)}
+      </div>
+      <div className="sme-sp-body" role="tabpanel">
+        {pages.map((k) => <Link key={k} to={`/sme/${k}`} className="sme-sp-item">
+          <span className="i"><Icon name={SME_PAGES[k]!.icon} /></span>
+          <span className="t"><b>{SME_PAGES[k]!.title}</b><small>{PAGE_LINE[k]?.(r, d) ?? SME_PAGES[k]!.sub}</small></span><span className="go" aria-hidden="true">›</span>
+        </Link>)}
+        {!pages.length && <p className="muted" style={{ margin: 0 }}>Not needed for you now: your Profile says you do not export to the EU or UK. <Link to="/sme/profile">Change</Link></p>}
+      </div>
+    </section>);
 }
