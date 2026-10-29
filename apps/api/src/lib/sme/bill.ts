@@ -31,7 +31,9 @@ export function readIndianBill(text: string, type: 'electricity' | 'diesel' | 'l
   const ls = lines(text);
   const from = (f: { value: string | number; line: string } | undefined): Field => (f ? { value: f.value, line: f.line } : { value: null, line: null });
   const period: Field = general.periodFrom && general.periodTo ? { value: `${general.periodFrom.value} to ${general.periodTo.value}`, line: general.periodTo.line } : from(general.issueDate);
-  const amount = from(general.amount as { value: number; line: string } | undefined);
+  let amount = from(general.amount as { value: number; line: string } | undefined);
+  // Indian bills: "Net Amount Payable Rs 5,12,300.00" (lakh grouping), when the general reader found none
+  if (amount.value === null) amount = find(ls, /(net\s*amount\s*payable|amount\s*payable|net\s*payable|total\s*amount\s*due|bill\s*amount|amount\s*due)/i, 1, 1e10);
   if (type === 'electricity') {
     let units = find(ls, /(units?\s*consumed|net\s*units|total\s*units|consumption\s*\(?kwh\)?|kwh\s*consumed|billed\s*units|energy\s*consumption)/i, 1, 1e8);
     if (units.value === null && general.quantity && /kwh/i.test(general.quantity.unit)) units = { value: general.quantity.value, line: general.quantity.line };

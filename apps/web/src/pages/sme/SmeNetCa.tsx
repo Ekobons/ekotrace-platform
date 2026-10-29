@@ -11,7 +11,7 @@ const STATUS: Record<string, [string, string]> = {
   requested: ['watch', 'Waiting for a CA firm'], assigned: ['soon', 'New'], in_review: ['soon', 'In review'], validated: ['good', 'Validated'], rejected: ['apply', 'Returned'],
 };
 export const CaStatus = ({ s }: { s: string }) => { const [k, l] = STATUS[s] ?? ['watch', s]; return <Pill kind={k}>{l}</Pill>; };
-const SECTION: Record<string, string> = { A: 'Section A · General disclosures', B: 'Section B · Principle-wise performance', C: 'Section C · Leadership' };
+
 /** ICAI SRMM bands (same as the engine): every section ≥30%, then >30 / >50 / >65 / >80 %. */
 const levelFor = (pct: number, all30: boolean) => (!all30 ? 0 : pct > 80 ? 4 : pct > 65 ? 3 : pct > 50 ? 2 : pct > 30 ? 1 : 0);
 
@@ -103,20 +103,20 @@ function CaReview({ id, onBack }: { id: string; onBack: () => void }) {
           <div className="card"><h2>Score by section</h2>
             <div style={{ display: 'grid', gap: 10, marginTop: 12 }}>
               {(['A', 'B', 'C'] as const).map((s) => { const x = sr.sections[s]; return (
-                <div key={s} className="sme-secbar" style={{ gridTemplateColumns: '96px 1fr 120px' }}><span>Section {s}</span><div className="sme-track"><b style={{ width: `${n(x.pct) * 100}%` }} /><em /></div>
+                <div key={s} className="sme-secbar net-secbar"><span>Section {s}</span><div className="sme-track"><b style={{ width: `${n(x.pct) * 100}%` }} /><em /></div>
                   <span className="num" style={{ textAlign: 'right' }}>{f0(x.got)}/{f0(x.max)} · {f0(n(x.pct) * 100)}%</span></div>); })}
             </div>
             <p className="muted small" style={{ margin: '10px 0 0' }}>Each section needs at least 30% (the marker) before any level is awarded. Levels: 1 above 30%, 2 above 50%, 3 above 65%, 4 above 80%.</p>
           </div>
           <div className="card">
-            <div className="row"><h2 className="grow">Answers</h2>
+            <div className="row"><h2 className="grow" style={{ minWidth: 140 }}>Answers</h2>
               <div className="seg">{([['all', 'All'], ['open', `Blank (${sr.open})`], ['suggest', `Evidence differs (${sugg.size})`]] as const).map(([k, l]) => <button key={k} className={filter === k ? 'on' : ''} onClick={() => setFilter(k)}>{l}</button>)}</div></div>
             {!items.length && <p className="muted">Nothing in this view.</p>}
             {items.map((it, i) => {
               const sc = score(it), sg = sugg.get(it.id), rm = sm.remarks?.[key(it.id)], prev = items[i - 1];
               return (
                 <Fragment key={it.id}>
-                  {(!prev || prev.cat !== it.cat) && <div className="net-cat">{prev?.s !== it.s ? `${SECTION[it.s] ?? it.s} — ` : ''}{it.cat}</div>}
+                  {(!prev || prev.cat !== it.cat) && <div className="net-cat">{prev?.s !== it.s ? `Section ${it.s} — ` : ''}{it.cat}</div>}
                   <div className="net-q">
                     <span className="id">{it.id}</span>
                     <span className="qt">{it.q}</span>

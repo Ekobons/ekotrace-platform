@@ -88,4 +88,12 @@
   .srp { grid-template-columns: 1fr; }
   .cb-band-l em { display: none; } .cb-band-l i { display: inline; }
   .cb-hm { display: none; }
+  .cb-certs thead { display: none; }
+  .cb-certs, .cb-certs tbody { display: block; }
+  .cb-certs tr { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; padding: 12px 0; border-top: 1px solid var(--line); }
+  .cb-certs tr:first-child { border-top: 0; }
+  .cb-certs td { border: 0; padding: 0; min-width: 0; }
+  .cb-certs td:first-child { grid-column: 1 / -1; min-width: 0; }
+  .cb-certs td:last-child { grid-column: 1 / -1; text-align: left; }
+  .cb-certs select.input, .cb-certs input.input { min-width: 0; }
 }

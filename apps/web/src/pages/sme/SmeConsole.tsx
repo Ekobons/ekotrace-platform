@@ -10,7 +10,7 @@ import { Icon } from '../../components/Icon';
 import { useApp } from '../../App';
 import { LEVELS, dmy, f0, f1, n, smeAdminApi, smePublic, type PartnerKind } from '../../lib/sme';
 import { Kpi, Kpis, Pill } from './ui';
-import { Bars, FySelect, NetHead, currentFy, errText, rupees, useLoad } from './netShared';
+import { Bars, FySelect, NetHead, currentFy, fyList, errText, rupees, useLoad } from './netShared';
 import { CaStatus } from './SmeNetCa';
 import { ConsoleSettings } from './SmeConsoleSettings';
 
@@ -31,7 +31,8 @@ const Sec = ({ title, lede, tools, children }: { title: string; lede?: ReactNode
 export function SmeConsole() {
   const [sp, setSp] = useSearchParams();
   const tab = (TABS.find((t) => t[0] === sp.get('tab'))?.[0] ?? 'overview') as Tab;
-  const [fy, setFy] = useState(currentFy());
+  // SME data for a year is mostly complete after it ends, so the console opens on the previous year.
+  const [fy, setFy] = useState(fyList(currentFy())[1]!);
   const go = (t: Tab) => setSp(t === 'overview' ? {} : { tab: t }, { replace: true });
   return (
     <div className="page">
@@ -70,14 +71,14 @@ function Overview({ fy, setFy, go }: { fy: string; setFy: (s: string) => void; g
   return (
     <>
       <div className="row"><span className="muted small grow">Figures for companies below exclude demo companies. Results are for the chosen year.</span><FySelect value={fy} current={currentFy()} onChange={setFy} /></div>
-      <Kpis>
+      <div className="sme-kpis net-k3">
         <Kpi label="SME companies" value={f0(c.total)} unit={`${f0(c.active)} active · ${f0(c.trial)} on trial`} />
         <Kpi label="New in 30 days" value={f0(c.new30)} unit="companies" />
         <Kpi label="With emissions data" value={f0(o.withData)} unit={`companies · ${o.fy}`} />
         <Kpi label="SME users" value={f0(u.total)} unit={`${f0(u.active30)} signed in within 30 days`} />
         <Kpi label="Scope 1 + 2 tracked" value={f0(t.s12)} unit={`tCO₂e across ${f0(t.n)} results`} />
         <Kpi label="Contract value" value={rupees(o.revenue)} unit="active SME companies" />
-      </Kpis>
+      </div>
       {waiting > 0 && <div className="sme-callout warn">{waiting} CA validation request{waiting > 1 ? 's are' : ' is'} waiting for a firm. <button className="btn sm" onClick={() => go('ca')}>Assign</button></div>}
       <div className="sme-grid2">
         <div className="card"><h2>Sign-ups, last 12 months</h2>
@@ -208,7 +209,7 @@ function Links() {
         </form>
         {err && <div className="note bad">{err}</div>}
       </Sec>
-      <Sec title="Links" tools={<select className="input" aria-label="Filter by partner" value={partner} onChange={(e) => setPartner(e.target.value)}><option value="">All partners</option>{(partners.data?.partners ?? []).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select>}>
+      <Sec title="Links" tools={<select className="input" style={{ maxWidth: 280 }} aria-label="Filter by partner" value={partner} onChange={(e) => setPartner(e.target.value)}><option value="">All partners</option>{(partners.data?.partners ?? []).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select>}>
         {!data ? <Loading error={error} /> : !data.links.length ? <div className="empty">No links{partner ? ' for this partner' : ''} yet.</div> : (
           <div className="sme-scroll">
             <table className="sme-tbl"><thead><tr><th>Partner</th><th>SME</th><th>Sharing</th><th className="r">Purchases</th><th className="r">Loan</th><th className="r">Equity + debt</th><th>Linked</th><th /></tr></thead>
@@ -216,11 +217,11 @@ function Links() {
                 <tr key={l.id}>
                   <td className="net-name"><b>{l.partner}</b><small>{l.kind ? KIND[l.kind as PartnerKind] : 'Kind not set'}</small></td>
                   <td>{l.sme}</td>
-                  <td>{l.share ? <Pill kind="good">Sharing{l.consent_at ? ` since ${dmy(l.consent_at)}` : ''}</Pill> : l.revoked_at ? <Pill kind="apply">Stopped {dmy(l.revoked_at)}</Pill> : <Pill kind="soon">Not shared</Pill>}</td>
+                  <td>{l.share ? <><Pill kind="good">Sharing</Pill>{l.consent_at && <div className="muted small">since {dmy(l.consent_at)}</div>}</> : l.revoked_at ? <><Pill kind="apply">Stopped</Pill><div className="muted small">{dmy(l.revoked_at)}</div></> : <Pill kind="soon">Not shared</Pill>}</td>
                   <td className="r">{l.purchase_share_pct == null ? dash : `${f1(l.purchase_share_pct)}%`}</td>
                   <td className="r">{l.loan_cr == null ? dash : `₹${f1(l.loan_cr)} Cr`}</td>
                   <td className="r">{l.ev_cr == null ? dash : `₹${f1(l.ev_cr)} Cr`}</td>
-                  <td>{dmy(l.created_at)}</td>
+                  <td style={{ whiteSpace: 'nowrap' }}>{dmy(l.created_at)}</td>
                   <td className="r"><button className="btn sm danger" onClick={() => del(l)}>Remove</button></td>
                 </tr>))}</tbody></table>
           </div>)}

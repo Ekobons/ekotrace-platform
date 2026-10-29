@@ -437,9 +437,9 @@ export function requirements(d: any, cfg: any): any {
   };
   add('brsr_value_chain', p.listedBuyer ? 'likely' : 'watch');
   add('srmm', sr.open > 0 ? 'open' : 'done');
-  if (p.euExport && p.cbamGood !== 'none') add('eu_cbam', 'applies');
+  if (p.euExport && (p.cbamGood || 'none') !== 'none') add('eu_cbam', 'applies');
   else if (p.euExport) add('eu_cbam', 'watch');
-  if (p.ukExport && p.cbamGood !== 'none') add('uk_cbam', 'applies');
+  if (p.ukExport && (p.cbamGood || 'none') !== 'none') add('uk_cbam', 'applies');
   if (p.eudr && p.eudr !== 'none') add('eudr', 'applies');
   add('brsr_filing', p.listed ? 'applies' : 'not_required');
   add('ccts', p.energyIntensive ? 'check' : 'opportunity');
@@ -473,30 +473,33 @@ export function schemes(d: any, cfg: any): any {
 /* ------------------------------------------------------------------ questionnaire auto-answer */
 export function answer(d: any, cfg: any, q: any): any {
   const em = emissions(d, cfg), es = esgScore(d, cfg), x = String(q).toLowerCase(), s = d.esg || {}, sf = safety(d), sr = srmm(d, cfg);
-  const R: [RegExp, () => string][] = [
-    [/scope\s*1/, () => `${em.s1.toFixed(1)} tCO2e (fuels and refrigerants)`],
-    [/scope\s*2/, () => `${em.s2.toFixed(1)} tCO2e (grid electricity, location-based, CEA factor)`],
-    [/scope\s*3/, () => (em.s3 > 0 ? `Yes. ${em.s3.toFixed(1)} tCO2e covering Cat 1, 4 and 6` : 'Not yet tracked')],
-    [/water/, () => `${Math.round(n(s.water))} kL withdrawn`],
-    [/waste/, () => `${n(s.waste).toFixed(1)} t generated, ${Math.round(n(s.recycled))}% recycled or reused`],
-    [/renewable|solar/, () => `${em.renewablePct.toFixed(1)}% of electricity from rooftop solar`],
-    [/women|female|gender/, () => `${Math.round(n(s.women))}% of workforce`],
-    [/injur|ltifr|safety|accident/, () => `${sf.lti} lost-time injuries; LTIFR ${sf.ltifr.toFixed(2)}`],
-    [/bribery|corruption/, () => `Code of conduct: ${s.coc ? 'Yes' : 'No'}. Anti-bribery policy: ${s.abc ? 'Yes' : 'No'}`],
-    [/code of conduct|ethic/, () => `Code of conduct: ${s.coc ? 'Yes' : 'No'}`],
-    [/iso\s*14001|environmental management/, () => (hasCert(d, 'iso14001') ? 'Yes, ISO 14001' : 'No')],
-    [/grievance|complaint/, () => (s.grievance ? 'Yes, including an anonymous QR channel for workers' : 'No')],
-    [/posh|harass/, () => `Internal Committee: ${(d.people || {}).posh_ic ? 'Yes' : 'No'}`],
-    [/cbam|embedded/, () => `${cbam(d, cfg).see.toFixed(2)} tCO2e per tonne`],
-    [/privacy|dpdp|personal data/, () => `Policy: ${s.privacy ? 'Yes' : 'No'}; DPDP checklist ${Math.round(dpdpPct(d, cfg))}% complete`],
-    [/employee|headcount|workforce/, () => `${Math.round(n(d.profile && d.profile.employees))} employees`],
-    [/target/, () => (s.target ? 'Yes' : 'No target set')],
-    [/certif|zed/, () => (d.certs || []).filter((k: any) => k.level && k.level !== 'none').map((k: any) => k.name + (k.level !== 'held' ? ` (${k.level})` : '')).join(', ') || 'None'],
-    [/energy|electricity|fuel/, () => `Grid ${Math.round(n(d.emissions && d.emissions.grid))} kWh, solar ${Math.round(n(d.emissions && d.emissions.solar))} kWh, diesel ${Math.round(n(d.emissions && d.emissions.diesel))} L`],
-    [/srmm|maturity model/, () => `SRMM ${sr.versionLabel} self-assessed: ${(sr.pct * 100).toFixed(1)}% (${sr.label})`],
-    [/rating|readiness|maturity/, () => `${Math.round(es.overall)}%, ${es.level ? `Level ${es.level} ${es.levelName}` : es.levelName}`],
+  const has = (v: any) => v !== undefined && v !== null && v !== '';
+  // [question pattern, the data it needs is there, answer]. Patterns are specific so a question is never
+  // answered with a figure about something else; with no data the question is left for the user.
+  const R: [RegExp, () => boolean, () => string][] = [
+    [/scope\s*1/, () => em.s1 > 0, () => `${em.s1.toFixed(1)} tCO2e (fuels and refrigerants)`],
+    [/scope\s*2/, () => em.s2 > 0, () => `${em.s2.toFixed(1)} tCO2e (grid electricity, location-based, CEA factor)`],
+    [/scope\s*3/, () => true, () => (em.s3 > 0 ? `Yes. ${em.s3.toFixed(1)} tCO2e covering Cat 1, 4 and 6` : 'Not yet tracked')],
+    [/(total|how much|quantity|volume).*water|water.*(withdraw|consum|use|usage|kl|litre)/, () => n(s.water) > 0, () => `${Math.round(n(s.water))} kL withdrawn`],
+    [/(total|how much|quantity).*waste|waste.*(generat|recycl|tonne|quantity|disposed)/, () => n(s.waste) > 0, () => `${n(s.waste).toFixed(1)} t generated, ${Math.round(n(s.recycled))}% recycled or reused`],
+    [/renewable|solar/, () => true, () => `${em.renewablePct.toFixed(1)}% of electricity from rooftop solar`],
+    [/(share|percent|%|number|proportion).*(women|female)|gender (diversity|ratio)/, () => has(s.women), () => `${Math.round(n(s.women))}% of workforce`],
+    [/injur|ltifr|lost.?time|accident/, () => true, () => `${sf.lti} lost-time injuries; LTIFR ${sf.ltifr.toFixed(2)}`],
+    [/bribery|corruption/, () => true, () => `Code of conduct: ${s.coc ? 'Yes' : 'No'}. Anti-bribery policy: ${s.abc ? 'Yes' : 'No'}`],
+    [/code of conduct/, () => true, () => `Code of conduct: ${s.coc ? 'Yes' : 'No'}`],
+    [/iso\s*14001|environmental management system/, () => true, () => (hasCert(d, 'iso14001') ? 'Yes, ISO 14001' : 'No')],
+    [/grievance|complaint mechanism/, () => true, () => (s.grievance ? 'Yes, including an anonymous QR channel for workers' : 'No')],
+    [/posh|sexual harass/, () => true, () => `Internal Committee: ${(d.people || {}).posh_ic ? 'Yes' : 'No'}`],
+    [/cbam|embedded emission/, () => cbam(d, cfg).see > 0, () => `${cbam(d, cfg).see.toFixed(2)} tCO2e per tonne`],
+    [/privacy|dpdp|personal data/, () => true, () => `Policy: ${s.privacy ? 'Yes' : 'No'}; DPDP checklist ${Math.round(dpdpPct(d, cfg))}% complete`],
+    [/headcount|number of (employees|workers|staff)|how many (employees|workers|people)|total (employees|workforce)/, () => n(d.profile && d.profile.employees) > 0, () => `${Math.round(n(d.profile && d.profile.employees))} employees`],
+    [/(emission|reduction|climate|net.?zero|carbon).*target|target.*(emission|reduction|net.?zero|carbon)/, () => true, () => (s.target ? 'Yes' : 'No target set')],
+    [/certif|zed/, () => true, () => (d.certs || []).filter((k: any) => k.level && k.level !== 'none').map((k: any) => k.name + (k.level !== 'held' ? ` (${k.level})` : '')).join(', ') || 'None'],
+    [/(energy|electricity|fuel).*(consum|use|usage|kwh|total)|(total|how much).*(energy|electricity|fuel)/, () => n(d.emissions && d.emissions.grid) + n(d.emissions && d.emissions.diesel) > 0, () => `Grid ${Math.round(n(d.emissions && d.emissions.grid))} kWh, solar ${Math.round(n(d.emissions && d.emissions.solar))} kWh, diesel ${Math.round(n(d.emissions && d.emissions.diesel))} L`],
+    [/srmm|maturity model/, () => sr.open < sr.indicators, () => `SRMM ${sr.versionLabel} self-assessed: ${(sr.pct * 100).toFixed(1)}% (${sr.label})`],
+    [/esg (rating|score|readiness)/, () => true, () => `${Math.round(es.overall)}%, ${es.level ? `Level ${es.level} ${es.levelName}` : es.levelName}`],
   ];
-  for (const [re, fn] of R) if (re.test(x)) return { answer: fn(), filled: true };
+  for (const [re, ok, fn] of R) if (re.test(x)) return ok() ? { answer: fn(), filled: true } : { answer: 'No data entered yet. Add it, or answer manually.', filled: false };
   return { answer: 'No stored data. Answer manually.', filled: false };
 }
 

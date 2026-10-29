@@ -43,10 +43,10 @@ export function SmeCredits() {
   const add = async (e: FormEvent) => {
     e.preventDefault();
     const v = Number(form.type === 'solar' ? form.kw : form.kwh);
-    if (!(v > 0)) { toast(form.type === 'solar' ? 'Enter the new capacity in kWp.' : 'Enter the electricity saved a year.'); return; }
+    if (!(v > 0)) { toast(form.type === 'solar' ? 'Enter the new capacity in kWp.' : form.type === 'fuel_switch' ? 'Enter the diesel no longer burned a year.' : 'Enter the electricity saved a year.'); return; }
     setAdding(true);
     try {
-      const r = await smeApi.addCredit(form.type === 'solar' ? { type: 'solar', capacityKw: v } : { type: form.type, kwhPerYear: v });
+      const r = await smeApi.addCredit(form.type === 'solar' ? { type: 'solar', capacityKw: v } : form.type === 'fuel_switch' ? { type: 'fuel_switch', litresPerYear: v } : { type: form.type, kwhPerYear: v });
       setForm({ type: form.type, kw: '', kwh: '' });
       await load();
       toast(`Submitted: about ${f1(r.tco2ePerYear)} tCO₂e a year. EKOTRACE reviews it before it joins the pool.`);
@@ -120,7 +120,7 @@ export function SmeCredits() {
               <p className="muted small" style={{ margin: 0 }}>{TYPES.find((t) => t[0] === form.type)?.[2]}</p>
               {form.type === 'solar'
                 ? <label className="l">New capacity<small>kWp installed</small><input className="input num" type="number" min={0} step="any" inputMode="decimal" value={form.kw} onChange={(e) => setForm({ ...form, kw: e.target.value })} /></label>
-                : <label className="l">{form.type === 'efficiency' ? 'Electricity saved' : 'Energy switched'}<small>kWh a year, from meter readings before and after</small><input className="input num" type="number" min={0} step="any" inputMode="decimal" value={form.kwh} onChange={(e) => setForm({ ...form, kwh: e.target.value })} /></label>}
+                : <label className="l">{form.type === 'efficiency' ? 'Electricity saved' : 'Diesel no longer burned'}<small>{form.type === 'efficiency' ? 'kWh a year, from meter readings before and after' : 'litres a year, from fuel purchase records before and after'}</small><input className="input num" type="number" min={0} step="any" inputMode="decimal" value={form.kwh} onChange={(e) => setForm({ ...form, kwh: e.target.value })} /></label>}
               <div className="row"><button className="btn p" type="submit" disabled={adding}>{adding ? 'Submitting…' : 'Submit to the pool'}</button></div>
             </form>
           ) : <p className="muted">Only a company admin can submit projects to the pool.</p>}
@@ -138,7 +138,7 @@ export function SmeCredits() {
                   return (
                     <tr key={p.id}>
                       <td><b>{p.type === 'solar' ? `Solar ${f1(p.capacity_kw)} kWp` : p.type === 'efficiency' ? 'Energy efficiency' : 'Fuel switch'}</b><br />
-                        <span className="muted small">{f0(p.kwh_per_year)} kWh a year · {dmy(p.created_at)}{p.created_name ? ` · ${p.created_name}` : ''}</span></td>
+                        <span className="muted small">{p.kwh_per_year != null ? `${f0(p.kwh_per_year)} kWh a year · ` : ''}{dmy(p.created_at)}{p.created_name ? ` · ${p.created_name}` : ''}</span></td>
                       <td className="r">{f1(p.tco2e_per_year)}</td>
                       <td><Pill kind={kind}>{label}</Pill><br /><span className="muted small">{help}</span></td>
                     </tr>);

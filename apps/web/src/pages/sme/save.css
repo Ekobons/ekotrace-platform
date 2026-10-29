@@ -104,3 +104,8 @@
 }
 .sv-read.wide { grid-template-columns: minmax(0, 1fr) minmax(0, 280px); }
 @media (max-width: 700px) { .sv-read.wide { grid-template-columns: 1fr; } }
+@media (max-width: 520px) {
+  .sv-item { grid-template-columns: 1fr; }
+  .sv-amt { text-align: left; }
+  .sv-amt b { display: inline; margin-right: 6px; }
+}

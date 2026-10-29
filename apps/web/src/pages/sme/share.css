@@ -61,5 +61,6 @@ textarea.input.smq-text { width: 100%; min-height: 300px; font-size: 13.5px; }
   .sml-cols { grid-template-columns: 1fr 1fr; }
   .sml-sig { grid-template-columns: 1fr 1fr; }
   .sml-pack .chip { border: 1px solid currentColor; }
+  html, body, .app, .main { background: #fff !important; }
   @page { margin: 14mm; }
 }

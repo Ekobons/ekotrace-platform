@@ -94,6 +94,8 @@ export function uiConfig(config: any) {
     srmm: { mfg: config.srmm_mfg, svc: config.srmm_svc },
     dpdp: config.dpdp,
     cbam: { benchmarks: config.cbam.benchmarks, default_values: config.cbam.default_values, eu_price_eur: config.cbam.eu_price_eur, eur_inr: config.cbam.eur_inr, uk_price_gbp: config.cbam.uk_price_gbp, gbp_inr: config.cbam.gbp_inr, free_allocation_share: config.cbam.free_allocation_share, uk_start: config.cbam.uk_start, note: config.cbam.note },
+    esg: config.esg,
+    schemes: config.schemes,
     tariffs: config.tariffs, solar: config.solar, credit_pool: config.credit_pool, plans: config.plans, content: config.content,
     states: STATES,
   };

@@ -37,7 +37,6 @@ export function SmeBills() {
   return (
     <>
       <SmeHead lede="Enter the figures from one month's electricity bill (or read them from the bill PDF). We look for penalties you can stop paying and show what each fix saves in a year.">
-        {d.company.isExample && <Sample />}
         <Link className="btn" to="/sme/scan">Read a bill PDF</Link>
       </SmeHead>
 
@@ -49,7 +48,7 @@ export function SmeBills() {
       </Kpis>
 
       <div className="card">
-        <div className="sv-h2row"><h2>What we found</h2>{has && <span className="muted small">From one month's bill, shown as a yearly figure</span>}</div>
+        <div className="sv-h2row"><h2>What we found{d.company.isExample && <Sample />}</h2>{has && <span className="muted small">From one month's bill, shown as a yearly figure</span>}</div>
         {!has && <div className="sme-callout" style={{ marginTop: 10 }}>Add the figures from your power bill below (contract demand, maximum demand, power factor penalty and units) to see what you can save. Or <Link to="/sme/scan">read them from a bill PDF</Link>.</div>}
         {has && !findings.length && <p className="note ok" style={{ marginTop: 10 }}>No penalties on this bill. Your maximum demand is within contract demand, there is no power factor penalty, and no peak-hour units are entered.</p>}
         {findings.map((x, i) => <Finding key={i} x={x} b={b} />)}

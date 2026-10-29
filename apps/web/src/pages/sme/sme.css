@@ -90,3 +90,6 @@
 .smesb-list svg { width: 18px; height: 18px; flex: none; margin-top: 2px; color: var(--lime); }
 .sme-cats { display: flex; flex-wrap: wrap; gap: 8px; }
 .smesb .sb-chart { margin-top: 18px; }
+
+/* page heading: on phones the buttons go to their own line */
+@media (max-width: 700px) { .sme-head > .row { flex-basis: 100%; flex-wrap: wrap; } }

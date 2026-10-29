@@ -71,7 +71,7 @@ function Invite({ kind, onDone }: { kind: 'buyer' | 'cluster' | 'bank'; onDone: 
         <div className="net-pw" role="status">
           <b>{res.company || res.email} is set up. Give them this temporary password.</b>
           <code ref={pwRef}>{res.temporaryPassword}</code>
-          <p>It is shown <b>only once</b>. They sign in with <b>{res.email}</b> and this password, then choose their own.{res.emailed ? ' We have also e-mailed it to them.' : ' E-mail is not set up on this server, so please pass it on yourself.'}</p>
+          <p>It is shown <b>only once</b>. They sign in at <b>{window.location.origin}/sme</b> with <b>{res.email}</b> and this password, then choose their own.{res.emailed ? ' We have also e-mailed it to them.' : ' E-mail is not set up on this server, so please pass it on yourself.'}</p>
           <div className="row">
             <button type="button" className="btn sm" onClick={async () => { const ok = await copyText(res.temporaryPassword!, pwRef.current); toast(ok ? 'Password copied' : 'Selected, press Ctrl+C to copy'); }}><Icon name="paste" />Copy password</button>
             <button type="button" className="btn sm ghost" onClick={() => setRes(null)}>I have passed it on</button>

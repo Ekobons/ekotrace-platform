@@ -40,7 +40,7 @@ export const smeApi = {
   caRequests: () => call<{ items: SmeCaRequest[] }>('GET', '/api/sme/ca-requests'),
   requestCa: (fy: string, publish: boolean) => call<{ id: string }>('POST', `/api/sme/ca-requests${q(fy)}`, { publish }),
   credits: () => call<{ items: SmeCredit[] }>('GET', '/api/sme/credit-projects'),
-  addCredit: (b: { type: SmeCredit['type']; capacityKw?: number | null; kwhPerYear?: number | null }) => call<{ id: string; tco2ePerYear: number }>('POST', '/api/sme/credit-projects', b),
+  addCredit: (b: { type: SmeCredit['type']; capacityKw?: number | null; kwhPerYear?: number | null; litresPerYear?: number | null }) => call<{ id: string; tco2ePerYear: number }>('POST', '/api/sme/credit-projects', b),
 };
 
 // ------------------------------------------------------------------ open pages --

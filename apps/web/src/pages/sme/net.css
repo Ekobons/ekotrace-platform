@@ -5,6 +5,7 @@
 .net-edit { display: inline-flex; align-items: center; gap: 4px; justify-content: flex-end; }
 .net-edit .input { width: 82px; height: 32px; text-align: right; font-size: 13px; padding: 0 8px; }
 .net-edit small { color: var(--muted); font-size: 11.5px; }
+.net-name { min-width: 190px; }
 .net-name b { display: block; font-size: 13.5px; }
 .net-name small { color: var(--muted); font-size: 12px; }
 .net-actions { display: flex; gap: 6px; justify-content: flex-end; flex-wrap: wrap; }
@@ -52,6 +53,7 @@
 .net-cat { font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 16px 0 2px; }
 .net-review { position: sticky; top: 12px; }
 .net-review textarea { width: 100%; min-height: 90px; padding: 8px 10px; resize: vertical; font: inherit; font-size: 13px; }
+.net-secbar { grid-template-columns: 96px 1fr 120px; }
 .net-split { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 14px; align-items: start; }
 .net-check { display: flex; gap: 8px; align-items: flex-start; font-size: 13.5px; }
 .net-check input { margin-top: 3px; }
@@ -87,11 +89,12 @@
 .net-months i { display: block; width: 100%; max-width: 34px; background: var(--primary); border-radius: 4px 4px 0 0; min-height: 2px; }
 .net-months span { font-size: 11px; font-weight: 700; }
 .net-months small { font-size: 10px; color: var(--muted); white-space: nowrap; }
+.net-k3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .net-con-v { grid-template-columns: 260px minmax(0, 1fr); }
 .net-form3 { grid-template-columns: minmax(0, 1fr) auto auto; }
 @media (max-width: 1000px) {
   .net-split { grid-template-columns: 1fr; }
-  .net-review { position: static; }
+  .net-review { position: static; order: -1; }
   .net-con { grid-template-columns: 1fr; }
   .net-tabs { position: static; display: flex; overflow-x: auto; padding: 6px; }
   .net-tabs button { flex: none; white-space: nowrap; }
@@ -101,6 +104,8 @@
   .net-hist-l { font-size: 9.5px; }
   .net-barrow { grid-template-columns: 100px 1fr 52px; }
   .net-lock { grid-template-columns: 1fr; }
+  .net-k3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .net-secbar { grid-template-columns: 70px 1fr 96px; }
   .net-form3 { grid-template-columns: 1fr 1fr; } .net-form3 .field { grid-column: 1 / -1; }
   .net-q { grid-template-columns: 40px minmax(0, 1fr) auto; }
 }

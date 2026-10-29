@@ -52,11 +52,16 @@ export async function smeRoutes(app: FastifyInstance) {
     const t = requireTenant(req), fy = fyParam(req);
     const mod = (req.params as { module: string }).module;
     if (!(MODULES as readonly string[]).includes(mod)) throw notFound('Module');
-    const b = z.object({ data: z.record(z.string(), z.any()), version: z.number().int().optional() }).parse(req.body);
+    // certifications are a list; every other module is one object
+    const b = z.object({ data: mod === 'certs' ? z.array(z.record(z.string(), z.any())).max(60) : z.record(z.string(), z.any()), version: z.number().int().optional() }).parse(req.body);
     if (JSON.stringify(b.data).length > 95_000) throw new AppError('That is too much data for one save.', 413, 'TOO_LARGE');
     return tenantTx(t, async (c) => {
       const before = (await c.query(`SELECT data, version FROM sme_doc WHERE tenant_id = $1 AND fy = $2 AND module = $3`, [t, fy, mod])).rows[0];
       if (before && b.version !== undefined && b.version !== before.version) throw new AppError('Someone else changed this page. Reload to see their changes.', 409, 'STALE');
+      // joining the anonymous benchmark is a consent: only the owner (super admin) may change it
+      if (mod === 'share' && !!(b.data as any).bench !== !!before?.data?.bench && !['super_admin', 'platform_admin'].includes(req.user.role)) {
+        throw new AppError('Only the owner (super admin) can change consent to the benchmark.', 403, 'FORBIDDEN');
+      }
       const v = (await c.query(`INSERT INTO sme_doc (tenant_id, fy, module, data, updated_name) VALUES ($1,$2,$3,$4,$5)
         ON CONFLICT (tenant_id, fy, module) DO UPDATE SET data = EXCLUDED.data, version = sme_doc.version + 1, updated_name = EXCLUDED.updated_name, updated_at = now() RETURNING version`,
         [t, fy, mod, JSON.stringify(b.data), req.user.name])).rows[0].version;
@@ -214,6 +219,7 @@ export async function smeRoutes(app: FastifyInstance) {
         throw new AppError('A validation request for this year is already open.', 409, 'DUPLICATE');
       }
       const out = await compute(c, t, fy);
+      if (!out.results.srmm.eligible) throw new AppError('The SRMM self-assessment is not yet eligible for a level: each section needs at least 30% and the total above 30%.', 400, 'NOT_ELIGIBLE');
       const r = (await c.query(`INSERT INTO sme_ca_request (sme_tenant, fy, srmm_version, self_pct, publish_on_icai) VALUES ($1,$2,$3,$4,$5) RETURNING id`,
         [t, fy, out.results.srmm.version, out.results.srmm.pct * 100, b.publish])).rows[0];
       await audit(c, req, 'sme.ca.request', 'sme_ca_request', r.id, { fy });
@@ -229,10 +235,12 @@ export async function smeRoutes(app: FastifyInstance) {
   app.post('/api/sme/credit-projects', async (req) => {
     canManage(req);
     const t = requireTenant(req);
-    const b = z.object({ type: z.enum(['solar', 'efficiency', 'fuel_switch']), capacityKw: z.number().min(0).max(1e5).nullable().optional(), kwhPerYear: z.number().min(0).max(1e9).nullable().optional() }).parse(req.body);
+    const b = z.object({ type: z.enum(['solar', 'efficiency', 'fuel_switch']), capacityKw: z.number().min(0).max(1e5).nullable().optional(), kwhPerYear: z.number().min(0).max(1e9).nullable().optional(), litresPerYear: z.number().min(0).max(1e8).nullable().optional() }).parse(req.body);
     const config = await cfg();
-    const kwh = b.type === 'solar' ? (b.capacityKw ?? 0) * (config.solar.default?.yieldKwp ?? 1450) : b.kwhPerYear ?? 0;
-    const tco2e = (kwh * config.factors.items.grid.factor) / 1000;
+    // solar and efficiency save grid electricity; a fuel switch saves the diesel no longer burned
+    const kwh = b.type === 'solar' ? (b.capacityKw ?? 0) * (config.solar.default?.yieldKwp ?? 1450) : b.type === 'efficiency' ? b.kwhPerYear ?? 0 : null;
+    if (b.type === 'fuel_switch' && !(b.litresPerYear! > 0)) throw new AppError('Enter the diesel no longer burned, in litres a year.');
+    const tco2e = b.type === 'fuel_switch' ? (b.litresPerYear! * config.factors.items.diesel.factor) / 1000 : ((kwh ?? 0) * config.factors.items.grid.factor) / 1000;
     return tenantTx(t, async (c) => {
       const r = (await c.query(`INSERT INTO sme_credit (tenant_id, type, capacity_kw, kwh_per_year, tco2e_per_year, created_name) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id`,
         [t, b.type, b.capacityKw ?? null, kwh, tco2e, req.user.name])).rows[0];
