@@ -1,0 +1,106 @@
+/* SME network (partners) and the SME console. Built on styles.css + sme.css. */
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.net-fy select { height: 36px; font-size: 13px; font-weight: 600; }
+.net-sec { display: grid; gap: 14px; }
+.net-edit { display: inline-flex; align-items: center; gap: 4px; justify-content: flex-end; }
+.net-edit .input { width: 82px; height: 32px; text-align: right; font-size: 13px; padding: 0 8px; }
+.net-edit small { color: var(--muted); font-size: 11.5px; }
+.net-name b { display: block; font-size: 13.5px; }
+.net-name small { color: var(--muted); font-size: 12px; }
+.net-actions { display: flex; gap: 6px; justify-content: flex-end; flex-wrap: wrap; }
+.net-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; align-items: end; }
+.net-form .field .input, .net-form .field select, .net-form .field textarea { width: 100%; }
+.net-form .field > span small { text-transform: none; letter-spacing: 0; font-weight: 400; margin-left: 4px; }
+.net-pw { display: grid; gap: 8px; border: 1px solid #BFE3D4; background: var(--primary-soft); border-radius: 14px; padding: 14px 16px; }
+.net-pw code { font-family: var(--f-mono); font-size: 18px; font-weight: 700; letter-spacing: .04em; background: var(--surface); border: 1px dashed var(--line2); border-radius: 8px; padding: 6px 10px; user-select: all; overflow-wrap: anywhere; }
+.net-pw p { margin: 0; font-size: 13px; }
+.net-bars { display: grid; gap: 8px; }
+.net-barrow { display: grid; grid-template-columns: minmax(90px, 160px) 1fr 64px; gap: 10px; align-items: center; font-size: 13px; }
+.net-barrow > .num { text-align: right; font-variant-numeric: tabular-nums; }
+.net-bl { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.net-bt { height: 10px; background: var(--line); border-radius: 5px; overflow: hidden; }
+.net-bt b { display: block; height: 100%; border-radius: 5px; }
+/* histogram */
+.net-hist { display: grid; grid-template-columns: repeat(8, 1fr); gap: 6px; align-items: end; height: 150px; margin-top: 14px; }
+.net-hist div { display: flex; flex-direction: column; justify-content: flex-end; align-items: center; height: 100%; gap: 4px; }
+.net-hist i { display: block; width: 100%; background: var(--primary); border-radius: 5px 5px 0 0; min-height: 2px; opacity: .85; }
+.net-hist i.mid { background: var(--ink); }
+.net-hist span { font-size: 11.5px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.net-hist-l { display: grid; grid-template-columns: repeat(8, 1fr); gap: 6px; font-size: 10.5px; color: var(--muted); text-align: center; margin-top: 6px; }
+.net-spread { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 12px; }
+.net-spread div { background: #F4F7F5; border-radius: 10px; padding: 8px 10px; text-align: center; }
+.net-spread small { display: block; font-size: 11px; color: var(--muted); }
+.net-spread b { font-size: 16px; font-variant-numeric: tabular-nums; }
+/* locked state (cluster below the minimum group) */
+.net-lock { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 16px; align-items: start; }
+.net-lock .ic { width: 44px; height: 44px; border-radius: 12px; background: var(--warn-bg); color: var(--warn); display: grid; place-items: center; }
+.net-lock .ic svg { width: 22px; height: 22px; }
+.net-lock p { margin: 6px 0 0; font-size: 13.5px; color: var(--fg2); max-width: 70ch; }
+.net-meter { display: grid; grid-template-columns: repeat(var(--n, 5), 1fr); gap: 4px; margin-top: 12px; max-width: 320px; }
+.net-meter i { height: 8px; border-radius: 4px; background: var(--line); }
+.net-meter i.on { background: var(--primary); }
+/* CA review */
+.net-back { align-self: flex-start; }
+.net-q { display: grid; grid-template-columns: 52px minmax(0, 1fr) auto; gap: 4px 12px; padding: 12px 0; border-top: 1px solid var(--line); }
+.net-q:first-child { border-top: 0; }
+.net-q .id { font-family: var(--f-mono); font-size: 12px; font-weight: 700; color: var(--muted); padding-top: 2px; }
+.net-q .qt { font-size: 13.5px; }
+.net-q .sc { text-align: right; font-variant-numeric: tabular-nums; font-weight: 700; white-space: nowrap; }
+.net-q .sc.open { color: var(--muted); font-weight: 500; }
+.net-q .ex { grid-column: 2 / -1; font-size: 12.5px; color: var(--muted); }
+.net-q .ex b { color: var(--fg2); font-weight: 600; }
+.net-cat { font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 16px 0 2px; }
+.net-review { position: sticky; top: 12px; }
+.net-review textarea { width: 100%; min-height: 90px; padding: 8px 10px; resize: vertical; font: inherit; font-size: 13px; }
+.net-split { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 14px; align-items: start; }
+.net-check { display: flex; gap: 8px; align-items: flex-start; font-size: 13.5px; }
+.net-check input { margin-top: 3px; }
+/* console */
+.net-con { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 16px; align-items: start; }
+.net-tabs { display: grid; gap: 2px; position: sticky; top: 12px; background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 8px; }
+.net-tabs button { display: flex; align-items: center; gap: 10px; text-align: left; border: 0; background: none; padding: 9px 10px; border-radius: 10px; font: inherit; font-size: 13.5px; color: var(--fg2); cursor: pointer; }
+.net-tabs button svg { width: 16px; height: 16px; color: var(--muted); flex: none; }
+.net-tabs button:hover { background: #F4F7F5; }
+.net-tabs button.on { background: var(--primary-soft); color: var(--fg); font-weight: 600; }
+.net-tabs button.on svg { color: var(--primary); }
+.net-tabs .cnt { margin-left: auto; font-size: 11px; font-weight: 700; background: var(--warn-bg); color: var(--warn); border-radius: 99px; padding: 1px 7px; }
+.net-tools { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.net-tools .input { height: 36px; }
+.net-tools .grow .input { width: 100%; }
+.net-json { width: 100%; min-height: 420px; font-family: var(--f-mono); font-size: 12px; line-height: 1.5; padding: 10px 12px; border: 1px solid var(--line2); border-radius: 10px; resize: vertical; tab-size: 2; white-space: pre; background: #FBFCFB; }
+.net-json.bad { border-color: var(--bad); }
+.net-json[readonly] { background: #F4F7F5; }
+.net-keys { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; }
+.net-key { display: grid; gap: 4px; text-align: left; padding: 12px 14px; border-radius: 14px; background: var(--surface); border: 1px solid var(--line); cursor: pointer; font: inherit; color: var(--fg); }
+.net-key:hover { border-color: var(--primary); }
+.net-key b { font-size: 13.5px; }
+.net-key small { color: var(--muted); font-size: 12px; }
+.net-key code { font-family: var(--f-mono); font-size: 11px; color: var(--muted); }
+.net-vlist { display: grid; gap: 2px; }
+.net-vlist button { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 2px 10px; align-items: center; text-align: left; border: 1px solid transparent; background: none; border-radius: 10px; padding: 8px 10px; font: inherit; cursor: pointer; color: var(--fg); }
+.net-vlist button:hover { background: #F4F7F5; }
+.net-vlist button.on { border-color: #BFE3D4; background: var(--primary-soft); }
+.net-vlist button b { font-variant-numeric: tabular-nums; }
+.net-vlist button small { grid-column: 2 / -1; color: var(--muted); font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.net-months { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 4px; align-items: end; height: 110px; margin-top: 12px; }
+.net-months div { display: flex; flex-direction: column; justify-content: flex-end; align-items: center; height: 100%; gap: 3px; }
+.net-months i { display: block; width: 100%; max-width: 34px; background: var(--primary); border-radius: 4px 4px 0 0; min-height: 2px; }
+.net-months span { font-size: 11px; font-weight: 700; }
+.net-months small { font-size: 10px; color: var(--muted); white-space: nowrap; }
+.net-con-v { grid-template-columns: 260px minmax(0, 1fr); }
+.net-form3 { grid-template-columns: minmax(0, 1fr) auto auto; }
+@media (max-width: 1000px) {
+  .net-split { grid-template-columns: 1fr; }
+  .net-review { position: static; }
+  .net-con { grid-template-columns: 1fr; }
+  .net-tabs { position: static; display: flex; overflow-x: auto; padding: 6px; }
+  .net-tabs button { flex: none; white-space: nowrap; }
+}
+@media (max-width: 700px) {
+  .net-hist, .net-hist-l { gap: 3px; }
+  .net-hist-l { font-size: 9.5px; }
+  .net-barrow { grid-template-columns: 100px 1fr 52px; }
+  .net-lock { grid-template-columns: 1fr; }
+  .net-form3 { grid-template-columns: 1fr 1fr; } .net-form3 .field { grid-column: 1 / -1; }
+  .net-q { grid-template-columns: 40px minmax(0, 1fr) auto; }
+}

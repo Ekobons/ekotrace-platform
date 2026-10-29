@@ -1,7 +1,7 @@
 /* SME Assist & Share screens: questionnaire, WhatsApp preview, share & validate, green-loan pack (and its print view). */
 
 /* questionnaire */
-.smq-text { width: 100%; min-height: 260px; font-size: 13.5px; }
+textarea.input.smq-text { width: 100%; min-height: 300px; font-size: 13.5px; }
 .smq-ans { display: grid; gap: 0; }
 .smq-a { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; gap: 4px 10px; padding: 12px 0; border-top: 1px solid var(--line); align-items: start; }
 .smq-a:first-child { border-top: 0; }
@@ -9,9 +9,10 @@
 .smq-a.ok .qn { background: var(--ok-bg); color: var(--ok); }
 .smq-a.gap .qn { background: var(--warn-bg); color: var(--warn); }
 .smq-a h3 { font-size: 13.5px; font-weight: 600; margin: 2px 0 0; overflow-wrap: anywhere; }
-.smq-a p { grid-column: 2 / -1; margin: 0; font-size: 13.5px; overflow-wrap: anywhere; }
+.smq-a p { grid-column: 2 / 3; margin: 0; font-size: 13.5px; overflow-wrap: anywhere; color: var(--fg2, var(--fg)); }
+.smq-a.gap p { grid-column: 2 / -1; }
 .smq-a.gap p { color: var(--warn); }
-.smq-a .go { grid-column: 2 / -1; font-size: 12.5px; }
+.smq-a .go { grid-column: 3; justify-self: end; height: 24px; margin-right: -6px; }
 .smq-meter { display: flex; height: 8px; border-radius: 4px; overflow: hidden; background: var(--line); margin: 10px 0 4px; }
 .smq-meter b { background: var(--ok); }
 .smq-meter i { background: var(--warn); opacity: .55; }
@@ -44,7 +45,8 @@
 .sml-pack header h2 { font-size: 20px; }
 .sml-pack header .lbl { display: block; margin-bottom: 4px; }
 .sml-pack section h3 { font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--primary); margin: 0 0 6px; }
-.sml-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 18px 28px; }
+.sml-cols { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px 32px; }
+@media (max-width: 760px) { .sml-cols { grid-template-columns: 1fr; } }
 .sml-pack .sme-tbl td:first-child { color: var(--muted); }
 .sml-pack footer { font-size: 11.5px; color: var(--muted); border-top: 1px solid var(--line); padding-top: 10px; }
 .sml-sig { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; margin-top: 18px; font-size: 12px; color: var(--muted); }

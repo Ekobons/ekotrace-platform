@@ -136,7 +136,7 @@ export const requirements: any = {
       applies: { status: 'apply', label: 'Applies', title: 'EU CBAM', detail: 'Your EU importer pays for embedded emissions from 2026. Without your data, higher EU default values are used.', action: 'Calculate emissions per tonne and send them to your importer.', go: 'cbam' },
       watch: { status: 'watch', label: 'Watch', title: 'EU CBAM', detail: 'Your product is not a CBAM good today. Coverage of downstream products is planned to widen.', action: 'Track emissions now.', go: 'emissions' },
     },
-    uk_cbam: { applies: { status: 'likely', label: 'From Jan 2027', title: 'UK CBAM', detail: 'The UK applies its own CBAM to aluminium, cement, ceramics, fertiliser, glass, hydrogen and iron & steel from 1 January 2027.', action: 'Use the same embedded-emissions data for your UK importer.', go: 'cbam' } },
+    uk_cbam: { applies: { status: 'likely', label: 'From Jan 2027', title: 'UK CBAM', detail: 'The UK applies its own CBAM to aluminium, cement, fertiliser, hydrogen and iron & steel from 1 January 2027 (glass and ceramics were dropped).', action: 'Use the same embedded-emissions data for your UK importer.', go: 'cbam' } },
     eudr: { applies: { status: 'apply', label: 'Applies', title: 'EU Deforestation Regulation (EUDR)', detail: 'EU buyers must prove your {eudr} is deforestation-free with plot geolocation. Large operators from 30 Dec 2026, micro and small from 30 Jun 2027.', action: 'Record plot coordinates and documents.', go: 'eudr' } },
     brsr_filing: {
       applies: { status: 'apply', label: 'Applies', title: 'BRSR filing (SEBI)', detail: 'Listed companies in the SEBI top-1000 file BRSR with the annual report.', action: 'Use the full EKOTRACE BRSR Core package.' },

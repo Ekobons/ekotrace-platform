@@ -92,3 +92,15 @@
 .sv-busy { display: inline-block; width: 14px; height: 14px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: sv-spin .8s linear infinite; vertical-align: -2px; }
 @keyframes sv-spin { to { transform: rotate(360deg); } }
 @media (max-width: 700px) { .sv-read { grid-template-columns: minmax(0, 1fr) 140px; } }
+.sv-col { display: grid; gap: 8px; align-content: start; }
+@media (min-width: 900px) {
+  .sv-scheme { grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); column-gap: 28px; }
+  .sv-scheme .sv-span { grid-column: 1 / -1; }
+}
+@media (min-width: 701px) {
+  .sv-lst td { vertical-align: middle; }
+  .sv-lst th, .sv-lst td { padding-left: 10px; }
+  .sv-lst th:first-child, .sv-lst td:first-child { padding-left: 0; }
+}
+.sv-read.wide { grid-template-columns: minmax(0, 1fr) minmax(0, 280px); }
+@media (max-width: 700px) { .sv-read.wide { grid-template-columns: 1fr; } }

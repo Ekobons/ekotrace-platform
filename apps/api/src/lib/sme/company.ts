@@ -93,7 +93,7 @@ export function uiConfig(config: any) {
     factors: { version: F.version, note: F.note, items: Object.fromEntries(Object.entries<any>(F.items).map(([k, v]) => [k, { label: v.label, unit: v.unit, scope: v.scope, category: v.category ?? null, factor: v.factor, source: v.source ?? null }])) },
     srmm: { mfg: config.srmm_mfg, svc: config.srmm_svc },
     dpdp: config.dpdp,
-    cbam: { benchmarks: config.cbam.benchmarks, default_values: config.cbam.default_values, eu_price_eur: config.cbam.eu_price_eur, eur_inr: config.cbam.eur_inr, uk_price_gbp: config.cbam.uk_price_gbp, gbp_inr: config.cbam.gbp_inr, free_allocation_share: config.cbam.free_allocation_share },
+    cbam: { benchmarks: config.cbam.benchmarks, default_values: config.cbam.default_values, eu_price_eur: config.cbam.eu_price_eur, eur_inr: config.cbam.eur_inr, uk_price_gbp: config.cbam.uk_price_gbp, gbp_inr: config.cbam.gbp_inr, free_allocation_share: config.cbam.free_allocation_share, uk_start: config.cbam.uk_start, note: config.cbam.note },
     tariffs: config.tariffs, solar: config.solar, credit_pool: config.credit_pool, plans: config.plans, content: config.content,
     states: STATES,
   };
