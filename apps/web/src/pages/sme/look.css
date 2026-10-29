@@ -88,3 +88,55 @@
 .sme-hub-l .sme-hub-none a { display: inline; padding: 0; background: none; color: var(--primary); text-decoration: underline; }
 /* the SME menu is short: no need for the fold-all control */
 .sme-shell .navtools { display: none; }
+
+/* ---------- overview: compact company band ---------- */
+.sme-hero2 { background: linear-gradient(120deg, #10231C, #1E4034); color: #EAF1ED; border-radius: 18px; padding: 16px 20px; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 14px 24px; }
+.sme-hero2-co { min-width: 0; }
+.sme-hero2-co h1 { color: #FFFFFF; font-size: 23px; margin: 2px 0 0; }
+.sme-hero2-co .lbl, .sme-hero2-co p { color: #A9C0B5; }
+.sme-hero2-co p { margin: 2px 0 0; font-size: 14px; }
+.sme-hero2-st { display: grid; grid-template-columns: repeat(4, auto); align-items: center; }
+.sme-hero2-st > div { padding: 2px 18px; border-left: 1px solid rgba(255, 255, 255, .14); min-width: 0; }
+.sme-hero2-st > div:first-child { border-left: 0; padding-left: 0; }
+.sme-hero2-st > div > span:first-child, .sme-rd > span > span { display: block; font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #A9C0B5; white-space: nowrap; }
+.sme-hero2-st b { display: block; font-size: 21px; font-variant-numeric: tabular-nums; white-space: nowrap; color: #FFFFFF; }
+.sme-hero2-st b small { font-size: 12.5px; font-weight: 500; color: #C9DAD1; }
+.sme-rd { display: flex; align-items: center; gap: 10px; }
+.sme-rd svg { width: 52px; height: 52px; flex: none; color: #FFFFFF; }
+.sme-rd > span { display: block; }
+.sme-rd b { font-size: 15px !important; }
+@media (max-width: 1250px) {
+  .sme-hero2 { grid-template-columns: 1fr; }
+  .sme-hero2-st { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+@media (max-width: 700px) {
+  .sme-hero2 { padding: 16px; }
+  .sme-hero2-st { grid-template-columns: 1fr 1fr; gap: 12px; }
+  .sme-hero2-st > div { border: 0; padding: 0; }
+  .sme-rd { grid-column: 1 / -1; }
+}
+
+/* ---------- overview: sections as one compact row of tiles ---------- */
+.sme-hubs2 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+@media (max-width: 700px) { .sme-hubs2 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.sme-hub2 { display: flex; align-items: center; gap: 10px; padding: 12px; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; text-decoration: none; color: var(--fg); min-width: 0; }
+.sme-hub2:hover { border-color: var(--gc); background: var(--gs); }
+.sme-hub2 .i { width: 38px; height: 38px; border-radius: 11px; background: var(--gc); color: #FFFFFF; display: grid; place-items: center; flex: none; }
+.sme-hub2 .i svg { width: 20px; height: 20px; }
+.sme-hub2 .t { min-width: 0; }
+.sme-hub2 b { display: block; font-size: 14.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sme-hub2 small { display: block; font-size: 12.5px; color: var(--fg2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sme-hub2 em { font-style: normal; font-weight: 700; color: var(--gc); }
+
+/* ---------- darker, firmer body text in lists and tables ---------- */
+.page.sme { color: #10201C; }
+.page.sme .sme-tbl { font-size: 14.5px; }
+.page.sme .sme-tbl td { font-weight: 500; color: #10201C; padding-top: 10px; padding-bottom: 10px; }
+.page.sme .muted { color: #46564F; }
+.page.sme .sme-tbl td .muted { font-weight: 400; font-size: 13.5px; }
+.page.sme .sme-req h3 { font-size: 15.5px; }
+.page.sme .sme-req p { font-size: 14.5px; color: #3D4F49; }
+.page.sme .sme-act { font-size: 14px; }
+.page.sme .sme-field label, .page.sme .sme-toggle label { font-size: 14.5px; font-weight: 500; }
+.page.sme .chip { font-size: 12.5px; padding: 3px 10px; }
+@media (max-width: 700px) { .sme-hub2 { padding: 10px; gap: 8px; } .sme-hub2 b, .sme-hub2 small { white-space: normal; } .sme-hub2 .i { width: 34px; height: 34px; } }

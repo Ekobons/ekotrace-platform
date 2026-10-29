@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { Icon } from '../../components/Icon';
 import { useSme } from './store';
 import { Pill, Req, Sample } from './ui';
-import { SME_GROUPS, SME_PAGES, relevant } from './nav';
+import { SME_GROUPS, relevant } from './nav';
 import type { CSSProperties } from 'react';
 import { dmy, f0, f1, lakh } from '../../lib/sme';
 
@@ -38,28 +38,21 @@ export function SmeHome() {
   const stepsDone = steps.filter((x) => x.done).length, firstOpen = steps.findIndex((x) => !x.done);
   return (
     <>
-      <section className="sme-hero">
-        <div style={{ minWidth: 0 }}>
+      <section className="sme-hero2">
+        <div className="sme-hero2-co">
           <span className="lbl">{d.fy}{d.company.isExample && <Sample />}</span>
           <h1>{d.company.name}</h1>
           <p>{[d.company.industry, d.company.state, `${r.msmeClass} enterprise`].filter(Boolean).join(' · ')}</p>
-          <div className="sme-hstats">
-            <div><span>Scope 1 + 2</span><b>{f1(r.emissions.total)}</b><small>tCO₂e</small></div>
-            <div><span>Intensity</span><b>{f1(r.emissions.intensity)}</b><small>t per ₹ crore</small></div>
-            <div><span>Savings found</span><b>{lakh(r.money.savingsFound)}</b><small>per year</small></div>
-          </div>
         </div>
-        <div className="sme-ring">
-          <svg viewBox="0 0 130 130" role="img" aria-label={`ESG readiness ${pct}%`}>
-            <circle cx="65" cy="65" r="52" fill="none" stroke="rgba(255,255,255,.12)" strokeWidth="11" />
-            <circle cx="65" cy="65" r="52" fill="none" stroke="#C6F06B" strokeWidth="11" strokeLinecap="round" strokeDasharray={`${(C * pct) / 100} ${C}`} transform="rotate(-90 65 65)" />
-            <text x="65" y="64" textAnchor="middle" fill="currentColor" style={{ font: '700 28px var(--f-ui)' }}>{pct}%</text>
-            <text x="65" y="84" textAnchor="middle" fill="currentColor" opacity=".65" style={{ font: '600 9.5px var(--f-ui)', letterSpacing: '.1em' }}>READINESS</text>
-          </svg>
-          <div style={{ display: 'grid', gap: 6, justifyItems: 'center' }}>
-            <span className="chip2">{r.esg.level ? `Level ${r.esg.level} · ${r.esg.levelName}` : 'Not yet rated'}</span>
-            <span className="chip2">SRMM {f1(r.srmm.pct * 100)}%</span>
-          </div>
+        <div className="sme-hero2-st">
+          <div><span>Scope 1 + 2</span><b>{f1(r.emissions.total)} <small>tCO₂e</small></b></div>
+          <div><span>Intensity</span><b>{f1(r.emissions.intensity)} <small>t / ₹ cr</small></b></div>
+          <div><span>Savings found</span><b>{lakh(r.money.savingsFound)} <small>/ yr</small></b></div>
+          <div className="sme-rd"><svg viewBox="0 0 130 130" role="img" aria-label={`ESG readiness ${pct}%`}>
+            <circle cx="65" cy="65" r="52" fill="none" stroke="rgba(255,255,255,.14)" strokeWidth="14" />
+            <circle cx="65" cy="65" r="52" fill="none" stroke="#C6F06B" strokeWidth="14" strokeLinecap="round" strokeDasharray={`${(C * pct) / 100} ${C}`} transform="rotate(-90 65 65)" />
+            <text x="65" y="76" textAnchor="middle" fill="currentColor" style={{ font: '700 34px var(--f-ui)' }}>{pct}%</text></svg>
+            <span><span>ESG readiness</span><b>{r.esg.level ? `Level ${r.esg.level} · ${r.esg.levelName}` : 'Not yet rated'}</b></span></div>
         </div>
       </section>
 
@@ -71,15 +64,14 @@ export function SmeHome() {
           {!x.done && <Link className={`btn${i === firstOpen ? ' p' : ''}`} to={x.to}>{i === firstOpen ? 'Start' : 'Open'}</Link>}</li>)}</ol>
       </div>}
 
-      <div className="sme-hubs">
+      <div className="sme-hubs2">
         {SME_GROUPS.slice(1).map((g) => {
           const pages = g.pages.filter((k) => relevant(k, d.data, r));
           const fig = HUB_FIG[g.key]?.(r);
-          return <div key={g.key} className="sme-hub" style={{ '--gc': g.color, '--gs': g.soft } as CSSProperties}>
-            <Link to={`/sme/${pages[0] ?? g.pages[0]}`} className="sme-hub-h"><span className="sme-hub-i"><Icon name={g.icon} /></span><span className="grow"><b>{g.title}</b><small>{g.sub}</small></span>{fig && <span className="sme-hub-f"><b>{fig[0]}</b><small>{fig[1]}</small></span>}</Link>
-            <div className="sme-hub-l">{pages.map((k) => <Link key={k} to={`/sme/${k}`}><Icon name={SME_PAGES[k]!.icon} />{SME_PAGES[k]!.title}</Link>)}
-              {!pages.length && <span className="muted sme-hub-none">Not needed for you now: your Profile says you do not export to the EU or UK. <Link to="/sme/profile">Change</Link></span>}</div>
-          </div>;
+          return <Link key={g.key} to={`/sme/${pages[0] ?? g.pages[0]}`} className="sme-hub2" style={{ '--gc': g.color, '--gs': g.soft } as CSSProperties}>
+            <span className="i"><Icon name={g.icon} /></span>
+            <span className="t"><b>{g.title}</b><small>{fig ? <><em>{fig[0]}</em> {fig[1]}</> : pages.length ? `${pages.length} pages` : 'Not needed now'}</small></span>
+          </Link>;
         })}
       </div>
 
