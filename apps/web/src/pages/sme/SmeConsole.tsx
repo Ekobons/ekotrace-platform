@@ -4,7 +4,7 @@
  * manages what is SME-specific: partners, links, CA validation, settings, scrap, credits, benchmark.
  */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Icon } from '../../components/Icon';
 import { useApp } from '../../App';
@@ -24,7 +24,7 @@ const dash = <span className="muted">—</span>;
 const Loading = ({ error }: { error?: string | null }) => <div className="card empty">{error ?? 'Loading…'}</div>;
 const Sec = ({ title, lede, tools, children }: { title: string; lede?: ReactNode; tools?: ReactNode; children?: ReactNode }) => (
   <div className="card net-sec">
-    <div className="row" style={{ alignItems: 'flex-start' }}><div className="grow"><h2>{title}</h2>{lede && <p className="muted small" style={{ margin: '4px 0 0', maxWidth: '80ch' }}>{lede}</p>}</div>{tools}</div>
+    <div className="row" style={{ alignItems: 'flex-start' }}><div className="grow" style={{ minWidth: 260 }}><h2>{title}</h2>{lede && <p className="muted small" style={{ margin: '4px 0 0', maxWidth: '80ch' }}>{lede}</p>}</div>{tools}</div>
     {children}
   </div>);
 
@@ -34,6 +34,7 @@ export function SmeConsole() {
   // SME data for a year is mostly complete after it ends, so the console opens on the previous year.
   const [fy, setFy] = useState(fyList(currentFy())[1]!);
   const go = (t: Tab) => setSp(t === 'overview' ? {} : { tab: t }, { replace: true });
+  useEffect(() => { document.querySelector('.net-tabs button.on')?.scrollIntoView({ block: 'nearest', inline: 'nearest' }); }, [tab]);
   return (
     <div className="page">
       <NetHead icon="building" eyebrow="Platform console · EKOTRACE SME" title="SME console" lede="Everything specific to the SME tool and its partner network. Create companies, plans and users in the main console.">
@@ -124,7 +125,7 @@ function Companies({ fy, setFy }: { fy: string; setFy: (s: string) => void }) {
             <tbody>{rows.map((c: any) => (
               <tr key={c.id}>
                 <td className="net-name"><b>{c.name} {c.is_example && <span className="chip warn">Demo</span>}</b><small>{[c.industry, c.state].filter(Boolean).join(' · ') || 'Profile not filled'}</small></td>
-                <td>{c.plan}{c.status !== 'active' && <div><Pill kind="apply">{c.status}</Pill></div>}<div className="muted small">to {dmy(c.access_expiry)}</div></td>
+                <td>{c.plan}{c.status !== 'active' && <div><Pill kind="apply">{c.status}</Pill></div>}<div className="muted small" style={{ whiteSpace: 'nowrap' }}>to {dmy(c.access_expiry)}</div></td>
                 <td className="r">{f0(c.modules)}</td>
                 <td className="r">{c.scope1 == null ? dash : `${f1(n(c.scope1) + n(c.scope2))} t`}</td>
                 <td className="r">{c.esg_pct == null ? dash : <>{f0(c.esg_pct)}%<div className="muted small">{c.esg_level ? `L${c.esg_level} ${LEVELS[c.esg_level]}` : 'Not rated'}</div></>}</td>
@@ -288,7 +289,7 @@ function Scrap() {
     setBusy(x.id);
     try { await smeAdminApi.moderateScrap(x.id, status, nt || null); toast(status === 'blocked' ? 'Listing blocked' : 'Listing approved'); reload(); } catch (e) { toast(errText(e)); } finally { setBusy(null); }
   };
-  const per = (u: string) => (u === 'nos' ? 'piece' : u);
+  const per = (u: string) => (u === 't' || u === 'kg' ? 'kg' : u === 'kL' || u === 'L' ? 'L' : 'piece');   // price is per kg / L / piece, as entered
   return (
     <Sec title="Scrap moderation" lede="Listings SME companies put up for sale to recyclers. Hazardous waste can only go to an authorised recycler: check those first. Blocking hides the listing and shows your note to the company."
       tools={<div className="seg">{(['all', 'listed', 'blocked', 'sold'] as const).map((k) => <button key={k} className={show === k ? 'on' : ''} onClick={() => setShow(k)}>{k === 'all' ? 'All' : k[0]!.toUpperCase() + k.slice(1)}</button>)}</div>}>

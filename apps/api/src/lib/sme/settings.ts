@@ -98,6 +98,16 @@ export function validate(k: Key, d: any) {
       need(!ids.has(x.id), `Indicator ${x.id} appears twice.`); ids.add(x.id);
     }
   }
+  // every setting keeps the parts of its first version the engine reads (same names, same kind of value)
+  const base: any = k === 'srmm_mfg' || k === 'srmm_svc' ? null : (DEFAULTS as any)[k];
+  if (base && typeof base === 'object') {
+    const kind = (v: unknown) => (Array.isArray(v) ? 'list' : v === null ? 'null' : typeof v);
+    for (const [key, v] of Object.entries(base)) {
+      if (key === 'note' || key === 'version') continue;
+      need(key in d, `"${key}" is missing: keep every part of the setting (copy the active version and change the values).`);
+      need(kind(d[key]) === kind(v), `"${key}" must be ${kind(v) === 'list' ? 'a list' : kind(v) === 'object' ? 'a group of values' : `a ${kind(v)}`}.`);
+    }
+  }
   if (k === 'cbam') need(+d.free_allocation_share >= 0 && +d.free_allocation_share <= 1, 'Free allocation share must be between 0 and 1.');
   if (k === 'esg') need(d.weights?.env && d.weights?.soc && d.weights?.gov, 'Weights need env, soc and gov sections.');
   if (k === 'calendar') need(Array.isArray(d.templates) && Number.isFinite(+d.soon_days), 'The calendar needs templates and soon_days.');

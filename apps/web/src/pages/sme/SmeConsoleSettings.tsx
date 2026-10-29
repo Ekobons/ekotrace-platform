@@ -62,6 +62,7 @@ function SettingKey({ k, onBack }: { k: string; onBack: () => void }) {
   const showErr = (e: unknown) => {
     if (e instanceof ApiError && e.details?.length) setApiErr(`${e.message} ${e.details.map((d) => `${d.field}: ${d.message}`).join('; ')}`);
     else setApiErr(errText(e));
+    setTimeout(() => document.querySelector('.net-apierr')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }), 50);
   };
   const save = async () => {
     if (!parsed.ok || !('v' in parsed)) return;
@@ -114,7 +115,7 @@ function SettingKey({ k, onBack }: { k: string; onBack: () => void }) {
                     </div>
                     <p className="muted small" style={{ margin: 0 }}>Saving checks the setting so the calculations keep working. A draft changes nothing until it is activated.</p>
                   </>)}
-              {apiErr && <div className="note bad" role="alert"><b>Not saved.</b> {apiErr}</div>}
+              {apiErr && <div className="note bad net-apierr" role="alert"><b>Not saved.</b> {apiErr}</div>}
             </>)}
         </div>
       </div>

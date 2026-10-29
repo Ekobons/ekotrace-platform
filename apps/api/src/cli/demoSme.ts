@@ -120,14 +120,16 @@ async function main() {
 
   // five more cluster members, sharing anonymised figures
   const members: string[] = [];
+  let firstPct = 0;
   for (const [i, [name, industry, turnover, grid, diesel]] of MEMBERS.entries()) {
     const t = await tenant(name, ['sme']);
     await platformTx((c) => c.query(`INSERT INTO sme_company (tenant_id, sector, industry, state, is_example) VALUES ($1,'mfg',$2,'Maharashtra',true)`, [t, industry]));
     await user(t, `member${i + 1}@sme.demo`, `Demo Owner ${i + 1}`, 'super_admin');
     await docs(t, FY, { profile: { employees: 20 + i * 15, turnover, production: 0, udyam: true }, emissions: { grid, diesel, lpg: 1200 * (i + 1), solar: i % 2 ? 30000 : 0 },
       esg: { water: 800 + i * 300, waste: 20 + i * 8, recycled: 30 + i * 10, women: 6 + i * 3, training: 2 + i, minwage: true, posh: i % 2 === 0, coc: true, grievance: i > 1, ownerEsg: i > 2 },
-      bills: { cd: 100 + i * 40, md: 110 + i * 45, pf: 0.88 + i * 0.02, units: grid / 12, pfPenalty: i < 3 ? 4000 + i * 1500 : 0, peakShare: 30 }, solar: { roof: 400 + i * 150 }, share: { bench: true } });
-    await tenantTx(t, (c) => compute(c, t, FY));
+      bills: { cd: 100 + i * 40, md: 110 + i * 45, pf: 0.88 + i * 0.02, units: grid / 12, pfPenalty: i < 3 ? 4000 + i * 1500 : 0, peakShare: 30 }, solar: { roof: 400 + i * 150 }, share: { bench: true }, ...(i === 0 ? { srmm: demoSrmm() } : {}) });
+    const out = await tenantTx(t, (c) => compute(c, t, FY));
+    if (i === 0) firstPct = out.results.srmm.pct * 100;
     members.push(t);
   }
 
@@ -149,7 +151,7 @@ async function main() {
     await c.query(`INSERT INTO sme_link (partner_tenant, sme_tenant, loan_cr, ev_cr) VALUES ($1,$2,5,30)`, [partner.bank, sme]);
     for (const [i, m] of members.entries()) await c.query(`INSERT INTO sme_link (partner_tenant, sme_tenant, loan_cr, ev_cr, share, consent_at) VALUES ($1,$2,$3,$4,true, now())`, [partner.bank, m, [6, 2.2, 3.5, 1.2, 0.8][i], [20, 9, 12, 5, 4][i]]);
     // a validation request waiting at the CA firm
-    await c.query(`INSERT INTO sme_ca_request (sme_tenant, fy, srmm_version, self_pct, status, ca_tenant) VALUES ($1,$2,'mfg',0,'assigned',$3)`, [members[0], FY, partner.ca_firm]);
+    await c.query(`INSERT INTO sme_ca_request (sme_tenant, fy, srmm_version, self_pct, status, ca_tenant) VALUES ($1,$2,'mfg',$4,'assigned',$3)`, [members[0], FY, partner.ca_firm, firstPct]);
   });
 
   console.log(`\nEKOTRACE SME demo ready (every figure is invented). Temporary password for every demo login: ${pw}\n`);

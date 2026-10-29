@@ -104,6 +104,7 @@
   .net-hist-l { font-size: 9.5px; }
   .net-barrow { grid-template-columns: 100px 1fr 52px; }
   .net-lock { grid-template-columns: 1fr; }
+  .net-json { min-height: 300px; }
   .net-k3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .net-secbar { grid-template-columns: 70px 1fr 96px; }
   .net-form3 { grid-template-columns: 1fr 1fr; } .net-form3 .field { grid-column: 1 / -1; }
