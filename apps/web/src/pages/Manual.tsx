@@ -11,13 +11,15 @@ import { Icon } from '../components/Icon';
 import { BRAND, productSlug } from '../lib/brand';
 
 const files = import.meta.glob('../manual/*.md', { query: '?raw', import: 'default', eager: true }) as Record<string, string>;
+// EKOTRACE SME has a manual of its own: SME companies and their partners see only these chapters
+const smeFiles = import.meta.glob('../manual-sme/*.md', { query: '?raw', import: 'default', eager: true }) as Record<string, string>;
 const slug = (s: string) => s.toLowerCase().replace(/<[^>]+>/g, '').replace(/&[a-z]+;/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 
 interface Chapter { id: string; title: string; src: string; sections: { id: string; title: string }[] }
 // the product's name in the text (the old tool keeps its name: "the previous Ekotrace list")
 const brandify = (s: string) => s.replace(/(?<!previous )\bEkotrace\b/g, BRAND.name);
-let chapters: Chapter[] | null = null;
-const CH = (): Chapter[] => (chapters ??= Object.entries(files).sort(([a], [b]) => a.localeCompare(b)).map(([path, raw]) => {
+const cache: Record<string, Chapter[]> = {};
+const CH = (set: 'full' | 'sme'): Chapter[] => (cache[set] ??= Object.entries(set === 'sme' ? smeFiles : files).sort(([a], [b]) => a.localeCompare(b)).map(([path, raw]) => {
   const src = brandify(raw);
   const title = /^#\s+(.+)$/m.exec(src)?.[1] ?? path;
   const sections = [...src.replace(/```[\s\S]*?```/g, '').matchAll(/^##\s+(.+)$/gm)].map((m) => ({ id: slug(m[1]!), title: m[1]! }));
@@ -49,11 +51,11 @@ function Rendered({ src }: { src: string }) {
   ))}</>;
 }
 
-export function Manual() {
+export function Manual({ set = 'full' }: { set?: 'full' | 'sme' }) {
   const [params, setParams] = useSearchParams();
   const [q, setQ] = useState('');
   const [printAll, setPrintAll] = useState(false);
-  const CHAPTERS = CH();
+  const CHAPTERS = CH(set);
   const current = CHAPTERS.find((c) => c.id === params.get('c')) ?? CHAPTERS[0]!;
   const idx = CHAPTERS.indexOf(current);
   const go = (id: string, section?: string) => {
@@ -72,7 +74,7 @@ export function Manual() {
   return (
     <div className="page manual">
       <div className="head no-print">
-        <div><div className="eyebrow">Help</div><h1>User manual</h1><p className="sub">How {BRAND.name} works: data categories, entering data, meters, bills, factors, integrations and security. Updated with every release.</p></div>
+        <div><div className="eyebrow">Help</div><h1>User manual</h1><p className="sub">{set === 'sme' ? `How ${BRAND.name} SME works: getting started, every page step by step, saving money, compliance, sharing with buyers and banks.` : `How ${BRAND.name} works: data categories, entering data, meters, bills, factors, integrations and security.`} Updated with every release.</p></div>
         <button className="btn" style={{ alignSelf: 'flex-end' }} onClick={() => setPrintAll(true)}><Icon name="doc" />Print / save as PDF</button>
       </div>
       <div className="grid2">

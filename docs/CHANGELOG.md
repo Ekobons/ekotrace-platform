@@ -9,7 +9,7 @@ Newest first.
 - API: `/api/sme…` (data per module and year, company, answer, bill scan with OCR, scrap, recyclers, grievances, links and consent, CA requests, credit projects), `/api/sme-net…` (partner overview by kind, invite, remind, CA review), `/api/platform/sme…` (SME console), `/api/public/sme…` (sign-up with e-mail confirmation behind `SME_SIGNUP=on`; anonymous grievance page).
 - Web: own sign-in page `/sme`, own menu and screens `/sme/<page>` (25 screens), partner screens `/sme-net`, open pages `/sme-signup`, `/sme-start`, `/sme-grievance`; platform admin **SME console** (`/console/sme`).
 - `npm run demo:sme` (`cli/demoSme.ts`): *Shree Ganesh Fasteners (demo)* with two years of data, five cluster members, a buyer, a cluster, a bank and a CA firm. INVENTED.
-- Manual: new chapter EKOTRACE SME. Test `sme.test.ts`.
+- Manual: SME companies and their partners get their own manual (`apps/web/src/manual-sme/`, 9 chapters: getting started, each section, partners, questions and words); the platform manual keeps a chapter EKOTRACE SME for the platform team. Test `sme.test.ts`.
 
 ## 2026-10-28 · Phone menu, dashboard drill-down to entries, OCR for scanned bills
 

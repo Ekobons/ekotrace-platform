@@ -296,6 +296,8 @@ function Shell() {
   const [picked, setPicked] = useState<Product>(() => { try { return (localStorage.getItem('eko_product') as Product) || 'ekotrace'; } catch { return 'ekotrace'; } });
   const product: Product = path.startsWith('/sme/') && products.includes('sme') ? 'sme' : path.startsWith('/sme-net') && products.includes('smenet') ? 'smenet' : path.startsWith('/fin') && products.includes('ekofin') ? 'ekofin' : path.startsWith('/ccts') && products.includes('ccts') ? 'ccts' : path.startsWith('/brsr') && products.includes('brsr') ? 'brsr' : path.startsWith('/uae-mrv') && products.includes('uaemrv') ? 'uaemrv' : path.startsWith('/energy-mgmt') && products.includes('energy') ? 'energy' : path.startsWith('/compliance') && products.includes('compliance') ? 'compliance' : path.startsWith('/epr') && products.includes('epr') ? 'epr' : path.startsWith('/cbam/') && products.includes('cbam') && (picked === 'cbam' || !products.includes('ekotrace')) ? 'cbam' : products.includes(picked) ? picked : products[0]!;
   const cbamRole = useCbamRole(product === 'cbam');
+  // SME companies and their partners get the SME manual, not the full platform's
+  const smeOnly = !!tenant && owned.every((p) => p === 'sme' || p === 'smenet');
   const NAV = product === 'sme' ? SME_NAV : product === 'smenet' ? SMENET_NAV : product === 'ekofin' ? FIN_NAV : product === 'cbam' ? cbamNav(cbamRole ?? 'both') : product === 'ccts' || product === 'brsr' || product === 'uaemrv' || product === 'energy' || product === 'compliance' || product === 'epr' ? packNav(product) : EKO_NAV;
   const switchTo = (p: Product) => { setPicked(p); try { localStorage.setItem('eko_product', p); } catch { /* not kept */ } nav(HOME[p]); };
   const allGroups = NAV.flatMap((g) => (g.group ? [g.group] : []));
@@ -480,7 +482,7 @@ function Shell() {
           <Route path="/people" element={<NeedCo><People /></NeedCo>} />
           <Route path="/methodology" element={<NeedCo><Methodology /></NeedCo>} />
           <Route path="/energy" element={<NeedCo><EnergyRegister /></NeedCo>} />
-          <Route path="/help" element={<Manual />} />
+          <Route path="/help" element={<Manual set={smeOnly ? 'sme' : 'full'} />} />
           <Route path="/meters" element={<NeedCo><Meters /></NeedCo>} />
           <Route path="/bills" element={<NeedCo><Bills /></NeedCo>} />
           <Route path="/purchases" element={<NeedCo><Purchases /></NeedCo>} />
