@@ -14,12 +14,12 @@ import { DEFAULTS } from './defaults.js';
 const DATA = join(dirname(fileURLToPath(import.meta.url)), '../../../../../data/sme');
 const bank = (f: string) => JSON.parse(readFileSync(join(DATA, f), 'utf8'));
 
-export const KEYS = ['factors', 'energy', 'cbam', 'tariffs', 'solar', 'credit_pool', 'esg', 'dpdp', 'calendar', 'requirements', 'schemes', 'plans', 'content', 'srmm_mfg', 'srmm_svc', 'recyclers'] as const;
+export const KEYS = ['factors', 'energy', 'cbam', 'tariffs', 'solar', 'credit_pool', 'esg', 'dpdp', 'calendar', 'requirements', 'schemes', 'plans', 'content', 'srmm_mfg', 'srmm_svc', 'recyclers', 'actions'] as const;
 export type Key = (typeof KEYS)[number];
 export const KEY_LABEL: Record<Key, string> = {
   factors: 'Emission factors & units', energy: 'Energy conversion (GJ)', cbam: 'CBAM settings', tariffs: 'Electricity tariffs', solar: 'Rooftop solar defaults',
   credit_pool: 'Carbon credit pool', esg: 'ESG scoring weights', dpdp: 'DPDP checklist', calendar: 'Compliance calendar templates', requirements: 'Requirement rules',
-  schemes: 'Schemes library', plans: 'Plans & prices', content: 'Messages & languages', srmm_mfg: 'SRMM v3.1 (manufacturing)', srmm_svc: 'SRMM v3.2 (services)', recyclers: 'Recycler directory',
+  schemes: 'Schemes library', plans: 'Plans & prices', content: 'Messages & languages', srmm_mfg: 'SRMM v3.1 (manufacturing)', srmm_svc: 'SRMM v3.2 (services)', recyclers: 'Recycler directory', actions: 'Reduction actions library',
 };
 const firstVersion = (k: Key): any => (k === 'srmm_mfg' ? bank('srmm_mfg.json') : k === 'srmm_svc' ? bank('srmm_svc.json') : DEFAULTS[k]);
 
@@ -112,7 +112,23 @@ export function validate(k: Key, d: any) {
   if (k === 'esg') need(d.weights?.env && d.weights?.soc && d.weights?.gov, 'Weights need env, soc and gov sections.');
   if (k === 'calendar') need(Array.isArray(d.templates) && Number.isFinite(+d.soon_days), 'The calendar needs templates and soon_days.');
   if (k === 'requirements') need(d.items && d.msme_turnover_cr && d.csr, 'Requirement rules need items, msme_turnover_cr and csr.');
-  if (k === 'schemes' || k === 'plans' || k === 'dpdp' || k === 'recyclers') need(Array.isArray(d.items), 'This setting needs an "items" list.');
+  if (k === 'schemes' || k === 'plans' || k === 'dpdp' || k === 'recyclers' || k === 'actions') need(Array.isArray(d.items), 'This setting needs an "items" list.');
+  if (k === 'actions') {
+    for (const [f, v] of Object.entries<any>(d.prices || {})) need(Number.isFinite(+v) && +v >= 0, `The price of ${f} must be a number of 0 or more.`);
+    need(+d.target?.pct >= 0 && +d.target?.pct <= 100 && Number.isInteger(+d.target?.year), 'The target needs pct (0–100) and year.');
+    const ids = new Set<string>();
+    for (const x of d.items) {
+      need(x && typeof x.id === 'string' && /^[a-z0-9_]{2,30}$/.test(x.id) && typeof x.title === 'string' && x.title.length > 0, `Every action needs an id (lower-case letters, numbers, _) and a title (${x?.id ?? '?'}).`);
+      need(!ids.has(x.id), `Action ${x.id} appears twice.`); ids.add(x.id);
+      need(typeof x.source === 'string' || (Array.isArray(x.sources) && x.sources.length > 0 && x.sources.every((s: unknown) => typeof s === 'string')), `Action ${x.id} needs a source (e.g. "grid") or a list of sources.`);
+      if (x.from !== undefined) need(['solar', 'pf'].includes(x.from), `Action ${x.id}: "from" can only be "solar" or "pf".`);
+      else for (const f of ['share', 'pct']) need(Number.isFinite(+x[f]) && +x[f] >= 0 && +x[f] <= 100, `Action ${x.id}: ${f} must be a percentage from 0 to 100.`);
+      need(x.cost && ['per_unit', 'per_kw', 'lump', 'from'].includes(x.cost.basis), `Action ${x.id}: cost.basis must be per_unit, per_kw, lump or from.`);
+      if (x.cost.basis !== 'from') need(Number.isFinite(+x.cost.rate) && +x.cost.rate >= 0, `Action ${x.id}: cost.rate must be a number of 0 or more.`);
+      need(Number.isFinite(+x.life) && +x.life > 0, `Action ${x.id}: life must be a number of years.`);
+      if (x.per !== undefined) need(Number.isFinite(+x.per) && +x.per > 0, `Action ${x.id}: per must be a positive number.`);
+    }
+  }
   if (k === 'dpdp') {
     const areas = new Set((d.areas || []).map((a: any) => a.key));
     for (const x of d.items) need(typeof x.key === 'string' && typeof x.title === 'string' && areas.has(x.area), `DPDP item ${x.key ?? '?'} needs a key, a title and one of the areas.`);

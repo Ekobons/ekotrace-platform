@@ -104,7 +104,7 @@ export function startCollectionWorker(log: (m: string) => void = console.log) {
     try { const n = await deliverEmails(); if (n) log(`[mail] ${n} e-mail(s) sent`); } catch (e) { log(`[mail] ${(e as Error).message}`); } finally { busy = false; }
   }, 30_000);
   mailTimer.unref();
-  const rem = () => runReminders(new Date(), log).then(() => checkIntegrations(log)).then(() => cbamAutoRemind(log)).catch((e) => log(`[reminders] ${(e as Error).message}`));
+  const rem = () => runReminders(new Date(), log).then(() => checkIntegrations(log)).then(() => cbamAutoRemind(log)).then(() => import('./sme/reminders.js')).then((m) => m.runSmeReminders(new Date(), log)).catch((e) => log(`[reminders] ${(e as Error).message}`));
   setTimeout(rem, 60_000).unref();
   remTimer = setInterval(rem, 3600_000);
   remTimer.unref();

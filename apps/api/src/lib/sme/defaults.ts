@@ -228,4 +228,43 @@ export const recyclers: any = {
   items: [] as any[],
 };
 
-export const DEFAULTS: Record<string, any> = { recyclers, factors, energy, cbam, tariffs, solar, credit_pool, esg, dpdp, calendar, requirements, schemes, plans, content };
+/**
+ * Reduction plan: library of typical actions for Indian MSMEs (lib/sme/plan.ts does the arithmetic).
+ * Each action cuts `pct` % of the part (`share` %) of one source it touches. Figures are deliberately
+ * conservative typical values from BEE guide books, EESL programmes and SAMEEEKSHA / BEE-SME cluster
+ * studies; every company can change them for its own case.
+ *   cost.basis: per_unit (₹ × number of items) · per_kw (₹ × kW) · lump (₹) · from (another page's figure)
+ *   to / per:   a switch adds `per` units of `to` for each unit of the source removed (no `per` = equal energy)
+ */
+export const actions: any = {
+  note: 'Typical figures for small Indian factories, kept on the low side. Real savings depend on the site: confirm with an energy audit or supplier quote before you invest.',
+  // ₹ per unit, used when a company has not entered its own price. Electricity uses the company's own bill rate.
+  prices: { diesel: 92, petrol: 104, lpg: 95, png: 55, coal: 9000 },
+  target: { pct: 30, year: 2030, rate_15c: 4.2, note: '30% below the base year by 2030 is a common first target. The 1.5 °C path (as used by SBTi) is about 4.2% less each year, in a straight line from the base year.' },
+  items: [
+    { id: 'led', title: 'LED lighting', plain: 'Replace tube lights, CFLs and sodium / metal-halide lamps with LED fittings.', source: 'grid', share: 8, pct: 50,
+      cost: { basis: 'per_unit', rate: 900, unit: 'fittings' }, life: 8, notes: 'Lighting is often 5–10% of a factory’s electricity. LEDs use about half the power of tube lights; more against sodium lamps. High-bay LEDs cost ₹3,000–6,000 each.', ref: 'EESL UJALA / Street Lighting programme; BEE' },
+    { id: 'vfd', title: 'Variable speed drives (VFDs)', plain: 'Fit drives on pumps, fans, blowers and compressors that run below full load, instead of throttling with valves or dampers.', source: 'grid', share: 15, pct: 25,
+      cost: { basis: 'per_kw', rate: 4000, unit: 'kW of motors' }, life: 10, notes: 'Savings are largest where flow is controlled by a valve or damper (BEE quotes 20–50%). Little gain on motors that run at full load all day.', ref: 'BEE Guide Book 3 (fans, pumps)' },
+    { id: 'ie3', title: 'IE3 / IE4 efficient motors', plain: 'Replace old or repeatedly rewound motors with IE3 or IE4 premium-efficiency motors.', source: 'grid', share: 40, pct: 3,
+      cost: { basis: 'per_kw', rate: 5000, unit: 'kW of motors' }, life: 15, notes: 'Motors use most of a factory’s electricity. IE3 saves about 2–10% against standard motors (more on small motors, less on large). Best done when a motor fails.', ref: 'EESL / FICCI National Motor Replacement Programme' },
+    { id: 'air', title: 'Compressed air: fix leaks, lower pressure', plain: 'Find and fix air leaks, switch off air at idle times, and run the compressor at the lowest pressure that works.', source: 'grid', share: 10, pct: 20,
+      cost: { basis: 'lump', rate: 50000 }, life: 2, notes: 'Leaks often waste 20–30% of compressor output. Each 1 bar lower pressure saves roughly 6–10% of compressor power. Repeat the leak survey every year.', ref: 'BEE Guide Book 3 (compressed air)' },
+    { id: 'pf', title: 'Power factor correction', plain: 'Install an automatic capacitor panel (APFC) so your power factor stays near 0.99.', source: 'grid', from: 'pf', link: 'bills',
+      cost: { basis: 'from' }, life: 10, notes: 'Mainly removes the power factor penalty and frees transformer capacity; energy and CO₂ savings are small, so none are counted. Figures come from the Bill analyser.', ref: 'Your power bill (Bill analyser)' },
+    { id: 'solar', title: 'Rooftop solar', plain: 'Generate your own electricity on the factory roof.', source: 'grid', from: 'solar', link: 'solar',
+      cost: { basis: 'from' }, life: 25, notes: 'Size, cost and savings come from the Solar page (roof area, your grid use and your state’s yield).', ref: 'Solar page; MNRE benchmark costs' },
+    { id: 'boiler', title: 'Boiler and furnace efficiency', plain: 'Tune burners, control excess air, insulate hot surfaces and doors, and fix steam traps and condensate return.', sources: ['lpg', 'png', 'coal', 'diesel'], share: 80, pct: 5,
+      cost: { basis: 'lump', rate: 150000 }, life: 5, notes: 'Combustion tuning and insulation typically save 5–10% of fuel in small boilers and furnaces. “Part of your use” is the share of this fuel burnt in them.', ref: 'BEE Guide Book 2 (boilers, furnaces)' },
+    { id: 'whr', title: 'Waste-heat recovery', plain: 'Use hot flue gas or cooling water to preheat combustion air, boiler feed water or the next batch (economiser, recuperator).', sources: ['lpg', 'png', 'coal', 'diesel'], share: 80, pct: 8,
+      cost: { basis: 'lump', rate: 400000 }, life: 10, notes: 'An economiser saves about 1% of fuel for every 6 °C rise in feed-water temperature; furnace recuperators 10–20%. Needs a steady hot exhaust.', ref: 'BEE Guide Book 2 (waste heat recovery)' },
+    { id: 'png', title: 'Switch burners to piped natural gas', plain: 'Convert furnaces, ovens or boilers from diesel or LPG to PNG where a city-gas pipeline reaches you.', sources: ['diesel', 'lpg'], share: 50, pct: 100, to: 'png',
+      cost: { basis: 'lump', rate: 200000 }, life: 15, notes: 'Natural gas emits about 20–25% less CO₂ than diesel and about 15% less than LPG for the same heat, and is usually cheaper. “Part of your use” is the share of this fuel burnt in burners (not in the DG set or vehicles).', ref: 'IPCC 2006 fuel factors; city-gas distributor quote' },
+    { id: 'dg', title: 'Run on grid or solar instead of the DG set', plain: 'Cut diesel generator hours: raise your contract demand, fix supply problems with the DISCOM, or cover daytime load with solar.', sources: ['diesel'], share: 70, pct: 60, to: 'grid', toOptions: ['grid', 'solar'], per: 3,
+      cost: { basis: 'lump', rate: 0 }, life: 10, notes: 'A small DG set makes about 3 kWh per litre, so its power costs ₹25–35 a unit against ₹8–10 from the grid. “Part of your use” is the share of diesel that goes into the DG set. With solar, the cost of panels is worked out from the Solar page’s figures.', ref: 'BEE Guide Book 3 (DG sets); your diesel bills' },
+    { id: 'transformer', title: 'Cut transformer and cable losses', plain: 'Right-size or replace an old transformer (amorphous-core or BEE star-rated), and fix undersized cables and loose joints.', source: 'grid', share: 100, pct: 1,
+      cost: { basis: 'per_unit', rate: 1500, unit: 'kVA of transformer' }, life: 25, notes: 'Only for HT consumers who own their transformer. Losses of an old or lightly loaded transformer are about 1–2% of units bought.', ref: 'BEE star labelling of distribution transformers' },
+  ],
+};
+
+export const DEFAULTS: Record<string, any> = { recyclers, factors, energy, cbam, tariffs, solar, credit_pool, esg, dpdp, calendar, requirements, schemes, plans, content, actions };

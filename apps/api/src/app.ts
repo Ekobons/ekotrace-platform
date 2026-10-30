@@ -169,6 +169,7 @@ export async function buildApp(opts: { logger?: boolean; rateLimit?: Limits | nu
     await secured.register(supplierEngagementRoutes);
     await secured.register(smeRoutes);
     await secured.register(smeFilesRoutes);
+    await secured.register((await import('./modules/smeCalendar.routes.js')).smeCalendarRoutes);
     await secured.register(smeNetRoutes);
     await secured.register(smeAdminRoutes);
     await secured.register(qrRoutes);

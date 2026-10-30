@@ -21,35 +21,98 @@
  *           srmm_svc, esg, dpdp, energy, credit_pool, today }
  */
 
+import { EXTRA_KEYS, plantList, plantQuantities, sourceQuality, sourceTotal, withTotals } from './emisSites.js';
+import { billsYear, yearMode } from './billYear.js';
+import { plan } from './plan.js';
+
 export const n = (v: any): number => (v === '' || v === null || v === undefined || isNaN(+v) ? 0 : +v);
 export const round = (v: number, dp = 2): number => Math.round(v * 10 ** dp) / 10 ** dp;
 
 /* ------------------------------------------------------------------ emissions */
+/**
+ * Scope 1, 2, 3 from yearly totals per source (emissions.<key>; see emisSites.ts for months and plants).
+ * Scope 2 is reported both ways (GHG Protocol): location-based with the CEA grid factor (s2, used
+ * everywhere else), and market-based, where renewable electricity bought (open access, green tariff,
+ * I-RECs: emissions.green kWh, part of the grid units) counts as zero. India publishes no residual-mix
+ * factor, so the rest of the grid units keep the CEA factor.
+ */
 export function emissions(d: any, cfg: any): any {
   const act = d.emissions || {};
   const F = cfg.factors.items;
-  const rows = Object.keys(F).map((k: any) => ({
-    key: k,
-    label: F[k].label,
-    unit: F[k].unit,
-    scope: F[k].scope,
-    category: F[k].category || null,
-    quantity: n(act[k]),
-    factor: F[k].factor,
-    tco2e: (n(act[k]) * F[k].factor) / 1000,
-    source: F[k].source || null,
-  }));
-  const sum = (s: number) => rows.filter((r: any) => r.scope === s).reduce((a: any, r: any) => a + r.tco2e, 0);
+  const keys = Object.keys(F);
+  const qty = (doc: any, k: string) => sourceTotal(doc, k);
+  const pe = d.priorYear && d.priorYear.emissions ? d.priorYear.emissions : null;
+  const rows = keys.map((k: any) => {
+    const q = sourceQuality(act, k);
+    const quantity = qty(act, k);
+    return {
+      key: k,
+      label: F[k].label,
+      unit: F[k].unit,
+      scope: F[k].scope,
+      category: F[k].category || null,
+      quantity,
+      factor: F[k].factor,
+      tco2e: (quantity * F[k].factor) / 1000,
+      source: F[k].source || null,
+      quality: q.status, months: q.months, partial: q.partial,
+      priorQuantity: pe ? qty(pe, k) : null,
+      priorTco2e: pe ? (qty(pe, k) * F[k].factor) / 1000 : null,
+    };
+  });
+  const sum = (s: number, f: (r: any) => number = (r) => r.tco2e) => rows.filter((r: any) => r.scope === s).reduce((a: any, r: any) => a + f(r), 0);
   const s1 = sum(1), s2 = sum(2), s3 = sum(3);
   const turnover = n(d.profile && d.profile.turnover);
-  const grid = n(act.grid), solar = n(act.solar);
+  const grid = qty(act, 'grid'), solar = qty(act, 'solar');
+  const gridF = n(F.grid && F.grid.factor);
+  const green = Math.min(qty(act, 'green'), grid);
+  const s2Market = Math.max(0, s2 - (green * gridF) / 1000);
+
+  // last year: source by source when its document is there, else the stored total only
+  let prior: any = null;
+  if (pe) {
+    const p1 = sum(1, (r) => r.priorTco2e), p2 = sum(2, (r) => r.priorTco2e), p3 = sum(3, (r) => r.priorTco2e);
+    const pg = Math.min(qty(pe, 'green'), qty(pe, 'grid'));
+    prior = { fy: d.priorYear.fy || null, bySource: true, s1: p1, s2: p2, s3: p3, total: p1 + p2, withS3: p1 + p2 + p3, s2Market: Math.max(0, p2 - (pg * gridF) / 1000) };
+  } else if (d.priorYear && n(d.priorYear.total) > 0) {
+    prior = { fy: d.priorYear.fy || null, bySource: false, total: n(d.priorYear.total) };
+  }
+
+  // data quality over Scope 1 and 2 (Scope 3 is optional, so empty Scope 3 sources are not "missing")
+  const s12 = rows.filter((r: any) => r.scope !== 3);
+  const tq = (st: string) => s12.filter((r: any) => r.quality === st).reduce((a: any, r: any) => a + r.tco2e, 0);
+  const measuredT = tq('measured'), estimatedT = tq('estimated');
+  const quality = {
+    measuredT, estimatedT,
+    measuredPct: s1 + s2 > 0 ? (measuredT / (s1 + s2)) * 100 : 0,
+    estimated: rows.filter((r: any) => r.quality === 'estimated').map((r: any) => r.key),
+    missing: s12.filter((r: any) => r.quality === 'missing').map((r: any) => r.key),
+    partial: rows.filter((r: any) => r.partial).map((r: any) => r.key),
+  };
+
+  // per plant (only meaningful with more than one; a single-site company is all "Main plant")
+  const plants = plantList(d.profile);
+  const pq = plantQuantities(act, [...keys, ...EXTRA_KEYS], plants);
+  const byPlant = Object.keys(pq).map((id) => {
+    const q = pq[id]!, pl = plants.find((p) => p.id === id);
+    const t = (s: number) => keys.filter((k) => F[k].scope === s).reduce((a, k) => a + (n(q[k]) * F[k].factor) / 1000, 0);
+    const ps1 = t(1), ps2 = t(2), pg = Math.min(n(q.green), n(q.grid));
+    return { id, name: pl ? pl.name : 'Plant no longer listed', listed: !!pl, city: pl?.city || '', state: pl?.state || '', s1: ps1, s2: ps2, s3: t(3), total: ps1 + ps2, s2Market: Math.max(0, ps2 - (pg * gridF) / 1000) };
+  }).filter((p) => p.listed || p.total + p.s3 > 0);
+
   return {
     rows,
     s1, s2, s3,
     total: s1 + s2,
     withS3: s1 + s2 + s3,
+    s2Location: s2, s2Market, totalMarket: s1 + s2Market, greenKwh: green,
     intensity: turnover > 0 ? (s1 + s2) / turnover : 0,
-    renewablePct: grid + solar > 0 ? (solar / (grid + solar)) * 100 : 0,
+    renewablePct: grid + solar > 0 ? ((solar + green) / (grid + solar)) * 100 : 0,
+    solarPct: grid + solar > 0 ? (solar / (grid + solar)) * 100 : 0,
+    prior,
+    change: prior && prior.total > 0 ? ((s1 + s2 - prior.total) / prior.total) * 100 : null,
+    quality,
+    plants: byPlant,
     factorVersion: cfg.factors.version || null,
   };
 }
@@ -58,9 +121,11 @@ export function energyGJ(d: any, cfg: any): any {
   const a = d.emissions || {};
   const E = cfg.energy; // GJ per unit
   let fossil = 0;
-  for (const k of Object.keys(E.fuels)) fossil += n(a[k]) * E.fuels[k];
-  const elec = (n(a.grid) + n(a.solar)) * E.kwh;
-  const re = n(a.solar) * E.kwh;
+  for (const k of Object.keys(E.fuels)) fossil += sourceTotal(a, k) * E.fuels[k];
+  const grid = sourceTotal(a, 'grid'), sol = sourceTotal(a, 'solar');
+  const elec = (grid + sol) * E.kwh;
+  // renewable: rooftop solar plus renewable electricity bought (part of the grid units)
+  const re = (sol + Math.min(sourceTotal(a, 'green'), grid)) * E.kwh;
   const total = fossil + elec;
   return { total, re, pct: total > 0 ? (re / total) * 100 : 0 };
 }
@@ -285,6 +350,8 @@ export function cbam(d: any, cfg: any): any {
 export function bills(d: any, cfg: any): any {
   const T = cfg.tariffs.default || {};
   const b = Object.assign({}, T, d.bills || {});
+  // up to 12 monthly bills (billYear.ts); otherwise one month's bill shown as a year (×12)
+  if (yearMode(b)) return billsYear(b);
   const excess = Math.max(0, n(b.md) - n(b.cd));
   const excessCost = excess * n(b.demandRate) * n(b.excessMult) * 12;
   const newCd = Math.ceil((n(b.md) * 1.05) / 5) * 5;
@@ -299,10 +366,10 @@ export function bills(d: any, cfg: any): any {
   const shiftKwh = (n(b.units) * n(b.peakShare) / 100) * (n(b.shiftPct) / 100);
   const todSave = shiftKwh * (n(b.peakSur) + n(b.offRebate)) * 12;
   const findings = [];
-  if (excess > 0) findings.push({ kind: 'fix', text: `Maximum demand ${n(b.md)} kVA is above contract demand ${n(b.cd)} kVA.`, action: `Raise contract demand to ${newCd} kVA.`, saving: cdSave });
-  if (n(b.pfPenalty) > 0) findings.push({ kind: 'fix', text: `Power factor ${b.pf} is drawing a penalty of ₹${Math.round(n(b.pfPenalty))} a month.`, action: `Install ${kvarRounded} kVAr of capacitors (APFC panel).`, saving: pfSave, capex });
-  if (todSave > 0) findings.push({ kind: 'option', text: `${n(b.peakShare)}% of units are in peak hours.`, action: `Move ${n(b.shiftPct)}% of that load to off-peak.`, saving: todSave });
-  return { inputs: b, excess, excessCost, newCd, cdIncrease, cdSave, kvarRounded, capex, pfSave, pfPaybackMonths: pfSave > 0 ? (capex / pfSave) * 12 : 0, shiftKwh, todSave, total: cdSave + pfSave + todSave, findings };
+  if (excess > 0) findings.push({ kind: 'fix', code: 'cd', text: `Maximum demand ${n(b.md)} kVA is above contract demand ${n(b.cd)} kVA.`, action: `Raise contract demand to ${newCd} kVA.`, saving: cdSave });
+  if (n(b.pfPenalty) > 0) findings.push({ kind: 'fix', code: 'pf', text: `Power factor ${b.pf} is drawing a penalty of ₹${Math.round(n(b.pfPenalty))} a month.`, action: `Install ${kvarRounded} kVAr of capacitors (APFC panel).`, saving: pfSave, capex });
+  if (todSave > 0) findings.push({ kind: 'option', code: 'tod', text: `${n(b.peakShare)}% of units are in peak hours.`, action: `Move ${n(b.shiftPct)}% of that load to off-peak.`, saving: todSave });
+  return { mode: 'one', inputs: b, excess, excessCost, newCd, cdIncrease, cdSave, kvarRounded, capex, pfSave, pfPaybackMonths: pfSave > 0 ? (capex / pfSave) * 12 : 0, shiftKwh, todSave, total: cdSave + pfSave + todSave, findings };
 }
 
 /* ------------------------------------------------------------------ rooftop solar */
@@ -412,8 +479,17 @@ export function nextMonthly(today: any, day: any): any {
   if (dt < today) dt = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() + 1, day));
   return dt;
 }
+/** The company's own dates on the calendar ({ id, title, date, repeat: 'yearly' | 'once', notes }), cleaned. */
+export function ownDates(c: any): any[] {
+  const list = Array.isArray(c && c.custom) ? c.custom : [];
+  return list.filter((x: any) => x && typeof x.title === 'string' && x.title.trim() && typeof x.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(x.date) && !isNaN(Date.parse(x.date + 'T00:00:00Z')))
+    .slice(0, 100).map((x: any) => ({ id: String(x.id || x.date + x.title).slice(0, 40), title: x.title.trim().slice(0, 120), date: x.date, repeat: x.repeat === 'yearly' ? 'yearly' : 'once', notes: typeof x.notes === 'string' ? x.notes.slice(0, 500) : '' }));
+}
 export function calendar(d: any, cfg: any): any {
-  const today = cfg.today instanceof Date ? cfg.today : new Date();
+  const now = cfg.today instanceof Date ? cfg.today : new Date();
+  // whole days, counted on the Indian calendar date (IST, UTC+5:30), so an item due today is "due today" all day
+  const ist = new Date(now.getTime() + 330 * 60e3);
+  const today = new Date(Date.UTC(ist.getUTCFullYear(), ist.getUTCMonth(), ist.getUTCDate()));
   const p = d.profile || {}, c = d.calendar || {}, done = c.done || {};
   const out: any[] = [];
   const flags: Record<string, boolean> = {
@@ -434,17 +510,23 @@ export function calendar(d: any, cfg: any): any {
     else if (o.kind === 'fixed') date = new Date(o.date + 'T00:00:00Z');
     else if (o.kind === 'company') { if (!c[o.field]) continue; date = new Date(c[o.field] + 'T00:00:00Z'); }
     if (!date || isNaN(date.getTime())) continue;
-    out.push({ id: o.id, title: o.title, date, freq: o.freq, who: o.who, go: o.go || null });
+    out.push({ id: o.id, title: o.title, date, freq: o.freq, who: o.who, go: o.go || null, repeat: o.kind === 'monthly' ? 'monthly' : o.kind === 'annual' ? 'yearly' : null });
   }
   for (const x of d.certs || []) {
-    if (x.level && x.level !== 'none' && x.expiry) out.push({ id: 'cert-' + x.id, title: `${x.name} renewal`, date: new Date(x.expiry + 'T00:00:00Z'), freq: 'Certificate expiry', who: 'Certifying body', go: 'certs' });
+    if (x.level && x.level !== 'none' && x.expiry) out.push({ id: 'cert-' + x.id, title: `${x.name} renewal`, date: new Date(x.expiry + 'T00:00:00Z'), freq: 'Certificate expiry', who: 'Certifying body', go: 'certs', repeat: null });
+  }
+  for (const x of ownDates(c)) {
+    let date = new Date(x.date + 'T00:00:00Z');
+    if (x.repeat === 'yearly' && date < today) date = nextAnnual(today, date.getUTCMonth() + 1, date.getUTCDate());
+    out.push({ id: 'own-' + x.id, title: x.title, date, freq: x.repeat === 'yearly' ? 'Every year' : 'Once', who: 'Your own date', go: null, repeat: x.repeat === 'yearly' ? 'yearly' : null, own: true, notes: x.notes });
   }
   for (const x of out) {
-    x.days = Math.round((x.date - today) / 864e5);
+    if (isNaN(x.date.getTime())) { x.drop = true; continue; }
+    x.days = Math.round((x.date - (today as any)) / 864e5);
     x.status = done[x.id] ? 'done' : x.days < 0 ? 'overdue' : x.days <= cfg.calendar.soon_days ? 'soon' : 'later';
     x.date = x.date.toISOString().slice(0, 10);
   }
-  return out.sort((a: any, b: any) => (a.date < b.date ? -1 : 1));
+  return out.filter((x) => !x.drop).sort((a: any, b: any) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
 }
 
 /* ------------------------------------------------------------------ requirements ("What applies") */
@@ -531,7 +613,11 @@ export function answer(d: any, cfg: any, q: any): any {
 
 /* ------------------------------------------------------------------ full result set */
 export function all(d: any, cfg: any): any {
-  const em = emissions(d, cfg), es = esgScore(d, cfg), b = bills(d, cfg), so = solar(d, cfg), cr = credits(d, cfg);
+  // every yearly total present even if only per-plant figures were saved; last year's total from its document
+  d = { ...d, emissions: withTotals(d.emissions, [...Object.keys(cfg.factors.items), ...EXTRA_KEYS]) };
+  const em = emissions(d, cfg);
+  if (d.priorYear && !(n(d.priorYear.total) > 0) && em.prior && em.prior.total > 0) d.priorYear = { ...d.priorYear, total: em.prior.total };
+  const es = esgScore(d, cfg), b = bills(d, cfg), so = solar(d, cfg), cr = credits(d, cfg);
   // price is per kg (or per litre / piece); t and kL listings are converted to kg / litres.
   const perUnit: Record<string, number> = { t: 1000, kL: 1000, kg: 1, L: 1, nos: 1 };
   const scrapValue = (d.scrap || []).reduce((a: any, x: any) => a + n(x.qty) * (perUnit[x.unit] || 1) * n(x.price), 0);
@@ -554,6 +640,7 @@ export function all(d: any, cfg: any): any {
     calendar: calendar(d, cfg),
     requirements: requirements(d, cfg),
     schemes: schemes(d, cfg),
+    plan: plan(d, cfg, { emissions: em, bills: b, solar: so }),
     money: { bills: b.total, solar: so.save, scrap: scrapValue, credits: cr.mine, cbamAvoidedInr: cbam(d, cfg).saveInr, savingsFound: b.total + so.save },
   };
 }
