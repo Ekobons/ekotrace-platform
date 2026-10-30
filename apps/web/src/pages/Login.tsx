@@ -5,6 +5,7 @@ import { BRAND } from '../lib/brand';
 import { BrandMark } from '../components/BrandMark';
 import { CbamBrandSide } from './CbamPublic';
 import { SmeBrandSide } from './sme/SmePublic';
+import { LangSwitch, useHtmlLang, t as tSme } from './sme/i18n';
 
 export function Login({ onDone }: { onDone: () => void }) {
   // a bin's QR label opened before signing in: a contractor goes to the portal with that bin chosen
@@ -43,41 +44,46 @@ export function Login({ onDone }: { onDone: () => void }) {
   const cbam = /^\/cbam(\/|$)/.test(window.location.pathname);
   // EKOTRACE SME's own sign-in page (and its partners')
   const sme = /^\/sme(\/|-net|$)/.test(window.location.pathname);
+  // EKOTRACE SME's own sign-in (not its partners') can be read in Hindi; the platform's stays English
+  const hiOk = /^\/sme(\/|$)/.test(window.location.pathname);
+  useHtmlLang(hiOk);
+  const T = (s: string) => (hiOk ? tSme(s) : s);
   return (
     <div className="signin">
       {sme ? <SmeBrandSide /> : cbam ? <CbamBrandSide /> : <BrandSide />}
       <main className="signin-form">
         <form className="sf" onSubmit={submit}>
+          {hiOk && <div className="sf-lang"><LangSwitch /></div>}
           {mode === 'code' ? <>
-            <h1>Enter your code</h1>
-            <p className="sf-sub">{recovery ? 'Type one of the recovery codes you saved when you set up multi-factor authentication. Each works once.' : `Open your authenticator app and type the 6-digit code shown for ${BRAND.name}.`}</p>
-            <label className="field"><span>{recovery ? 'Recovery code' : '6-digit code'}</span>
+            <h1>{T('Enter your code')}</h1>
+            <p className="sf-sub">{recovery ? T('Type one of the recovery codes you saved when you set up multi-factor authentication. Each works once.') : T('Open your authenticator app and type the 6-digit code shown for {brand}.').replace('{brand}', BRAND.name)}</p>
+            <label className="field"><span>{T(recovery ? 'Recovery code' : '6-digit code')}</span>
               <input className="input mfacode" autoFocus inputMode={recovery ? 'text' : 'numeric'} autoComplete="one-time-code" required maxLength={recovery ? 20 : 7} value={code} onChange={(e) => setCode(e.target.value)} placeholder={recovery ? 'XXXX-XXXX-XXXX' : '123 456'} /></label>
             {err && <div className="note bad" role="alert">{err}</div>}
-            <button className="btn p sf-go" disabled={busy}>{busy ? 'Checking…' : 'Continue'}</button>
+            <button className="btn p sf-go" disabled={busy}>{busy ? T('Checking…') : T('Continue')}</button>
             <div className="sf-alt">
-              <button type="button" className="linkbtn" onClick={() => { setRecovery(!recovery); setCode(''); setErr(null); }}>{recovery ? 'Use the code from the app instead' : 'Lost your phone? Use a recovery code'}</button>
-              <button type="button" className="linkbtn" onClick={() => { setMode('password'); setChallenge(''); setErr(null); }}>Start again</button>
+              <button type="button" className="linkbtn" onClick={() => { setRecovery(!recovery); setCode(''); setErr(null); }}>{T(recovery ? 'Use the code from the app instead' : 'Lost your phone? Use a recovery code')}</button>
+              <button type="button" className="linkbtn" onClick={() => { setMode('password'); setChallenge(''); setErr(null); }}>{T('Start again')}</button>
             </div>
           </> : mode === 'sso' ? <>
-            <h1>Company sign-in</h1>
-            <p className="sf-sub">Sign in with your company's Microsoft, Google or other work account. Your email tells us which company you belong to.</p>
-            <label className="field"><span>Work email</span><input className="input" type="email" autoComplete="username" autoFocus required value={email} onChange={(e) => setEmail(e.target.value)} /></label>
+            <h1>{T('Company sign-in')}</h1>
+            <p className="sf-sub">{T('Sign in with your company\'s Microsoft, Google or other work account. Your email tells us which company you belong to.')}</p>
+            <label className="field"><span>{T('Work email')}</span><input className="input" type="email" autoComplete="username" autoFocus required value={email} onChange={(e) => setEmail(e.target.value)} /></label>
             {err && <div className="note bad" role="alert">{err}</div>}
-            <button className="btn p sf-go" disabled={busy}>{busy ? 'Opening…' : 'Continue to your company sign-in'}</button>
-            <div className="sf-alt"><button type="button" className="linkbtn" onClick={() => { setMode('password'); setErr(null); }}>Sign in with a password instead</button></div>
+            <button className="btn p sf-go" disabled={busy}>{busy ? T('Opening…') : T('Continue to your company sign-in')}</button>
+            <div className="sf-alt"><button type="button" className="linkbtn" onClick={() => { setMode('password'); setErr(null); }}>{T('Sign in with a password instead')}</button></div>
           </> : <>
-            <h1>Sign in</h1>
-            <p className="sf-sub">Use your work email and password, or your company account.</p>
-            <label className="field"><span>Work email</span><input className="input" type="email" autoComplete="username" required value={email} onChange={(e) => setEmail(e.target.value)} /></label>
-            <label className="field"><span>Password</span><input className="input" type="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} /></label>
+            <h1>{T('Sign in')}</h1>
+            <p className="sf-sub">{T('Use your work email and password, or your company account.')}</p>
+            <label className="field"><span>{T('Work email')}</span><input className="input" type="email" autoComplete="username" required value={email} onChange={(e) => setEmail(e.target.value)} /></label>
+            <label className="field"><span>{T('Password')}</span><input className="input" type="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} /></label>
             {err && <div className="note bad" role="alert">{err}</div>}
-            <button className="btn p sf-go" disabled={busy}>{busy ? 'Checking…' : 'Sign in'}</button>
-            <button type="button" className="btn sf-sso" onClick={() => { setMode('sso'); setErr(null); }}>Sign in with your company account</button>
-            <p className="sf-note">Forgot your password? Your company's super admin or admin can reset it.</p>
+            <button className="btn p sf-go" disabled={busy}>{busy ? T('Checking…') : T('Sign in')}</button>
+            <button type="button" className="btn sf-sso" onClick={() => { setMode('sso'); setErr(null); }}>{T('Sign in with your company account')}</button>
+            <p className="sf-note">{T('Forgot your password? Your company\'s super admin or admin can reset it.')}</p>
             {sme ? <div className="sf-other">
-              <span>New here?</span>
-              <a href="/sme-signup">Create your company's account</a>
+              <span>{T('New here?')}</span>
+              <a href="/sme-signup">{T('Create your company\'s account')}</a>
             </div> : cbam ? <div className="sf-other">
               <span>New here?</span>
               <a href="/cbam-signup">Create a free account</a>

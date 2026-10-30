@@ -7,6 +7,7 @@ import { NavLink, useLocation } from 'react-router-dom';
 import { Icon } from '../../components/Icon';
 import { useSme } from './store';
 import { SME_PAGES, groupOf, relevant } from './nav';
+import { t } from './i18n';
 
 export function SmeTabs() {
   const { d } = useSme();
@@ -20,14 +21,14 @@ export function SmeTabs() {
   const shown = g.pages.filter((k) => k === key || more || relevant(k, d?.data, d?.results));
   const hidden = g.pages.length - g.pages.filter((k) => relevant(k, d?.data, d?.results)).length;
   return (
-    <nav className="sme-tabs" aria-label={g.title} style={{ '--gc': g.color, '--gs': g.soft } as CSSProperties}>
-      <div className="sme-tabs-h"><span className="sme-tabs-i"><Icon name={g.icon} /></span><div><b>{g.title}</b><small>{g.sub}</small></div></div>
+    <nav className="sme-tabs" aria-label={t(g.title)} style={{ '--gc': g.color, '--gs': g.soft } as CSSProperties}>
+      <div className="sme-tabs-h"><span className="sme-tabs-i"><Icon name={g.icon} /></span><div><b>{t(g.title)}</b><small>{t(g.sub)}</small></div></div>
       <div className="sme-tabs-l" role="list" ref={list}>
         {shown.map((k) => (
           <NavLink key={k} to={`/sme/${k}`} role="listitem" className={({ isActive }) => `sme-tab${isActive ? ' on' : ''}${relevant(k, d?.data, d?.results) ? '' : ' na'}`}>
-            <Icon name={SME_PAGES[k]!.icon} /><span>{SME_PAGES[k]!.title}</span>
+            <Icon name={SME_PAGES[k]!.icon} /><span>{t(SME_PAGES[k]!.title)}</span>
           </NavLink>))}
-        {hidden > 0 && <button type="button" className="sme-tab more" onClick={() => setMore(!more)} title="Pages your Profile says do not apply to you">{more ? 'Show less' : `+${hidden} not for you`}</button>}
+        {hidden > 0 && <button type="button" className="sme-tab more" onClick={() => setMore(!more)} title={t('Pages your Profile says do not apply to you')}>{more ? t('Show less') : t('+{n} not for you', { n: hidden })}</button>}
       </div>
     </nav>);
 }

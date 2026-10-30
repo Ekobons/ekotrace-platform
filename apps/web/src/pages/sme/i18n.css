@@ -1,0 +1,19 @@
+/* Hindi (Devanagari): Instrument Sans has no Devanagari, so name the fonts that do — Windows (Nirmala UI, Mangal),
+   Android / Linux (Noto Sans Devanagari, Lohit, FreeSans), Apple (Kohinoor, Devanagari Sangam MN). No web fonts. */
+html[lang="hi"] {
+  --f-ui: 'Instrument Sans', 'Nirmala UI', 'Noto Sans Devanagari', 'Kohinoor Devanagari', 'Devanagari Sangam MN', 'Mangal', 'Lohit Devanagari', system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+/* Devanagari has its head-line and marks above and below: a little more line height, and no letter spacing (it breaks the joined letters) */
+html[lang="hi"] .sme-shell .main, html[lang="hi"] .sme-shell .side, html[lang="hi"] .signin { line-height: 1.55; }
+html[lang="hi"] .sme-shell *, html[lang="hi"] .signin * { letter-spacing: 0 !important; }
+html[lang="hi"] .sme-shell .sech span { font-size: 12px; }
+
+/* the language switch: small, quiet, two words */
+.sme-lang { --lang-fg: var(--fg2); --lang-on: #fff; display: inline-flex; border: 1px solid var(--lang-fg); border-radius: 999px; padding: 2px; gap: 2px; width: max-content; }
+.sme-lang button { border: 0; background: transparent; color: var(--lang-fg); font: 600 12px/1 var(--f-ui); padding: 5px 11px; border-radius: 999px; cursor: pointer; }
+.sme-lang button[lang="hi"] { font-family: 'Nirmala UI', 'Noto Sans Devanagari', 'Kohinoor Devanagari', 'Devanagari Sangam MN', 'Mangal', 'Lohit Devanagari', var(--f-ui); font-size: 13px; }
+.sme-lang button.on { background: var(--lang-fg); color: var(--lang-on); }
+.sme-lang button:not(.on):hover { background: color-mix(in srgb, var(--lang-fg) 14%, transparent); }
+.sme-lang button:focus-visible { outline: 2px solid var(--lime, #C6F06B); outline-offset: 1px; }
+.sidefoot .sme-lang { --lang-fg: var(--side-fg); --lang-on: var(--side); border-color: #ffffff55; margin-bottom: 4px; }
+.sf-lang { display: flex; justify-content: flex-end; margin: 0 0 4px; }

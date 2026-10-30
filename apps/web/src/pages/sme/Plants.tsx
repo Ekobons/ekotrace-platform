@@ -8,6 +8,7 @@ import { Link } from 'react-router-dom';
 import { useSme } from './store';
 import { change, sitesOf, siteValue } from './emisData';
 import './emis.css';
+import { t, tn } from './i18n';
 
 type Plant = { id: string; name: string; city: string; state: string };
 
@@ -26,35 +27,35 @@ export function PlantsCard() {
     const em = get('emissions') ?? {};
     const s = sitesOf(em)[p.id];
     const hasData = !!s && keys.some((k) => siteValue(s, k) > 0);
-    if (!window.confirm(hasData ? `${p.name || 'This plant'} has emission figures for ${d.fy}. Removing it deletes them and lowers your totals. Remove it?` : `Remove ${p.name || 'this plant'}?`)) return;
+    if (!window.confirm(hasData ? t('{name} has emission figures for {fy}. Removing it deletes them and lowers your totals. Remove it?', { name: p.name || t('This plant'), fy: d.fy }) : t('Remove {name}?', { name: p.name || t('this plant') }))) return;
     if (s) setModule('emissions', change(em, keys, (nx) => { delete nx.sites[p.id]; }));
     save(list.filter((x) => x.id !== p.id));
   };
   return (
     <section className="card">
-      <div className="cb-h"><h2>Plants and sites</h2>{list.length > 1 && <span className="cb-count">{list.length} plants</span>}</div>
+      <div className="cb-h"><h2>{t('Plants and sites')}</h2>{list.length > 1 && <span className="cb-count">{t('{n} plants', { n: list.length })}</span>}</div>
       <p className="cb-sub">
         {list.length > 1
-          ? <>Enter emissions for each plant in <Link to="/sme/emissions">Emissions</Link>; totals add up and you see the split by plant.</>
-          : <>One site is all most companies need. Add a plant only if you want its emissions shown separately.</>}
+          ? <>{tn('Enter emissions for each plant in {link}; totals add up and you see the split by plant.', { link: <Link to="/sme/emissions">{t('Emissions')}</Link> })}</>
+          : <>{t('One site is all most companies need. Add a plant only if you want its emissions shown separately.')}</>}
       </p>
       <div className="pl-list">
         {list.map((p, i) => (
           <div className="pl-row" key={p.id}>
-            <label><span className="lbl">{i === 0 ? 'Main plant' : `Plant ${i + 1}`}</span>
-              <input className="input" value={p.name} placeholder={i === 0 ? 'Main plant' : 'Name, for example Chakan unit'} disabled={!can} onChange={(e) => edit(i, 'name', e.target.value)} /></label>
-            <label><span className="lbl">City or town</span>
+            <label><span className="lbl">{i === 0 ? t('Main plant') : t('Plant {n}', { n: i + 1 })}</span>
+              <input className="input" value={p.name} placeholder={i === 0 ? t('Main plant') : t('Name, for example Chakan unit')} disabled={!can} onChange={(e) => edit(i, 'name', e.target.value)} /></label>
+            <label><span className="lbl">{t('City or town')}</span>
               <input className="input" value={p.city ?? ''} disabled={!can} onChange={(e) => edit(i, 'city', e.target.value)} /></label>
-            <label><span className="lbl">State</span>
+            <label><span className="lbl">{t('State')}</span>
               <select className="input" value={p.state ?? ''} disabled={!can} onChange={(e) => edit(i, 'state', e.target.value)}>
-                <option value="">Choose…</option>
+                <option value="">{t('Choose…')}</option>
                 {p.state && !states.includes(p.state) && <option value={p.state}>{p.state}</option>}
                 {states.map((s) => <option key={s} value={s}>{s}</option>)}
               </select></label>
-            <div className="pl-x">{can && i > 0 && <button type="button" className="btn sm ghost" onClick={() => remove(p)}>Remove</button>}</div>
+            <div className="pl-x">{can && i > 0 && <button type="button" className="btn sm ghost" onClick={() => remove(p)}>{t('Remove')}</button>}</div>
           </div>))}
       </div>
-      {can && <button type="button" className="btn sm" style={{ marginTop: 10 }} onClick={add}>+ Add a plant</button>}
-      {list.length > 1 && <p className="cb-muted-note">Plants are kept for {d.fy}. When you start another year, add them again there.</p>}
+      {can && <button type="button" className="btn sm" style={{ marginTop: 10 }} onClick={add}>{t('+ Add a plant')}</button>}
+      {list.length > 1 && <p className="cb-muted-note">{t('Plants are kept for {fy}. When you start another year, add them again there.', { fy: d.fy })}</p>}
     </section>);
 }

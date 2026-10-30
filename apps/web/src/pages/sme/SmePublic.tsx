@@ -11,6 +11,7 @@ import { BRAND } from '../../lib/brand';
 import { BrandMark } from '../../components/BrandMark';
 import { smePublic } from '../../lib/sme';
 import './sme.css';
+import { t as tr } from './i18n';
 
 const tool = () => `${BRAND.name} SME`;
 const Tick = () => <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 10.5l4 4 8-9" /></svg>;
@@ -20,21 +21,21 @@ export function SmeBrandSide() {
   return <aside className="signin-brand smesb">
     <div className="sb-top"><BrandMark size={36} /><b>{tool()}</b></div>
     <div className="sb-copy">
-      <h2>Carbon, ESG and compliance, made simple for MSMEs.</h2>
+      <h2>{tr('Carbon, ESG and compliance, made simple for MSMEs.')}</h2>
       <ul className="smesb-list">
-        <li><Tick />Know which rules apply to you: BRSR, CBAM, EPR, DPDP, POSH and more</li>
-        <li><Tick />Scope 1, 2 and 3 from your bills, and your ICAI SRMM level</li>
-        <li><Tick />Find savings: power bill penalties, rooftop solar, scrap, schemes</li>
-        <li><Tick />Share your data with buyers, banks and your CA, only with your consent</li>
+        <li><Tick />{tr('Know which rules apply to you: BRSR, CBAM, EPR, DPDP, POSH and more')}</li>
+        <li><Tick />{tr('Scope 1, 2 and 3 from your bills, and your ICAI SRMM level')}</li>
+        <li><Tick />{tr('Find savings: power bill penalties, rooftop solar, scrap, schemes')}</li>
+        <li><Tick />{tr('Share your data with buyers, banks and your CA, only with your consent')}</li>
       </ul>
     </div>
     <figure className="sb-chart" aria-hidden="true">
       <svg viewBox="0 0 1000 260" preserveAspectRatio="xMidYMid meet">
         {[0, 1, 2, 3, 4].map((i) => <rect key={i} x={110 + i * 170} y={230 - (i + 1) * 40} width={110} height={(i + 1) * 40} rx={8} fill={i === 4 ? '#C6F06B' : `rgba(198,240,107,${0.18 + i * 0.12})`} />)}
-        {['Formative', 'Developing', 'Emerging', 'Established'].map((t, i) => <text key={t} x={335 + i * 170} y={252} textAnchor="middle" fill="#B9D3CA" style={{ font: '600 15px var(--f-ui)' }}>{t}</text>)}
-        <text x={165} y={252} textAnchor="middle" fill="#B9D3CA" style={{ font: '600 15px var(--f-ui)' }}>Start</text>
+        {['Formative', 'Developing', 'Emerging', 'Established'].map((t, i) => <text key={t} x={335 + i * 170} y={252} textAnchor="middle" fill="#B9D3CA" style={{ font: '600 15px var(--f-ui)' }}>{tr(t)}</text>)}
+        <text x={165} y={252} textAnchor="middle" fill="#B9D3CA" style={{ font: '600 15px var(--f-ui)' }}>{tr('Start')}</text>
       </svg>
-      <figcaption><span>Your readiness, step by step</span><span>ICAI SRMM levels</span></figcaption>
+      <figcaption><span>{tr('Your readiness, step by step')}</span><span>{tr('ICAI SRMM levels')}</span></figcaption>
     </figure>
   </aside>;
 }

@@ -3,6 +3,7 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import './sme.css';
 import { SmeProvider } from './store';
 import { SmeTabs } from './Tabs';
+import { useHtmlLang } from './i18n';
 import { groupOf } from './nav';
 import { useLocation } from 'react-router-dom';
 import type { CSSProperties, ReactNode } from 'react';
@@ -39,6 +40,8 @@ import { SmeLoan } from './Loan';
 import './look.css';
 
 export function SmeApp() {
+  // English or Hindi: sets <html lang> and re-renders every SME screen when the language changes
+  useHtmlLang();
   return (
     <SmeProvider>
       <SmePage>

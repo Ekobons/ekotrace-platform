@@ -10,6 +10,7 @@ import { useSme } from './store';
 import { Choice, Num, Pill, Req, Sample, SmeHead, Text } from './ui';
 import { smeApi, crore, dmy, f0, f1, lakh, n, LEVELS, type SmeCaRequest } from '../../lib/sme';
 import './share.css';
+import { t, tn } from './i18n';
 
 const PROJECTS: [string, string][] = [
   ['solar', 'Rooftop solar'],
@@ -24,20 +25,20 @@ export function SmeLoan() {
   const [ca, setCa] = useState<SmeCaRequest[]>([]);
   useEffect(() => { smeApi.caRequests().then((r) => setCa(r.items)).catch(() => { /* shown as "not asked" */ }); }, []);
   if (error) return <div className="card empty">{error}</div>;
-  if (!d) return <div className="card empty">Loading…</div>;
+  if (!d) return <div className="card empty">{t('Loading…')}</div>;
 
   const r = d.results, p = d.data.profile ?? {}, em = r.emissions, b = r.bills, so = r.solar, es = r.esg, sr = r.srmm;
   const pr: string = get('loan.project') || 'solar';
   const amount = n(get('loan.amount')) * 1e7, tenor = n(get('loan.tenor')), bank: string = get('loan.bank') ?? '';
-  const proj = pr === 'solar' ? { name: `Rooftop solar, ${f0(so.kw)} kWp`, cost: n(so.cost), save: n(so.save), co2: n(so.co2) as number | null, ready: n(so.kw) > 0, fix: <>Add your roof area in <Link to="/sme/solar">Solar</Link> and your grid units in <Link to="/sme/emissions">Emissions</Link>.</> }
-    : pr === 'pf' ? { name: `Power factor correction, ${f0(b.kvarRounded)} kVAr capacitors`, cost: n(b.capex), save: n(b.pfSave), co2: null, ready: n(b.pfSave) > 0, fix: <>No power factor penalty found. Check your bill in the <Link to="/sme/bills">Bill analyser</Link>.</> }
-    : pr === 'bills' ? { name: 'Power bill fixes: contract demand, power factor, time-of-day', cost: n(b.capex), save: n(b.total), co2: null, ready: n(b.total) > 0, fix: <>Add your power bill in the <Link to="/sme/bills">Bill analyser</Link>.</> }
-    : { name: (get('loan.purpose') as string) || 'Energy-saving project', cost: n(get('loan.otherCost')) * 1e5, save: n(get('loan.otherSave')) * 1e5, co2: null, ready: n(get('loan.otherSave')) > 0, fix: <>Enter the project cost and yearly saving from your supplier’s quote.</> };
+  const proj = pr === 'solar' ? { name: `Rooftop solar, ${f0(so.kw)} kWp`, cost: n(so.cost), save: n(so.save), co2: n(so.co2) as number | null, ready: n(so.kw) > 0, fix: <>{tn('Add your roof area in {a} and your grid units in {b}.', { a: <Link to="/sme/solar">{t('Solar')}</Link>, b: <Link to="/sme/emissions">{t('Emissions')}</Link> })}</> }
+    : pr === 'pf' ? { name: `Power factor correction, ${f0(b.kvarRounded)} kVAr capacitors`, cost: n(b.capex), save: n(b.pfSave), co2: null, ready: n(b.pfSave) > 0, fix: <>{tn('No power factor penalty found. Check your bill in the {link}.', { link: <Link to="/sme/bills">{t('Bill analyser')}</Link> })}</> }
+    : pr === 'bills' ? { name: 'Power bill fixes: contract demand, power factor, time-of-day', cost: n(b.capex), save: n(b.total), co2: null, ready: n(b.total) > 0, fix: <>{tn('Add your power bill in the {link}.', { link: <Link to="/sme/bills">{t('Bill analyser')}</Link> })}</> }
+    : { name: (get('loan.purpose') as string) || 'Energy-saving project', cost: n(get('loan.otherCost')) * 1e5, save: n(get('loan.otherSave')) * 1e5, co2: null, ready: n(get('loan.otherSave')) > 0, fix: <>{t('Enter the project cost and yearly saving from your supplier’s quote.')}</> };
   const repay = tenor > 0 ? amount / tenor : 0;
   const payback = proj.save > 0 && proj.cost > 0 ? proj.cost / proj.save : 0;
   const mine = ca.filter((c) => c.fy === fy);
   const validated = mine.find((c) => c.status === 'validated'), caOpen = mine.find((c) => OPEN.includes(c.status));
-  const caText = validated ? `Validated by CA: ${f1(validated.validated_pct)}%, Level ${validated.validated_level} · ${LEVELS[validated.validated_level ?? 0]}` : caOpen ? 'CA validation requested' : 'Self-assessed, not yet validated by a CA';
+  const caText = validated ? `Validated by CA: ${f1(validated.validated_pct)}%, Level ${validated.validated_level} · ${LEVELS[validated.validated_level ?? 0]}` : caOpen ? t('CA validation requested') : 'Self-assessed, not yet validated by a CA';
   const certs = ((d.data.certs ?? []) as any[]).filter((c) => c.level && c.level !== 'none').map((c) => `${c.name}${c.level !== 'held' ? ` (${c.level})` : ''}`);
   const schemes = ((r.schemes ?? []) as any[]).filter((s) => s.eligible);
   const hasData = Object.keys(d.meta).length > 0;
@@ -45,39 +46,39 @@ export function SmeLoan() {
 
   return (
     <>
-      <SmeHead lede="A ready file for your bank: the project, what it saves, the emissions it cuts and your ESG profile, all from your own figures." />
-      <div className="row sme-noprint"><button className="btn p" type="button" onClick={() => window.print()}><Icon name="download" />Print or save as PDF</button>
-        <span className="muted small">Choose “Save as PDF” in the print window to e-mail it.</span></div>
+      <SmeHead lede={t('A ready file for your bank: the project, what it saves, the emissions it cuts and your ESG profile, all from your own figures.')} />
+      <div className="row sme-noprint"><button className="btn p" type="button" onClick={() => window.print()}><Icon name="download" />{t('Print or save as PDF')}</button>
+        <span className="muted small">{t('Choose “Save as PDF” in the print window to e-mail it.')}</span></div>
 
       <div className="sme-grid2 sme-noprint">
         <div className="card">
-          <h2>Your loan</h2>
+          <h2>{t('Your loan')}</h2>
           <div style={{ marginTop: 6 }}>
-            <Choice path="loan.project" label="What the loan is for" options={PROJECTS} />
+            <Choice path="loan.project" label={t('What the loan is for')} options={PROJECTS} />
             {pr === 'other' && <>
-              <Text path="loan.purpose" label="Describe the project" />
-              <Num path="loan.otherCost" label="Project cost" unit="₹ lakh" hint="From the supplier’s quote" />
-              <Num path="loan.otherSave" label="Yearly saving" unit="₹ lakh" hint="Your estimate, shown as yours in the pack" />
+              <Text path="loan.purpose" label={t('Describe the project')} />
+              <Num path="loan.otherCost" label={t('Project cost')} unit={t('₹ lakh')} hint={t('From the supplier’s quote')} />
+              <Num path="loan.otherSave" label={t('Yearly saving')} unit={t('₹ lakh')} hint={t('Your estimate, shown as yours in the pack')} />
             </>}
-            <Num path="loan.amount" label="Loan amount" unit="₹ cr" out={amount ? `= ${lakh(amount)}` : ''} />
-            <Num path="loan.tenor" label="Repayment period" unit="years" />
-            <Text path="loan.bank" label="Bank or lender" />
+            <Num path="loan.amount" label={t('Loan amount')} unit="₹ cr" out={amount ? `= ${lakh(amount)}` : ''} />
+            <Num path="loan.tenor" label={t('Repayment period')} unit={t('years')} />
+            <Text path="loan.bank" label={t('Bank or lender')} />
           </div>
         </div>
         <div className="card">
-          <h2>What a bank will look at</h2>
+          <h2>{t('What a bank will look at')}</h2>
           <div style={{ marginTop: 6 }}>
-            <Req title={proj.save > 0 ? `The project saves ${lakh(proj.save)} a year` : 'Project saving not known yet'} pill={!proj.ready ? 'Missing data' : repay ? (proj.save >= repay ? 'Covers repayment' : 'Covers part') : 'No loan amount'} kind={!proj.ready ? 'soon' : repay ? (proj.save >= repay ? 'good' : 'soon') : 'watch'}>
-              {!proj.ready ? proj.fix : repay ? `Principal repayment is about ${lakh(repay)} a year over ${f0(tenor)} years (before interest).` : 'Enter the loan amount and repayment period to compare.'}
+            <Req title={proj.save > 0 ? t('The project saves {amt} a year', { amt: lakh(proj.save) }) : t('Project saving not known yet')} pill={!proj.ready ? t('Missing data') : repay ? (proj.save >= repay ? t('Covers repayment') : t('Covers part')) : t('No loan amount')} kind={!proj.ready ? 'soon' : repay ? (proj.save >= repay ? 'good' : 'soon') : 'watch'}>
+              {!proj.ready ? proj.fix : repay ? t('Principal repayment is about {amt} a year over {n} years (before interest).', { amt: lakh(repay), n: f0(tenor) }) : t('Enter the loan amount and repayment period to compare.')}
             </Req>
-            <Req title={`ESG readiness ${f0(es.overall)}%`} pill={es.level ? `Level ${es.level} · ${es.levelName}` : 'Not yet rated'} kind={es.level >= 2 ? 'good' : 'soon'}>{es.level >= 2 ? 'Meets the Developing level many green-loan desks ask for.' : <>Improve it in <Link to="/sme/esg">ESG</Link>; each section needs at least 30%.</>}</Req>
-            <Req title={`SRMM ${f1(sr.pct * 100)}%`} pill={validated ? 'CA validated' : caOpen ? 'CA requested' : 'Self-assessed'} kind={validated ? 'good' : 'watch'}>{validated ? 'Banks treat CA-validated figures as the best data quality.' : <>Banks rate CA-validated figures higher. <Link to="/sme/share">Ask a CA to validate</Link>.</>}</Req>
-            <Req title="Udyam registration" pill={p.udyam ? 'Registered' : 'Not recorded'} kind={p.udyam ? 'good' : 'soon'}>{p.udyam ? 'Needed for MSME green-finance schemes.' : <>Most MSME schemes need it. Update your <Link to="/sme/profile">Profile</Link>.</>}</Req>
+            <Req title={t('ESG readiness {pct}%', { pct: f0(es.overall) })} pill={es.level ? `${t('Level {n}', { n: es.level })} · ${t(es.levelName)}` : t('Not yet rated')} kind={es.level >= 2 ? 'good' : 'soon'}>{es.level >= 2 ? t('Meets the Developing level many green-loan desks ask for.') : <>{tn('Improve it in {link}; each section needs at least 30%.', { link: <Link to="/sme/esg">ESG</Link> })}</>}</Req>
+            <Req title={`SRMM ${f1(sr.pct * 100)}%`} pill={validated ? t('CA validated') : caOpen ? t('CA requested') : t('Self-assessed')} kind={validated ? 'good' : 'watch'}>{validated ? t('Banks treat CA-validated figures as the best data quality.') : <>{t('Banks rate CA-validated figures higher.')} <Link to="/sme/share">{t('Ask a CA to validate')}</Link>.</>}</Req>
+            <Req title={t('Udyam registration')} pill={p.udyam ? t('Registered') : t('Not recorded')} kind={p.udyam ? 'good' : 'soon'}>{p.udyam ? t('Needed for MSME green-finance schemes.') : <>{tn('Most MSME schemes need it. Update your {link}.', { link: <Link to="/sme/profile">{t('Profile')}</Link> })}</>}</Req>
           </div>
         </div>
       </div>
-      {!hasData && <div className="sme-callout warn sme-noprint">Your figures are empty. Add your bills in <Link to="/sme/emissions">Emissions</Link> before you print the pack.</div>}
-      <p className="lbl sme-noprint" style={{ margin: '6px 0 -4px' }}>The pack, as your bank will see it</p>
+      {!hasData && <div className="sme-callout warn sme-noprint">{tn('Your figures are empty. Add your bills in {link} before you print the pack.', { link: <Link to="/sme/emissions">{t('Emissions')}</Link> })}</div>}
+      <p className="lbl sme-noprint" style={{ margin: '6px 0 -4px' }}>{t('The pack, as your bank will see it')}</p>
 
       <article className="sml-pack" aria-label="Green loan pack">
         <header>

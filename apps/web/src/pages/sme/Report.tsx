@@ -14,6 +14,7 @@ import { smeApi, dmy, f0, f1, f2, n, LEVELS, type SmeCaRequest } from '../../lib
 import { PathChart, rupees, STATUS } from './Plan';
 import './plan.css';
 import './report.css';
+import { t, tn } from './i18n';
 
 const SECTIONS: [string, string, string][] = [
   ['emissions', 'Greenhouse gas emissions', 'Scope 1, 2 and 3, intensity, change from last year'],
@@ -34,7 +35,7 @@ export function SmeReport() {
   const [ca, setCa] = useState<SmeCaRequest[] | null>(null);
   useEffect(() => { smeApi.caRequests().then((r) => setCa(r.items)).catch(() => setCa([])); }, []);
   if (error) return <div className="card empty">{error}</div>;
-  if (!d) return <div className="card empty">Loading…</div>;
+  if (!d) return <div className="card empty">{t('Loading…')}</div>;
 
   const can = d.canEdit;
   const on = (k: string) => get(`report.sections.${k}`) !== false;
@@ -50,36 +51,36 @@ export function SmeReport() {
   const hasData = em.total > 0;
   const preparedBy: string = get('report.preparedBy') || me.user.name;
   const today = new Date().toISOString().slice(0, 10);
-  const yes = (v: unknown) => (v ? 'Yes' : 'No');
+  const yes = (v: unknown) => (v ? t('Yes') : t('No'));
   const shown = SECTIONS.filter(([k]) => on(k)).length;
   const est: string[] = (em.quality?.estimated ?? []).map((k: string) => (em.rows as any[]).find((x) => x.key === k)?.label).filter(Boolean);
   const partial: string[] = (em.quality?.partial ?? []).map((k: string) => (em.rows as any[]).find((x) => x.key === k)?.label).filter(Boolean);
 
   return (
     <>
-      <SmeHead lede="A one-page summary for your buyers, in the shape of the BRSR value-chain questions listed companies ask suppliers. Choose what to include, then print it or save it as a PDF.">
-        <button type="button" className="btn p" onClick={() => window.print()}><Icon name="download" />Print or save as PDF</button>
+      <SmeHead lede={t('A one-page summary for your buyers, in the shape of the BRSR value-chain questions listed companies ask suppliers. Choose what to include, then print it or save it as a PDF.')}>
+        <button type="button" className="btn p" onClick={() => window.print()}><Icon name="download" />{t('Print or save as PDF')}</button>
       </SmeHead>
 
       <div className="rp-setup sme-noprint">
         <div className="card">
-          <h2>What to include</h2>
-          <div className="rp-checks">{SECTIONS.map(([k, t, s]) => (
-            <label key={k} className="rp-check"><input type="checkbox" disabled={!can} checked={on(k)} onChange={(ev) => set(`report.sections.${k}`, ev.target.checked)} /><span><b>{t}</b><small>{s}</small></span></label>))}</div>
-          <p className="muted small" style={{ margin: '10px 0 0' }}>{shown} of {SECTIONS.length} sections. Company details and the footer are always included.</p>
+          <h2>{t('What to include')}</h2>
+          <div className="rp-checks">{SECTIONS.map(([k, l, s]) => (
+            <label key={k} className="rp-check"><input type="checkbox" disabled={!can} checked={on(k)} onChange={(ev) => set(`report.sections.${k}`, ev.target.checked)} /><span><b>{t(l)}</b><small>{t(s)}</small></span></label>))}</div>
+          <p className="muted small" style={{ margin: '10px 0 0' }}>{t('{n} of {total} sections. Company details and the footer are always included.', { n: shown, total: SECTIONS.length })}</p>
         </div>
         <div className="card">
-          <h2>Prepared by</h2>
+          <h2>{t('Prepared by')}</h2>
           <div className="rp-form">
-            <label><span>Name</span><input className="input" disabled={!can} value={get('report.preparedBy') ?? ''} placeholder={me.user.name} onChange={(ev) => set('report.preparedBy', ev.target.value)} /></label>
-            <label><span>Designation</span><input className="input" disabled={!can} value={get('report.designation') ?? ''} placeholder="e.g. Director" onChange={(ev) => set('report.designation', ev.target.value)} /></label>
-            <label><span>For (buyer, optional)</span><input className="input" disabled={!can} value={get('report.forBuyer') ?? ''} placeholder="e.g. Bharat Auto Components Ltd" onChange={(ev) => set('report.forBuyer', ev.target.value)} /></label>
+            <label><span>{t('Name')}</span><input className="input" disabled={!can} value={get('report.preparedBy') ?? ''} placeholder={me.user.name} onChange={(ev) => set('report.preparedBy', ev.target.value)} /></label>
+            <label><span>{t('Designation')}</span><input className="input" disabled={!can} value={get('report.designation') ?? ''} placeholder={t('e.g. Director')} onChange={(ev) => set('report.designation', ev.target.value)} /></label>
+            <label><span>{t('For (buyer, optional)')}</span><input className="input" disabled={!can} value={get('report.forBuyer') ?? ''} placeholder={t('e.g. Bharat Auto Components Ltd')} onChange={(ev) => set('report.forBuyer', ev.target.value)} /></label>
           </div>
-          <p className="muted small" style={{ margin: '10px 0 0' }}>In the print window choose <b>Save as PDF</b> and A4 to e-mail it. Turn off the browser’s “Headers and footers” for a clean page.</p>
+          <p className="muted small" style={{ margin: '10px 0 0' }}>{tn('In the print window choose {b} and A4 to e-mail it. Turn off the browser’s “Headers and footers” for a clean page.', { b: <b>{t('Save as PDF')}</b> })}</p>
         </div>
       </div>
-      {!hasData && <div className="sme-callout warn sme-noprint">No emissions are entered for {fy} yet. <Link to="/sme/emissions">Add your bills in Emissions</Link> before you send this to a buyer.</div>}
-      <p className="lbl sme-noprint" style={{ margin: '6px 0 -4px' }}>The report, as your buyer will see it</p>
+      {!hasData && <div className="sme-callout warn sme-noprint">{tn('No emissions are entered for {fy} yet. {link} before you send this to a buyer.', { fy, link: <Link to="/sme/emissions">{t('Add your bills in Emissions')}</Link> })}</div>}
+      <p className="lbl sme-noprint" style={{ margin: '6px 0 -4px' }}>{t('The report, as your buyer will see it')}</p>
 
       <article className={`rp-doc${d.company.isExample ? ' sample' : ''}`} aria-label="Buyer report">
         {d.company.isExample && <div className="rp-wm" aria-hidden="true">Sample</div>}

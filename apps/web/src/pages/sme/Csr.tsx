@@ -13,6 +13,7 @@ import { Evidence } from './Evidence';
 import { f1, f2, lakh, n } from '../../lib/sme';
 import './comply.css';
 import './rules.css';
+import { t, tn } from './i18n';
 
 interface Project { id: string; project: string; area: string; mode: 'own' | 'agency'; agency: string; csr1: string; budget: number | ''; spent: number | ''; date: string; ongoing: boolean; local: boolean }
 const uid = () => Math.random().toString(36).slice(2, 9);
@@ -37,7 +38,7 @@ const endYear = (fy: string) => Number(/^FY (\d{4})/.exec(fy)?.[1] ?? new Date()
 export function SmeCsr() {
   const { d, get, fy, setModule } = useSme();
   const [tab, setTab] = useState<Tab>('overview');
-  if (!d) return <div className="card empty">Loading…</div>;
+  if (!d) return <div className="card empty">{t('Loading…')}</div>;
   const c = d.results.csr as any;
   const raw = (d.data.csr ?? {}) as any;
   const projects: Project[] = Array.isArray(raw.projects) ? raw.projects : [];
@@ -54,9 +55,9 @@ export function SmeCsr() {
   const nw = n(get('csr.netWorth')), to = n(get('profile.turnover')), p3 = n(get('csr.profit3'));
   const filled = ['csr.netWorth', 'csr.profit1', 'csr.profit2', 'csr.profit3'].some((k) => get(k) !== undefined && get(k) !== '');
   const tests: [string, string, boolean][] = [
-    ['Net worth ₹500 crore or more', nw ? `Yours: ${cr(nw)}` : 'Add net worth', nw >= 500],
-    ['Turnover ₹1,000 crore or more', to ? `Yours: ${cr(to)} (from Profile)` : 'Add turnover in Profile', to >= 1000],
-    ['Net profit ₹5 crore or more last year', p3 ? `Yours: ${cr(p3)}` : 'Add last year’s profit', p3 >= 5],
+    ['Net worth ₹500 crore or more', nw ? `Yours: ${cr(nw)}` : t('Add net worth'), nw >= 500],
+    ['Turnover ₹1,000 crore or more', to ? `Yours: ${cr(to)} (from Profile)` : t('Add turnover in Profile'), to >= 1000],
+    ['Net profit ₹5 crore or more last year', p3 ? `Yours: ${cr(p3)}` : t('Add last year’s profit'), p3 >= 5],
   ];
   const pct = c.obligation > 0 ? Math.min(100, (c.spent / c.obligation) * 100) : 0;
   const y = endYear(fy);
@@ -64,68 +65,68 @@ export function SmeCsr() {
 
   return (
     <>
-      <SmeHead lede="Section 135 of the Companies Act: once any one threshold is crossed, the company spends 2% of its average net profit of the last three years on activities in Schedule VII, and reports it." />
+      <SmeHead lede={t('Section 135 of the Companies Act: once any one threshold is crossed, the company spends 2% of its average net profit of the last three years on activities in Schedule VII, and reports it.')} />
       <div className="seg ru-tabs" role="tablist">
-        {([['overview', 'Overview'], ['spend', 'Spending'], ['plan', 'Board & action plan']] as [Tab, string][]).map(([k, t]) => (
-          <button key={k} type="button" role="tab" aria-selected={tab === k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>{t}{k === 'spend' && projects.length > 0 && <span className="ru-ct">{projects.length}</span>}</button>))}
+        {([['overview', 'Overview'], ['spend', 'Spending'], ['plan', 'Board & action plan']] as [Tab, string][]).map(([k, l]) => (
+          <button key={k} type="button" role="tab" aria-selected={tab === k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>{t(l)}{k === 'spend' && projects.length > 0 && <span className="ru-ct">{projects.length}</span>}</button>))}
       </div>
 
       {tab === 'overview' && <>
         <Kpis>
-          <Kpi label="Does CSR apply?" value={filled || to ? (c.applies ? 'Yes' : 'No') : '—'} unit={c.applies ? 'a threshold is crossed' : filled ? 'no threshold crossed' : 'add your figures'} />
-          <Kpi label="2% obligation" value={c.applies ? L(c.obligation) : '—'} unit={c.applies ? 'this year' : ''} />
-          <Kpi label="Spent so far" value={c.applies ? L(c.spent) : '—'} unit={projects.length ? `${projects.length} project${projects.length === 1 ? '' : 's'}` : ''} />
-          <Kpi label="Still to spend" value={c.applies ? L(c.left) : '—'} good={c.applies && c.left <= 0} />
+          <Kpi label={t('Does CSR apply?')} value={filled || to ? (c.applies ? 'Yes' : 'No') : '—'} unit={c.applies ? t('a threshold is crossed') : filled ? t('no threshold crossed') : t('add your figures')} />
+          <Kpi label={t('2% obligation')} value={c.applies ? L(c.obligation) : '—'} unit={c.applies ? t('this year') : ''} />
+          <Kpi label={t('Spent so far')} value={c.applies ? L(c.spent) : '—'} unit={projects.length ? `${projects.length} project${projects.length === 1 ? '' : 's'}` : ''} />
+          <Kpi label={t('Still to spend')} value={c.applies ? L(c.left) : '—'} good={c.applies && c.left <= 0} />
         </Kpis>
-        {d.company.isExample && <p className="muted small" style={{ margin: 0 }}><Sample /> Figures of the demo company.</p>}
+        {d.company.isExample && <p className="muted small" style={{ margin: 0 }}><Sample /> {t('Figures of the demo company.')}</p>}
 
         <div className="sme-grid2">
-          <div className="card"><h2>Your figures</h2>
-            <p className="cmp-sub">From your audited accounts, in ₹ crore. Net profit is as worked out under section 198.</p>
-            <Num path="csr.netWorth" label="Net worth" unit="₹ Cr" />
-            <Num path="csr.profit1" label="Net profit, three years ago" unit="₹ Cr" />
-            <Num path="csr.profit2" label="Net profit, two years ago" unit="₹ Cr" />
-            <Num path="csr.profit3" label="Net profit, last year" unit="₹ Cr" />
-            {!projects.length && <Num path="csr.spent" label="CSR spent so far this year" hint="Or list each project under Spending" unit="₹ Cr" />}
-            <div style={{ marginTop: 10 }}><Evidence module="csr" item="accounts" label="Audited accounts" /></div>
+          <div className="card"><h2>{t('Your figures')}</h2>
+            <p className="cmp-sub">{t('From your audited accounts, in ₹ crore. Net profit is as worked out under section 198.')}</p>
+            <Num path="csr.netWorth" label={t('Net worth')} unit="₹ Cr" />
+            <Num path="csr.profit1" label={t('Net profit, three years ago')} unit="₹ Cr" />
+            <Num path="csr.profit2" label={t('Net profit, two years ago')} unit="₹ Cr" />
+            <Num path="csr.profit3" label={t('Net profit, last year')} unit="₹ Cr" />
+            {!projects.length && <Num path="csr.spent" label={t('CSR spent so far this year')} hint={t('Or list each project under Spending')} unit="₹ Cr" />}
+            <div style={{ marginTop: 10 }}><Evidence module="csr" item="accounts" label={t('Audited accounts')} /></div>
           </div>
 
           <div className="cmp-stack">
-            <div className="card"><h2>The three tests</h2>
-              <p className="cmp-sub">Crossing any one of them in the previous year brings in CSR.</p>
+            <div className="card"><h2>{t('The three tests')}</h2>
+              <p className="cmp-sub">{t('Crossing any one of them in the previous year brings in CSR.')}</p>
               <div className="cmp-tests">
-                {tests.map(([t, sub, ok]) => (
-                  <div key={t} className="cmp-test"><span>{t}</span><Pill kind={ok ? 'likely' : 'watch'}>{ok ? 'Crossed' : 'Not crossed'}</Pill><small>{sub}</small></div>))}
+                {tests.map(([l, sub, ok]) => (
+                  <div key={l} className="cmp-test"><span>{t(l)}</span><Pill kind={ok ? 'likely' : 'watch'}>{ok ? t('Crossed') : t('Not crossed')}</Pill><small>{t(sub)}</small></div>))}
               </div>
             </div>
-            {!c.applies && <div className="sme-callout">{filled || to ? 'CSR does not apply at your current figures. Check again each year after the accounts are audited.' : 'Add your net worth and the last three years’ net profit to check whether CSR applies.'}</div>}
+            {!c.applies && <div className="sme-callout">{filled || to ? t('CSR does not apply at your current figures. Check again each year after the accounts are audited.') : t('Add your net worth and the last three years’ net profit to check whether CSR applies.')}</div>}
           </div>
         </div>
 
         {c.applies && (
           <div className="sme-grid2">
-            <div className="card"><h2>Spent against the obligation</h2>
+            <div className="card"><h2>{t('Spent against the obligation')}</h2>
               <div className={`cmp-prog${c.left > 0 ? ' warn' : ''}`} style={{ marginTop: 12 }}><b style={{ width: `${pct}%` }} /></div>
-              <div className="cmp-progl"><span>{L(c.spent)} spent</span><span>{L(c.obligation)} to spend</span></div>
+              <div className="cmp-progl"><span>{t('{amt} spent', { amt: L(c.spent) })}</span><span>{t('{amt} to spend', { amt: L(c.obligation) })}</span></div>
               <dl className="ru-sums">
-                <dt>Average net profit, last three years</dt><dd>{cr(c.avgProfit)}</dd>
-                <dt>2% obligation for {fy}</dt><dd>{L(c.obligation)}</dd>
-                <dt>Planned in projects</dt><dd>{L(c.planned)}</dd>
-                <dt>Spent</dt><dd>{L(c.spent)}</dd>
-                <dt className="tot">{c.excess > 0 ? 'Spent above the obligation' : 'Unspent'}</dt><dd className="tot">{L(c.excess > 0 ? c.excess : c.left)}</dd>
+                <dt>{t('Average net profit, last three years')}</dt><dd>{cr(c.avgProfit)}</dd>
+                <dt>{t('2% obligation for {fy}', { fy })}</dt><dd>{L(c.obligation)}</dd>
+                <dt>{t('Planned in projects')}</dt><dd>{L(c.planned)}</dd>
+                <dt>{t('Spent')}</dt><dd>{L(c.spent)}</dd>
+                <dt className="tot">{c.excess > 0 ? t('Spent above the obligation') : t('Unspent')}</dt><dd className="tot">{L(c.excess > 0 ? c.excess : c.left)}</dd>
               </dl>
-              {!projects.length && <p className="cmp-sub" style={{ marginTop: 10 }}>List each project under <button type="button" className="ru-link" onClick={() => setTab('spend')}>Spending</button> to split the unspent amount correctly and keep proof.</p>}
+              {!projects.length && <p className="cmp-sub" style={{ marginTop: 10 }}>{t('List each project under')} <button type="button" className="ru-link" onClick={() => setTab('spend')}>{t('Spending')}</button> {t('to split the unspent amount correctly and keep proof.')}</p>}
             </div>
 
-            <div className="card"><h2>What to do and by when</h2>
+            <div className="card"><h2>{t('What to do and by when')}</h2>
               <ul className="cmp-time" style={{ marginTop: 10 }}>
-                <li><b>By 31 Mar {y}</b><span>Spend {L(c.obligation)} on Schedule VII activities. Administrative overheads may be at most 5% of the spend{c.overheads > 0 ? ` (yours: ${f1(c.overheadsPct)}%${c.overheadsOk ? '' : ', above the limit'})` : ''}.</span></li>
-                {c.left > 0 && c.toUnspentAccount > 0 && <li className="now"><b>By 30 Apr {y}</b><span>Move {L(c.toUnspentAccount)} for ongoing projects to an Unspent CSR Account in a scheduled bank, and spend it within the next three financial years (by 31 Mar {y + 3}). Whatever is still unspent then goes to a Schedule VII fund within 30 days.</span></li>}
-                {c.left > 0 && c.toFund > 0 && <li className="now"><b>By 30 Sep {y}</b><span>Transfer {L(c.toFund)} not tied to an ongoing project to a Schedule VII fund (for example PM CARES or the PM National Relief Fund), within six months of the year end.</span></li>}
-                {c.left <= 0 && <li><b>Unspent</b><span>Nothing is unspent.{c.excess > 0 ? ` The extra ${L(c.excess)} can be set off against the next three years’ obligations if the board passes a resolution.` : ''}</span></li>}
-                <li><b>Committee</b><span>{c.committeeNeeded ? 'The obligation is above ₹50 lakh, so the board must have a CSR committee.' : 'Up to ₹50 lakh the board itself can do the CSR committee’s work.'}</span></li>
-                {c.impactAssessment && <li><b>Impact assessment</b><span>With an obligation of ₹10 crore or more, projects of ₹1 crore or more need an independent impact assessment.</span></li>}
-                <li><b>Report</b><span>Annual report on CSR in the board’s report, and Form CSR-2 with the MCA. Penalty for not following the unspent rules: twice the unspent amount or ₹1 crore, whichever is less.</span></li>
+                <li><b>{t('By 31 Mar {y}', { y })}</b><span>{t('Spend {amt} on Schedule VII activities. Administrative overheads may be at most 5% of the spend.', { amt: L(c.obligation) })}{c.overheads > 0 ? ` ${t(c.overheadsOk ? 'Yours: {pct}%.' : 'Yours: {pct}%, above the limit.', { pct: f1(c.overheadsPct) })}` : ''}</span></li>
+                {c.left > 0 && c.toUnspentAccount > 0 && <li className="now"><b>{t('By 30 Apr {y}', { y })}</b><span>{t('Move {amt} for ongoing projects to an Unspent CSR Account in a scheduled bank, and spend it within the next three financial years (by 31 Mar {y3}). Whatever is still unspent then goes to a Schedule VII fund within 30 days.', { amt: L(c.toUnspentAccount), y3: y + 3 })}</span></li>}
+                {c.left > 0 && c.toFund > 0 && <li className="now"><b>{t('By 30 Sep {y}', { y })}</b><span>{t('Transfer {amt} not tied to an ongoing project to a Schedule VII fund (for example PM CARES or the PM National Relief Fund), within six months of the year end.', { amt: L(c.toFund) })}</span></li>}
+                {c.left <= 0 && <li><b>{t('Unspent')}</b><span>{t('Nothing is unspent.')}{c.excess > 0 ? ` ${t('The extra {amt} can be set off against the next three years’ obligations if the board passes a resolution.', { amt: L(c.excess) })}` : ''}</span></li>}
+                <li><b>{t('Committee')}</b><span>{c.committeeNeeded ? t('The obligation is above ₹50 lakh, so the board must have a CSR committee.') : t('Up to ₹50 lakh the board itself can do the CSR committee’s work.')}</span></li>
+                {c.impactAssessment && <li><b>{t('Impact assessment')}</b><span>{t('With an obligation of ₹10 crore or more, projects of ₹1 crore or more need an independent impact assessment.')}</span></li>}
+                <li><b>{t('Report')}</b><span>{t('Annual report on CSR in the board’s report, and Form CSR-2 with the MCA. Penalty for not following the unspent rules: twice the unspent amount or ₹1 crore, whichever is less.')}</span></li>
               </ul>
             </div>
           </div>)}
@@ -136,14 +137,14 @@ export function SmeCsr() {
 
       {tab === 'plan' && <>
         <div className="card">
-          <h2>For the board</h2>
-          <p className="cmp-sub">Tick each step when done. Attach the signed papers as proof.</p>
+          <h2>{t('For the board')}</h2>
+          <p className="cmp-sub">{t('Tick each step when done. Attach the signed papers as proof.')}</p>
           <div className="ru-checks">{CHECKS.filter(([k]) => k !== 'committee' || c.committeeNeeded).map(([k, t, ref]) => (
             <label key={k} className={`ru-check${checks[k] ? ' on' : ''}`}>
               <input type="checkbox" disabled={!can} checked={!!checks[k]} onChange={(e) => save({ checks: { ...checks, [k]: e.target.checked } })} />
               <span>{t} <small className="muted">· {ref}</small></span>
             </label>))}</div>
-          <div style={{ marginTop: 10 }}><Evidence module="csr" item="board" label="Board papers" /></div>
+          <div style={{ marginTop: 10 }}><Evidence module="csr" item="board" label={t('Board papers')} /></div>
         </div>
         <ActionPlan projects={projects} company={d.company.name} fy={fy} obligation={c.obligation} areaName={areaName} committee={c.committeeNeeded} />
       </>}
@@ -161,14 +162,14 @@ function Spending({ projects, areas, can, overheads, obligation, applies, onChan
   return (
     <>
       <div className="card">
-        <div className="ru-h2row"><h2>CSR projects</h2>{can && <button type="button" className="btn sm p" onClick={() => onChange([...projects, { id: uid(), project: '', area: '', mode: 'agency', agency: '', csr1: '', budget: '', spent: '', date: '', ongoing: false, local: true }])}>+ Add a project</button>}</div>
-        <p className="cmp-sub">One entry for each project or contribution, in ₹ lakh. A project through an implementing agency (trust, society or section 8 company) needs the agency’s CSR-1 registration number (CSR followed by 8 digits). An ongoing project runs over more than one year (up to three), approved as such by the board.</p>
-        {!projects.length && <p className="muted" style={{ margin: '8px 0 0' }}>No projects listed yet.{applies ? ` Your obligation this year is ${L(obligation)}.` : ''}{can ? ' Add the first one.' : ''}</p>}
+        <div className="ru-h2row"><h2>{t('CSR projects')}</h2>{can && <button type="button" className="btn sm p" onClick={() => onChange([...projects, { id: uid(), project: '', area: '', mode: 'agency', agency: '', csr1: '', budget: '', spent: '', date: '', ongoing: false, local: true }])}>{t('+ Add a project')}</button>}</div>
+        <p className="cmp-sub">{t('One entry for each project or contribution, in ₹ lakh. A project through an implementing agency (trust, society or section 8 company) needs the agency’s CSR-1 registration number (CSR followed by 8 digits). An ongoing project runs over more than one year (up to three), approved as such by the board.')}</p>
+        {!projects.length && <p className="muted" style={{ margin: '8px 0 0' }}>{t('No projects listed yet.')}{applies ? ` ${t('Your obligation this year is {amt}.', { amt: L(obligation) })}` : ''}{can ? ` ${t('Add the first one.')}` : ''}</p>}
         {projects.length > 0 && (
           <dl className="ru-sums">
-            <dt>Planned (budgets)</dt><dd>₹{f1(budget)} L</dd>
-            <dt>Spent</dt><dd>₹{f1(spent)} L</dd>
-            {applies && <><dt className="tot">Obligation</dt><dd className="tot">{L(obligation)}</dd></>}
+            <dt>{t('Planned (budgets)')}</dt><dd>₹{f1(budget)} L</dd>
+            <dt>{t('Spent')}</dt><dd>₹{f1(spent)} L</dd>
+            {applies && <><dt className="tot">{t('Obligation')}</dt><dd className="tot">{L(obligation)}</dd></>}
           </dl>)}
       </div>
       {projects.map((p) => {
@@ -177,40 +178,40 @@ function Spending({ projects, areas, can, overheads, obligation, applies, onChan
           <div key={p.id} className="card">
             <div className="ru-h2row">
               <h2 style={{ fontSize: 15.5 }}>{p.project || 'New project'}</h2>
-              {p.ongoing && <Pill kind="watch">Ongoing</Pill>}
-              {!p.area ? <Pill kind="soon">Choose the area</Pill> : badCsr1 ? <Pill kind="soon">CSR-1 number</Pill> : <Pill kind="good">Complete</Pill>}
-              {can && <button type="button" className="btn sm ghost" onClick={() => window.confirm('Remove this project?') && onChange(projects.filter((x) => x.id !== p.id))}>Remove</button>}
+              {p.ongoing && <Pill kind="watch">{t('Ongoing')}</Pill>}
+              {!p.area ? <Pill kind="soon">{t('Choose the area')}</Pill> : badCsr1 ? <Pill kind="soon">{t('CSR-1 number')}</Pill> : <Pill kind="good">{t('Complete')}</Pill>}
+              {can && <button type="button" className="btn sm ghost" onClick={() => window.confirm(t('Remove this project?')) && onChange(projects.filter((x) => x.id !== p.id))}>{t('Remove')}</button>}
             </div>
             <div className="ru-grid">
-              <label className="wide"><span>Project</span><input className="input" disabled={!can} value={p.project} placeholder="e.g. Drinking water ATM in Chakan village" onChange={(e) => upd(p.id, 'project', e.target.value)} /></label>
-              <label className="wide"><span>Schedule VII area</span>
+              <label className="wide"><span>{t('Project')}</span><input className="input" disabled={!can} value={p.project} placeholder={t('e.g. Drinking water ATM in Chakan village')} onChange={(e) => upd(p.id, 'project', e.target.value)} /></label>
+              <label className="wide"><span>{t('Schedule VII area')}</span>
                 <select className="input" disabled={!can} value={p.area} onChange={(e) => upd(p.id, 'area', e.target.value)}>
-                  <option value="">Choose…</option>{areas.map(([k, t]) => <option key={k} value={k}>({k}) {t}</option>)}
+                  <option value="">{t('Choose…')}</option>{areas.map(([k, l]) => <option key={k} value={k}>({k}) {t(l)}</option>)}
                 </select></label>
-              <label><span>Carried out</span>
+              <label><span>{t('Carried out')}</span>
                 <select className="input" disabled={!can} value={p.mode} onChange={(e) => upd(p.id, 'mode', e.target.value)}>
-                  <option value="agency">Through an implementing agency</option><option value="own">By the company itself</option>
+                  <option value="agency">{t('Through an implementing agency')}</option><option value="own">{t('By the company itself')}</option>
                 </select></label>
               {p.mode === 'agency' && <>
-                <label><span>Implementing agency</span><input className="input" disabled={!can} value={p.agency} onChange={(e) => upd(p.id, 'agency', e.target.value)} /></label>
-                <label><span>CSR-1 registration no.</span><input className="input" disabled={!can} value={p.csr1} placeholder="CSR00012345" onChange={(e) => upd(p.id, 'csr1', e.target.value.toUpperCase())} />
-                  {can && p.csr1 && badCsr1 && <small className="ru-err">CSR followed by 8 digits.</small>}</label>
+                <label><span>{t('Implementing agency')}</span><input className="input" disabled={!can} value={p.agency} onChange={(e) => upd(p.id, 'agency', e.target.value)} /></label>
+                <label><span>{t('CSR-1 registration no.')}</span><input className="input" disabled={!can} value={p.csr1} placeholder={t('CSR00012345')} onChange={(e) => upd(p.id, 'csr1', e.target.value.toUpperCase())} />
+                  {can && p.csr1 && badCsr1 && <small className="ru-err">{t('CSR followed by 8 digits.')}</small>}</label>
               </>}
-              <label><span>Budget for the year (₹ lakh)</span><input className="input num" type="number" min={0} step="any" inputMode="decimal" disabled={!can} value={p.budget} onChange={(e) => upd(p.id, 'budget', num(e.target.value))} /></label>
-              <label><span>Spent so far (₹ lakh)</span><input className="input num" type="number" min={0} step="any" inputMode="decimal" disabled={!can} value={p.spent} onChange={(e) => upd(p.id, 'spent', num(e.target.value))} /></label>
-              <label><span>Last payment on</span><input className="input" type="date" disabled={!can} value={p.date} onChange={(e) => upd(p.id, 'date', e.target.value)} /></label>
-              <label className="ru-chk"><input type="checkbox" disabled={!can} checked={p.ongoing} onChange={(e) => upd(p.id, 'ongoing', e.target.checked)} /> Ongoing project (more than one year)</label>
-              <label className="ru-chk"><input type="checkbox" disabled={!can} checked={p.local} onChange={(e) => upd(p.id, 'local', e.target.checked)} /> Near our plant (local area)</label>
+              <label><span>{t('Budget for the year (₹ lakh)')}</span><input className="input num" type="number" min={0} step="any" inputMode="decimal" disabled={!can} value={p.budget} onChange={(e) => upd(p.id, 'budget', num(e.target.value))} /></label>
+              <label><span>{t('Spent so far (₹ lakh)')}</span><input className="input num" type="number" min={0} step="any" inputMode="decimal" disabled={!can} value={p.spent} onChange={(e) => upd(p.id, 'spent', num(e.target.value))} /></label>
+              <label><span>{t('Last payment on')}</span><input className="input" type="date" disabled={!can} value={p.date} onChange={(e) => upd(p.id, 'date', e.target.value)} /></label>
+              <label className="ru-chk"><input type="checkbox" disabled={!can} checked={p.ongoing} onChange={(e) => upd(p.id, 'ongoing', e.target.checked)} /> {t('Ongoing project (more than one year)')}</label>
+              <label className="ru-chk"><input type="checkbox" disabled={!can} checked={p.local} onChange={(e) => upd(p.id, 'local', e.target.checked)} /> {t('Near our plant (local area)')}</label>
             </div>
-            {p.area && <p className="muted small" style={{ margin: '8px 0 0' }}>Schedule VII ({p.area}): {areas.find((a) => a[0] === p.area)?.[1]}</p>}
-            <div style={{ marginTop: 10 }}><Evidence module="csr" item={`project-${p.id}`} label="Proof (receipts, utilisation certificate, photos)" /></div>
+            {p.area && <p className="muted small" style={{ margin: '8px 0 0' }}>{t('Schedule VII')} ({p.area}): {t(areas.find((a) => a[0] === p.area)?.[1])}</p>}
+            <div style={{ marginTop: 10 }}><Evidence module="csr" item={`project-${p.id}`} label={t('Proof (receipts, utilisation certificate, photos)')} /></div>
           </div>);
       })}
       <div className="card">
-        <h2>Administrative overheads</h2>
-        <p className="cmp-sub">Running costs of your CSR work (staff time, travel, monitoring). Counted in the spend, at most 5% of the total.</p>
-        <div className="ru-grid"><label><span>Overheads this year (₹ lakh)</span><input className="input num" type="number" min={0} step="any" inputMode="decimal" disabled={!can} value={overheads} onChange={(e) => onOverheads(e.target.value === '' ? '' : Number(e.target.value))} /></label>
-          <div className="ru-note">{spent > 0 && n(overheads) > 0 ? <>That is <b>{f1((n(overheads) / spent) * 100)}%</b> of the spend{n(overheads) > spent * 0.05 ? <span className="chip warn" style={{ marginLeft: 8 }}>Above 5%</span> : ''}</> : <span className="muted">Limit: 5% of the spend.</span>}</div></div>
+        <h2>{t('Administrative overheads')}</h2>
+        <p className="cmp-sub">{t('Running costs of your CSR work (staff time, travel, monitoring). Counted in the spend, at most 5% of the total.')}</p>
+        <div className="ru-grid"><label><span>{t('Overheads this year (₹ lakh)')}</span><input className="input num" type="number" min={0} step="any" inputMode="decimal" disabled={!can} value={overheads} onChange={(e) => onOverheads(e.target.value === '' ? '' : Number(e.target.value))} /></label>
+          <div className="ru-note">{spent > 0 && n(overheads) > 0 ? <>{tn('That is {pct} of the spend', { pct: <b>{f1((n(overheads) / spent) * 100)}%</b> })}{n(overheads) > spent * 0.05 ? <span className="chip warn" style={{ marginLeft: 8 }}>{t('Above 5%')}</span> : ''}</> : <span className="muted">{t('Limit: 5% of the spend.')}</span>}</div></div>
       </div>
     </>);
 }
@@ -222,13 +223,13 @@ function ActionPlan({ projects, company, fy, obligation, areaName, committee }: 
   const lines = projects.map((p, i) => [
     `${i + 1}. ${p.project || 'Project'}`,
     `   Schedule VII: (${p.area || '—'}) ${areaName(p.area) || 'area to be chosen'}`,
-    `   Carried out: ${p.mode === 'own' ? 'by the company itself' : `through ${p.agency || 'an implementing agency'} (CSR-1: ${p.csr1 || 'to be added'})`}`,
+    `   Carried out: ${p.mode === 'own' ? t('by the company itself') : `through ${p.agency || 'an implementing agency'} (CSR-1: ${p.csr1 || 'to be added'})`}`,
     `   Budget for ${fy}: ₹${f1(p.budget)} lakh${p.ongoing ? ' · ongoing project (multi-year)' : ' · to be completed this year'}${p.local ? ' · local area' : ''}`,
   ].join('\n'));
   const text = [
     `${company}`,
     `Annual action plan for CSR, ${fy}`,
-    `(Rule 5(2), Companies (CSR Policy) Rules, 2014 — ${committee ? 'recommended by the CSR committee to the board' : 'approved by the board'})`,
+    `(Rule 5(2), Companies (CSR Policy) Rules, 2014 — ${committee ? t('recommended by the CSR committee to the board') : t('approved by the board')})`,
     '',
     `CSR obligation for the year: ₹${f1(obligation * 100)} lakh (2% of average net profit of the last three years).`,
     `Total of the budgets below: ₹${f1(total)} lakh.`,
@@ -243,9 +244,9 @@ function ActionPlan({ projects, company, fy, obligation, areaName, committee }: 
   ].join('\n');
   return (
     <div className="card">
-      <div className="ru-h2row"><h2>Annual action plan</h2><button type="button" className="btn sm p" onClick={async () => setCopied(await copyText(text, document.getElementById('ru-plan')))}>{copied ? 'Copied' : 'Copy text'}</button></div>
-      <p className="cmp-sub">Made from your Spending list. Copy it into the board or committee papers and adjust the wording.</p>
+      <div className="ru-h2row"><h2>{t('Annual action plan')}</h2><button type="button" className="btn sm p" onClick={async () => setCopied(await copyText(text, document.getElementById('ru-plan')))}>{copied ? t('Copied') : t('Copy text')}</button></div>
+      <p className="cmp-sub">{t('Made from your Spending list. Copy it into the board or committee papers and adjust the wording.')}</p>
       <pre id="ru-plan" className="ru-plan">{text}</pre>
-      {!projects.length && <p className="muted small" style={{ margin: 0 }}>Add projects under Spending to fill section A. <Link to="/sme/esg">Water, skilling and renewable energy</Link> projects near your plant also lift your ESG score.</p>}
+      {!projects.length && <p className="muted small" style={{ margin: 0 }}>{tn('Add projects under Spending to fill section A. {link} projects near your plant also lift your ESG score.', { link: <Link to="/sme/esg">{t('Water, skilling and renewable energy')}</Link> })}</p>}
     </div>);
 }

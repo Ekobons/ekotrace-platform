@@ -72,6 +72,7 @@ import { SME_GROUPS, SME_PAGES } from './pages/sme/nav';
 import { SmeNet } from './pages/sme/SmeNet';
 import { SmeConsole } from './pages/sme/SmeConsole';
 import { SmeGrievancePage, SmeSignup, SmeStart } from './pages/sme/SmePublic';
+import { LangSwitch, useLang, t as tSme } from './pages/sme/i18n';
 
 interface Ctx {
   me: Me;
@@ -297,6 +298,9 @@ function Shell() {
   const [picked, setPicked] = useState<Product>(() => { try { return (localStorage.getItem('eko_product') as Product) || 'ekotrace'; } catch { return 'ekotrace'; } });
   const product: Product = path.startsWith('/sme/') && products.includes('sme') ? 'sme' : path.startsWith('/sme-net') && products.includes('smenet') ? 'smenet' : path.startsWith('/fin') && products.includes('ekofin') ? 'ekofin' : path.startsWith('/ccts') && products.includes('ccts') ? 'ccts' : path.startsWith('/brsr') && products.includes('brsr') ? 'brsr' : path.startsWith('/uae-mrv') && products.includes('uaemrv') ? 'uaemrv' : path.startsWith('/energy-mgmt') && products.includes('energy') ? 'energy' : path.startsWith('/compliance') && products.includes('compliance') ? 'compliance' : path.startsWith('/epr') && products.includes('epr') ? 'epr' : path.startsWith('/cbam/') && products.includes('cbam') && (picked === 'cbam' || !products.includes('ekotrace')) ? 'cbam' : products.includes(picked) ? picked : products[0]!;
   const cbamRole = useCbamRole(product === 'cbam');
+  // EKOTRACE SME can be shown in Hindi (its own switch, kept on this browser); other products stay English
+  useLang();
+  const T = (s: string) => (product === 'sme' ? tSme(s) : s);
   // SME companies and their partners get the SME manual, not the full platform's
   const smeOnly = !!tenant && owned.every((p) => p === 'sme' || p === 'smenet');
   const NAV = product === 'sme' ? SME_NAV : product === 'smenet' ? SMENET_NAV : product === 'ekofin' ? FIN_NAV : product === 'cbam' ? cbamNav(cbamRole ?? 'both') : product === 'ccts' || product === 'brsr' || product === 'uaemrv' || product === 'energy' || product === 'compliance' || product === 'epr' ? packNav(product) : EKO_NAV;
@@ -358,7 +362,7 @@ function Shell() {
       <aside className="side" id="sidenav" aria-label="Menu" inert={small && !navOpen}
         onClick={(e) => { if (small && (e.target as Element).closest('a')) setNavOpen(false); }}>
         <button type="button" className="mclose" onClick={() => setNavOpen(false)} aria-label="Close the menu">✕</button>
-        <div className="brand"><BrandMark /><div className="bt"><b>{product === 'sme' || product === 'smenet' ? `${BRAND.name} SME` : BRAND.name}</b><small>{product === 'sme' ? 'Carbon, ESG & compliance for MSMEs' : product === 'smenet' ? 'Your SME network' : BRAND.tagline}</small></div>
+        <div className="brand"><BrandMark /><div className="bt"><b>{product === 'sme' || product === 'smenet' ? `${BRAND.name} SME` : BRAND.name}</b><small>{product === 'sme' ? T('Carbon, ESG & compliance for MSMEs') : product === 'smenet' ? 'Your SME network' : BRAND.tagline}</small></div>
           <button type="button" className="minibtn" onClick={toggleMini} aria-label={mini ? 'Expand the menu' : 'Collapse the menu'} title={mini ? 'Expand the menu' : 'Collapse the menu'}>{mini ? '»' : '«'}</button></div>
         <div className="org">
           {role === 'platform_admin' ? (
@@ -370,13 +374,13 @@ function Shell() {
               </select>
             </>
           ) : (
-            <><b style={{ fontSize: 14 }}>{tenant?.name}</b><span style={{ fontSize: 11.5, color: 'var(--side-dim)' }}>{tenant?.planLimits?.name ?? tenant?.plan} plan{tenant?.scope_name ? ` · ${tenant.scope_name}` : ' · whole group'}</span></>
+            <><b style={{ fontSize: 14 }}>{tenant?.name}</b><span style={{ fontSize: 11.5, color: 'var(--side-dim)' }}>{product === 'sme' ? tSme('{plan} plan', { plan: tenant?.planLimits?.name ?? tenant?.plan }) : `${tenant?.planLimits?.name ?? tenant?.plan} plan`}{tenant?.scope_name ? ` · ${tenant.scope_name}` : ` · ${T('whole group')}`}</span></>
           )}
         </div>
         {tenant && products.length > 1 && (mini
           ? (() => { const next = products[(products.indexOf(product) + 1) % products.length]!; return <button type="button" className="prodmini" title={`Switch to ${PRODUCT_NAME[next]}`} onClick={() => switchTo(next)}>{SHORT[product]}</button>; })()
           : <div className="prodsw" role="tablist" aria-label="Product">{products.map((p) => <button key={p} type="button" role="tab" aria-selected={p === product} className={p === product ? 'on' : ''} onClick={() => p !== product && switchTo(p)}>{PRODUCT_NAME[p]}</button>)}</div>)}
-        {tenant && !mini && <div className="navtools"><button type="button" onClick={foldAll} title={allClosed ? 'Expand all sections' : 'Collapse all sections'}>{allClosed ? '▸▸ Expand all' : '▾▾ Collapse all'}</button></div>}
+        {tenant && !mini && <div className="navtools"><button type="button" onClick={foldAll} title={T(allClosed ? 'Expand all sections' : 'Collapse all sections')}>{allClosed ? `▸▸ ${T('Expand all')}` : `▾▾ ${T('Collapse all')}`}</button></div>}
         <nav className="nav">
           {role === 'platform_admin' && <NavLink to="/console" end title={mini ? 'Platform console' : undefined}><Icon name="gear" /><span className="nl">Platform console</span>{!tenant && alertN > 0 && <span className="navb red" title="Platform security alerts">{alertN}</span>}</NavLink>}
           {role === 'platform_admin' && <NavLink to="/console/sme" title={mini ? 'SME console' : undefined}><Icon name="building" /><span className="nl">SME console</span></NavLink>}
@@ -393,9 +397,9 @@ function Shell() {
             return (
               <div key={gi} className="navsec" style={{ '--sc': sc } as CSSProperties}>
                 {g.group && <button type="button" className={`sech${open ? ' open' : ''}${on ? ' has' : ''}`} aria-expanded={open} title={g.group} onClick={() => !mini && fold(g.group!)}>
-                  <i className="sdot" /><span>{g.group.toUpperCase()}</span><span className="chev">{open ? '▾' : '▸'}</span></button>}
+                  <i className="sdot" /><span>{T(g.group).toUpperCase()}</span><span className="chev">{open ? '▾' : '▸'}</span></button>}
                 {open && <div className="secitems">{items.map((i) => hrefOf(i)
-                  ? <NavLink key={i.label} to={hrefOf(i)!} title={mini ? labelOf(i) : undefined} className={() => (isOn(i) ? 'active' : '')} style={product === 'sme' && SME_C[i.label] ? { '--ic': SME_C[i.label] } as CSSProperties : undefined}><Icon name={i.icon} /><span className="nl">{labelOf(i)}</span>
+                  ? <NavLink key={i.label} to={hrefOf(i)!} title={mini ? T(labelOf(i)) : undefined} className={() => (isOn(i) ? 'active' : '')} style={product === 'sme' && SME_C[i.label] ? { '--ic': SME_C[i.label] } as CSSProperties : undefined}><Icon name={i.icon} /><span className="nl">{T(labelOf(i))}</span>
                     {(() => { const ts = i.tabs ? tabsOf(i).map((t) => t.to) : [i.to!]; const amber = ts.reduce((a, t) => a + badge(t), 0);
                       return <>{amber > 0 && <span className="navb amber" title={ts.includes('/approvals') ? 'Waiting for your approval' : 'Unread notices, things to do and messages'}>{amber}</span>}
                         {i.to === '/audit' && alertN > 0 && <span className="navb red" title="Security alerts to review">{alertN}</span>}</>; })()}</NavLink>
@@ -405,10 +409,11 @@ function Shell() {
           })}
         </nav>
         <div className="sidefoot">
-          <div className="who"><b>{me.user.name}</b><span>{ROLE_LABEL[role]}</span></div>
+          {product === 'sme' && <LangSwitch />}
+          <div className="who"><b>{me.user.name}</b><span>{T(ROLE_LABEL[role])}</span></div>
           <div className="row" style={{ gap: 6 }}>
-            <NavLink to="/account" className="btn sm ghost" style={{ color: 'var(--side-fg)' }}>Password</NavLink>
-            <button className="btn sm ghost" style={{ color: 'var(--side-fg)' }} onClick={logout}>Log out</button>
+            <NavLink to="/account" className="btn sm ghost" style={{ color: 'var(--side-fg)' }}>{T('Password')}</NavLink>
+            <button className="btn sm ghost" style={{ color: 'var(--side-fg)' }} onClick={logout}>{T('Log out')}</button>
           </div>
         </div>
       </aside>

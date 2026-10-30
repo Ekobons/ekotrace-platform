@@ -13,6 +13,7 @@ import { dmy } from '../../lib/sme';
 import { SME_PAGES } from './nav';
 import { Pill, SmeHead } from './ui';
 import './billing.css';
+import { t, tn } from './i18n';
 
 interface Price { base: number; cgst: number; sgst: number; igst: number; total: number; intra: boolean; rate: number }
 interface PlanRow { id: string; name: string; modules: string[] | 'all'; ca_validation: boolean; price_inr: number; price: Price | null }
@@ -65,30 +66,30 @@ export function SmeBilling() {
   }, [b?.online]);
 
   if (err && !b) return <div className="card empty">{err}</div>;
-  if (!b) return <div className="card empty">Loading…</div>;
+  if (!b) return <div className="card empty">{t('Loading…')}</div>;
 
   const cur = b.current, left = daysBetween(cur.today, cur.expiry);
   const curPlan = b.plans.find((p) => p.id === cur.planId) ?? null;
-  const curLabel = curPlan?.name ?? (cur.trial ? 'Trial' : 'Set up by our team');
+  const curLabel = curPlan?.name ?? (cur.trial ? t('Trial') : t('Set up by our team'));
   const paid = b.payments.filter((p) => p.status === 'paid');
   const support = b.support;
 
   /** after the payment window: the server checks the signature and records the payment (the webhook does the same if this page is closed) */
   const confirm = async (orderId: string, r: any) => {
-    setBusy('confirm'); setMsg({ kind: 'info', text: 'Payment received by the bank. Confirming…' });
+    setBusy('confirm'); setMsg({ kind: 'info', text: t('Payment received by the bank. Confirming…') });
     try {
       const v = await call<{ status: string; message?: string; invoiceNo?: string; expiry?: string }>('POST', '/api/sme/billing/verify', { orderId, paymentId: r.razorpay_payment_id, signature: r.razorpay_signature });
       if (v.status === 'paid') {
         setMsg({ kind: 'ok', text: `Thank you — payment received. Your access now runs until ${dmy(v.expiry ?? '')}. Invoice ${v.invoiceNo ?? ''} is below.` });
         await load();
       } else {
-        setMsg({ kind: 'info', text: v.message ?? 'Waiting for the bank to confirm. This page updates by itself.' });
+        setMsg({ kind: 'info', text: v.message ?? t('Waiting for the bank to confirm. This page updates by itself.') });
         let n = 0;
         poll.current = window.setInterval(async () => {
           const x = await load();
           if (x?.payments.some((p) => p.status === 'paid' && p.rp_payment_id === r.razorpay_payment_id) || ++n > 24) {
             if (poll.current) window.clearInterval(poll.current);
-            if (x?.payments.some((p) => p.rp_payment_id === r.razorpay_payment_id && p.status === 'paid')) setMsg({ kind: 'ok', text: 'Thank you — payment confirmed. Your invoice is below.' });
+            if (x?.payments.some((p) => p.rp_payment_id === r.razorpay_payment_id && p.status === 'paid')) setMsg({ kind: 'ok', text: t('Thank you — payment confirmed. Your invoice is below.') });
           }
         }, 5000);
       }
@@ -108,7 +109,7 @@ export function SmeBilling() {
         modal: { ondismiss: () => setBusy((x) => (x === plan.id ? null : x)), confirm_close: true },
       });
       rz.on('payment.failed', (r: any) => {
-        const why = String(r?.error?.description ?? 'The payment did not go through.');
+        const why = String(r?.error?.description ?? t('The payment did not go through.'));
         setMsg({ kind: 'bad', text: `${why} No money was taken for this attempt; you can try again.` });
         void call('POST', '/api/sme/billing/failed', { orderId: o.orderId, reason: why }).catch(() => undefined);
       });
@@ -118,73 +119,73 @@ export function SmeBilling() {
 
   return (
     <>
-      <SmeHead lede="Your plan, how long your access runs, and paying for the next year. Every payment has a GST tax invoice you can print." />
+      <SmeHead lede={t('Your plan, how long your access runs, and paying for the next year. Every payment has a GST tax invoice you can print.')} />
 
       {msg && <div className={`note ${msg.kind}`} role="status">{msg.text}</div>}
 
       <div className="card bil-now">
         <div className="bil-now-main">
-          <span className="lbl">Your plan</span>
+          <span className="lbl">{t('Your plan')}</span>
           <b className="bil-now-plan">{curLabel}</b>
-          <span className="muted">{curPlan ? (curPlan.price_inr ? `${rs(curPlan.price_inr * 100)} a year + GST` : 'Free') : cur.trial ? 'Free trial of every page' : 'No plan paid online yet'}</span>
+          <span className="muted">{curPlan ? (curPlan.price_inr ? t('{amt} a year + GST', { amt: rs(curPlan.price_inr * 100) }) : t('Free')) : cur.trial ? t('Free trial of every page') : t('No plan paid online yet')}</span>
         </div>
         <div className="bil-now-main">
-          <span className="lbl">Access until</span>
+          <span className="lbl">{t('Access until')}</span>
           <b className="bil-now-plan">{dmy(cur.expiry)}</b>
-          <span>{left < 0 ? <Pill kind="overdue">Ended</Pill> : left <= 30 ? <Pill kind="soon">{left === 0 ? 'Ends today' : `${left} day${left === 1 ? '' : 's'} left`}</Pill> : <Pill kind="good">{left} days left</Pill>}</span>
+          <span>{left < 0 ? <Pill kind="overdue">{t('Ended')}</Pill> : left <= 30 ? <Pill kind="soon">{left === 0 ? t('Ends today') : t(left === 1 ? '{n} day left' : '{n} days left', { n: left })}</Pill> : <Pill kind="good">{t('{n} days left', { n: left })}</Pill>}</span>
         </div>
-        <p className="bil-now-note muted small">After this date nobody in the company can sign in until the plan is renewed. Paying now adds one year after this date, so you lose no days by paying early.</p>
+        <p className="bil-now-note muted small">{t('After this date nobody in the company can sign in until the plan is renewed. Paying now adds one year after this date, so you lose no days by paying early.')}</p>
       </div>
 
       <div className="card">
-        <div className="bil-h"><h2>Plans</h2><span className="muted small">Prices are per year. GST at {b.gstRate}% is added.</span></div>
+        <div className="bil-h"><h2>{t('Plans')}</h2><span className="muted small">{t('Prices are per year. GST at {rate}% is added.', { rate: b.gstRate })}</span></div>
         {!b.online && <div className="bil-off">
-          <b>Online payment is not switched on yet.</b>
-          <p>Pay by bank transfer instead: {support ? <>write to <a href={`mailto:${support}?subject=${encodeURIComponent(`Plan payment — ${b.company.name}`)}`}>{support}</a></> : 'contact the team that set up your account'} with the plan you want. We send the bank details and a GST invoice, and extend your access when the money arrives.</p>
+          <b>{t('Online payment is not switched on yet.')}</b>
+          <p>{tn('Pay by bank transfer instead: {who} with the plan you want. We send the bank details and a GST invoice, and extend your access when the money arrives.', { who: support ? <>{t('write to')} <a href={`mailto:${support}?subject=${encodeURIComponent(`Plan payment — ${b.company.name}`)}`}>{support}</a></> : t('contact the team that set up your account') })}</p>
         </div>}
         <div className="bil-plans">
           {b.plans.map((p) => {
             const isCur = p.id === cur.planId, pr = p.price;
             return (
               <div key={p.id} className={`bil-plan${isCur ? ' cur' : ''}`}>
-                <div className="bil-plan-h"><b>{p.name}</b>{isCur && <span className="chip">Your plan</span>}</div>
+                <div className="bil-plan-h"><b>{p.name}</b>{isCur && <span className="chip">{t('Your plan')}</span>}</div>
                 {pr ? <>
-                  <div className="bil-price"><span className="num">{rs(pr.total)}</span><small>a year, incl. GST</small></div>
+                  <div className="bil-price"><span className="num">{rs(pr.total)}</span><small>{t('a year, incl. GST')}</small></div>
                   <div className="bil-split muted small">{rs(pr.base)} + GST {rs(pr.cgst + pr.sgst + pr.igst)}{pr.intra ? ` (CGST ${pr.rate / 2}% + SGST ${pr.rate / 2}%)` : ` (IGST ${pr.rate}%)`}</div>
-                </> : <div className="bil-price"><span className="num">Free</span><small>no payment</small></div>}
+                </> : <div className="bil-price"><span className="num">{t('Free')}</span><small>{t('no payment')}</small></div>}
                 <ul className="bil-inc">
-                  {p.modules === 'all' ? <li>Every page of the tool</li> : <>
-                    {p.modules.map((m) => <li key={m}>{SME_PAGES[m]?.title ?? m}</li>)}
+                  {p.modules === 'all' ? <li>{t('Every page of the tool')}</li> : <>
+                    {p.modules.map((m) => <li key={m}>{t(SME_PAGES[m]?.title ?? m)}</li>)}
                   </>}
-                  {p.ca_validation ? <li>CA validation of your SRMM self-assessment</li> : null}
+                  {p.ca_validation ? <li>{t('CA validation of your SRMM self-assessment')}</li> : null}
                 </ul>
                 {pr && b.online && b.canPay && <button type="button" className={`btn ${isCur ? '' : 'p'} bil-pay`} disabled={!!busy} onClick={() => void pay(p)}>
-                  {busy === p.id ? 'Opening…' : isCur ? `Renew for ${rs(pr.total)}` : `Pay ${rs(pr.total)}`}</button>}
+                  {busy === p.id ? t('Opening…') : isCur ? t('Renew for {amt}', { amt: rs(pr.total) }) : t('Pay {amt}', { amt: rs(pr.total) })}</button>}
               </div>);
           })}
         </div>
-        {b.online && !b.canPay && <p className="muted small" style={{ margin: '12px 0 0' }}>Only the company’s owner or an admin can pay.</p>}
-        {b.online && b.canPay && <p className="muted small" style={{ margin: '12px 0 0' }}>You pay on Razorpay’s secure window by UPI, card or net banking. We never see your card or bank details.</p>}
+        {b.online && !b.canPay && <p className="muted small" style={{ margin: '12px 0 0' }}>{t('Only the company’s owner or an admin can pay.')}</p>}
+        {b.online && b.canPay && <p className="muted small" style={{ margin: '12px 0 0' }}>{t('You pay on Razorpay’s secure window by UPI, card or net banking. We never see your card or bank details.')}</p>}
         <p className="muted small" style={{ margin: '6px 0 0' }}>
-          GST: CGST + SGST when your company is in {b.sellerState ?? 'the same state as ours'}, IGST otherwise{b.company.gstState ? ` — you are billed as ${b.company.gstState}` : ''}. Check the GST treatment with your CA.
+          {t('GST: CGST + SGST when your company is in {state}, IGST otherwise.', { state: b.sellerState ?? t('the same state as ours') })}{b.company.gstState ? ` ${t('You are billed as {state}.', { state: b.company.gstState })}` : ''} {t('Check the GST treatment with your CA.')}
         </p>
       </div>
 
       <div className="bil-cols">
         <Details b={b} onSaved={load} />
         <div className="card">
-          <div className="bil-h"><h2>Payments</h2>{paid.length > 0 && <span className="muted small">{paid.length} paid</span>}</div>
-          {b.payments.length === 0 ? <p className="muted bil-empty">No payments yet. {b.online ? 'When you pay for a plan, the payment and its invoice appear here.' : 'Payments by bank transfer are added here by our team, with the invoice.'}</p> : (
+          <div className="bil-h"><h2>{t('Payments')}</h2>{paid.length > 0 && <span className="muted small">{t('{n} paid', { n: paid.length })}</span>}</div>
+          {b.payments.length === 0 ? <p className="muted bil-empty">{t('No payments yet.')} {b.online ? t('When you pay for a plan, the payment and its invoice appear here.') : t('Payments by bank transfer are added here by our team, with the invoice.')}</p> : (
             <div className="sme-scroll"><table className="sme-tbl bil-tbl">
-              <thead><tr><th>Date</th><th>Plan</th><th className="r">Amount</th><th>Status</th><th /></tr></thead>
+              <thead><tr><th>{t('Date')}</th><th>{t('Plan')}</th><th className="r">{t('Amount')}</th><th>{t('Status')}</th><th /></tr></thead>
               <tbody>{b.payments.map((p) => (
                 <tr key={p.id}>
                   <td>{dmy(p.paid_at ?? p.created_at)}</td>
                   <td>{p.plan_name}{p.period_to && <div className="muted small">to {dmy(p.period_to)}</div>}</td>
                   <td className="r">{rs(p.amount_paise)}{p.method && <div className="muted small">{METHOD[p.method] ?? p.method}</div>}</td>
-                  <td>{p.status === 'paid' ? <Pill kind="good">Paid</Pill> : p.status === 'failed' ? <Pill kind="overdue">Failed</Pill> : <Pill kind="grey">Not completed</Pill>}
+                  <td>{p.status === 'paid' ? <Pill kind="good">{t('Paid')}</Pill> : p.status === 'failed' ? <Pill kind="overdue">{t('Failed')}</Pill> : <Pill kind="grey">{t('Not completed')}</Pill>}
                     {p.status !== 'paid' && p.failure && <div className="muted small">{p.failure}</div>}</td>
-                  <td className="r">{p.status === 'paid' && <button type="button" className="btn sm" onClick={() => setInv(p.id)}>Invoice</button>}</td>
+                  <td className="r">{p.status === 'paid' && <button type="button" className="btn sm" onClick={() => setInv(p.id)}>{t('Invoice')}</button>}</td>
                 </tr>))}</tbody>
             </table></div>)}
         </div>
@@ -202,30 +203,30 @@ function Details({ b, onSaved }: { b: Billing; onSaved: () => Promise<unknown> }
   const dirty = f.gstin !== (b.company.gstin ?? '') || f.address !== (b.company.address ?? '') || f.billingEmail !== (b.company.billingEmail ?? '');
   const save = async () => {
     setSaving(true); setSt(null);
-    try { await call('PUT', '/api/sme/billing/details', { gstin: f.gstin.trim() || null, address: f.address.trim() || null, billingEmail: f.billingEmail.trim() || null }); await onSaved(); setSt({ kind: 'ok', text: 'Saved. New invoices use these details.' }); }
+    try { await call('PUT', '/api/sme/billing/details', { gstin: f.gstin.trim() || null, address: f.address.trim() || null, billingEmail: f.billingEmail.trim() || null }); await onSaved(); setSt({ kind: 'ok', text: t('Saved. New invoices use these details.') }); }
     catch (e) { setSt({ kind: 'bad', text: errText(e) }); }
     setSaving(false);
   };
   const ro = !b.canEdit;
   return (
     <div className="card">
-      <div className="bil-h"><h2>Invoice details</h2></div>
-      <p className="muted small" style={{ margin: '2px 0 12px' }}>Printed on your invoices as the buyer. Add your GSTIN if the company is registered for GST, so you can claim the input tax credit.</p>
+      <div className="bil-h"><h2>{t('Invoice details')}</h2></div>
+      <p className="muted small" style={{ margin: '2px 0 12px' }}>{t('Printed on your invoices as the buyer. Add your GSTIN if the company is registered for GST, so you can claim the input tax credit.')}</p>
       <dl className="bil-dl">
-        <dt>Company</dt><dd>{b.company.name}</dd>
-        <dt>State</dt><dd>{b.company.state || <span className="muted">Not set</span>} <Link to="/sme/profile" className="small">Change in Profile</Link></dd>
+        <dt>{t('Company')}</dt><dd>{b.company.name}</dd>
+        <dt>{t('State')}</dt><dd>{b.company.state || <span className="muted">{t('Not set')}</span>} <Link to="/sme/profile" className="small">{t('Change in Profile')}</Link></dd>
       </dl>
       <div className="bil-form">
-        <label><span>GSTIN <small className="muted">(optional)</small></span>
-          <input className="input mono" value={f.gstin} maxLength={15} disabled={ro} placeholder="27AAACG1234F1Z5" onChange={(e) => setF({ ...f, gstin: e.target.value.toUpperCase().replace(/\s/g, '') })} /></label>
-        <label><span>Billing address</span>
-          <textarea className="input" rows={3} value={f.address} maxLength={400} disabled={ro} placeholder="Plot, street, area, city, PIN" onChange={(e) => setF({ ...f, address: e.target.value })} /></label>
-        <label><span>Send invoices also to <small className="muted">(optional)</small></span>
-          <input className="input" type="email" value={f.billingEmail} maxLength={190} disabled={ro} placeholder="accounts@yourcompany.in" onChange={(e) => setF({ ...f, billingEmail: e.target.value })} /></label>
+        <label><span>{t('GSTIN')} <small className="muted">{t('(optional)')}</small></span>
+          <input className="input mono" value={f.gstin} maxLength={15} disabled={ro} placeholder={t('27AAACG1234F1Z5')} onChange={(e) => setF({ ...f, gstin: e.target.value.toUpperCase().replace(/\s/g, '') })} /></label>
+        <label><span>{t('Billing address')}</span>
+          <textarea className="input" rows={3} value={f.address} maxLength={400} disabled={ro} placeholder={t('Plot, street, area, city, PIN')} onChange={(e) => setF({ ...f, address: e.target.value })} /></label>
+        <label><span>{t('Send invoices also to')} <small className="muted">{t('(optional)')}</small></span>
+          <input className="input" type="email" value={f.billingEmail} maxLength={190} disabled={ro} placeholder={t('accounts@yourcompany.in')} onChange={(e) => setF({ ...f, billingEmail: e.target.value })} /></label>
       </div>
       {st && <div className={`note ${st.kind}`} style={{ marginTop: 10 }}>{st.text}</div>}
-      {!ro && <div className="row" style={{ marginTop: 12 }}><button type="button" className="btn p" disabled={!dirty || saving} onClick={() => void save()}>{saving ? 'Saving…' : 'Save details'}</button></div>}
-      {ro && <p className="muted small" style={{ margin: '10px 0 0' }}>Only the owner or an admin can change these.</p>}
+      {!ro && <div className="row" style={{ marginTop: 12 }}><button type="button" className="btn p" disabled={!dirty || saving} onClick={() => void save()}>{saving ? t('Saving…') : t('Save details')}</button></div>}
+      {ro && <p className="muted small" style={{ margin: '10px 0 0' }}>{t('Only the owner or an admin can change these.')}</p>}
     </div>);
 }
 
@@ -250,14 +251,14 @@ export function InvoiceModal({ url, onClose }: { url: string; onClose: () => voi
     return () => { document.body.classList.remove('bil-modal-open'); window.removeEventListener('keydown', k); };
   }, [onClose]);
   return createPortal(
-    <div className="bil-overlay" role="dialog" aria-modal="true" aria-label="Tax invoice" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+    <div className="bil-overlay" role="dialog" aria-modal="true" aria-label={t('Tax invoice')} onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="bil-sheet">
         <div className="bil-bar bil-noprint">
-          <b className="grow">{inv ? `Invoice ${inv.number}` : 'Invoice'}</b>
-          <button type="button" className="btn p" disabled={!inv} onClick={() => window.print()}>Print or save as PDF</button>
-          <button type="button" className="btn ghost" onClick={onClose}>Close</button>
+          <b className="grow">{inv ? `Invoice ${inv.number}` : t('Invoice')}</b>
+          <button type="button" className="btn p" disabled={!inv} onClick={() => window.print()}>{t('Print or save as PDF')}</button>
+          <button type="button" className="btn ghost" onClick={onClose}>{t('Close')}</button>
         </div>
-        {err ? <div className="note bad">{err}</div> : !inv ? <p className="muted">Loading…</p> : <InvoiceDoc inv={inv} />}
+        {err ? <div className="note bad">{err}</div> : !inv ? <p className="muted">{t('Loading…')}</p> : <InvoiceDoc inv={inv} />}
       </div>
     </div>, document.body);
 }

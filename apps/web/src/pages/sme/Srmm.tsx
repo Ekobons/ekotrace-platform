@@ -10,6 +10,7 @@ import { useSme } from './store';
 import { Choice, Kpi, Kpis, Pill, Sample, SmeHead, copyText } from './ui';
 import { f0, f1, LEVELS } from '../../lib/sme';
 import './carbon.css';
+import { t, tn } from './i18n';
 
 type SecKey = 'A' | 'B' | 'C';
 interface Item { id: string; s: SecKey; cat: string; q: string; c: string; note: string; max: number; o: [number, string][] | null; parts?: [string, string][] }
@@ -37,7 +38,7 @@ function Band({ pct }: { pct: number }) {
     <div className="cb-band" role="img" aria-label={`Overall ${f1(pct)}%`}>
       <div className="cb-band-m" style={{ left: `${p}%` }}><b>{f1(pct)}%</b><i /></div>
       <div className="cb-band-bar">{BANDS.map((b) => <div key={b.label} style={{ width: `${b.to - b.from}%`, background: b.color }} />)}</div>
-      <div className="cb-band-l">{BANDS.map((b) => <span key={b.label} style={{ width: `${b.to - b.from}%` }}><em>{b.label}</em><i>{b.from ? `L${BANDS.indexOf(b)}` : '—'}</i><br />{b.from ? `>${b.from}%` : '0–30%'}</span>)}</div>
+      <div className="cb-band-l">{BANDS.map((b) => <span key={b.label} style={{ width: `${b.to - b.from}%` }}><em>{t(b.label)}</em><i>{b.from ? `L${BANDS.indexOf(b)}` : '—'}</i><br />{b.from ? `>${b.from}%` : '0–30%'}</span>)}</div>
     </div>);
 }
 
@@ -70,7 +71,7 @@ export function SmeSrmm() {
   }, [sm.scores, sm.multi, items, ver]);
 
   if (error) return <div className="card empty">{error}</div>;
-  if (!d || !r) return <div className="card empty">Loading your data…</div>;
+  if (!d || !r) return <div className="card empty">{t('Loading your data…')}</div>;
 
   const sugs: Sug[] = r.version === ver ? r.suggestions ?? [] : [];
   const sugMap = Object.fromEntries(sugs.map((s) => [s.id, s])) as Record<string, Sug>;
@@ -96,7 +97,7 @@ export function SmeSrmm() {
     const n = next();
     for (const s of newSugs) { const k = key(s.id); n.scores[k] = s.score; if (!n.remarks[k]) n.remarks[k] = s.reason; }
     if (newSugs.length) setModule('srmm', n);
-    toast(newSugs.length ? `${newSugs.length} score${newSugs.length === 1 ? '' : 's'} filled from your data. Check each one.` : 'No new suggestions.');
+    toast(newSugs.length ? `${newSugs.length} score${newSugs.length === 1 ? '' : 's'} filled from your data. Check each one.` : t('No new suggestions.'));
   };
 
   const report = () => {
@@ -105,62 +106,62 @@ export function SmeSrmm() {
     return `SRMM ${String(bank.label).toUpperCase()} (SELF-EVALUATION)\n${d.company.name} · ${fy}\n\n${secs}\n\nGrand total: ${f0(r.got)} / ${r.max} (${f1(r.pct * 100)}%)\nLevel achieved: ${r.label}\n${r.eligible ? 'Eligible — minimum 30% achieved in every section' : 'Not eligible — minimum 30% not achieved in one or more sections'}\n\nScores\n${rows}\n\nSelf-assessed with EKOTRACE SME using ICAI's SRMM ${bank.short ?? ''} utility. Validation by a Chartered Accountant provides limited assurance. SRMM® is a registered trademark of ICAI.`;
   };
   const copy = async () => {
-    const t = report();
-    if (reportRef.current) reportRef.current.textContent = t;
-    toast((await copyText(t, reportRef.current)) ? 'Report copied.' : 'Copy is blocked here. The report is selected: press Ctrl+C.');
+    const txt = report();
+    if (reportRef.current) reportRef.current.textContent = txt;
+    toast((await copyText(txt, reportRef.current)) ? t('Report copied.') : t('Copy is blocked here. The report is selected: press Ctrl+C.'));
   };
 
   return (
     <div className="cb-stack">
-      <SmeHead lede={`ICAI Sustainability Reporting Maturity Model, ${bank.label}. ${items.length} indicators, ${total} points. Scores your EKOTRACE data already supports are suggested for you to accept.`}>
-        <button type="button" className="btn" onClick={copy}>Copy report</button>
-        <Link className="btn p" to="/sme/share">Request CA validation</Link>
+      <SmeHead lede={t('ICAI Sustainability Reporting Maturity Model, {label}. {n} indicators, {total} points. Scores your EKOTRACE data already supports are suggested for you to accept.', { label: bank.label, n: items.length, total })}>
+        <button type="button" className="btn" onClick={copy}>{t('Copy report')}</button>
+        <Link className="btn p" to="/sme/share">{t('Request CA validation')}</Link>
       </SmeHead>
 
       <Kpis>
-        <Kpi label="Overall" value={<>{f1(r.pct * 100)}%{d.company.isExample && <Sample />}</>} unit={`${f0(r.got)} of ${r.max} points`} good={r.eligible && r.level > 0} />
-        <Kpi label="Level" value={r.level ? `Level ${r.level}` : 'Not rated'} unit={r.level ? LEVELS[r.level] : r.eligible ? 'Needs more than 30% overall' : 'A section is below 30%'} good={r.level > 0} />
-        <Kpi label="Scored" value={`${scored} of ${items.length}`} unit={r.open ? `${r.open} still to score` : 'All indicators scored'} />
-        <Kpi label="Suggestions" value={sugs.length} unit={newSugs.length ? `${newSugs.length} for indicators not yet scored` : 'from your data'} />
+        <Kpi label={t('Overall')} value={<>{f1(r.pct * 100)}%{d.company.isExample && <Sample />}</>} unit={t('{a} of {b} points', { a: f0(r.got), b: r.max })} good={r.eligible && r.level > 0} />
+        <Kpi label={t('Level')} value={r.level ? t('Level {n}', { n: r.level }) : t('Not rated')} unit={r.level ? t(LEVELS[r.level]) : r.eligible ? t('Needs more than 30% overall') : t('A section is below 30%')} good={r.level > 0} />
+        <Kpi label={t('Scored')} value={t('{a} of {b}', { a: scored, b: items.length })} unit={r.open ? t('{n} still to score', { n: r.open }) : t('All indicators scored')} />
+        <Kpi label={t('Suggestions')} value={sugs.length} unit={newSugs.length ? t('{n} for indicators not yet scored', { n: newSugs.length }) : t('from your data')} />
       </Kpis>
 
       <div className="sme-grid2">
         <div className="card">
-          <div className="cb-h"><h2>Where you stand</h2><Pill kind={r.level ? 'good' : 'soon'}>{r.label}</Pill></div>
+          <div className="cb-h"><h2>{t('Where you stand')}</h2><Pill kind={r.level ? 'good' : 'soon'}>{t(r.label)}</Pill></div>
           <Band pct={r.pct * 100} />
           {r.eligible
-            ? <p className="cb-muted-note">Every section has at least 30% of its points, so the overall score sets the level.</p>
-            : <div className="sme-callout warn" style={{ marginTop: 10 }}>No level can be given yet: {SECS.filter((k) => !r.sections[k].eligible).map((k) => `Section ${k}`).join(', ')} {SECS.filter((k) => !r.sections[k].eligible).length === 1 ? 'is' : 'are'} below 30% of {SECS.filter((k) => !r.sections[k].eligible).length === 1 ? 'its' : 'their'} points. ICAI needs at least 30% in every section.</div>}
+            ? <p className="cb-muted-note">{t('Every section has at least 30% of its points, so the overall score sets the level.')}</p>
+            : <div className="sme-callout warn" style={{ marginTop: 10 }}>{t(SECS.filter((k) => !r.sections[k].eligible).length === 1 ? 'No level can be given yet: {list} is below 30% of its points. ICAI needs at least 30% in every section.' : 'No level can be given yet: {list} are below 30% of their points. ICAI needs at least 30% in every section.', { list: SECS.filter((k) => !r.sections[k].eligible).map((k) => t('Section {k}', { k })).join(', ') })}</div>}
           <div style={{ marginTop: 10 }} />
-          <Choice path="srmm.version" label="SRMM version" hint="Scores are kept separately for each version" options={[['auto', `Automatic (${sector === 'svc' ? 'services' : 'manufacturing'}, from your profile)`], ['mfg', 'Version 3.1 · Manufacturing'], ['svc', 'Version 3.2 · Services']]} />
+          <Choice path="srmm.version" label={t('SRMM version')} hint={t('Scores are kept separately for each version')} options={[['auto', `Automatic (${sector === 'svc' ? 'services' : 'manufacturing'}, from your profile)`], ['mfg', 'Version 3.1 · Manufacturing'], ['svc', 'Version 3.2 · Services']]} />
         </div>
         <div className="card">
-          <h2>By section</h2>
+          <h2>{t('By section')}</h2>
           <div className="sme-scroll"><table className="sme-tbl" style={{ marginTop: 8 }}>
-            <thead><tr><th>Section</th><th className="r">Points</th><th className="r cb-hm">Min 30%</th><th className="r">%</th><th>Rated?</th></tr></thead>
+            <thead><tr><th>{t('Section')}</th><th className="r">{t('Points')}</th><th className="r cb-hm">{t('Min 30%')}</th><th className="r">%</th><th>{t('Rated?')}</th></tr></thead>
             <tbody>
               {SECS.map((k) => { const x = r.sections[k]; return (
-                <tr key={k}><td><b>{k}</b> · {SEC_SHORT[k]}<div className="cb-prog" title={`${secN[k] - secOpen[k]} of ${secN[k]} scored`}><b style={{ width: `${secN[k] ? ((secN[k] - secOpen[k]) / secN[k]) * 100 : 0}%` }} /></div><span className="muted" style={{ fontSize: 11.5 }}>{secN[k] - secOpen[k]} of {secN[k]} scored</span></td>
+                <tr key={k}><td><b>{k}</b> · {t(SEC_SHORT[k])}<div className="cb-prog" title={t('{a} of {b} scored', { a: secN[k] - secOpen[k], b: secN[k] })}><b style={{ width: `${secN[k] ? ((secN[k] - secOpen[k]) / secN[k]) * 100 : 0}%` }} /></div><span className="muted" style={{ fontSize: 11.5 }}>{t('{a} of {b} scored', { a: secN[k] - secOpen[k], b: secN[k] })}</span></td>
                   <td className="r">{f0(x.got)} / {x.max}</td><td className="r cb-hm">{f0(x.min)}</td><td className="r">{f1(x.pct * 100)}%</td>
-                  <td><Pill kind={x.eligible ? 'good' : 'apply'}>{x.eligible ? 'Yes' : 'Below 30%'}</Pill></td></tr>); })}
-              <tr className="tot"><td>Total</td><td className="r">{f0(r.got)} / {r.max}</td><td className="r cb-hm">{f0(r.max * 0.3)}</td><td className="r">{f1(r.pct * 100)}%</td><td><Pill kind={r.eligible ? 'good' : 'apply'}>{r.eligible ? 'Yes' : 'No'}</Pill></td></tr>
+                  <td><Pill kind={x.eligible ? 'good' : 'apply'}>{x.eligible ? t('Yes') : t('Below 30%')}</Pill></td></tr>); })}
+              <tr className="tot"><td>{t('Total')}</td><td className="r">{f0(r.got)} / {r.max}</td><td className="r cb-hm">{f0(r.max * 0.3)}</td><td className="r">{f1(r.pct * 100)}%</td><td><Pill kind={r.eligible ? 'good' : 'apply'}>{r.eligible ? t('Yes') : t('No')}</Pill></td></tr>
             </tbody></table></div>
         </div>
       </div>
 
       <div className="card">
         <div className="cb-tools">
-          <div className="seg" role="group" aria-label="Section">
-            {SECS.map((k) => <button key={k} type="button" className={sec === k ? 'on' : ''} aria-pressed={sec === k} onClick={() => setSec(k)}>Section {k}{secOpen[k] ? ` · ${secOpen[k]} open` : ' ✓'}</button>)}
-            <button type="button" className={sec === 'all' ? 'on' : ''} aria-pressed={sec === 'all'} onClick={() => setSec('all')}>All</button>
+          <div className="seg" role="group" aria-label={t('Section')}>
+            {SECS.map((k) => <button key={k} type="button" className={sec === k ? 'on' : ''} aria-pressed={sec === k} onClick={() => setSec(k)}>{t('Section {k}', { k })}{secOpen[k] ? ` · ${t('{n} open', { n: secOpen[k] })}` : ' ✓'}</button>)}
+            <button type="button" className={sec === 'all' ? 'on' : ''} aria-pressed={sec === 'all'} onClick={() => setSec('all')}>{t('All')}</button>
           </div>
           <div className="row">
-            <label className="cb-check"><input type="checkbox" checked={onlyOpen} onChange={(e) => setOnlyOpen(e.target.checked)} />Not scored only</label>
-            <label className="cb-check"><input type="checkbox" checked={onlySug} onChange={(e) => setOnlySug(e.target.checked)} />With a suggestion</label>
-            {can && <button type="button" className="btn sm" disabled={!newSugs.length} onClick={applyAll}>Accept {newSugs.length || ''} suggestion{newSugs.length === 1 ? '' : 's'}</button>}
+            <label className="cb-check"><input type="checkbox" checked={onlyOpen} onChange={(e) => setOnlyOpen(e.target.checked)} />{t('Not scored only')}</label>
+            <label className="cb-check"><input type="checkbox" checked={onlySug} onChange={(e) => setOnlySug(e.target.checked)} />{t('With a suggestion')}</label>
+            {can && <button type="button" className="btn sm" disabled={!newSugs.length} onClick={applyAll}>{newSugs.length ? t(newSugs.length === 1 ? 'Accept {n} suggestion' : 'Accept {n} suggestions', { n: newSugs.length }) : t('Accept suggestions')}</button>}
           </div>
         </div>
-        {sec !== 'all' && <p className="cb-sub" style={{ marginTop: 10 }}>Section {sec}: {SEC_LONG[sec]} · {secMax[sec]} points · at least {f0(secMax[sec] * 0.3)} needed</p>}
+        {sec !== 'all' && <p className="cb-sub" style={{ marginTop: 10 }}>{t('Section {k}', { k: sec })}: {t(SEC_LONG[sec])} · {t('{n} points', { n: secMax[sec] })} · {t('at least {n} needed', { n: f0(secMax[sec] * 0.3) })}</p>}
       </div>
 
       <div className="card">
@@ -175,15 +176,15 @@ export function SmeSrmm() {
               <p className="srq-q">{q.q}</p>
               {!q.parts && (
                 <div className="sro" role="radiogroup" aria-label={`${q.id} score`}>
-                  {(q.o ?? []).map(([s, t]) => {
+                  {(q.o ?? []).map(([s, l]) => {
                     const on = raw(q.id) === String(s);
                     return (
                       <label key={s} className={`${on ? 'on' : ''}${can ? '' : ' dis'}`}>
                         <input type="radio" name={name} value={s} checked={on} disabled={!can} onChange={() => set(`srmm.scores.${key(q.id)}`, s)} />
-                        <span className="sc">{s}</span><span>{t.charAt(0).toUpperCase() + t.slice(1)}</span>
+                        <span className="sc">{s}</span><span>{l.charAt(0).toUpperCase() + l.slice(1)}</span>
                       </label>);
                   })}
-                  {can && v !== null && <button type="button" className="btn xs ghost sro-clear" onClick={() => set(`srmm.scores.${key(q.id)}`, '')}>Clear score</button>}
+                  {can && v !== null && <button type="button" className="btn xs ghost sro-clear" onClick={() => set(`srmm.scores.${key(q.id)}`, '')}>{t('Clear score')}</button>}
                 </div>)}
               {q.parts && (
                 <div>
@@ -191,25 +192,25 @@ export function SmeSrmm() {
                     <div className="srp" key={p}>
                       <span>{label}</span>
                       <div className="seg" role="group" aria-label={`${q.id} ${label}`}>
-                        {PART_OPTS.map(([s, t]) => <button key={s} type="button" title={t} disabled={!can} className={part(q.id, p) === String(s) ? 'on' : ''} aria-pressed={part(q.id, p) === String(s)} onClick={() => set(`srmm.multi.${key(q.id)}_${p}`, s)}>{s} · {t}</button>)}
+                        {PART_OPTS.map(([s, l]) => <button key={s} type="button" title={t(l)} disabled={!can} className={part(q.id, p) === String(s) ? 'on' : ''} aria-pressed={part(q.id, p) === String(s)} onClick={() => set(`srmm.multi.${key(q.id)}_${p}`, s)}>{s} · {t(l)}</button>)}
                         {can && part(q.id, p) !== '' && <button type="button" onClick={() => set(`srmm.multi.${key(q.id)}_${p}`, '')} aria-label={`Clear ${label}`}>✕</button>}
                       </div>
                     </div>))}
                 </div>)}
               {sg && (
                 <div className={`srsug${raw(q.id) === String(sg.score) ? ' same' : ''}`}>
-                  <span>Suggested from your data: <b>{sg.score}</b>. {sg.reason}{v !== null && v > sg.score ? ' Your score is higher than your data shows, so keep the evidence ready for your CA.' : ''}</span>
-                  {can && !q.parts && raw(q.id) !== String(sg.score) && <button type="button" className="btn sm" onClick={() => acceptSug(sg)}>Use {sg.score}</button>}
+                  <span>{tn('Suggested from your data: {score}.', { score: <b>{sg.score}</b> })} {t(sg.reason)}{v !== null && v > sg.score ? ` ${t('Your score is higher than your data shows, so keep the evidence ready for your CA.')}` : ''}</span>
+                  {can && !q.parts && raw(q.id) !== String(sg.score) && <button type="button" className="btn sm" onClick={() => acceptSug(sg)}>{t('Use {n}', { n: sg.score })}</button>}
                 </div>)}
-              <details><summary>Scoring criteria</summary><p>{q.c}</p>{q.note && <p><b>Note:</b> {q.note}</p>}</details>
-              {(can || remark(q.id)) && <input type="text" className="input rm" aria-label={`${q.id} remarks`} placeholder="Basis for this score (for your CA)" disabled={!can} value={remark(q.id)} onChange={(e) => set(`srmm.remarks.${key(q.id)}`, e.target.value)} />}
+              <details><summary>{t('Scoring criteria')}</summary><p>{q.c}</p>{q.note && <p><b>{t('Note:')}</b> {q.note}</p>}</details>
+              {(can || remark(q.id)) && <input type="text" className="input rm" aria-label={`${q.id} remarks`} placeholder={t('Basis for this score (for your CA)')} disabled={!can} value={remark(q.id)} onChange={(e) => set(`srmm.remarks.${key(q.id)}`, e.target.value)} />}
             </div>);
         })}
-        {!shown.length && <p className="muted" style={{ margin: 0 }}>{onlyOpen ? 'Every indicator in this view is scored.' : onlySug ? 'No suggestions in this view. Suggestions come from your Emissions, ESG and Certifications data.' : 'No indicators.'}</p>}
+        {!shown.length && <p className="muted" style={{ margin: 0 }}>{onlyOpen ? t('Every indicator in this view is scored.') : onlySug ? t('No suggestions in this view. Suggestions come from your Emissions, ESG and Certifications data.') : t('No indicators.')}</p>}
       </div>
 
-      <div className="sme-callout">When you have scored every indicator, <Link to="/sme/share">ask a Chartered Accountant to validate</Link> it. A validated level can be shown on ICAI’s website with your consent.</div>
-      <p className="muted" style={{ fontSize: 12, margin: 0 }}>SRMM® is a registered trademark of the Institute of Chartered Accountants of India. This is a self-evaluation using ICAI’s published utility ({String(get('srmm.version') ?? 'auto') === 'auto' ? 'chosen from your sector' : 'chosen by you'}); the validated score is issued after review by a Chartered Accountant.</p>
+      <div className="sme-callout">{tn('When you have scored every indicator, {link} it. A validated level can be shown on ICAI’s website with your consent.', { link: <Link to="/sme/share">{t('ask a Chartered Accountant to validate')}</Link> })}</div>
+      <p className="muted" style={{ fontSize: 12, margin: 0 }}>SRMM® is a registered trademark of the Institute of Chartered Accountants of India. This is a self-evaluation using ICAI’s published utility ({String(get('srmm.version') ?? 'auto') === 'auto' ? t('chosen from your sector') : t('chosen by you')}); the validated score is issued after review by a Chartered Accountant.</p>
       <pre ref={reportRef} aria-hidden="true" style={{ position: 'absolute', left: -9999, top: 0, width: 1, height: 1, overflow: 'hidden' }} />
     </div>);
 }

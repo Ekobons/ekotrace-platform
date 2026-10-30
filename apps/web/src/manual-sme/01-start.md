@@ -12,6 +12,10 @@ New company? Use **Create your company's account** on the sign-in page (when you
 
 Forgot your password? The owner of your company account (super admin) can reset it under **People & access**.
 
+## English or Hindi (हिंदी)
+
+The screens can be shown in Hindi. Use the **English | हिंदी** switch on the sign-in page, or at the bottom of the menu once you are signed in (on a phone, open the menu with **☰**). Your choice is remembered on that browser; on another phone or computer, choose it once again. Menus, headings, buttons and most explanations change to Hindi. Some longer texts (the details of each rule, scheme descriptions, ICAI SRMM questions) and the documents you send out (buyer report, bank pack, tax invoice, privacy notice) stay in English. The WhatsApp message has its own English / हिंदी choice.
+
 ## The screen
 
 ```flow

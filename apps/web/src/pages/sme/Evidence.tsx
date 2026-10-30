@@ -9,6 +9,7 @@ import { useCallback, useEffect, useRef, useState, type DragEvent } from 'react'
 import { useSme } from './store';
 import { smeFiles, fileSize, type SmeFile } from '../../lib/smeFiles';
 import './evidence.css';
+import { t, tn } from './i18n';
 
 const CHANGED = 'sme-evidence-changed';
 const MAX = 10 * 1024 * 1024;
@@ -50,12 +51,12 @@ export function Evidence({ module, item = '', label = 'Proof', compact = true }:
     if (!list.length) return;
     setErr(null);
     const bad = list.find((f) => f.size > MAX || !OK_EXT.test(f.name));
-    if (bad) { setErr(bad.size > MAX ? `${bad.name} is larger than 10 MB.` : `${bad.name}: attach a PDF, a photo (JPG or PNG), or a Word or Excel file.`); return; }
+    if (bad) { setErr(bad.size > MAX ? t('{name} is larger than 10 MB.', { name: bad.name }) : t('{name}: attach a PDF, a photo (JPG or PNG), or a Word or Excel file.', { name: bad.name })); return; }
     setBusy(true);
     try { for (const f of list.slice(0, 5)) await smeFiles.upload(fy, module, item, f); } catch (e) { setErr((e as Error).message); } finally { setBusy(false); load(); announce(module); }
   };
   const remove = async (f: SmeFile) => {
-    if (!window.confirm(`Remove ${f.name}?`)) return;
+    if (!window.confirm(t('Remove {name}?', { name: f.name }))) return;
     try { await smeFiles.remove(f.id); } catch (e) { setErr((e as Error).message); }
     load(); announce(module);
   };
@@ -66,18 +67,18 @@ export function Evidence({ module, item = '', label = 'Proof', compact = true }:
   } : {};
   return (
     <div className={`sme-ev${compact ? ' compact' : ''}${over ? ' over' : ''}`} {...drop}>
-      <span className="sme-ev-l">{label}</span>
+      <span className="sme-ev-l">{t(label)}</span>
       {files === null ? <span className="muted small">…</span> : files.map((f) => (
         <span key={f.id} className="sme-ev-f">
           <i className={`sme-ev-k k-${kindOf(f).toLowerCase()}`} aria-hidden="true">{kindOf(f)}</i>
           <button type="button" className="sme-ev-n" onClick={() => void smeFiles.open(f).catch((e: Error) => setErr(e.message))}
-            title={`${f.name} · ${fileSize(f.size)}${f.uploaded_name ? ` · added by ${f.uploaded_name}` : ''}`}>{f.name}</button>
-          {can && <button type="button" className="sme-ev-x" aria-label={`Remove ${f.name}`} onClick={() => void remove(f)}>✕</button>}
+            title={`${f.name} · ${fileSize(f.size)}${f.uploaded_name ? ` · ${t('added by {name}', { name: f.uploaded_name })}` : ''}`}>{f.name}</button>
+          {can && <button type="button" className="sme-ev-x" aria-label={t('Remove {name}', { name: f.name })} onClick={() => void remove(f)}>✕</button>}
         </span>))}
-      {files !== null && !files.length && !can && <span className="muted small">None attached</span>}
+      {files !== null && !files.length && !can && <span className="muted small">{t('None attached')}</span>}
       {can && <>
-        <button type="button" className="sme-ev-add" disabled={busy} onClick={() => input.current?.click()}>{busy ? 'Uploading…' : files?.length ? '+ Add' : '+ Attach'}</button>
-        {files !== null && !files.length && !busy && <span className="sme-ev-hint">PDF or photo, up to 10 MB</span>}
+        <button type="button" className="sme-ev-add" disabled={busy} onClick={() => input.current?.click()}>{busy ? t('Uploading…') : files?.length ? `+ ${t('Add')}` : `+ ${t('Attach')}`}</button>
+        {files !== null && !files.length && !busy && <span className="sme-ev-hint">{t('PDF or photo, up to 10 MB')}</span>}
         <input ref={input} type="file" hidden multiple accept=".pdf,.jpg,.jpeg,.png,.docx,.xlsx,application/pdf,image/jpeg,image/png" onChange={(e) => { const l = Array.from(e.target.files ?? []); e.target.value = ''; void add(l); }} />
       </>}
       {err && <span className="sme-ev-err" role="alert">{err}</span>}
@@ -86,5 +87,5 @@ export function Evidence({ module, item = '', label = 'Proof', compact = true }:
 
 /** "3 of 7 have proof" as a small pill-like line. */
 export function ProofCount({ have, of, what = 'have proof attached' }: { have: number; of: number; what?: string }) {
-  return <span className={`sme-ev-count${have === of && of > 0 ? ' all' : ''}`}><b>{have}</b> of {of} {what}</span>;
+  return <span className={`sme-ev-count${have === of && of > 0 ? ' all' : ''}`}>{tn('{have} of {of} {what}', { have: <b>{have}</b>, of, what: t(what) })}</span>;
 }

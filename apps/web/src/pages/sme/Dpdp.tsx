@@ -12,6 +12,7 @@ import { dmy, f0 } from '../../lib/sme';
 import './comply.css';
 import './dpdp.css';
 import { Evidence, ProofCount, useProofCounts } from './Evidence';
+import { t, tn } from './i18n';
 
 interface Item { key: string; area: string; title: string; why?: string; evidence?: string }
 interface Check { done?: boolean; owner?: string; date?: string; note?: string }
@@ -54,7 +55,7 @@ const TABS: [Tab, string][] = [['overview', 'Overview'], ['register', 'Data regi
 export function SmeDpdp() {
   const { d, setModule } = useSme();
   const [tab, setTab] = useState<Tab>('overview');
-  if (!d) return <div className="card empty">Loading…</div>;
+  if (!d) return <div className="card empty">{t('Loading…')}</div>;
   const cfg = d.config.dpdp ?? {};
   const items = (cfg.items ?? []) as Item[];
   const areas = (cfg.areas ?? []) as { key: string; title: string }[];
@@ -76,40 +77,40 @@ export function SmeDpdp() {
 
   return (
     <>
-      <SmeHead lede="The Digital Personal Data Protection Act applies to every business that holds personal data: employees, customers, vendors, CCTV. Build your data register, work through the checklist, keep the two logs, and use the ready texts." />
-      <div className="seg dp-tabs" role="tablist">{TABS.map(([k, t]) => <button key={k} type="button" role="tab" aria-selected={tab === k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>{t}{k === 'logs' && lateBreaches + lateReq > 0 && <span className="dp-dot" />}</button>)}</div>
+      <SmeHead lede={t('The Digital Personal Data Protection Act applies to every business that holds personal data: employees, customers, vendors, CCTV. Build your data register, work through the checklist, keep the two logs, and use the ready texts.')} />
+      <div className="seg dp-tabs" role="tablist">{TABS.map(([k, l]) => <button key={k} type="button" role="tab" aria-selected={tab === k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>{t(l)}{k === 'logs' && lateBreaches + lateReq > 0 && <span className="dp-dot" />}</button>)}</div>
 
       {tab === 'overview' && <>
         <Kpis>
-          <Kpi label="Checklist done" value={`${f0(pct)}%`} unit={`${done} of ${items.length} steps`} good={pct >= 80} />
-          <Kpi label="Data register" value={dp.register!.length} unit={dp.register!.length === 1 ? 'kind of data listed' : 'kinds of data listed'} />
-          <Kpi label="Open requests" value={openReq.length} unit={lateReq ? `${lateReq} past 90 days` : 'none late'} />
-          <Kpi label="Months left" value={cfg.deadline ? monthsUntil(cfg.deadline) : '—'} unit={cfg.deadline ? `to ${dmy(cfg.deadline)}` : ''} />
+          <Kpi label={t('Checklist done')} value={`${f0(pct)}%`} unit={t('{n} of {total} steps', { n: done, total: items.length })} good={pct >= 80} />
+          <Kpi label={t('Data register')} value={dp.register!.length} unit={dp.register!.length === 1 ? t('kind of data listed') : t('kinds of data listed')} />
+          <Kpi label={t('Open requests')} value={openReq.length} unit={lateReq ? t('{n} past 90 days', { n: lateReq }) : t('none late')} />
+          <Kpi label={t('Months left')} value={cfg.deadline ? monthsUntil(cfg.deadline) : '—'} unit={cfg.deadline ? t('to {date}', { date: dmy(cfg.deadline) }) : ''} />
         </Kpis>
-        {lateBreaches > 0 && <div className="note bad">{lateBreaches} breach{lateBreaches === 1 ? ' has' : 'es have'} not been reported to the Data Protection Board within 72 hours. <button type="button" className="linkbtn" onClick={() => setTab('logs')}>Open the breach log</button></div>}
+        {lateBreaches > 0 && <div className="note bad">{t(lateBreaches === 1 ? '{n} breach has not been reported to the Data Protection Board within 72 hours.' : '{n} breaches have not been reported to the Data Protection Board within 72 hours.', { n: lateBreaches })} <button type="button" className="linkbtn" onClick={() => setTab('logs')}>{t('Open the breach log')}</button></div>}
         <div className="cmp-main">
           <div className="card">
-            <h2>Where you stand</h2>
+            <h2>{t('Where you stand')}</h2>
             <div className="dp-areas">{areas.map((a) => {
               const its = items.filter((x) => x.area === a.key), n = its.filter((x) => checks[x.key]?.done).length;
               return <button key={a.key} type="button" className="dp-area" onClick={() => setTab('checklist')}>
-                <span className="t">{a.title}</span><span className="cmp-prog"><b style={{ width: `${its.length ? (n / its.length) * 100 : 0}%` }} /></span><span className="n num">{n}/{its.length}</span></button>;
+                <span className="t">{t(a.title)}</span><span className="cmp-prog"><b style={{ width: `${its.length ? (n / its.length) * 100 : 0}%` }} /></span><span className="n num">{n}/{its.length}</span></button>;
             })}</div>
-            {next && <div className="dp-next"><span className="lbl">Next step</span><b>{next.title}</b>{next.why && <p>{next.why}</p>}
-              <button type="button" className="btn p sm" onClick={() => setTab(next.key === 'inv' ? 'register' : 'checklist')}>{next.key === 'inv' ? 'Start the data register' : 'Open the checklist'}</button></div>}
+            {next && <div className="dp-next"><span className="lbl">{t('Next step')}</span><b>{t(next.title)}</b>{next.why && <p>{t(next.why)}</p>}
+              <button type="button" className="btn p sm" onClick={() => setTab(next.key === 'inv' ? 'register' : 'checklist')}>{next.key === 'inv' ? t('Start the data register') : t('Open the checklist')}</button></div>}
           </div>
           <div className="cmp-stack">
-            <div className="card"><h2>Key dates</h2>
-              <ul className="dp-dates">{(cfg.milestones ?? []).map((m: { date: string; title: string }) => <li key={m.date} className={m.date <= today() ? 'past' : ''}><b>{dmy(m.date)}</b><span>{m.title}</span></li>)}</ul>
+            <div className="card"><h2>{t('Key dates')}</h2>
+              <ul className="dp-dates">{(cfg.milestones ?? []).map((m: { date: string; title: string }) => <li key={m.date} className={m.date <= today() ? 'past' : ''}><b>{dmy(m.date)}</b><span>{t(m.title)}</span></li>)}</ul>
               <p className="muted small" style={{ margin: '8px 0 0' }}>{cfg.note}</p>
             </div>
-            <div className="card"><h2>What the law asks</h2>
+            <div className="card"><h2>{t('What the law asks')}</h2>
               <ul className="cmp-time">
-                <li><b>Notice</b><span>Tell people what you collect, why, and how to withdraw consent or complain.</span></li>
-                <li><b>Lawful basis</b><span>Consent, or a legitimate use such as employment or a legal duty.</span></li>
-                <li><b>Safeguards</b><span>Protect the data, keep access logs for a year, delete it when the purpose is over.</span></li>
-                <li><b>Breaches</b><span>Tell the Board and the people affected without delay; a detailed report to the Board within 72 hours.</span></li>
-                <li><b>Rights</b><span>Answer requests to see, correct or erase data within 90 days.</span></li>
+                <li><b>{t('Notice')}</b><span>{t('Tell people what you collect, why, and how to withdraw consent or complain.')}</span></li>
+                <li><b>{t('Lawful basis')}</b><span>{t('Consent, or a legitimate use such as employment or a legal duty.')}</span></li>
+                <li><b>{t('Safeguards')}</b><span>{t('Protect the data, keep access logs for a year, delete it when the purpose is over.')}</span></li>
+                <li><b>{t('Breaches')}</b><span>{t('Tell the Board and the people affected without delay; a detailed report to the Board within 72 hours.')}</span></li>
+                <li><b>{t('Rights')}</b><span>{t('Answer requests to see, correct or erase data within 90 days.')}</span></li>
               </ul>
               <p className="muted small" style={{ margin: '8px 0 0' }}>{cfg.penalty}</p>
             </div>
@@ -132,33 +133,33 @@ function Register({ rows, can, onChange }: { rows: Row[]; can: boolean; onChange
   return (
     <>
       <div className="card">
-        <h2>Your data register</h2>
-        <p className="muted" style={{ margin: '4px 0 12px' }}>One entry for each kind of personal data: what you hold, why, on what basis, where it is kept, who can see it, how long you keep it and which vendors handle it. The privacy notice and other texts are made from this.</p>
-        {can && <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}><span className="muted">Add:</span>{CATS.map(([k, t]) => <button key={k} type="button" className="btn sm" onClick={() => add(k)}>+ {t}</button>)}</div>}
+        <h2>{t('Your data register')}</h2>
+        <p className="muted" style={{ margin: '4px 0 12px' }}>{t('One entry for each kind of personal data: what you hold, why, on what basis, where it is kept, who can see it, how long you keep it and which vendors handle it. The privacy notice and other texts are made from this.')}</p>
+        {can && <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}><span className="muted">{t('Add:')}</span>{CATS.map(([k, l]) => <button key={k} type="button" className="btn sm" onClick={() => add(k)}>+ {t(l)}</button>)}</div>}
       </div>
-      {!rows.length && <div className="card empty">Nothing listed yet. Start with <b>Employees and workers</b>: every company has them.</div>}
+      {!rows.length && <div className="card empty">{tn('Nothing listed yet. Start with {b}: every company has them.', { b: <b>{t('Employees and workers')}</b> })}</div>}
       {rows.map((r) => {
         const miss = missing(r);
         return (
           <div key={r.id} className="card dp-row">
             <div className="row" style={{ gap: 10, flexWrap: 'wrap' }}>
-              <select className="input dp-cat" value={r.category} disabled={!can} onChange={(e) => upd(r.id, 'category', e.target.value)} aria-label="Kind of data">{CATS.map(([k, t]) => <option key={k} value={k}>{t}</option>)}</select>
+              <select className="input dp-cat" value={r.category} disabled={!can} onChange={(e) => upd(r.id, 'category', e.target.value)} aria-label={t('Kind of data')}>{CATS.map(([k, l]) => <option key={k} value={k}>{t(l)}</option>)}</select>
               <span className="grow" />
-              {miss.length ? <Pill kind="soon">{miss.length} to fill</Pill> : <Pill kind="good">Complete</Pill>}
-              {can && <button type="button" className="btn sm ghost danger" onClick={() => window.confirm('Remove this entry?') && onChange(rows.filter((x) => x.id !== r.id))}>Remove</button>}
+              {miss.length ? <Pill kind="soon">{t('{n} to fill', { n: miss.length })}</Pill> : <Pill kind="good">{t('Complete')}</Pill>}
+              {can && <button type="button" className="btn sm ghost danger" onClick={() => window.confirm(t('Remove this entry?')) && onChange(rows.filter((x) => x.id !== r.id))}>{t('Remove')}</button>}
             </div>
             <div className="dp-grid">
-              <label className="wide"><span>What data</span><textarea className="input" rows={2} disabled={!can} value={r.what} onChange={(e) => upd(r.id, 'what', e.target.value)} /></label>
-              <label className="wide"><span>Why you hold it (purpose)</span><input className="input" disabled={!can} value={r.purpose} onChange={(e) => upd(r.id, 'purpose', e.target.value)} /></label>
-              <label><span>Basis</span><select className="input" disabled={!can} value={r.basis} onChange={(e) => upd(r.id, 'basis', e.target.value)}>{BASIS.map(([k, t]) => <option key={k} value={k}>{t}</option>)}</select></label>
-              <label><span>How long you keep it</span><input className="input" disabled={!can} value={r.keep} placeholder="e.g. 30 days, 8 years" onChange={(e) => upd(r.id, 'keep', e.target.value)} /></label>
-              <label><span>Where it is kept</span><input className="input" disabled={!can} value={r.where} placeholder="Software, files, phones" onChange={(e) => upd(r.id, 'where', e.target.value)} /></label>
-              <label><span>Who can see it</span><input className="input" disabled={!can} value={r.access} onChange={(e) => upd(r.id, 'access', e.target.value)} /></label>
-              <label className="wide"><span>Vendors who handle it</span><input className="input" disabled={!can} value={r.vendors} placeholder="Payroll software, cloud, CCTV company…" onChange={(e) => upd(r.id, 'vendors', e.target.value)} /></label>
-              <label className="dp-chk"><input type="checkbox" disabled={!can} checked={r.children} onChange={(e) => upd(r.id, 'children', e.target.checked)} /> Includes children (under 18)</label>
+              <label className="wide"><span>{t('What data')}</span><textarea className="input" rows={2} disabled={!can} value={r.what} onChange={(e) => upd(r.id, 'what', e.target.value)} /></label>
+              <label className="wide"><span>{t('Why you hold it (purpose)')}</span><input className="input" disabled={!can} value={r.purpose} onChange={(e) => upd(r.id, 'purpose', e.target.value)} /></label>
+              <label><span>{t('Basis')}</span><select className="input" disabled={!can} value={r.basis} onChange={(e) => upd(r.id, 'basis', e.target.value)}>{BASIS.map(([k, l]) => <option key={k} value={k}>{t(l)}</option>)}</select></label>
+              <label><span>{t('How long you keep it')}</span><input className="input" disabled={!can} value={r.keep} placeholder={t('e.g. 30 days, 8 years')} onChange={(e) => upd(r.id, 'keep', e.target.value)} /></label>
+              <label><span>{t('Where it is kept')}</span><input className="input" disabled={!can} value={r.where} placeholder={t('Software, files, phones')} onChange={(e) => upd(r.id, 'where', e.target.value)} /></label>
+              <label><span>{t('Who can see it')}</span><input className="input" disabled={!can} value={r.access} onChange={(e) => upd(r.id, 'access', e.target.value)} /></label>
+              <label className="wide"><span>{t('Vendors who handle it')}</span><input className="input" disabled={!can} value={r.vendors} placeholder={t('Payroll software, cloud, CCTV company…')} onChange={(e) => upd(r.id, 'vendors', e.target.value)} /></label>
+              <label className="dp-chk"><input type="checkbox" disabled={!can} checked={r.children} onChange={(e) => upd(r.id, 'children', e.target.checked)} /> {t('Includes children (under 18)')}</label>
             </div>
-            {r.basis === 'consent' && <p className="muted small" style={{ margin: '8px 0 0' }}>Consent must be free, specific and clear, and you must keep proof. The <b>Ready texts</b> tab has a consent wording.</p>}
-            {r.children && <p className="note warn small" style={{ margin: '8px 0 0' }}>Children’s data needs verifiable consent of a parent or guardian, and no tracking or targeted advertising.</p>}
+            {r.basis === 'consent' && <p className="muted small" style={{ margin: '8px 0 0' }}>{tn('Consent must be free, specific and clear, and you must keep proof. The {b} tab has a consent wording.', { b: <b>{t('Ready texts')}</b> })}</p>}
+            {r.children && <p className="note warn small" style={{ margin: '8px 0 0' }}>{t('Children’s data needs verifiable consent of a parent or guardian, and no tracking or targeted advertising.')}</p>}
           </div>);
       })}
     </>);
@@ -173,31 +174,31 @@ function Checklist({ items, areas, checks, can, onChange, go }: { items: Item[];
   const link: Record<string, Tab> = { inv: 'register', legit: 'register', kids: 'register', retain: 'register', vendorlist: 'register', breachlog: 'logs', rights: 'logs', notice: 'texts', cctv: 'texts', vendors: 'texts', contact: 'texts', owner: 'texts' };
   return (
     <>
-    {proofs && <div className="card sme-ev-head" style={{ marginBottom: 0 }}><p className="muted" style={{ flex: '1 1 260px', margin: 0 }}>Open a step to note who owns it and attach its evidence. Keep evidence here so it is ready if the Data Protection Board or a customer asks.</p>
-      <ProofCount have={proven} of={items.length} what="steps have evidence attached" /></div>}
+    {proofs && <div className="card sme-ev-head" style={{ marginBottom: 0 }}><p className="muted" style={{ flex: '1 1 260px', margin: 0 }}>{t('Open a step to note who owns it and attach its evidence. Keep evidence here so it is ready if the Data Protection Board or a customer asks.')}</p>
+      <ProofCount have={proven} of={items.length} what={t('steps have evidence attached')} /></div>}
     {areas.map((a) => {
       const its = items.filter((x) => x.area === a.key), n = its.filter((x) => checks[x.key]?.done).length;
       return (
         <div key={a.key} className="card">
-          <div className="cmp-h2row"><h2>{a.title}</h2><span className="muted">{n} of {its.length}</span></div>
+          <div className="cmp-h2row"><h2>{t(a.title)}</h2><span className="muted">{t('{a} of {b}', { a: n, b: its.length })}</span></div>
           <div className="cmp-checks" style={{ marginTop: 6 }}>{its.map((x) => {
             const c = checks[x.key] ?? {}, on = !!c.done, isOpen = open === x.key;
             return (
               <div key={x.key} className={`dp-item${on ? ' on' : ''}`}>
                 <div className="dp-item-h">
-                  <input type="checkbox" aria-label={x.title} disabled={!can} checked={on} onChange={(e) => upd(x.key, { done: e.target.checked, date: e.target.checked ? c.date || today() : c.date })} />
-                  <button type="button" className="dp-item-t" onClick={() => setOpen(isOpen ? null : x.key)} aria-expanded={isOpen}><b>{x.title}</b><small>{x.why}</small>
-                    {(c.owner || c.note || (proofs?.[x.key] ?? 0) > 0) && <em>{[c.owner && `Owner: ${c.owner}`, c.date && on && `done ${dmy(c.date)}`, c.note, (proofs?.[x.key] ?? 0) > 0 && `${proofs![x.key]} evidence file${proofs![x.key] === 1 ? '' : 's'}`].filter(Boolean).join(' · ')}</em>}</button>
+                  <input type="checkbox" aria-label={t(x.title)} disabled={!can} checked={on} onChange={(e) => upd(x.key, { done: e.target.checked, date: e.target.checked ? c.date || today() : c.date })} />
+                  <button type="button" className="dp-item-t" onClick={() => setOpen(isOpen ? null : x.key)} aria-expanded={isOpen}><b>{t(x.title)}</b><small>{t(x.why)}</small>
+                    {(c.owner || c.note || (proofs?.[x.key] ?? 0) > 0) && <em>{[c.owner && `${t('Owner')}: ${c.owner}`, c.date && on && t('done {date}', { date: dmy(c.date) }), c.note, (proofs?.[x.key] ?? 0) > 0 && t(proofs![x.key] === 1 ? '{n} evidence file' : '{n} evidence files', { n: proofs![x.key] })].filter(Boolean).join(' · ')}</em>}</button>
                   <span className="dp-chev" aria-hidden="true">{isOpen ? '▾' : '▸'}</span>
                 </div>
                 {isOpen && <div className="dp-item-b">
-                  {x.evidence && <p><span className="lbl">Evidence to keep</span> {x.evidence}{link[x.key] && <> · <button type="button" className="linkbtn" onClick={() => go(link[x.key]!)}>Open {TABS.find((t) => t[0] === link[x.key])![1]}</button></>}</p>}
+                  {x.evidence && <p><span className="lbl">{t('Evidence to keep')}</span> {t(x.evidence)}{link[x.key] && <> · <button type="button" className="linkbtn" onClick={() => go(link[x.key]!)}>{t('Open {page}', { page: t(TABS.find((y) => y[0] === link[x.key])![1]) })}</button></>}</p>}
                   <div className="dp-grid">
-                    <label><span>Owner</span><input className="input" disabled={!can} value={c.owner ?? ''} onChange={(e) => upd(x.key, { owner: e.target.value })} /></label>
-                    <label><span>Done on</span><input className="input" type="date" disabled={!can} value={c.date ?? ''} onChange={(e) => upd(x.key, { date: e.target.value })} /></label>
-                    <label className="wide"><span>Note or where the evidence is</span><input className="input" disabled={!can} value={c.note ?? ''} onChange={(e) => upd(x.key, { note: e.target.value })} /></label>
+                    <label><span>{t('Owner')}</span><input className="input" disabled={!can} value={c.owner ?? ''} onChange={(e) => upd(x.key, { owner: e.target.value })} /></label>
+                    <label><span>{t('Done on')}</span><input className="input" type="date" disabled={!can} value={c.date ?? ''} onChange={(e) => upd(x.key, { date: e.target.value })} /></label>
+                    <label className="wide"><span>{t('Note or where the evidence is')}</span><input className="input" disabled={!can} value={c.note ?? ''} onChange={(e) => upd(x.key, { note: e.target.value })} /></label>
                   </div>
-                  <div className="sme-ev-row"><Evidence module="dpdp" item={x.key} label="Evidence" /></div>
+                  <div className="sme-ev-row"><Evidence module="dpdp" item={x.key} label={t('Evidence')} /></div>
                 </div>}
               </div>);
           })}</div>
@@ -213,45 +214,45 @@ function Logs({ breaches, requests, can, onBreaches, onRequests }: { breaches: B
   return (
     <>
       <div className="card">
-        <div className="cmp-h2row"><h2>Breach log</h2>{can && <button type="button" className="btn sm" onClick={() => onBreaches([{ id: uid(), found: now, what: '', people: '', boardAt: '', peopleAt: '', steps: '', closed: false }, ...breaches])}>+ Record a breach</button>}</div>
-        <p className="muted" style={{ margin: '4px 0 10px' }}>A breach is any unauthorised use, sharing, loss or destruction of personal data: a lost phone or laptop, a hacked e-mail, a wrong file sent, files left in the open. Tell the Data Protection Board and the people affected without delay, and send the Board a detailed report within 72 hours.</p>
-        {!breaches.length && <p className="muted" style={{ margin: 0 }}>No breaches recorded.</p>}
+        <div className="cmp-h2row"><h2>{t('Breach log')}</h2>{can && <button type="button" className="btn sm" onClick={() => onBreaches([{ id: uid(), found: now, what: '', people: '', boardAt: '', peopleAt: '', steps: '', closed: false }, ...breaches])}>{t('+ Record a breach')}</button>}</div>
+        <p className="muted" style={{ margin: '4px 0 10px' }}>{t('A breach is any unauthorised use, sharing, loss or destruction of personal data: a lost phone or laptop, a hacked e-mail, a wrong file sent, files left in the open. Tell the Data Protection Board and the people affected without delay, and send the Board a detailed report within 72 hours.')}</p>
+        {!breaches.length && <p className="muted" style={{ margin: 0 }}>{t('No breaches recorded.')}</p>}
         {breaches.map((b) => {
           const h = b.found ? hoursSince(b.found) : 0, left = Math.max(0, 72 - h);
-          const state = b.boardAt ? <Pill kind="good">Board told {dmy(b.boardAt)}</Pill> : h > 72 ? <Pill kind="overdue">Past 72 hours</Pill> : <Pill kind="soon">{f0(left)} h left to report</Pill>;
+          const state = b.boardAt ? <Pill kind="good">{t('Board told {date}', { date: dmy(b.boardAt) })}</Pill> : h > 72 ? <Pill kind="overdue">{t('Past 72 hours')}</Pill> : <Pill kind="soon">{t('{n} h left to report', { n: f0(left) })}</Pill>;
           return (
             <div key={b.id} className="dp-log">
-              <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>{state}{b.closed && <Pill kind="done">Closed</Pill>}<span className="grow" />{can && <button type="button" className="btn sm ghost danger" onClick={() => window.confirm('Remove this breach from the log?') && onBreaches(breaches.filter((x) => x.id !== b.id))}>Remove</button>}</div>
+              <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>{state}{b.closed && <Pill kind="done">{t('Closed')}</Pill>}<span className="grow" />{can && <button type="button" className="btn sm ghost danger" onClick={() => window.confirm(t('Remove this breach from the log?')) && onBreaches(breaches.filter((x) => x.id !== b.id))}>{t('Remove')}</button>}</div>
               <div className="dp-grid">
-                <label><span>Found on</span><input className="input" type="datetime-local" disabled={!can} value={b.found} onChange={(e) => updB(b.id, 'found', e.target.value)} /></label>
-                <label><span>People affected (about)</span><input className="input num" inputMode="numeric" disabled={!can} value={b.people} onChange={(e) => updB(b.id, 'people', e.target.value)} /></label>
-                <label className="wide"><span>What happened</span><textarea className="input" rows={2} disabled={!can} value={b.what} onChange={(e) => updB(b.id, 'what', e.target.value)} /></label>
-                <label className="wide"><span>Steps taken to limit harm and stop it happening again</span><textarea className="input" rows={2} disabled={!can} value={b.steps} onChange={(e) => updB(b.id, 'steps', e.target.value)} /></label>
-                <label><span>Board told on</span><input className="input" type="date" disabled={!can} value={b.boardAt} onChange={(e) => updB(b.id, 'boardAt', e.target.value)} /></label>
-                <label><span>People told on</span><input className="input" type="date" disabled={!can} value={b.peopleAt} onChange={(e) => updB(b.id, 'peopleAt', e.target.value)} /></label>
-                <label className="dp-chk"><input type="checkbox" disabled={!can} checked={b.closed} onChange={(e) => updB(b.id, 'closed', e.target.checked)} /> Closed</label>
+                <label><span>{t('Found on')}</span><input className="input" type="datetime-local" disabled={!can} value={b.found} onChange={(e) => updB(b.id, 'found', e.target.value)} /></label>
+                <label><span>{t('People affected (about)')}</span><input className="input num" inputMode="numeric" disabled={!can} value={b.people} onChange={(e) => updB(b.id, 'people', e.target.value)} /></label>
+                <label className="wide"><span>{t('What happened')}</span><textarea className="input" rows={2} disabled={!can} value={b.what} onChange={(e) => updB(b.id, 'what', e.target.value)} /></label>
+                <label className="wide"><span>{t('Steps taken to limit harm and stop it happening again')}</span><textarea className="input" rows={2} disabled={!can} value={b.steps} onChange={(e) => updB(b.id, 'steps', e.target.value)} /></label>
+                <label><span>{t('Board told on')}</span><input className="input" type="date" disabled={!can} value={b.boardAt} onChange={(e) => updB(b.id, 'boardAt', e.target.value)} /></label>
+                <label><span>{t('People told on')}</span><input className="input" type="date" disabled={!can} value={b.peopleAt} onChange={(e) => updB(b.id, 'peopleAt', e.target.value)} /></label>
+                <label className="dp-chk"><input type="checkbox" disabled={!can} checked={b.closed} onChange={(e) => updB(b.id, 'closed', e.target.checked)} /> {t('Closed')}</label>
               </div>
             </div>);
         })}
       </div>
 
       <div className="card">
-        <div className="cmp-h2row"><h2>Request log</h2>{can && <button type="button" className="btn sm" onClick={() => onRequests([{ id: uid(), received: today(), kind: 'access', from: '', closed: '', note: '' }, ...requests])}>+ Record a request</button>}</div>
-        <p className="muted" style={{ margin: '4px 0 10px' }}>Requests from people to see, correct or erase their data, to withdraw consent, or complaints. Answer within 90 days at most. Write only what you need to identify the request.</p>
-        {!requests.length && <p className="muted" style={{ margin: 0 }}>No requests recorded.</p>}
-        {!!requests.length && <div className="sme-scroll"><table className="sme-tbl dp-tbl"><thead><tr><th>Received</th><th>Request</th><th>From</th><th>Answer by</th><th>Closed on</th><th>Note</th><th /></tr></thead><tbody>
+        <div className="cmp-h2row"><h2>{t('Request log')}</h2>{can && <button type="button" className="btn sm" onClick={() => onRequests([{ id: uid(), received: today(), kind: 'access', from: '', closed: '', note: '' }, ...requests])}>{t('+ Record a request')}</button>}</div>
+        <p className="muted" style={{ margin: '4px 0 10px' }}>{t('Requests from people to see, correct or erase their data, to withdraw consent, or complaints. Answer within 90 days at most. Write only what you need to identify the request.')}</p>
+        {!requests.length && <p className="muted" style={{ margin: 0 }}>{t('No requests recorded.')}</p>}
+        {!!requests.length && <div className="sme-scroll"><table className="sme-tbl dp-tbl"><thead><tr><th>{t('Received')}</th><th>{t('Request')}</th><th>{t('From')}</th><th>{t('Answer by')}</th><th>{t('Closed on')}</th><th>{t('Note')}</th><th /></tr></thead><tbody>
           {requests.map((r) => {
             const due = r.received ? new Date(Date.parse(`${r.received}T00:00:00`) + 90 * 86400e3).toISOString().slice(0, 10) : '';
             const late = !r.closed && due && due < today();
             return (
               <tr key={r.id}>
                 <td><input className="input sm" type="date" disabled={!can} value={r.received} onChange={(e) => updR(r.id, 'received', e.target.value)} /></td>
-                <td><select className="input sm" disabled={!can} value={r.kind} onChange={(e) => updR(r.id, 'kind', e.target.value)}>{KINDS.map(([k, t]) => <option key={k} value={k}>{t}</option>)}</select></td>
-                <td><input className="input sm" disabled={!can} value={r.from} placeholder="e.g. Former employee (R.)" onChange={(e) => updR(r.id, 'from', e.target.value)} /></td>
+                <td><select className="input sm" disabled={!can} value={r.kind} onChange={(e) => updR(r.id, 'kind', e.target.value)}>{KINDS.map(([k, l]) => <option key={k} value={k}>{t(l)}</option>)}</select></td>
+                <td><input className="input sm" disabled={!can} value={r.from} placeholder={t('e.g. Former employee (R.)')} onChange={(e) => updR(r.id, 'from', e.target.value)} /></td>
                 <td>{r.closed ? <span className="muted">—</span> : late ? <Pill kind="overdue">{dmy(due)}</Pill> : dmy(due)}</td>
                 <td><input className="input sm" type="date" disabled={!can} value={r.closed} onChange={(e) => updR(r.id, 'closed', e.target.value)} /></td>
                 <td><input className="input sm" disabled={!can} value={r.note} onChange={(e) => updR(r.id, 'note', e.target.value)} /></td>
-                <td>{can && <button type="button" className="btn sm ghost danger" aria-label="Remove" onClick={() => window.confirm('Remove this request from the log?') && onRequests(requests.filter((x) => x.id !== r.id))}>✕</button>}</td>
+                <td>{can && <button type="button" className="btn sm ghost danger" aria-label={t('Remove')} onClick={() => window.confirm(t('Remove this request from the log?')) && onRequests(requests.filter((x) => x.id !== r.id))}>✕</button>}</td>
               </tr>);
           })}
         </tbody></table></div>}
@@ -276,22 +277,22 @@ function Texts({ dp, company, state, can, onContact }: { dp: Dp; company: string
   return (
     <div className="cmp-main">
       <div className="card">
-        <div className="seg dp-texts">{TEXTS.map(([t, l]) => <button key={t} type="button" className={k === t ? 'on' : ''} onClick={() => { setK(t); setCopied(false); }}>{l}</button>)}</div>
-        {missing && <div className="note warn" style={{ marginTop: 12 }}>Fill the <b>Data register</b> first: the texts are made from it.</div>}
+        <div className="seg dp-texts">{TEXTS.map(([x, l]) => <button key={x} type="button" className={k === x ? 'on' : ''} onClick={() => { setK(x); setCopied(false); }}>{t(l)}</button>)}</div>
+        {missing && <div className="note warn" style={{ marginTop: 12 }}>{tn('Fill the {b} first: the texts are made from it.', { b: <b>{t('Data register')}</b> })}</div>}
         <pre className="dp-text" id="dp-text">{text}</pre>
         <div className="row" style={{ gap: 8 }}>
-          <button type="button" className="btn p" onClick={async () => setCopied(await copyText(text, document.getElementById('dp-text')))}>{copied ? 'Copied' : 'Copy text'}</button>
-          <button type="button" className="btn" onClick={() => { const w = window.open('', '_blank'); if (w) { w.document.title = TEXTS.find((t) => t[0] === k)![1]; const p = w.document.createElement('pre'); p.style.cssText = 'white-space:pre-wrap;font:15px/1.55 system-ui,sans-serif;max-width:760px;margin:40px auto'; p.textContent = text; w.document.body.appendChild(p); w.print(); } }}>Print</button>
+          <button type="button" className="btn p" onClick={async () => setCopied(await copyText(text, document.getElementById('dp-text')))}>{copied ? t('Copied') : t('Copy text')}</button>
+          <button type="button" className="btn" onClick={() => { const w = window.open('', '_blank'); if (w) { w.document.title = TEXTS.find((t) => t[0] === k)![1]; const p = w.document.createElement('pre'); p.style.cssText = 'white-space:pre-wrap;font:15px/1.55 system-ui,sans-serif;max-width:760px;margin:40px auto'; p.textContent = text; w.document.body.appendChild(p); w.print(); } }}>{t('Print')}</button>
         </div>
-        <p className="muted small" style={{ margin: '10px 0 0' }}>A starting point made from your register. Review it with your lawyer or CA before you use it. Entries typed in English stay in English in the Hindi notice.</p>
+        <p className="muted small" style={{ margin: '10px 0 0' }}>{t('A starting point made from your register. Review it with your lawyer or CA before you use it. Entries typed in English stay in English in the Hindi notice.')}</p>
       </div>
       <div className="cmp-stack">
-        <div className="card"><h2>Your data contact</h2>
-          <p className="muted small" style={{ margin: '4px 0 8px' }}>The person people can ask about their data. Shown in every text.</p>
-          {(['name', 'email', 'phone'] as const).map((f) => <label key={f} className="field" style={{ marginTop: 8 }}><span>{f === 'name' ? 'Name and role' : f === 'email' ? 'E-mail' : 'Phone'}</span>
+        <div className="card"><h2>{t('Your data contact')}</h2>
+          <p className="muted small" style={{ margin: '4px 0 8px' }}>{t('The person people can ask about their data. Shown in every text.')}</p>
+          {(['name', 'email', 'phone'] as const).map((f) => <label key={f} className="field" style={{ marginTop: 8 }}><span>{f === 'name' ? t('Name and role') : f === 'email' ? t('E-mail') : t('Phone')}</span>
             <input className="input" disabled={!can} type={f === 'email' ? 'email' : 'text'} value={c[f] ?? ''} onChange={(e) => onContact({ ...c, [f]: e.target.value })} /></label>)}
         </div>
-        <div className="sme-callout">The privacy notice must stand on its own, list each kind of data and its purpose, and say how to withdraw consent, use your rights and complain to the Board (Rule 3). Show it where you collect data: forms, website, WhatsApp sign-ups, the notice board. See also <Link to="/sme/people">People &amp; safety</Link> for the workers’ grievance QR.</div>
+        <div className="sme-callout">{tn('The privacy notice must stand on its own, list each kind of data and its purpose, and say how to withdraw consent, use your rights and complain to the Board (Rule 3). Show it where you collect data: forms, website, WhatsApp sign-ups, the notice board. See also {link} for the workers’ grievance QR.', { link: <Link to="/sme/people">{t('People & safety')}</Link> })}</div>
       </div>
     </div>);
 }
