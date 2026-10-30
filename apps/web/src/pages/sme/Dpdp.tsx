@@ -60,7 +60,7 @@ export function SmeDpdp() {
               <li><b>Rights</b><span>Let people see, correct and erase their data, and name a contact for questions.</span></li>
             </ul>
           </div>
-          <div className="sme-callout">Templates for the privacy notice, consent form and vendor clauses come with the full DPDP kit.</div>
+          
           <p className="muted small" style={{ margin: 0 }}>{d.config.dpdp?.note}</p>
         </div>
       </div>
