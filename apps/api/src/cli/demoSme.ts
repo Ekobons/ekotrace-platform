@@ -72,7 +72,17 @@ const EXAMPLE = {
   credits: { newSolarKw: 120, effKwh: 45000, price: 500, share: 20 },
   calendar: { cto: '2027-03-31', factory: '2026-12-31', fire: '2027-01-15', done: {} },
   epr: { role: 'Brand owner', c1: 3.5, c2: 6.2, c3: 1.1, c4: 0, target: 100, bought: 7.0, registered: true },
-  dpdp: {},
+  dpdp: {
+    contact: { name: 'Anita Kulkarni (HR & admin)', email: 'privacy@ganeshfasteners.example', phone: '+91 20 0000 0000' },
+    checks: { inv: { done: true, owner: 'Anita', date: '2026-08-14', note: 'Register on this page' }, owner: { done: true, owner: 'Anita', date: '2026-08-14' }, legit: { done: true, owner: 'Anita', date: '2026-08-20' }, access: { done: true, owner: 'IT vendor', date: '2026-09-02', note: 'Tally and payroll logins per person' }, secure: { done: true, owner: 'IT vendor', date: '2026-09-02' }, contact: { done: true, owner: 'Anita', date: '2026-09-10' } },
+    register: [
+      { id: 'r1', category: 'employees', what: 'Name, address, phone, bank account, PAN, Aadhaar (masked), attendance, salary, PF and ESI numbers', purpose: 'Employment, payroll, PF/ESI and statutory registers', basis: 'employment', where: 'Payroll software, HR files in office', access: 'Owner, HR, accountant', keep: '8 years after leaving', vendors: 'Payroll software provider, CA firm', children: false },
+      { id: 'r2', category: 'customers', what: 'Buyer contact names, phone, e-mail, GST and delivery addresses', purpose: 'Orders, invoices, delivery', basis: 'voluntary', where: 'Tally, e-mail', access: 'Sales, accounts', keep: '8 years (tax records)', vendors: 'E-mail provider', children: false },
+      { id: 'r3', category: 'cctv', what: 'Video of people at the gate, shop floor and stores', purpose: 'Safety and security of people and goods', basis: '', where: 'DVR in security cabin', access: 'Owner, security supervisor', keep: '30 days', vendors: 'CCTV maintenance company', children: false },
+    ],
+    breaches: [],
+    requests: [{ id: 'q1', received: '2026-09-18', kind: 'access', from: 'Former employee (R.)', closed: '2026-09-25', note: 'Salary slips and PF statement sent' }],
+  },
   people: { posh_ic: true, posh_ext: false, posh_report: false, hours: 2400, log: [{ date: '2025-08-12', what: 'Hand injury at press shop', days: 4 }, { date: '2025-11-03', what: 'Slip near plating tank, no lost time', days: 0 }] },
   csr: { netWorth: 18, profit1: 3.2, profit2: 4.1, profit3: 5.6, spent: 0 },
   cbam: { tonnesEU: 420, price: 75, eurInr: 98, benchmark: 1.37, defaultValue: 3.2, tonnesUK: 120, ukPrice: 45, gbpInr: 113 },

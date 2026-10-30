@@ -349,10 +349,36 @@ export function epr(d: any): any {
 }
 
 /* ------------------------------------------------------------------ DPDP */
+/** A DPDP checklist tick: the current form { done, … } or the first version's plain true. */
+const dpdpTick = (d: any, key: string) => { const dp = d.dpdp || {}; const v = (dp.checks || {})[key] ?? dp[key]; return v === true || !!(v && v.done); };
 export function dpdpPct(d: any, cfg: any): any {
   const items = cfg.dpdp.items;
-  const done = items.filter((x: any) => (d.dpdp || {})[x.key]).length;
+  const done = items.filter((x: any) => dpdpTick(d, x.key)).length;
   return items.length ? (done / items.length) * 100 : 0;
+}
+/** DPDP position: checklist by area, register, breaches past 72 hours, requests past 90 days. */
+export function dpdp(d: any, cfg: any): any {
+  const dp = d.dpdp || {}, items = cfg.dpdp.items || [], now = cfg.today ? new Date(cfg.today).getTime() : Date.now();
+  const areas = (cfg.dpdp.areas || []).map((a: any) => {
+    const its = items.filter((x: any) => x.area === a.key);
+    const done = its.filter((x: any) => dpdpTick(d, x.key)).length;
+    return { key: a.key, title: a.title, done, total: its.length, pct: its.length ? (done / its.length) * 100 : 0 };
+  });
+  const breaches = (dp.breaches || []).map((b: any) => {
+    const found = Date.parse(b.found || '');
+    const late = !b.boardAt && Number.isFinite(found) && now - found > 72 * 3600e3;
+    return { open: !b.closed, late };
+  });
+  const requests = (dp.requests || []).map((r: any) => {
+    const got = Date.parse(r.received || '');
+    return { open: !r.closed, late: !r.closed && Number.isFinite(got) && now - got > 90 * 86400e3 };
+  });
+  return {
+    pct: dpdpPct(d, cfg), done: items.filter((x: any) => dpdpTick(d, x.key)).length, total: items.length, areas,
+    register: (dp.register || []).length, children: (dp.register || []).some((x: any) => x.children),
+    breachesOpen: breaches.filter((x: any) => x.open).length, breachesLate: breaches.filter((x: any) => x.late).length,
+    requestsOpen: requests.filter((x: any) => x.open).length, requestsLate: requests.filter((x: any) => x.late).length,
+  };
 }
 
 /* ------------------------------------------------------------------ product footprint */
@@ -522,6 +548,7 @@ export function all(d: any, cfg: any): any {
     csr: csr(d, cfg),
     epr: epr(d),
     dpdpPct: dpdpPct(d, cfg),
+    dpdp: dpdp(d, cfg),
     safety: safety(d),
     footprint: footprint(d, cfg),
     calendar: calendar(d, cfg),

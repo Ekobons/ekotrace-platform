@@ -17,7 +17,19 @@ Extended producer responsibility for plastic packaging, e-waste and batteries. T
 
 ## DPDP
 
-A checklist for the Digital Personal Data Protection Act (most duties apply from May 2027): consent, notices, security, breach reporting, employee and customer data. Tick each item as done; the page shows the percentage done and the months left.
+The Digital Personal Data Protection Act applies to every business holding personal data — employees, customers, vendors, CCTV. The main duties apply from **13 May 2027**. The page has five tabs:
+
+| Tab | What you do there |
+|---|---|
+| Overview | where you stand in each of seven areas, the next step, key dates, what the law asks and the penalties |
+| Data register | one entry per kind of data: what you hold, why, on what basis, where it is kept, who can see it, how long you keep it and which vendors handle it |
+| Checklist | 25 steps in seven areas (know your data, notice and consent, use and deletion, security, breaches, people's rights, vendors). Open a step to see why it matters and the evidence to keep; record the owner, the date and a note |
+| Breaches & requests | the **breach log** (with a 72-hour clock to report to the Data Protection Board) and the **request log** (people asking to see, correct or erase their data, with a 90-day clock) |
+| Ready texts | a privacy notice (English and Hindi), a notice to employees, a CCTV signboard, a consent wording, a vendor contract clause and a breach report to the Board — made from your register; copy or print |
+
+Start with the **Data register**, beginning with employees. Employee data used for employment needs no separate consent (a "legitimate use" under section 7); choose the basis for each kind of data.
+
+> The ready texts are a starting point. Review them with your lawyer or CA before you use them.
 
 ## People & safety
 

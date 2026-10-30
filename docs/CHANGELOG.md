@@ -9,6 +9,7 @@ Newest first.
 - API: `/api/sme…` (data per module and year, company, answer, bill scan with OCR, scrap, recyclers, grievances, links and consent, CA requests, credit projects), `/api/sme-net…` (partner overview by kind, invite, remind, CA review), `/api/platform/sme…` (SME console), `/api/public/sme…` (sign-up with e-mail confirmation behind `SME_SIGNUP=on`; anonymous grievance page).
 - Web: own sign-in page `/sme`, own menu and screens `/sme/<page>` (25 screens), partner screens `/sme-net`, open pages `/sme-signup`, `/sme-start`, `/sme-grievance`; platform admin **SME console** (`/console/sme`).
 - `npm run demo:sme` (`cli/demoSme.ts`): *Shree Ganesh Fasteners (demo)* with two years of data, five cluster members, a buyer, a cluster, a bank and a CA firm. INVENTED.
+- DPDP: data register, 25-step checklist in seven areas with owner / date / evidence, breach log (72-hour clock) and request log (90-day clock), ready texts (privacy notice EN/HI, employee notice, CCTV sign, consent, vendor clause, breach report) made from the register; engine `dpdp()`; migration 074 refreshes untouched first versions of the `dpdp` and `requirements` settings.
 - Manual: SME companies and their partners get their own manual (`apps/web/src/manual-sme/`, 9 chapters: getting started, each section, partners, questions and words); the platform manual keeps a chapter EKOTRACE SME for the platform team. Test `sme.test.ts`.
 
 ## 2026-10-28 · Phone menu, dashboard drill-down to entries, OCR for scanned bills

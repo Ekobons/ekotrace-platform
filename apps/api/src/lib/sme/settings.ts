@@ -113,4 +113,8 @@ export function validate(k: Key, d: any) {
   if (k === 'calendar') need(Array.isArray(d.templates) && Number.isFinite(+d.soon_days), 'The calendar needs templates and soon_days.');
   if (k === 'requirements') need(d.items && d.msme_turnover_cr && d.csr, 'Requirement rules need items, msme_turnover_cr and csr.');
   if (k === 'schemes' || k === 'plans' || k === 'dpdp' || k === 'recyclers') need(Array.isArray(d.items), 'This setting needs an "items" list.');
+  if (k === 'dpdp') {
+    const areas = new Set((d.areas || []).map((a: any) => a.key));
+    for (const x of d.items) need(typeof x.key === 'string' && typeof x.title === 'string' && areas.has(x.area), `DPDP item ${x.key ?? '?'} needs a key, a title and one of the areas.`);
+  }
 }
