@@ -137,6 +137,9 @@ test('bills: a part year is scaled to 12 months, and empty months are skipped', 
   // year mode with nothing entered: no savings, nothing invented
   const none = E.bills({ bills: { ...BILL, mode: 'year', months: [] } }, cfg);
   assert.equal(none.total, 0); assert.equal(none.findings.length, 0);
+  // a new company with no bill at all starts in 12-month mode; one with only a single bill keeps one-month mode
+  assert.equal(E.bills({ bills: {} }, cfg).mode, 'year');
+  assert.equal(E.bills({ bills: { md: 300 } }, cfg).mode, 'one');
 });
 
 // ------------------------------------------------------------------ API: last year's document reaches the engine --

@@ -10,6 +10,8 @@ Your company details (name, manufacturing or services, industry, state, Udyam nu
 - **Customers and exports:** whether you sell to listed companies, export to the EU or UK, and your main export product.
 - **Products:** whether you use plastic packaging, make electrical or electronic goods or batteries.
 
+**Plants and sites:** most companies have one site. If you have more than one plant, add each with its city and state; Emissions then lets you enter figures per plant and shows the split. Plants are kept per financial year.
+
 These answers decide what you see under **What applies** and which pages are tucked away. Only the owner or an admin can change the company details.
 
 The financial year switcher is at the top of this page.
@@ -31,17 +33,29 @@ Each rule says why it applies and the next step, with a link to the page that he
 
 ## Emissions
 
-Type **yearly totals** from your bills and invoices. The scope is worked out for you.
+Each source of emissions (diesel, LPG, grid electricity, steel bought and so on) is one row with its yearly total, tonnes of CO₂e, where the figure comes from, and the bills as proof. The scope is worked out for you.
 
 | Group | What to enter | Scope |
 |---|---|---|
 | Fuels and refrigerants | diesel, petrol, LPG, PNG, coal, refrigerant top-ups | Scope 1 |
-| Electricity | grid electricity from DISCOM bills (kWh); rooftop solar you generate | Scope 2 (solar adds nothing) |
-| Value chain (optional) | steel, aluminium, plastic bought; road, rail and air freight; business travel | Scope 3 |
+| Electricity | grid electricity from DISCOM bills (kWh); rooftop solar you generate; renewable electricity you buy | Scope 2 (solar adds nothing) |
+| Value chain (optional) | steel, aluminium, cement, plastic bought; inbound road freight; business air and rail travel | Scope 3 |
 
-Add Scope 3 only if your buyers ask for it. The figures at the top show Scope 1, 2 and 3 in tonnes of CO₂e and your **intensity** (tonnes per ₹ crore of turnover), which buyers use to compare suppliers.
+**By month or for the year.** Press **Months** (or **By month**) on a row to open April to March and type each month from your bills; the yearly total is the sum, and the row shows how many months are filled. If you only have one figure for the year, switch on **One yearly total only** and type it in the row.
 
-Tip: **Quick tools → Bill scan** reads an electricity or fuel bill PDF and fills the figures for you.
+**Where the figure comes from.** Each row with a figure says **From bills** or **Estimate**; change it if you estimated. An empty row says **Not filled in**; if you don't use that fuel, choose **We don't use this**. The **How good is the data** box shows how much of Scope 1 and 2 comes from bills, which sources are estimated, which have only part of the year, and which are not filled in.
+
+**Proof.** Attach the bills or invoices for each source under **Bills** on its row (PDF or photo, up to 10 MB). A buyer, bank or CA checking your figures will ask for them.
+
+**Last year.** If the previous financial year has figures, each row shows last year's quantity and the change, and **This year and last year** compares Scope 1, Scope 2 and your largest sources. To add last year, choose that year in **Profile** and enter its totals.
+
+**Green power.** Under Electricity, enter **Renewable electricity bought** (kWh) through green energy open access, a green tariff from your DISCOM, or renewable energy certificates (I-RECs). It is part of your grid units, not extra. Scope 2 is then shown two ways, as the GHG Protocol asks: **location-based** (all grid units at the CEA grid average; used for your totals) and **market-based** (the renewable power you bought counts as zero). Keep the open access invoices, green tariff bills or certificate statements. Rooftop solar is always zero-emission.
+
+**Several plants.** List your plants in **Profile → Plants and sites**. With more than one plant, Emissions shows a **Figures for** choice above the groups: pick a plant and enter its figures. Totals add up across plants, and **By plant** shows each plant's Scope 1, Scope 2 and share. With one site nothing changes: everything belongs to your main plant.
+
+The figures at the top show Scope 1, 2 and 3 in tonnes of CO₂e, the change from last year, and your **intensity** (tonnes per ₹ crore of turnover), which buyers use to compare suppliers.
+
+Tip: **Quick tools → Bill scan** reads an electricity or fuel bill PDF and adds it to the yearly total. If a source is entered by month, the amount added this way is shown on the row as "not split by month". The **Bill analyser** can also copy its 12 months of units into grid electricity.
 
 ## ESG
 

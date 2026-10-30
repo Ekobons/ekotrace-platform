@@ -1,0 +1,27 @@
+/* SME calendar: own dates, reminders. */
+.cal-own { display: inline-block; margin-left: 8px; padding: 1px 7px; border-radius: 99px; background: #EEF3FB; color: #34558B; font-size: 11px; font-weight: 600; vertical-align: 2px; }
+.cal-item p.cal-notes { color: var(--fg2); font-style: italic; overflow-wrap: anywhere; }
+.cal-own-list { list-style: none; margin: 4px 0 0; padding: 0; }
+.cal-own-list li { display: grid; gap: 4px; padding: 9px 0; border-top: 1px solid var(--line); }
+.cal-own-list li:first-child { border-top: 0; }
+.cal-own-list li > div { min-width: 0; }
+.cal-own-list b { display: block; font-size: 13.5px; font-weight: 600; }
+.cal-own-list small { display: block; font-size: 12px; color: var(--muted); overflow-wrap: anywhere; }
+.cal-own-act { display: flex; gap: 4px; margin-left: -8px; }
+.cal-note { margin: 0 0 10px; }
+.cal-sw { display: flex; align-items: center; gap: 10px; font-weight: 600; font-size: 14px; padding: 6px 0 10px; cursor: pointer; }
+.cal-sw input, .cal-person input { width: 18px; height: 18px; margin: 0; accent-color: var(--primary); flex: none; }
+.cal-fs { border: 0; border-top: 1px solid var(--line); margin: 0; padding: 10px 0 2px; min-width: 0; }
+.cal-fs legend { padding: 0; font-size: 11px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); float: left; width: 100%; margin-bottom: 6px; }
+.cal-person { display: flex; gap: 10px; align-items: center; padding: 5px 0; cursor: pointer; clear: both; }
+.cal-person span { min-width: 0; font-size: 13.5px; }
+.cal-person b { font-weight: 600; }
+.cal-person small { display: block; color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+.cal-days { display: flex; gap: 6px; flex-wrap: wrap; clear: both; }
+.cal-days button { min-width: 42px; height: 34px; border-radius: 10px; border: 1px solid var(--line2); background: var(--surface); font: inherit; font-weight: 600; color: var(--fg2); cursor: pointer; font-variant-numeric: tabular-nums; }
+.cal-days button.on { background: var(--primary); border-color: var(--primary); color: #fff; }
+.cal-fs:disabled .cal-days button, .cal-fs:disabled .cal-person { cursor: default; }
+.cal-recent { margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--line); }
+.cal-recent ul { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 6px; }
+.cal-recent li span { display: block; font-size: 13px; }
+.cal-recent li small { color: var(--muted); font-size: 12px; }

@@ -7,6 +7,7 @@ import { printHtml } from '../../lib/printwin';
 import { useSme } from './store';
 import { Kpi, Kpis, Num, Pill, Req, SmeHead, Toggle, copyText } from './ui';
 import { dmy, f0, f2, n, smeApi, type SmeGrievance } from '../../lib/sme';
+import { Evidence } from './Evidence';
 import './comply.css';
 
 interface LogRow { date: string; what: string; days: number }
@@ -60,6 +61,10 @@ function SafetyLog() {
           <div className="wide"><button className="btn p sm" type="submit">Add to log</button></div>
         </form>)}
       {!log.length && <Toggle path="people.noIncidents" label="No incidents at all this year" hint="Counts as a complete safety log for your ESG score" />}
+      <div className="cmp-proof">
+        <Evidence module="people" item="safety" label="Safety records" />
+        <p className="muted small">For example the accident register, first-aid register, a safety audit or training records.</p>
+      </div>
     </div>);
 }
 
@@ -186,6 +191,7 @@ export function SmePeople() {
             <Toggle path="people.posh_ic" label="Internal Committee constituted" hint="Presided by a senior woman employee, at least half women" />
             <Toggle path="people.posh_ext" label="External member on the committee" hint="From an NGO or someone familiar with women's issues" />
             <Toggle path="people.posh_report" label="Annual report filed with the District Officer" />
+            <div className="sme-ev-under"><Evidence module="people" item="posh_report" label="Filed report" /></div>
             {ic && !ext && <Req title="Add the external member" kind="soon" pill="Gap">The committee is not valid without one member from outside the company.</Req>}
             {poshDue && <p className="cmp-sub" style={{ marginTop: 10 }}>Next annual report due <b>{dmy(poshDue.date)}</b> (date varies by state). <Link to="/sme/calendar">Calendar</Link></p>}
           </div>

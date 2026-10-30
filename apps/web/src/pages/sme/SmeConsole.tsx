@@ -13,10 +13,11 @@ import { Kpi, Kpis, Pill } from './ui';
 import { Bars, FySelect, NetHead, currentFy, fyList, errText, rupees, useLoad } from './netShared';
 import { CaStatus } from './SmeNetCa';
 import { ConsoleSettings } from './SmeConsoleSettings';
+import { SmeConsolePayments } from './Billing';
 
 const TABS = [
   ['overview', 'Overview', 'chart'], ['companies', 'SME companies', 'building'], ['partners', 'Partners', 'users'], ['links', 'Links', 'plug'],
-  ['ca', 'CA validation', 'shield'], ['settings', 'Settings', 'gear'], ['scrap', 'Scrap moderation', 'cycle'], ['credits', 'Carbon credit pool', 'leaf'], ['benchmark', 'Benchmark', 'gauge'],
+  ['ca', 'CA validation', 'shield'], ['settings', 'Settings', 'gear'], ['scrap', 'Scrap moderation', 'cycle'], ['credits', 'Carbon credit pool', 'leaf'], ['benchmark', 'Benchmark', 'gauge'], ['payments', 'Payments', 'cart'],
 ] as const;
 type Tab = (typeof TABS)[number][0];
 const KIND: Record<PartnerKind, string> = { buyer: 'Buyer', cluster: 'Cluster', bank: 'Bank', ca_firm: 'CA firm' };
@@ -54,6 +55,7 @@ export function SmeConsole() {
           {tab === 'scrap' && <Scrap />}
           {tab === 'credits' && <Credits />}
           {tab === 'benchmark' && <Benchmark fy={fy} setFy={setFy} />}
+          {tab === 'payments' && <SmeConsolePayments />}
         </div>
       </div>
     </div>);

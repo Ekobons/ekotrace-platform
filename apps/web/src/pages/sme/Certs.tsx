@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { useSme } from './store';
 import { Kpi, Kpis, Pill, SmeHead } from './ui';
 import { dmy } from '../../lib/sme';
+import { Evidence, ProofCount, useProofCounts } from './Evidence';
 import './carbon.css';
 
 interface Cert { id: string; name: string; level?: string; expiry?: string }
@@ -38,6 +39,7 @@ function status(c: Cert): [string, string] {
 export function SmeCerts() {
   const { d, get, set, setModule, error } = useSme();
   const [newName, setNewName] = useState('');
+  const proofs = useProofCounts('certs');
   if (error) return <div className="card empty">{error}</div>;
   if (!d) return <div className="card empty">Loading your data…</div>;
   const certs = ((get('certs') ?? []) as Cert[]);
@@ -52,6 +54,8 @@ export function SmeCerts() {
     setNewName('');
   };
   const removable = (c: Cert) => c.id.startsWith('custom-');
+  const listed = certs.filter((c) => c.level && c.level !== 'none');
+  const withProof = listed.filter((c) => (proofs?.[c.id] ?? 0) > 0).length;
   return (
     <div className="cb-stack">
       <SmeHead lede="Track what you hold and when it expires. Renewal dates appear in your calendar." />
@@ -62,6 +66,7 @@ export function SmeCerts() {
       </Kpis>
 
       <div className="card">
+        <div className="sme-ev-head"><h2>Your certifications</h2>{listed.length > 0 && proofs && <ProofCount have={withProof} of={listed.length} what={listed.length === 1 ? 'has a copy of the certificate attached' : 'have a copy of the certificate attached'} />}</div>
         <div className="sme-scroll"><table className="sme-tbl cb-certs">
           <thead><tr><th>Certification</th><th>Status</th><th>Valid until</th><th /></tr></thead>
           <tbody>
@@ -69,7 +74,8 @@ export function SmeCerts() {
               const [kind, label] = status(c), opts = OPTS[c.id] ?? DEFAULT;
               return (
                 <tr key={c.id}>
-                  <td><b style={{ fontWeight: 600 }}>{c.name}</b>{WHY[c.id] && <><br /><span className="muted" style={{ fontSize: 12 }}>{WHY[c.id]}</span></>}</td>
+                  <td><b style={{ fontWeight: 600 }}>{c.name}</b>{WHY[c.id] && <><br /><span className="muted" style={{ fontSize: 12 }}>{WHY[c.id]}</span></>}
+                    {c.level && c.level !== 'none' && <div className="sme-ev-row"><Evidence module="certs" item={c.id} label={pending(c.level) ? 'Papers' : 'Certificate'} /></div>}</td>
                   <td>{can
                     ? <select className="input" aria-label={`${c.name} status`} value={c.level || 'none'} onChange={(e) => set(`certs.${i}.level`, e.target.value)}>
                         {opts.map(([v, t]) => <option key={v} value={v}>{t}</option>)}

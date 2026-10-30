@@ -32,5 +32,10 @@ export function needProduct(app: FastifyInstance, code: ProductCode) {
     if (!tenant) return; // the route itself asks for a company
     const p = await tenantTx(tenant, (c) => productsOf(c, tenant));
     if (!p.includes(code)) throw new AppError(`${NAMES[code]} is not switched on for this company. Contact the Ekobon team to add the ${NAMES[code]} package.`, 403, 'PRODUCT_OFF');
+    // EKOTRACE SME after the subscription ended: only Plan & billing answers, so the owner can renew
+    if (code === 'sme' && !req.url.startsWith('/api/sme/billing')) {
+      const exp = await tenantTx(tenant, async (c) => (await c.query(`SELECT access_expiry < current_date AS gone FROM tenant WHERE id = $1`, [tenant])).rows[0]?.gone);
+      if (exp) throw new AppError('Your subscription has ended. Renew it under Plan & billing to continue.', 402, 'RENEW');
+    }
   });
 }

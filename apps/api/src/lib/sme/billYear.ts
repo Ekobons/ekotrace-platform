@@ -26,8 +26,9 @@ export function billMonths(b: any): BillMonth[] {
   return out;
 }
 
-/** Whether the 12-month analysis is used: chosen, or months entered and the one-bill mode not chosen. */
-export const yearMode = (b: any) => b.mode === 'year' || (b.mode !== 'one' && billMonths(b).length > 0);
+/** Whether the 12-month analysis is used: chosen; or, with no choice made, months entered or no single bill either (a new company starts with 12 months). */
+const oneBill = (b: any) => ['md', 'cd', 'units', 'pfPenalty', 'peakShare'].some((k) => num(b[k]) > 0);
+export const yearMode = (b: any) => b.mode === 'year' || (b.mode !== 'one' && (billMonths(b).length > 0 || !oneBill(b)));
 
 const kvarFor = (md: number, pfIn: number) => {
   const pf = Math.min(Math.max(pfIn || 0.99, 0.5), 0.999);

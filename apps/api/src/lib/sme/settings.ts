@@ -14,12 +14,12 @@ import { DEFAULTS } from './defaults.js';
 const DATA = join(dirname(fileURLToPath(import.meta.url)), '../../../../../data/sme');
 const bank = (f: string) => JSON.parse(readFileSync(join(DATA, f), 'utf8'));
 
-export const KEYS = ['factors', 'energy', 'cbam', 'tariffs', 'solar', 'credit_pool', 'esg', 'dpdp', 'calendar', 'requirements', 'schemes', 'plans', 'content', 'srmm_mfg', 'srmm_svc', 'recyclers', 'actions'] as const;
+export const KEYS = ['factors', 'energy', 'cbam', 'tariffs', 'solar', 'credit_pool', 'esg', 'dpdp', 'calendar', 'requirements', 'schemes', 'plans', 'content', 'srmm_mfg', 'srmm_svc', 'recyclers', 'actions', 'news'] as const;
 export type Key = (typeof KEYS)[number];
 export const KEY_LABEL: Record<Key, string> = {
   factors: 'Emission factors & units', energy: 'Energy conversion (GJ)', cbam: 'CBAM settings', tariffs: 'Electricity tariffs', solar: 'Rooftop solar defaults',
   credit_pool: 'Carbon credit pool', esg: 'ESG scoring weights', dpdp: 'DPDP checklist', calendar: 'Compliance calendar templates', requirements: 'Requirement rules',
-  schemes: 'Schemes library', plans: 'Plans & prices', content: 'Messages & languages', srmm_mfg: 'SRMM v3.1 (manufacturing)', srmm_svc: 'SRMM v3.2 (services)', recyclers: 'Recycler directory', actions: 'Reduction actions library',
+  schemes: 'Schemes library', plans: 'Plans & prices', content: 'Messages & languages', srmm_mfg: 'SRMM v3.1 (manufacturing)', srmm_svc: 'SRMM v3.2 (services)', recyclers: 'Recycler directory', actions: 'Reduction actions library', news: 'What changed (regulatory updates)',
 };
 const firstVersion = (k: Key): any => (k === 'srmm_mfg' ? bank('srmm_mfg.json') : k === 'srmm_svc' ? bank('srmm_svc.json') : DEFAULTS[k]);
 
@@ -112,7 +112,14 @@ export function validate(k: Key, d: any) {
   if (k === 'esg') need(d.weights?.env && d.weights?.soc && d.weights?.gov, 'Weights need env, soc and gov sections.');
   if (k === 'calendar') need(Array.isArray(d.templates) && Number.isFinite(+d.soon_days), 'The calendar needs templates and soon_days.');
   if (k === 'requirements') need(d.items && d.msme_turnover_cr && d.csr, 'Requirement rules need items, msme_turnover_cr and csr.');
-  if (k === 'schemes' || k === 'plans' || k === 'dpdp' || k === 'recyclers' || k === 'actions') need(Array.isArray(d.items), 'This setting needs an "items" list.');
+  if (k === 'schemes' || k === 'plans' || k === 'dpdp' || k === 'recyclers' || k === 'actions' || k === 'news') need(Array.isArray(d.items), 'This setting needs an "items" list.');
+  if (k === 'news') {
+    for (const x of d.items) {
+      need(x && typeof x.id === 'string' && typeof x.title === 'string' && x.title.trim(), `Each update needs an id and a title${x?.id ? ` (${x.id})` : ''}.`);
+      need(/^\d{4}-\d{2}-\d{2}$/.test(String(x.date)), `Update ${x.id} needs a date like 2026-10-30.`);
+      need(!x.concerns || (typeof x.concerns === 'object' && !Array.isArray(x.concerns)), `Update ${x.id}: "concerns" must be a group of values (sectors, states, flags).`);
+    }
+  }
   if (k === 'actions') {
     for (const [f, v] of Object.entries<any>(d.prices || {})) need(Number.isFinite(+v) && +v >= 0, `The price of ${f} must be a number of 0 or more.`);
     need(+d.target?.pct >= 0 && +d.target?.pct <= 100 && Number.isInteger(+d.target?.year), 'The target needs pct (0–100) and year.');

@@ -4,21 +4,26 @@ Pages that find money: lower electricity bills, rooftop solar, government scheme
 
 ## Bill analyser
 
-Enter one month's HT electricity bill (or read it from the PDF with **Read a bill PDF**):
+Choose how many bills to use at the top of the page:
 
-- contract demand and maximum demand (kVA)
-- power factor and any power-factor penalty (₹)
-- units billed (kWh) and the share used in peak hours
+- **Up to 12 months** (recommended). Fill in one row per month, April to March, from your HT electricity bills: units (kWh), maximum demand (kVA), contract demand (kVA; leave it empty if it did not change), power factor, power-factor penalty (₹) and the share of units in peak hours (%). Leave a month empty if you don't have its bill. The **PDF** button on a row reads that month's bill and fills the row for you to check (peak-hour share is not read; take it from the time-of-day section of the bill).
+- **One month's bill.** A quick check from a single bill, shown as a yearly figure (× 12).
 
 Choose your electricity company to fill its tariff rates, or leave them empty to use typical rates.
 
+The figures at the top show the savings found a year, how many months went over contract demand, your average (and lowest) power factor, and the power-factor penalty you actually paid.
+
 **What we found** lists each saving in plain words, with what to do and the ₹ saved a year, for example:
 
-- *You are paying a penalty for going over your contract demand* — raise the contract demand.
-- *Low power factor is adding a penalty* — install capacitors (APFC panel); the cost and payback are shown.
+- *You went over your contract demand in 3 of 12 months* — raise the contract demand to cover your highest month, or, when it happened in only a few months and raising would cost more, keep the peak down in those months.
+- *Low power factor is adding a penalty* — install capacitors (APFC panel), sized for your worst month; the cost and payback are shown.
 - *You could save by running some load at night* — move flexible work to off-peak hours.
 
-> Savings are estimates from one month's bill. Check a few months before changing your contract demand.
+With fewer than 12 months, each saving is the months you entered scaled to a year (12 ÷ months entered). With all 12, it is what the year actually cost.
+
+**Use these units for grid electricity in Emissions** copies the monthly units into the Emissions page, so you type them once. Attach the bills under **Bills** as proof.
+
+> Savings are estimates from your own bills. A full year gives a much truer picture than one month.
 
 ## Solar
 

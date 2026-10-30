@@ -49,7 +49,7 @@ export async function smeCalendarRoutes(app: FastifyInstance) {
     for (const x of items) {
       if (x.status === 'done' || x.days < 0) continue;
       const rep = (x as { repeat?: string | null }).repeat;
-      const desc = [x.who && `With: ${x.who}`, x.notes, 'From the EKOTRACE SME compliance calendar. Dates are typical; confirm them for your state.'].filter(Boolean).join('\n');
+      const desc = [!x.own && x.who && `With: ${x.who}`, x.notes, 'From the EKOTRACE SME compliance calendar. Dates are typical; confirm them for your state.'].filter(Boolean).join('\n');
       lines.push('BEGIN:VEVENT', `UID:${t}-${x.id.replace(/[^A-Za-z0-9_.-]/g, '-')}@ekotrace-sme`, `DTSTAMP:${stamp}`, `DTSTART;VALUE=DATE:${ymd(x.date)}`, `DTEND;VALUE=DATE:${ymd(nextDay(x.date))}`,
         ...(rep === 'monthly' ? ['RRULE:FREQ=MONTHLY'] : rep === 'yearly' ? ['RRULE:FREQ=YEARLY'] : []),
         `SUMMARY:${esc(x.title)}`, `DESCRIPTION:${esc(desc)}`, 'TRANSP:TRANSPARENT',

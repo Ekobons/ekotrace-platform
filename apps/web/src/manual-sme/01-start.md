@@ -56,6 +56,12 @@ There is no Save button: **every change saves itself** a moment after you stop t
 
 If two people change the same page at once, the second person sees a message and the latest figures.
 
+## Proof documents
+
+Where a figure or a tick needs proof, the page has an **Attach** button: certificates (**Certifications**), signed policies (**ESG**), the POSH annual report and safety records (**People & safety**), and the evidence for each **DPDP** checklist step. Attach a PDF, a photo (JPG or PNG), or a Word or Excel file, up to 10 MB; on a computer you can also drag the file onto the line. Click a file's name to open it, and **✕** to remove it. Pages show how many items have proof, for example *2 of 7 policies have proof*.
+
+Files are kept with the financial year shown at the top of the page. Anyone in your company can open them; data entry and above can add or remove them.
+
 ## The financial year
 
 Everything is kept per Indian financial year, April to March (for example *FY 2025-26*). The year you are working on is shown at the top of every page. Change it, or start a new year, on **Profile**. Last year's figures stay, so you can see the trend.
@@ -71,3 +77,14 @@ Everything is kept per Indian financial year, April to March (for example *FY 20
 | Viewer (verifier) | see everything, change nothing |
 
 The owner adds colleagues under **People & access**. Every change is recorded under **Security & audit log**.
+
+## Plan & billing
+
+**Plan & billing** (under Setup, for the owner and admins) shows your plan, the date your access runs until, and the plans with their yearly price including GST.
+
+- **Paying online.** Choose a plan and press **Pay**. A secure Razorpay window opens: pay by UPI, card or net banking. We never see your card or bank details. When the payment goes through, your access is extended straight away. If you close the window too early, the payment is still recorded when the bank confirms it; do not pay twice.
+- **Paying early loses nothing.** One year is added after your current end date (or from today if it has passed).
+- **After the end date** nobody in the company can sign in until the plan is renewed, so pay before it.
+- **If the page says online payment is not switched on**, write to the e-mail address shown on the page. We send bank details for a transfer and extend your access when the money arrives.
+- **Invoices.** Every payment has a GST tax invoice: press **Invoice** in the payments list, then **Print or save as PDF**. Add your GSTIN and billing address under **Invoice details** before paying, so they appear on the invoice and you can claim the input tax credit. GST is CGST + SGST when your company is in the same state as ours, IGST otherwise. Check the GST treatment with your CA.
+- Only the owner or an admin can pay or change the invoice details. Others can see the page but not change it.

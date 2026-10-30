@@ -11,6 +11,7 @@ import { Kpi, Kpis, Pill, SmeHead, copyText } from './ui';
 import { dmy, f0 } from '../../lib/sme';
 import './comply.css';
 import './dpdp.css';
+import { Evidence, ProofCount, useProofCounts } from './Evidence';
 
 interface Item { key: string; area: string; title: string; why?: string; evidence?: string }
 interface Check { done?: boolean; owner?: string; date?: string; note?: string }
@@ -167,9 +168,14 @@ function Register({ rows, can, onChange }: { rows: Row[]; can: boolean; onChange
 function Checklist({ items, areas, checks, can, onChange, go }: { items: Item[]; areas: { key: string; title: string }[]; checks: Record<string, Check>; can: boolean; onChange: (c: Record<string, Check>) => void; go: (t: Tab) => void }) {
   const [open, setOpen] = useState<string | null>(null);
   const upd = (k: string, v: Partial<Check>) => onChange({ ...checks, [k]: { ...checks[k], ...v } });
+  const proofs = useProofCounts('dpdp');
+  const proven = items.filter((x) => (proofs?.[x.key] ?? 0) > 0).length;
   const link: Record<string, Tab> = { inv: 'register', legit: 'register', kids: 'register', retain: 'register', vendorlist: 'register', breachlog: 'logs', rights: 'logs', notice: 'texts', cctv: 'texts', vendors: 'texts', contact: 'texts', owner: 'texts' };
   return (
-    <>{areas.map((a) => {
+    <>
+    {proofs && <div className="card sme-ev-head" style={{ marginBottom: 0 }}><p className="muted" style={{ flex: '1 1 260px', margin: 0 }}>Open a step to note who owns it and attach its evidence. Keep evidence here so it is ready if the Data Protection Board or a customer asks.</p>
+      <ProofCount have={proven} of={items.length} what="steps have evidence attached" /></div>}
+    {areas.map((a) => {
       const its = items.filter((x) => x.area === a.key), n = its.filter((x) => checks[x.key]?.done).length;
       return (
         <div key={a.key} className="card">
@@ -181,7 +187,7 @@ function Checklist({ items, areas, checks, can, onChange, go }: { items: Item[];
                 <div className="dp-item-h">
                   <input type="checkbox" aria-label={x.title} disabled={!can} checked={on} onChange={(e) => upd(x.key, { done: e.target.checked, date: e.target.checked ? c.date || today() : c.date })} />
                   <button type="button" className="dp-item-t" onClick={() => setOpen(isOpen ? null : x.key)} aria-expanded={isOpen}><b>{x.title}</b><small>{x.why}</small>
-                    {(c.owner || c.note) && <em>{[c.owner && `Owner: ${c.owner}`, c.date && on && `done ${dmy(c.date)}`, c.note].filter(Boolean).join(' · ')}</em>}</button>
+                    {(c.owner || c.note || (proofs?.[x.key] ?? 0) > 0) && <em>{[c.owner && `Owner: ${c.owner}`, c.date && on && `done ${dmy(c.date)}`, c.note, (proofs?.[x.key] ?? 0) > 0 && `${proofs![x.key]} evidence file${proofs![x.key] === 1 ? '' : 's'}`].filter(Boolean).join(' · ')}</em>}</button>
                   <span className="dp-chev" aria-hidden="true">{isOpen ? '▾' : '▸'}</span>
                 </div>
                 {isOpen && <div className="dp-item-b">
@@ -191,6 +197,7 @@ function Checklist({ items, areas, checks, can, onChange, go }: { items: Item[];
                     <label><span>Done on</span><input className="input" type="date" disabled={!can} value={c.date ?? ''} onChange={(e) => upd(x.key, { date: e.target.value })} /></label>
                     <label className="wide"><span>Note or where the evidence is</span><input className="input" disabled={!can} value={c.note ?? ''} onChange={(e) => upd(x.key, { note: e.target.value })} /></label>
                   </div>
+                  <div className="sme-ev-row"><Evidence module="dpdp" item={x.key} label="Evidence" /></div>
                 </div>}
               </div>);
           })}</div>

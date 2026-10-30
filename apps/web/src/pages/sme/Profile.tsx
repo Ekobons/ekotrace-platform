@@ -8,6 +8,7 @@ import { useSme } from './store';
 import { Choice, Num, Pill, Sample, SmeHead, Toggle } from './ui';
 import { f0, type SmeCompany } from '../../lib/sme';
 import './carbon.css';
+import { PlantsCard } from './Plants';
 
 const CBAM_GOODS: [string, string][] = [['', 'Not chosen yet'], ['none', 'Not a CBAM good'], ['steel', 'Iron & steel products'], ['aluminium', 'Aluminium products'], ['cement', 'Cement'], ['fertiliser', 'Fertilisers']];
 const EUDR: [string, string][] = [['none', 'None'], ['leather', 'Leather / cattle products'], ['rubber', 'Rubber'], ['coffee', 'Coffee'], ['wood', 'Wood, furniture or paper'], ['soya', 'Soya'], ['cocoa', 'Cocoa'], ['palm oil', 'Palm oil']];
@@ -156,6 +157,8 @@ export function SmeProfile() {
           <Toggle path="profile.energyIntensive" label="We are in a CCTS-covered sector" hint="Aluminium, cement, chlor-alkali, pulp & paper, iron & steel, petrochemicals, refining, textiles" />
         </div>
       </div>
+
+      <PlantsCard />
 
       <div className="sme-callout">
         {act || check

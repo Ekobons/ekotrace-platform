@@ -24,6 +24,7 @@
 import { EXTRA_KEYS, plantList, plantQuantities, sourceQuality, sourceTotal, withTotals } from './emisSites.js';
 import { billsYear, yearMode } from './billYear.js';
 import { plan } from './plan.js';
+import { csrPosition, eprPosition, requirementList, schemeList } from './rules.js';
 
 export const n = (v: any): number => (v === '' || v === null || v === undefined || isNaN(+v) ? 0 : +v);
 export const round = (v: number, dp = 2): number => Math.round(v * 10 ** dp) / 10 ** dp;
@@ -97,7 +98,8 @@ export function emissions(d: any, cfg: any): any {
     const q = pq[id]!, pl = plants.find((p) => p.id === id);
     const t = (s: number) => keys.filter((k) => F[k].scope === s).reduce((a, k) => a + (n(q[k]) * F[k].factor) / 1000, 0);
     const ps1 = t(1), ps2 = t(2), pg = Math.min(n(q.green), n(q.grid));
-    return { id, name: pl ? pl.name : 'Plant no longer listed', listed: !!pl, city: pl?.city || '', state: pl?.state || '', s1: ps1, s2: ps2, s3: t(3), total: ps1 + ps2, s2Market: Math.max(0, ps2 - (pg * gridF) / 1000) };
+    const bySource = Object.fromEntries(keys.map((k) => [k, (n(q[k]) * F[k].factor) / 1000]));
+    return { id, name: pl ? pl.name : 'Plant no longer listed', listed: !!pl, city: pl?.city || '', state: pl?.state || '', s1: ps1, s2: ps2, s3: t(3), total: ps1 + ps2, s2Market: Math.max(0, ps2 - (pg * gridF) / 1000), quantities: q, bySource };
   }).filter((p) => p.listed || p.total + p.s3 > 0);
 
   return {
@@ -400,19 +402,12 @@ export function credits(d: any, cfg: any): any {
 
 /* ------------------------------------------------------------------ CSR (Companies Act s.135) */
 export function csr(d: any, cfg: any): any {
-  const c = d.csr || {}, R = cfg.requirements.csr;
-  const applies = n(c.netWorth) >= R.net_worth_cr || n(d.profile && d.profile.turnover) >= R.turnover_cr || n(c.profit3) >= R.net_profit_cr;
-  const avg = (n(c.profit1) + n(c.profit2) + n(c.profit3)) / 3;
-  const obligation = applies ? avg * R.rate : 0;
-  return { applies, avgProfit: avg, obligation, left: Math.max(0, obligation - n(c.spent)), committeeNeeded: obligation >= R.committee_threshold_cr };
+  return csrPosition(d, cfg); // rules.ts: threshold, 2% obligation, spending entries, unspent amount
 }
 
 /* ------------------------------------------------------------------ EPR */
-export function epr(d: any): any {
-  const e = d.epr || {};
-  const total = n(e.c1) + n(e.c2) + n(e.c3) + n(e.c4);
-  const need = (total * n(e.target)) / 100;
-  return { total, need, gap: Math.max(0, need - n(e.bought)), registered: !!e.registered };
+export function epr(d: any, cfg?: any): any {
+  return eprPosition(d, cfg || { requirements: {} }); // rules.ts: plastic, e-waste and battery obligations
 }
 
 /* ------------------------------------------------------------------ DPDP */
@@ -531,51 +526,12 @@ export function calendar(d: any, cfg: any): any {
 
 /* ------------------------------------------------------------------ requirements ("What applies") */
 export function requirements(d: any, cfg: any): any {
-  const p = d.profile || {}, R = cfg.requirements.items, out: any[] = [];
-  const sr = srmm(d, cfg), cs = csr(d, cfg), dp = dpdpPct(d, cfg);
-  const fill = (s: any, vars: any) => String(s || '').replace(/\{(\w+)\}/g, (_: string, k: string) => (vars[k] !== undefined ? vars[k] : ''));
-  const vars = {
-    eudr: p.eudr, srmm_pct: (sr.pct * 100).toFixed(1), srmm_open: sr.open, dpdp_pct: Math.round(dp),
-    csr_profit: n(d.csr && d.csr.profit3).toFixed(1), csr_lakh: (cs.obligation * 100).toFixed(1),
-  };
-  const add = (key: string, variant: string) => {
-    const r = R[key] && R[key][variant];
-    if (!r) return;
-    out.push({ key, status: r.status, label: fill(r.label, vars), title: fill(r.title, vars), detail: fill(r.detail, vars), action: fill(r.action, vars), go: r.go || null });
-  };
-  add('brsr_value_chain', p.listedBuyer ? 'likely' : 'watch');
-  add('srmm', sr.open > 0 ? 'open' : 'done');
-  if (p.euExport && (p.cbamGood || 'none') !== 'none') add('eu_cbam', 'applies');
-  else if (p.euExport) add('eu_cbam', 'watch');
-  if (p.ukExport && (p.cbamGood || 'none') !== 'none') add('uk_cbam', 'applies');
-  if (p.eudr && p.eudr !== 'none') add('eudr', 'applies');
-  add('brsr_filing', p.listed ? 'applies' : 'not_required');
-  add('ccts', p.energyIntensive ? 'check' : 'opportunity');
-  if (p.plastics) add('plastic_epr', 'check');
-  if (p.ewaste || p.battery) add('other_epr', 'check');
-  add('dpdp', dp >= 80 ? 'on_track' : 'prepare');
-  if (cs.applies) add('csr', 'applies');
-  add('posh', (d.people || {}).posh_report ? 'on_track' : 'check');
-  add('bank', 'useful');
-  if (out.find((x: any) => x.key === 'srmm' && x.status === 'good')) {
-    out.find((x: any) => x.key === 'srmm').label = sr.label.split(' –')[0];
-  }
-  return out;
+  return requirementList(d, cfg, { sr: srmm(d, cfg), dp: dpdpPct(d, cfg), cs: csr(d, cfg), ep: epr(d, cfg), cls: msmeClass(d, cfg) });
 }
 
 /* ------------------------------------------------------------------ schemes */
 export function schemes(d: any, cfg: any): any {
-  const p = d.profile || {}, cls = msmeClass(d, cfg), b = bills(d, cfg), so = solar(d, cfg), cr = credits(d, cfg);
-  const ok = cls !== 'Large' && !!p.udyam;
-  return cfg.schemes.items.filter((s: any) => s.active !== false).map((s: any) => {
-    const eligible = (s.needs_msme ? ok : true) && (s.sector ? p.sector === s.sector : true);
-    let note = s.note || '';
-    if (s.id === 'adeetie') note = `Your bill analysis found ₹${(b.total / 1e5).toFixed(1)} lakh a year in savings that an efficiency loan could fund.`;
-    if (s.id === 'zed') note = hasCert(d, 'zed') ? 'You hold ZED. Plan the next level.' : 'Start with Bronze.';
-    if (s.id === 'sidbi') note = `Solar sized at ${so.kw} kWp with ${so.paybackYears.toFixed(1)}-year payback.`;
-    if (s.id === 'ccts_offset') note = `About ${Math.round(cr.tco2e)} tCO₂e a year from your projects.`;
-    return { id: s.id, title: s.title, detail: s.detail.replace('{state}', p.state || 'Your state'), eligible, label: eligible ? s.label_ok : s.label_check, note, link: s.link || null };
-  });
+  return schemeList(d, cfg, { cls: msmeClass(d, cfg), b: bills(d, cfg), so: solar(d, cfg), cr: credits(d, cfg), hasZed: hasCert(d, 'zed') });
 }
 
 /* ------------------------------------------------------------------ questionnaire auto-answer */
@@ -632,7 +588,7 @@ export function all(d: any, cfg: any): any {
     solar: so,
     credits: cr,
     csr: csr(d, cfg),
-    epr: epr(d),
+    epr: epr(d, cfg),
     dpdpPct: dpdpPct(d, cfg),
     dpdp: dpdp(d, cfg),
     safety: safety(d),

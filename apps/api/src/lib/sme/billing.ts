@@ -170,6 +170,7 @@ export function inWords(paise: number) {
   if (cr) parts.push(`${three(cr)} Crore`); if (lk) parts.push(`${two(lk)} Lakh`); if (th) parts.push(`${two(th)} Thousand`); if (r) parts.push(three(r));
   return `Rupees ${parts.join(' ') || 'Zero'}${p ? ` and ${two(p)} Paise` : ''} only`;
 }
+const dmyText = (iso: string | null) => (iso ? String(iso).slice(0, 10).split('-').reverse().join('-') : '—');
 const inr = (paise: number) => `₹${(paise / 100).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 // ------------------------------------------------------------------ applying a payment --
@@ -217,7 +218,7 @@ export function invoiceOf(p: any) {
   return {
     id: p.id, number: p.invoice_no, date: p.paid_at ? todayIn(new Date(p.paid_at)) : null, fy: p.invoice_fy,
     seller: s, buyer: b, placeOfSupply: b.posState ? `${b.posState} (${GST_STATE[b.posState] ?? '—'})` : `${s.state} (${s.stateCode})`,
-    line: { description: `${s.product ?? 'EKOTRACE SME'} — ${p.plan_name} plan, annual subscription (${p.period_from} to ${p.period_to})`, sac: s.sac, qty: 1, taxable: Number(p.base_paise) },
+    line: { description: `${s.product ?? 'EKOTRACE SME'} — ${p.plan_name} plan, annual subscription, ${dmyText(p.period_from)} to ${dmyText(p.period_to)}`, sac: s.sac, qty: 1, taxable: Number(p.base_paise) },
     rate: Number(p.gst_rate), intra, cgst: Number(p.cgst_paise), sgst: Number(p.sgst_paise), igst: Number(p.igst_paise), total: Number(p.amount_paise), words: inWords(Number(p.amount_paise)),
     payment: { id: p.rp_payment_id, method: p.method, order: p.rp_order_id }, reverseCharge: 'No',
   };

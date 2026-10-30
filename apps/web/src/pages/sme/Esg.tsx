@@ -4,10 +4,23 @@ import { Link } from 'react-router-dom';
 import { useSme } from './store';
 import { Kpi, Kpis, Num, Pill, Req, Sample, SmeHead, Toggle } from './ui';
 import { f0, LEVELS } from '../../lib/sme';
+import { Evidence, ProofCount, useProofCounts } from './Evidence';
 import './carbon.css';
 
 type Sec = 'env' | 'soc' | 'gov';
 type Weights = Record<Sec, Record<string, number>>;
+/** Policies a buyer or CA asks to see: [store path, proof item, what to attach]. */
+const POLICIES: [string, string, string][] = [
+  ['esg.coc', 'coc', 'Code of conduct'], ['esg.abc', 'abc', 'Anti-bribery policy'], ['esg.posh', 'posh', 'POSH policy and committee order'],
+  ['esg.privacy', 'privacy', 'Privacy policy'], ['esg.grievance', 'grievance', 'Grievance mechanism'], ['esg.supplierCode', 'supplier_code', 'Supplier code of conduct'],
+  ['esg.target', 'target', 'Reduction target'],
+];
+
+/** The proof line under a policy toggle, once the policy is ticked. */
+function Proof({ path, item }: { path: string; item: string }) {
+  const { get } = useSme();
+  return get(path) ? <div className="sme-ev-under"><Evidence module="esg" item={item} label="Proof" /></div> : null;
+}
 
 /** A check the score reads from another page: shown with its state and a link there. */
 function From({ label, hint, ok, go, goLabel, pts }: { label: string; hint: ReactNode; ok: boolean; go: string; goLabel: string; pts?: string }) {
@@ -20,6 +33,7 @@ function From({ label, hint, ok, go, goLabel, pts }: { label: string; hint: Reac
 
 export function SmeEsg() {
   const { d, get, error } = useSme();
+  const proofs = useProofCounts('esg');
   if (error) return <div className="card empty">{error}</div>;
   if (!d) return <div className="card empty">Loading your data…</div>;
   const e = d.results.esg as { E: number; S: number; G: number; overall: number; eligible: boolean; level: number; levelName: string; gaps: { text: string; gain: string; go?: string }[] };
@@ -36,6 +50,7 @@ export function SmeEsg() {
   const noInc = !!get('people.noIncidents');
   const low = (['Environment', 'Social', 'Governance'] as const).filter((_, i) => [e.E, e.S, e.G][i]! < 30);
   const started = Object.keys(d.meta).length > 0;
+  const proven = POLICIES.filter(([, k]) => (proofs?.[k] ?? 0) > 0).length;
   return (
     <div className="cb-stack">
       <SmeHead lede="Mapped to what listed customers ask under BRSR Core. About ten minutes. Scores update as you answer." />
@@ -70,6 +85,12 @@ export function SmeEsg() {
         </div>
       </div>
 
+      <div className="card sme-ev-head" style={{ marginBottom: 0 }}>
+        <div style={{ flex: '1 1 300px' }}><h2 style={{ margin: 0 }}>Proof of your policies</h2>
+          <p className="cb-sub" style={{ margin: '4px 0 0' }}>Buyers, banks and CAs ask to see the documents. Tick a policy below, then attach the signed copy under it.</p></div>
+        {proofs && <ProofCount have={proven} of={POLICIES.length} what="policies have proof" />}
+      </div>
+
       <div className="sme-grid2">
         <div className="card">
           <div className="cb-h"><h2>Environment</h2><b className="num">{f0(e.E)}%</b></div>
@@ -79,6 +100,7 @@ export function SmeEsg() {
           <Num path="esg.waste" label="Waste generated" unit="t" hint={h('All solid and hazardous waste', 'env', 'waste_tracked')} />
           <Num path="esg.recycled" label="Waste recycled or reused" unit="%" hint={h('50% or more counts', 'env', 'recycling_50')} />
           <Toggle path="esg.target" label="We have an energy or emission reduction target" hint={pts('env', 'target') || undefined} />
+          <Proof path="esg.target" item="target" />
           <From label="ISO 14001 or similar system" hint={isoHeld ? `Status: ${iso?.level === 'inprogress' ? 'in progress' : iso?.level}` : 'Not held'} ok={isoHeld} go="certs" goLabel="Certifications" pts={pts('env', 'ems')} />
         </div>
         <div className="card">
@@ -90,14 +112,20 @@ export function SmeEsg() {
           <Toggle path="people.noIncidents" label="No safety incidents this year" hint="Tick only if the safety log is empty because nothing happened" disabled={entries > 0} />
           <Toggle path="esg.minwage" label="All workers paid at least minimum wage" hint={pts('soc', 'min_wage') || undefined} />
           <Toggle path="esg.posh" label="Internal Committee under the POSH Act" hint={pts('soc', 'posh') || undefined} />
+          <Proof path="esg.posh" item="posh" />
         </div>
         <div className="card">
           <div className="cb-h"><h2>Governance</h2><b className="num">{f0(e.G)}%</b></div>
           <Toggle path="esg.coc" label="Written code of conduct" hint={pts('gov', 'coc') || undefined} />
+          <Proof path="esg.coc" item="coc" />
           <Toggle path="esg.abc" label="Anti-bribery policy" hint={pts('gov', 'abc') || undefined} />
+          <Proof path="esg.abc" item="abc" />
           <Toggle path="esg.grievance" label="Grievance channel for workers and communities" hint={pts('gov', 'grievance') || undefined} />
+          <Proof path="esg.grievance" item="grievance" />
           <Toggle path="esg.privacy" label="Data privacy policy (DPDP Act)" hint={pts('gov', 'privacy') || undefined} />
+          <Proof path="esg.privacy" item="privacy" />
           <Toggle path="esg.supplierCode" label="Supplier code of conduct" hint={pts('gov', 'supplier_code') || undefined} />
+          <Proof path="esg.supplierCode" item="supplier_code" />
           <Toggle path="esg.ownerEsg" label="A named owner or director responsible for ESG" hint={pts('gov', 'owner_esg') || undefined} />
         </div>
       </div>

@@ -7,6 +7,8 @@
  * All values are indicative starting points and are labelled as such in the app.
  */
 
+import * as R from './rulesData.js';
+
 export const factors: any = {
   version: 'SME-IN-2026.1',
   note: 'Indicative factors: CEA grid baseline, IPCC 2006 / DEFRA fuel factors, industry averages for materials.',
@@ -145,63 +147,29 @@ export const calendar: any = {
     { id: 'cbam', title: 'Send 2026 embedded emissions to EU importer', kind: 'fixed', date: '2027-06-30', freq: 'Before importer’s declaration (30 Sep 2027)', who: 'EU importer', go: 'cbam', when: 'cbam' },
     { id: 'ukc', title: 'UK CBAM starts: share data with UK importer', kind: 'fixed', date: '2027-01-01', freq: 'From 1 Jan 2027', who: 'UK importer', go: 'cbam', when: 'ukCbam' },
     { id: 'csr', title: 'Spend CSR obligation for the year', kind: 'annual', month: 3, day: 31, freq: 'Yearly, 31 Mar', who: 'Board / CSR committee', go: 'csr', when: 'csr' },
+    { id: 'bt', title: 'Battery EPR annual return', kind: 'annual', month: 6, day: 30, freq: 'Yearly, 30 Jun', who: 'CPCB battery EPR portal', go: 'epr', when: 'battery' },
+    { id: 'csr_ua', title: 'Move unspent CSR of ongoing projects (if any) to the Unspent CSR Account', kind: 'annual', month: 4, day: 30, freq: 'Yearly, within 30 days of year end', who: 'Board / CSR committee', go: 'csr', when: 'csr' },
+    { id: 'csr_fund', title: 'Transfer other unspent CSR (if any) to a Schedule VII fund', kind: 'annual', month: 9, day: 30, freq: 'Yearly, within 6 months of year end', who: 'Board / CSR committee', go: 'csr', when: 'csr' },
   ],
   states: {},
 };
 
 export const requirements: any = {
-  note: 'Texts and thresholds behind "What applies". {placeholders} are filled from company data.',
+  note: 'Texts and thresholds behind "What applies", CSR and EPR. {placeholders} are filled from company data. Checked against the rules in force on 30 Oct 2026.',
   msme_turnover_cr: { micro: 10, small: 100, medium: 500 },
-  csr: { net_worth_cr: 500, turnover_cr: 1000, net_profit_cr: 5, rate: 0.02, committee_threshold_cr: 0.5 },
-  items: {
-    brsr_value_chain: {
-      likely: { status: 'likely', label: 'Likely', title: 'BRSR value-chain data requests', detail: 'Listed customers report ESG data for suppliers that make up 2% or more of their purchases. Expect a BRSR-style questionnaire.', action: 'Fill Emissions and ESG, then share the summary.', go: 'share' },
-      watch: { status: 'watch', label: 'Watch', title: 'BRSR value-chain data requests', detail: 'Applies when you supply a listed company.', action: 'Keep ESG data ready.', go: 'esg' },
-    },
-    srmm: {
-      open: { status: 'likely', label: 'In progress', title: 'SRMM maturity level (ICAI)', detail: 'ICAI’s Sustainability Reporting Maturity Model scores your reporting out of 300 (v3.1 manufacturing or v3.2 service) and awards Levels 1–4 after CA validation.', action: '{srmm_pct}% scored, {srmm_open} indicators open.', go: 'srmm' },
-      done: { status: 'good', label: 'Scored', title: 'SRMM maturity level (ICAI)', detail: 'ICAI’s Sustainability Reporting Maturity Model scores your reporting out of 300 and awards Levels 1–4 after CA validation.', action: '{srmm_pct}% scored.', go: 'srmm' },
-    },
-    eu_cbam: {
-      applies: { status: 'apply', label: 'Applies', title: 'EU CBAM', detail: 'Your EU importer pays for embedded emissions from 2026. Without your data, higher EU default values are used.', action: 'Calculate emissions per tonne and send them to your importer.', go: 'cbam' },
-      watch: { status: 'watch', label: 'Watch', title: 'EU CBAM', detail: 'Your product is not a CBAM good today. Coverage of downstream products is planned to widen.', action: 'Track emissions now.', go: 'emissions' },
-    },
-    uk_cbam: { applies: { status: 'likely', label: 'From Jan 2027', title: 'UK CBAM', detail: 'The UK applies its own CBAM to aluminium, cement, fertiliser, hydrogen and iron & steel from 1 January 2027 (glass and ceramics were dropped).', action: 'Use the same embedded-emissions data for your UK importer.', go: 'cbam' } },
-    eudr: { applies: { status: 'apply', label: 'Applies', title: 'EU Deforestation Regulation (EUDR)', detail: 'EU buyers must prove your {eudr} is deforestation-free with plot geolocation. Large operators from 30 Dec 2026, micro and small from 30 Jun 2027.', action: 'Record plot coordinates and documents.', go: 'eudr' } },
-    brsr_filing: {
-      applies: { status: 'apply', label: 'Applies', title: 'BRSR filing (SEBI)', detail: 'Listed companies in the SEBI top-1000 file BRSR with the annual report.', action: 'Use the full EKOTRACE BRSR Core package.' },
-      not_required: { status: 'good', label: 'Not required', title: 'BRSR filing (SEBI)', detail: 'Own filing applies to listed companies only.', action: '' },
-    },
-    ccts: {
-      check: { status: 'likely', label: 'Check', title: 'India CCTS obligations', detail: 'Units notified as obligated entities have emission-intensity targets.', action: 'Check whether your unit is notified.', go: 'emissions' },
-      opportunity: { status: 'watch', label: 'Opportunity', title: 'India CCTS offset credits', detail: 'Solar and efficiency projects can earn credits when pooled across SMEs.', action: 'See your credit potential.', go: 'credits' },
-    },
-    plastic_epr: { check: { status: 'likely', label: 'Check', title: 'Plastic packaging EPR', detail: 'Brand owners, producers and importers of plastic packaging have collection and recycling targets.', action: 'Track your EPR position.', go: 'epr' } },
-    other_epr: { check: { status: 'likely', label: 'Check', title: 'E-waste / battery EPR', detail: 'Producers of electrical goods or batteries need EPR registration and annual returns.', action: 'Track registration.', go: 'epr' } },
-    dpdp: {
-      on_track: { status: 'good', label: 'On track', title: 'DPDP Act (data privacy)', detail: 'Applies to every business holding personal data, including employee records. Most obligations apply from May 2027.', action: '{dpdp_pct}% of the checklist done.', go: 'dpdp' },
-      prepare: { status: 'likely', label: 'Prepare', title: 'DPDP Act (data privacy)', detail: 'Applies to every business holding personal data, including employee records. Most obligations apply from May 2027.', action: '{dpdp_pct}% of the checklist done.', go: 'dpdp' },
-    },
-    csr: { applies: { status: 'apply', label: 'Applies', title: 'CSR (Companies Act s.135)', detail: 'Net profit of ₹{csr_profit} crore crosses the ₹5 crore threshold. Spend 2% of average profit.', action: 'Obligation ₹{csr_lakh} lakh this year.', go: 'csr' } },
-    posh: {
-      on_track: { status: 'good', label: 'On track', title: 'Workplace safety & POSH', detail: 'Internal Committee and an annual report are required with 10 or more employees.', action: 'Review the safety log and POSH status.', go: 'people' },
-      check: { status: 'likely', label: 'Check', title: 'Workplace safety & POSH', detail: 'Internal Committee and an annual report are required with 10 or more employees.', action: 'Review the safety log and POSH status.', go: 'people' },
-    },
-    bank: { useful: { status: 'watch', label: 'Useful', title: 'Bank ESG checks & green loans', detail: 'Banks are adding ESG checks to loan reviews and pricing.', action: 'Build a green-loan pack.', go: 'loan' } },
-  },
+  csr: { net_worth_cr: 500, turnover_cr: 1000, net_profit_cr: 5, rate: 0.02, committee_threshold_cr: 0.5, areas: R.csrAreas },
+  thresholds: R.thresholds,
+  epr: R.epr,
+  items: R.items,
 };
 
 export const schemes: any = {
-  note: 'Terms change; each entry tells the user to confirm on the official portal.',
-  items: [
-    { id: 'adeetie', title: 'ADEETIE (Bureau of Energy Efficiency)', detail: 'Interest subvention on loans for energy-efficient technology, with energy audits and implementation support, for MSMEs in identified industrial clusters.', needs_msme: true, sector: 'mfg', label_ok: 'Likely eligible', label_check: 'Check', link: 'https://beeindia.gov.in/adeetie.php' },
-    { id: 'zed', title: 'MSME Sustainable (ZED) Certification', detail: 'Government support on certification cost for Udyam-registered MSMEs, with higher support for micro and small units. Bronze, Silver and Gold levels.', needs_msme: true, label_ok: 'Eligible', label_check: 'Udyam needed' },
-    { id: 'lean', title: 'MSME LEAN scheme', detail: 'Support for lean manufacturing consultants and implementation. Less waste, energy and rework.', needs_msme: true, sector: 'mfg', label_ok: 'Eligible', label_check: 'Check' },
-    { id: 'sidbi', title: 'SIDBI energy-efficiency and green finance', detail: 'Concessional loans for energy-efficient equipment and rooftop solar for MSMEs.', needs_msme: true, label_ok: 'Loan', label_check: 'Loan' },
-    { id: 'state_solar', title: 'State rooftop solar & net metering', detail: '{state} DISCOM rules decide net-metering limits and any capital subsidy.', label_ok: 'Check state', label_check: 'Check state' },
-    { id: 'ccts_offset', title: 'CCTS offset mechanism', detail: 'Credits for registered reduction projects, through the EKOTRACE pool.', label_ok: 'Opportunity', label_check: 'Opportunity' },
-  ],
+  note: 'Terms change; each entry tells the user to confirm on the official portal. docs: the documents to keep ready (the tracker ticks them off). Checked 30 Oct 2026.',
+  items: R.schemeItems,
 };
+
+/** "What changed" on What applies: dated regulatory updates, each with the companies it concerns. */
+export const news: any = R.news;
 
 export const plans: any = {
   note: 'Nominal-fee plans. Prices in INR per year, GST extra.',
@@ -267,4 +235,4 @@ export const actions: any = {
   ],
 };
 
-export const DEFAULTS: Record<string, any> = { recyclers, factors, energy, cbam, tariffs, solar, credit_pool, esg, dpdp, calendar, requirements, schemes, plans, content, actions };
+export const DEFAULTS: Record<string, any> = { recyclers, factors, energy, cbam, tariffs, solar, credit_pool, esg, dpdp, calendar, requirements, schemes, plans, content, actions, news };

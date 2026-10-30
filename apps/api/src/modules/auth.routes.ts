@@ -68,11 +68,18 @@ async function failed(c: Tx, req: FastifyRequest, u: { id: string; tenant_id: st
   await c.query(`INSERT INTO audit_log (tenant_id, user_id, user_name, action, detail, ip) VALUES ($1,$2,$3,$4,$5,$6)`, [u.tenant_id, u.id, u.name, action, detail ? JSON.stringify(detail) : null, req.ip]);
 }
 
-async function companyOk(tenantId: string | null) {
+async function companyOk(tenantId: string | null, userId?: string) {
   if (!tenantId) return;
-  const t = await platformTx(async (c) => (await c.query('SELECT status, access_expiry FROM tenant WHERE id = $1', [tenantId])).rows[0]);
+  const t = await platformTx(async (c) => (await c.query('SELECT status, access_expiry, products FROM tenant WHERE id = $1', [tenantId])).rows[0]);
   if (t?.status !== 'active') throw new AppError('This company account is suspended. Contact your administrator.', 403, 'SUSPENDED');
-  if (t.access_expiry < new Date().toISOString().slice(0, 10)) throw new AppError('This company\'s subscription has expired. Contact your administrator.', 403, 'EXPIRED');
+  if (t.access_expiry < new Date().toISOString().slice(0, 10)) {
+    // EKOTRACE SME: the owner or an admin may still sign in, to renew online (every SME page except Plan & billing then answers RENEW)
+    if (userId && (t.products as string[]).includes('sme')) {
+      const role = await platformTx(async (c) => (await c.query('SELECT role FROM app_user WHERE id = $1', [userId])).rows[0]?.role);
+      if (role === 'super_admin' || role === 'admin') return;
+    }
+    throw new AppError('This company\'s subscription has expired. Contact your administrator.', 403, 'EXPIRED');
+  }
 }
 
 export const ssoRedirectUri = (req: FastifyRequest) => `${config.publicUrl ?? `${req.protocol}://${req.headers.host}`}/api/auth/sso/callback`;
@@ -99,7 +106,7 @@ export async function authRoutes(app: FastifyInstance) {
       await platformTx((c) => failed(c, req, user, 'login.failed'));
       throw fail();
     }
-    await companyOk(user.tenant_id);
+    await companyOk(user.tenant_id, user.id);
     const pol = await platformTx((c) => policyOf(c, user));
     const ps = config.platformSso;
     if (user.role === 'platform_admin' && ps?.only) {
@@ -216,7 +223,7 @@ export async function authRoutes(app: FastifyInstance) {
       : `SELECT id, tenant_id, name, disabled FROM app_user WHERE $1::uuid IS NULL AND tenant_id IS NULL AND role = 'platform_admin' AND lower(email) = $2`, [st.tenant_id, email])).rows[0]);
     if (!user) return refuse(st.tenant_id ? `${email} has no ${BRAND} account in this company — ask your administrator to add you` : `${email} is not a platform administrator`, { email });
     if (user.disabled) return refuse('Your account is switched off — contact your administrator', { email });
-    try { await companyOk(user.tenant_id); } catch (e) { return back((e as Error).message); }
+    try { await companyOk(user.tenant_id, user.id); } catch (e) { return back((e as Error).message); }
     await openSession(req, reply, user, 'sso', false, { issuer: cfg.issuer, mfa: usedMfa(claims) });
     return reply.redirect('/');
   });

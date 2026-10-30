@@ -10,8 +10,8 @@ import assert from 'node:assert/strict';
 import pg from 'pg';
 import * as E from '../src/lib/sme/engine.js';
 import { DEFAULTS } from '../src/lib/sme/defaults.js';
-import { pickReminders, sentKey, type CalItem } from '../src/lib/sme/reminders.js';
-import { fold } from '../src/modules/smeCalendar.routes.js';
+import type { CalItem } from '../src/lib/sme/reminders.js';
+// modules that open the database are imported after DATABASE_URL points at the test database (below)
 
 const NOW = new Date('2026-10-28T06:00:00Z');      // 11:30 a.m. in India
 const cfg: any = { ...DEFAULTS, today: NOW };
@@ -44,7 +44,8 @@ test('calendar: own dates — once and yearly, notes, done ticks; old data witho
   assert.equal(od.status, 'overdue'); assert.equal(od.days, -8);
 });
 
-test('reminders: the smallest "days before" that applies, once; overdue once; done and far items skipped', () => {
+test('reminders: the smallest "days before" that applies, once; overdue once; done and far items skipped', async () => {
+  const { pickReminders, sentKey } = await import('../src/lib/sme/reminders.js');
   const it = (id: string, days: number, status = days < 0 ? 'overdue' : 'soon'): CalItem => ({ id, title: id, date: `D${id}`, days, status });
   const items = [it('far', 40, 'later'), it('d15', 15), it('d10', 10), it('d3', 3), it('today', 0), it('late', -2), it('old', -45), it('done', 2, 'done')];
   const s = { days: [15, 3], overdue: true };
@@ -57,7 +58,8 @@ test('reminders: the smallest "days before" that applies, once; overdue once; do
   assert.deepEqual(pickReminders(items, { days: [7], overdue: false }, new Set()).map((p) => `${p.item.id}:${p.kind}`), ['d3:d7', 'today:d7']);
 });
 
-test('ics: lines folded at 75 octets without splitting a character', () => {
+test('ics: lines folded at 75 octets without splitting a character', async () => {
+  const { fold } = await import('../src/modules/smeCalendar.routes.js');
   const long = `SUMMARY:${'₹'.repeat(60)}`;
   for (const l of fold(long).split('\r\n')) assert.ok(Buffer.byteLength(l) <= 75);
   assert.equal(fold(long).replace(/\r\n /g, ''), long);

@@ -55,7 +55,11 @@ export function SmeProvider({ children }: { children: ReactNode }) {
       }
       setD(x); setError(null);
       if (x.fy !== fy) { setFyState(x.fy); try { localStorage.setItem('eko_sme_fy', x.fy); } catch { /* not kept */ } }
-    } catch (e) { setError((e as Error).message); }
+    } catch (e) {
+      setError((e as Error).message);
+      // subscription ended: everything but Plan & billing is closed until renewed
+      if ((e as { code?: string }).code === 'RENEW' && !window.location.pathname.startsWith('/sme/billing')) window.location.assign('/sme/billing');
+    }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { load(fy || undefined); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 

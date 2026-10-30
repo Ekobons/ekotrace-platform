@@ -1,34 +1,270 @@
-/** Emissions: yearly totals from bills and invoices; scope is worked out from the factor library. */
+/**
+ * Emissions: each source as one row (yearly total, where the figure comes from, proof), entered month
+ * by month (April–March) or as one yearly figure; per plant when the company has several; this year
+ * against last year; Scope 2 both location-based and market-based (green power bought).
+ * All tCO₂e figures come from the server; this screen only edits quantities.
+ */
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useSme } from './store';
-import { Kpi, Kpis, Num, SmeHead } from './ui';
-import { f1, f2 } from '../../lib/sme';
+import { Kpi, Kpis, Sample, SmeHead } from './ui';
+import { Evidence } from './Evidence';
+import { f0, f1, f2, n } from '../../lib/sme';
+import { MONTHS, change, explicitMode, monthsArr, monthsFilled, plantValue, site, sitesOf, unsplit } from './emisData';
+import './emis.css';
+
+type Factor = { label: string; unit: string; scope: number; category: string | null; factor: number; source: string | null };
+type Row = { key: string; label: string; unit: string; scope: number; category: string | null; quantity: number; tco2e: number; quality: 'measured' | 'estimated' | 'missing' | 'unused'; months: number | null; partial: boolean; priorQuantity: number | null; priorTco2e: number | null };
+type PlantR = { id: string; name: string; listed: boolean; city: string; state: string; s1: number; s2: number; s3: number; total: number; s2Market: number; quantities?: Record<string, number>; bySource?: Record<string, number> };
 
 const GROUPS = [
-  { title: 'Fuels & refrigerants', scope: 1, note: 'Scope 1: fuels you burn and refrigerant you top up.' },
-  { title: 'Electricity', scope: 2, note: 'Scope 2: electricity you buy. Solar you generate adds no emissions.' },
-  { title: 'Value chain', scope: 3, note: 'Scope 3, optional: purchased goods (Cat 1), inbound transport (Cat 4) and business travel (Cat 6). Add only what buyers ask for.' },
+  { scope: 1, title: 'Fuels & refrigerants', note: 'Scope 1: fuel you burn on site and in your own vehicles, and refrigerant topped up in ACs and chillers.' },
+  { scope: 2, title: 'Electricity', note: 'Scope 2: electricity you buy from the grid. Rooftop solar you generate and use adds nothing.' },
+  { scope: 3, title: 'Value chain', note: 'Scope 3, optional: materials you buy (Cat 1), inbound freight (Cat 4) and business travel (Cat 6). Add only what your buyers ask for.' },
 ];
+const HINT: Record<string, string> = {
+  diesel: 'Fuel invoices or DG set log', petrol: 'Fuel bills or card statements', lpg: 'Cylinder invoices (19 or 47.5 kg)', png: 'Gas bills (standard cubic metres)', coal: 'Purchase invoices',
+  refrig: 'AC service reports (kg topped up)', grid: 'Units billed on DISCOM bills', solar: 'Inverter or generation meter reading',
+  steel: 'Purchase invoices', alu: 'Purchase invoices', cement: 'Purchase invoices', plastic: 'Purchase invoices', road: 'Tonnes × km from transporters', air: 'Passenger km from travel bookings', rail: 'Passenger km from travel bookings',
+};
+const GREEN_TYPES: [string, string][] = [['', 'Choose how you buy it…'], ['open_access', 'Open access (green energy open access)'], ['green_tariff', 'Green tariff from your DISCOM'], ['irec', 'Renewable energy certificates (I-RECs / RECs)'], ['ppa', 'Captive / group captive or PPA'], ['mixed', 'More than one of these']];
+const ORDER = ['diesel', 'petrol', 'lpg', 'png', 'coal', 'refrig', 'grid', 'solar', 'steel', 'alu', 'cement', 'plastic', 'road', 'air', 'rail'];
+const byOrder = (a: string, b: string) => (ORDER.indexOf(a) < 0 ? 99 : ORDER.indexOf(a)) - (ORDER.indexOf(b) < 0 ? 99 : ORDER.indexOf(b));
+const fyShort = (fy?: string | null) => (fy ? fy.replace(/^FY (\d{4})-(\d{2})$/, 'FY $1-$2') : 'last year');
 
 export function SmeEmissions() {
-  const { d } = useSme();
+  const { d, get, set, setModule } = useSme();
+  const [plantSel, setPlant] = useState('main');
+  const [open, setOpen] = useState<Record<string, boolean>>({});
+  const [showS3, setShowS3] = useState(false);
   if (!d) return <div className="card empty">Loading…</div>;
-  const r = d.results, F = d.config.factors.items as Record<string, { label: string; unit: string; scope: number; category: string | null }>;
-  const keys = (s: number) => Object.keys(F).filter((k) => F[k]!.scope === s);
-  const total = (s: number) => (s === 1 ? r.emissions.s1 : s === 2 ? r.emissions.s2 : r.emissions.s3);
-  const out = (k: string) => { const row = (r.emissions.rows as { key: string; tco2e: number; category: string | null; scope: number }[]).find((x) => x.key === k); return row && row.tco2e ? `= ${f2(row.tco2e)} tCO₂e · ${row.category ?? `Scope ${row.scope}`}` : ''; };
-  const group = (g: (typeof GROUPS)[number]) => (
-    <div className="card" key={g.title}>
-      <div className="row"><h2 className="grow">{g.title}</h2><b className="num">{f1(total(g.scope))} t</b></div>
-      <p className="muted" style={{ margin: '4px 0 6px', fontSize: 13 }}>{g.note}</p>
-      {keys(g.scope).map((k) => <Num key={k} path={`emissions.${k}`} label={F[k]!.label} unit={F[k]!.unit} out={out(k)} />)}
-    </div>);
+
+  const F = d.config.factors.items as Record<string, Factor>;
+  const KEYS = [...Object.keys(F), 'green'];
+  const r = d.results.emissions as any;
+  const rows = (r.rows ?? []) as Row[];
+  const em = get('emissions') ?? {};
+  const listed = (Array.isArray(get('profile.plants')) ? get('profile.plants') : []) as { id: string; name: string }[];
+  const plants = listed.some((p) => p.id === 'main') ? listed : [{ id: 'main', name: 'Main plant' }, ...listed];
+  const multi = plants.length > 1;
+  const plant = plants.some((p) => p.id === plantSel) ? plantSel : 'main';
+  const plantR = ((r.plants ?? []) as PlantR[]);
+  const prior = r.prior as null | { fy: string | null; bySource: boolean; total: number; s1?: number; s2?: number; s3?: number; s2Market?: number };
+  const can = d.canEdit;
+  const update = (fn: (next: any) => void) => setModule('emissions', change(em, KEYS, fn));
+  const scopeT = (s: number) => (s === 1 ? r.s1 : s === 2 ? r.s2 : r.s3) as number;
+  const priorScope = (s: number) => (prior?.bySource ? (s === 1 ? prior.s1 : s === 2 ? prior.s2 : prior.s3) ?? null : null);
+  const plantName = (id: string) => plants.find((p) => p.id === id)?.name ?? 'Main plant';
+  const has = r.withS3 > 0;
+  const q = r.quality ?? { measuredPct: 0, estimated: [], missing: [], partial: [], measuredT: 0, estimatedT: 0 };
+  const name = (k: string) => (k === 'green' ? 'Renewable electricity bought' : F[k]?.label ?? k);
+  const s3Has = rows.some((x) => x.scope === 3 && (x.quantity > 0 || (x.priorQuantity ?? 0) > 0));
+
+  const rowFor = (k: string, scope: number) => {
+    const res = rows.find((x) => x.key === k);
+    const unit = k === 'green' ? 'kWh' : F[k]!.unit;
+    const s = sitesOf(em)[plant];
+    const value = plantValue(em, plant, k);
+    const filledM = monthsFilled(s, k);
+    const mode = explicitMode(s, k) ?? (filledM > 0 ? 'month' : value > 0 || scope === 3 ? 'year' : 'month');
+    const id = `${plant}:${k}`, isOpen = !!open[id];
+    const qual = (s?.quality ?? {})[k] as string | undefined;
+    const extra = plant === 'main' ? unsplit(em, k) : 0;
+    const t = multi ? plantR.find((p) => p.id === plant)?.bySource?.[k] ?? 0 : res?.tco2e ?? 0;
+    const pq = res?.priorQuantity ?? null;
+    const setYear = (v: number | '') => update((nx) => { const x = site(nx, plant); x.mode[k] = 'year'; x.year[k] = v; });
+    const setMonth = (i: number, v: number | '') => update((nx) => { const x = site(nx, plant); const a = monthsArr(x, k); a[i] = v; x.months[k] = a; x.mode[k] = 'month'; });
+    const setMode = (m: 'month' | 'year') => update((nx) => { site(nx, plant).mode[k] = m; });
+    const setQual = (v: string) => update((nx) => { const x = site(nx, plant); if (v) x.quality[k] = v; else delete x.quality[k]; });
+    const pr = plantR.find((p) => p.id === plant);
+    const greenT = multi ? n(pr?.s2) - n(pr?.s2Market) : n(r.s2) - n(r.s2Market);
+    const evItem = plant === 'main' ? k : `${k}@${plant}`;
+    return (
+      <div className={`em-row${isOpen ? ' open' : ''}`} key={id}>
+        <div className="em-name">
+          <b>{name(k)}</b>
+          <small>{k === 'green' ? 'Open access, green tariff or I-RECs. Already part of your grid units above.' : HINT[k] ?? F[k]!.source ?? ''}</small>
+        </div>
+        <div className="em-val">
+          {mode === 'year'
+            ? <NumIn label={`${name(k)}, yearly total`} value={value || (s?.year?.[k] === 0 ? 0 : '')} unit={unit} disabled={!can} onChange={setYear} />
+            : <button type="button" className="em-sum" onClick={() => setOpen({ ...open, [id]: !isOpen })} aria-expanded={isOpen}>
+                <span className="num">{value > 0 ? f0(value) : '—'}</span><small>{unit}</small>
+              </button>}
+          <span className="em-modehint">{mode === 'month' ? (filledM ? `${filledM} of 12 months` : 'By month') : 'Yearly total'}</span>
+        </div>
+        <div className="em-t">
+          {k === 'green' ? <span className="muted small">{value > 0 ? `−${f2(greenT)} t market-based` : ''}</span>
+            : <><b className="num">{t > 0 ? f2(t) : '—'}</b><small>tCO₂e</small></>}
+          {!multi && pq !== null && k !== 'green' && <Trend now={res?.quantity ?? 0} before={pq} unit={unit} fy={prior?.fy} />}
+        </div>
+        <div className="em-q">
+          {value > 0
+            ? <select className={`input em-qsel ${qual === 'estimate' ? 'est' : 'ok'}`} aria-label={`Where the ${name(k)} figure comes from`} disabled={!can} value={qual === 'estimate' ? 'estimate' : 'bills'} onChange={(e) => setQual(e.target.value === 'bills' ? '' : e.target.value)}>
+                <option value="bills">From bills</option><option value="estimate">Estimate</option>
+              </select>
+            : <select className={`input em-qsel ${qual === 'none' ? 'none' : 'miss'}`} aria-label={`${name(k)}: not filled in or not used`} disabled={!can} value={qual === 'none' ? 'none' : ''} onChange={(e) => setQual(e.target.value)}>
+                <option value="">{scope === 3 ? 'Optional' : 'Not filled in'}</option><option value="none">We don’t use this</option>
+              </select>}
+        </div>
+        <div className="em-more">
+          <button type="button" className="btn sm ghost" aria-expanded={isOpen} onClick={() => setOpen({ ...open, [id]: !isOpen })}>{isOpen ? 'Close' : mode === 'month' ? 'Months' : 'By month'}</button>
+        </div>
+        {extra > 0 && <p className="em-extra">Includes {f0(extra)} {unit} added from a read bill or an earlier yearly figure, not split by month.</p>}
+        {(isOpen || value > 0) && <div className="em-ev"><Evidence module="emissions" item={evItem} label={multi ? `Bills · ${plantName(plant)}` : 'Bills'} /></div>}
+        {isOpen && (
+          <div className="em-panel">
+            <label className="em-switch">
+              <span className="sme-sw"><input type="checkbox" disabled={!can} checked={mode === 'year'} onChange={(e) => setMode(e.target.checked ? 'year' : 'month')} /><i /></span>
+              <span>One yearly total only<small>{mode === 'year' ? 'Switch off to enter each month from April to March.' : 'Switch on if you only have one figure for the year.'}</small></span>
+            </label>
+            {mode === 'month' && <>
+              <div className="em-months">
+                {MONTHS.map((m, i) => <NumIn key={m} label={`${name(k)}, ${m}`} caption={m} value={monthsArr(s, k)[i]} disabled={!can} onChange={(v) => setMonth(i, v)} />)}
+              </div>
+              <p className="em-psum">Year: <b className="num">{f0(value)} {unit}</b>{filledM > 0 && filledM < 12 && <> · {12 - filledM} month{12 - filledM === 1 ? '' : 's'} still empty</>}</p>
+              {n(s?.year?.[k]) > 0 && filledM === 0 && <p className="muted small">Your earlier yearly figure ({f0(s.year[k])} {unit}) is set aside while you enter months. Switch back to use it.</p>}
+            </>}
+            {mode === 'year' && <p className="muted small">The yearly figure is used as it is. Months give a truer picture and show gaps.</p>}
+          </div>)}
+      </div>);
+  };
+
+  const group = (g: (typeof GROUPS)[number]) => {
+    const keys = Object.keys(F).filter((k) => F[k]!.scope === g.scope).sort(byOrder);
+    const ps = priorScope(g.scope);
+    const folded = g.scope === 3 && !s3Has && !showS3;
+    return (
+      <section className="card em-group" key={g.title} style={{ ['--sc' as any]: `var(--s${g.scope})` }}>
+        <div className="em-gh">
+          <div className="grow"><h2>{g.title}</h2><p className="muted">{g.note}</p></div>
+          <div className="em-gt"><b className="num">{f1(multi ? plantR.find((p) => p.id === plant)?.[g.scope === 1 ? 's1' : g.scope === 2 ? 's2' : 's3'] ?? 0 : scopeT(g.scope))}</b><small>tCO₂e{multi ? ` · ${plantName(plant)}` : ''}</small>
+            {!multi && ps !== null && ps > 0 && <small>{fyShort(prior?.fy)}: {f1(ps)} t</small>}</div>
+        </div>
+        {folded
+          ? <div className="em-fold"><span className="muted">Only if a buyer asks for it.</span>{can && <button type="button" className="btn sm" onClick={() => setShowS3(true)}>Add value chain figures</button>}</div>
+          : <div className="em-rows">{keys.map((k) => rowFor(k, g.scope))}{g.scope === 2 && rowFor('green', 2)}</div>}
+        {g.scope === 2 && <Dual r={r} green={n(r.greenKwh)} can={can} type={get('emissions.greenType') ?? ''} setType={(v) => set('emissions.greenType', v)} />}
+      </section>);
+  };
+
+  const qbar = r.total > 0 ? [Math.max(0, Math.min(100, q.measuredPct)), Math.max(0, Math.min(100, (q.estimatedT / r.total) * 100))] : [0, 0];
   return (
     <>
-      <SmeHead lede="Enter yearly totals from your bills and invoices. Scope is worked out for you."><Link className="btn" to="/sme/scan">Read a bill</Link></SmeHead>
-      <Kpis><Kpi label="Scope 1" value={f1(r.emissions.s1)} unit="tCO₂e" /><Kpi label="Scope 2" value={f1(r.emissions.s2)} unit="tCO₂e" /><Kpi label="Scope 3" value={f1(r.emissions.s3)} unit="tCO₂e" /><Kpi label="Intensity" value={f1(r.emissions.intensity)} unit="tCO₂e per ₹ crore" /></Kpis>
-      <div className="sme-grid2">{GROUPS.slice(0, 2).map(group)}</div>
-      {group(GROUPS[2]!)}
-      <p className="muted" style={{ fontSize: 12 }}>{d.config.factors.note} Factor set {d.config.factors.version}.</p>
+      <SmeHead lede="Enter fuel, power and materials from your bills, month by month or as a yearly total. We work out the scope and the tonnes of CO₂e."><Link className="btn" to="/sme/scan">Read a bill</Link></SmeHead>
+      <Kpis>
+        <Kpi label="Scope 1 + 2" value={has ? f1(r.total) : '—'} unit={<>tCO₂e{d.company.isExample && <Sample />}{prior && prior.total > 0 && r.change !== null && <><br /><ChangeTxt pct={r.change} fy={prior.fy} /></>}</>} />
+        <Kpi label="Scope 1" value={f1(r.s1)} unit="tCO₂e · fuels" />
+        <Kpi label="Scope 2" value={f1(r.s2)} unit={n(r.greenKwh) > 0 ? <>location-based · market-based {f1(r.s2Market)}</> : 'tCO₂e · electricity'} />
+        <Kpi label="Scope 3" value={f1(r.s3)} unit="tCO₂e · optional" />
+        <Kpi label="Intensity" value={f1(r.intensity)} unit="tCO₂e per ₹ crore of turnover" />
+      </Kpis>
+
+      <div className="sme-grid2">
+        <section className="card">
+          <h2>How good is the data</h2>
+          {!has
+            ? <p className="muted" style={{ marginTop: 8 }}>Nothing entered yet. Start with your electricity bills and diesel invoices below; they are most of a small factory’s footprint.</p>
+            : <>
+              <div className="em-qbar" aria-hidden="true"><b style={{ width: `${qbar[0]}%` }} /><b className="est" style={{ width: `${qbar[1]}%` }} /></div>
+              <div className="sme-legend"><span><i style={{ background: 'var(--ok)' }} />From bills <b className="num">{f0(q.measuredPct)}%</b></span><span><i style={{ background: '#D9A441' }} />Estimated <b className="num">{f0(r.total > 0 ? (q.estimatedT / r.total) * 100 : 0)}%</b></span><span>of Scope 1 + 2</span></div>
+              <ul className="em-qlist">
+                {q.estimated.length > 0 && <li><span className="chip warn">Estimated</span> {q.estimated.map(name).join(', ')}. Replace with bill figures when you can.</li>}
+                {q.partial.length > 0 && <li><span className="chip info">Part year</span> {q.partial.map((k: string) => `${name(k)} (${rows.find((x) => x.key === k)?.months ?? 0} of 12 months)`).join(', ')}.</li>}
+                {q.missing.length > 0 && <li><span className="chip grey">Not filled in</span> {q.missing.map(name).join(', ')}. Enter a figure, or mark it “We don’t use this”.</li>}
+                {!q.estimated.length && !q.partial.length && !q.missing.length && <li><span className="chip">Complete</span> Every Scope 1 and 2 source is filled in from bills or marked as not used.</li>}
+              </ul>
+              <p className="muted small">Attach the bills to each source as proof. A buyer, bank or CA checking your figures will ask for them.</p>
+            </>}
+        </section>
+        {multi
+          ? <PlantSplit plants={plantR} total={r.total} />
+          : <section className="card">
+              <h2>This year and last year</h2>
+              {prior && prior.total > 0
+                ? <YearTable r={r} rows={rows} prior={prior} />
+                : <p className="muted" style={{ marginTop: 8 }}>No figures for last year yet. Choose the earlier year in <Link to="/sme/profile">Profile</Link> and enter its totals to see the change here. Buyers and the ICAI SRMM look for the trend.</p>}
+              <p className="muted small" style={{ marginTop: 10 }}>One site? If you have more than one plant, list them in <Link to="/sme/profile">Profile</Link> and enter figures for each.</p>
+            </section>}
+      </div>
+
+      {multi && (
+        <div className="em-plants" role="tablist" aria-label="Plant">
+          <span className="lbl">Figures for</span>
+          <div className="seg">{plants.map((p) => <button key={p.id} type="button" role="tab" aria-selected={plant === p.id} className={plant === p.id ? 'on' : ''} onClick={() => setPlant(p.id)}>{p.name || 'Unnamed plant'}</button>)}</div>
+        </div>)}
+
+      {GROUPS.map(group)}
+      {multi && prior && prior.total > 0 && <section className="card"><h2>This year and last year, all plants</h2><YearTable r={r} rows={rows} prior={prior} /></section>}
+      <p className="muted small">{d.config.factors.note} Factor set {d.config.factors.version}. Grid electricity uses the CEA CO₂ baseline factor ({f2(F.grid?.factor)} kg per kWh).</p>
     </>);
+}
+
+/** Number input that keeps empty as '' (not 0). */
+function NumIn({ label, caption, value, unit, disabled, onChange }: { label: string; caption?: string; value: any; unit?: string; disabled?: boolean; onChange: (v: number | '') => void }) {
+  const input = <input className="input num" type="number" inputMode="decimal" step="any" min={0} aria-label={label} disabled={disabled}
+    value={value === undefined || value === null ? '' : value} onChange={(e) => onChange(e.target.value === '' ? '' : Number(e.target.value))} />;
+  if (caption) return <label className="em-m"><span>{caption}</span>{input}</label>;
+  return <div className="sme-unit">{input}{unit && <span>{unit}</span>}</div>;
+}
+
+function ChangeTxt({ pct, fy }: { pct: number; fy: string | null }) {
+  if (Math.abs(pct) < 0.5) return <span className="em-chg">about the same as {fyShort(fy)}</span>;
+  return <span className={`em-chg ${pct < 0 ? 'down' : 'up'}`}>{pct < 0 ? '▼' : '▲'} {f0(Math.abs(pct))}% {pct < 0 ? 'lower' : 'higher'} than {fyShort(fy)}</span>;
+}
+function Trend({ now, before, unit, fy }: { now: number; before: number; unit: string; fy?: string | null }) {
+  if (!(before > 0) && !(now > 0)) return null;
+  if (!(before > 0)) return <small className="em-trend">new this year</small>;
+  const pct = ((now - before) / before) * 100;
+  return <small className="em-trend" title={`${fyShort(fy)}: ${f0(before)} ${unit}`}>{fyShort(fy)} {f0(before)} {unit}{Math.abs(pct) >= 0.5 && <b className={pct < 0 ? 'down' : 'up'}> {pct < 0 ? '▼' : '▲'}{f0(Math.abs(pct))}%</b>}</small>;
+}
+
+/** Location-based and market-based Scope 2, side by side (GHG Protocol Scope 2 Guidance). */
+function Dual({ r, green, can, type, setType }: { r: any; green: number; can: boolean; type: string; setType: (v: string) => void }) {
+  return (
+    <div className="em-dual">
+      <div><span className="lbl">Scope 2, location-based</span><b className="num">{f1(r.s2)} t</b><small>Grid units × CEA grid average. Used for your totals.</small></div>
+      <div><span className="lbl">Scope 2, market-based</span><b className="num">{f1(r.s2Market)} t</b><small>{green > 0 ? `${f0(green)} kWh of renewable power bought counted as zero; the rest at the grid average (India has no published residual mix).` : 'Same as location-based until you enter renewable power bought.'}</small></div>
+      {green > 0 && (
+        <label className="em-gtype"><span className="lbl">How you buy it</span>
+          <select className="input" disabled={!can} value={type} onChange={(e) => setType(e.target.value)}>{GREEN_TYPES.map(([v, t]) => <option key={v} value={v}>{t}</option>)}</select>
+          <small className="muted">Keep the open access invoices, green tariff bills or REC redemption statements: market-based figures need them.</small>
+        </label>)}
+    </div>);
+}
+
+function YearTable({ r, rows, prior }: { r: any; rows: Row[]; prior: { fy: string | null; bySource: boolean; total: number; s1?: number; s2?: number; s3?: number } }) {
+  const line = (label: string, now: number, before: number | null | undefined) => {
+    const pct = before && before > 0 ? ((now - before) / before) * 100 : null;
+    return <tr key={label}><td>{label}</td><td className="r">{before !== null && before !== undefined ? f1(before) : '—'}</td><td className="r">{f1(now)}</td><td className="r">{pct === null ? '' : <span className={pct < 0 ? 'em-down' : pct > 0 ? 'em-up' : ''}>{pct > 0 ? '+' : ''}{f0(pct)}%</span>}</td></tr>;
+  };
+  const top = prior.bySource ? rows.filter((x) => x.scope !== 3 && (x.tco2e > 0 || (x.priorTco2e ?? 0) > 0)).sort((a, b) => b.tco2e - a.tco2e).slice(0, 4) : [];
+  return (
+    <div className="sme-scroll"><table className="sme-tbl" style={{ marginTop: 8 }}>
+      <thead><tr><th>tCO₂e</th><th className="r">{fyShort(prior.fy)}</th><th className="r">This year</th><th className="r">Change</th></tr></thead>
+      <tbody>
+        {prior.bySource && <>{line('Scope 1', r.s1, prior.s1)}{line('Scope 2', r.s2, prior.s2)}</>}
+        <tr className="tot"><td>Scope 1 + 2</td><td className="r">{f1(prior.total)}</td><td className="r">{f1(r.total)}</td><td className="r">{r.change === null ? '' : `${r.change > 0 ? '+' : ''}${f0(r.change)}%`}</td></tr>
+        {top.length > 0 && <tr><td colSpan={4} className="em-sub">Largest sources</td></tr>}
+        {top.map((x) => line(x.label.replace(/ \(.*\)$/, ''), x.tco2e, x.priorTco2e))}
+      </tbody>
+    </table>
+    {!prior.bySource && <p className="muted small">Only last year’s total is stored. Enter last year’s sources to compare them one by one.</p>}
+    </div>);
+}
+
+function PlantSplit({ plants, total }: { plants: PlantR[]; total: number }) {
+  return (
+    <section className="card">
+      <h2>By plant</h2>
+      <div className="sme-scroll"><table className="sme-tbl" style={{ marginTop: 8 }}>
+        <thead><tr><th>Plant</th><th className="r">Scope 1</th><th className="r">Scope 2</th><th className="r">Scope 1 + 2</th><th className="r">Share</th></tr></thead>
+        <tbody>
+          {plants.map((p) => <tr key={p.id}><td>{p.name}{p.city ? <small className="muted"> · {p.city}</small> : null}{!p.listed && <small className="chip warn" style={{ marginLeft: 6 }}>removed</small>}</td><td className="r">{f1(p.s1)}</td><td className="r">{f1(p.s2)}</td><td className="r">{f1(p.total)}</td><td className="r">{total > 0 ? `${f0((p.total / total) * 100)}%` : '—'}</td></tr>)}
+          <tr className="tot"><td>All plants</td><td className="r">{f1(plants.reduce((a, p) => a + p.s1, 0))}</td><td className="r">{f1(plants.reduce((a, p) => a + p.s2, 0))}</td><td className="r">{f1(total)}</td><td className="r">100%</td></tr>
+        </tbody>
+      </table></div>
+      <p className="muted small" style={{ marginTop: 8 }}>Plants are listed in <Link to="/sme/profile">Profile</Link>. Choose a plant below to enter its figures.</p>
+    </section>);
 }

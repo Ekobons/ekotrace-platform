@@ -74,6 +74,8 @@ import { smeFilesRoutes } from './modules/smeFiles.routes.js';
 import { smeNetRoutes } from './modules/smeNet.routes.js';
 import { smeAdminRoutes } from './modules/smeAdmin.routes.js';
 import { smePublicRoutes } from './modules/smePublic.routes.js';
+import { smeBillingRoutes, smeBillingWebhook } from './modules/smeBilling.routes.js';
+import { checkoutHeaders } from './lib/sme/billing.js';
 import { logTransfers } from './lib/integrations.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -89,7 +91,7 @@ export async function buildApp(opts: { logger?: boolean; rateLimit?: Limits | nu
 
   // Security headers on every response (BEEAH web application security standard 4.9).
   // A route may set a stricter policy (stored files: sandboxed); it is kept.
-  app.addHook('onSend', async (_req, reply) => {
+  app.addHook('onSend', async (req, reply) => {
     reply.header('X-Content-Type-Options', 'nosniff');
     reply.header('X-Frame-Options', 'DENY');
     reply.header('Referrer-Policy', 'strict-origin-when-cross-origin');
@@ -98,7 +100,10 @@ export async function buildApp(opts: { logger?: boolean; rateLimit?: Limits | nu
     reply.header('Cross-Origin-Resource-Policy', 'same-origin');
     reply.header('Cross-Origin-Embedder-Policy', 'require-corp');
     reply.header('Permissions-Policy', 'camera=(self), geolocation=(self), microphone=(), payment=(), usb=()');
-    if (!reply.hasHeader('Content-Security-Policy')) reply.header('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self' blob:; style-src-attr 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob:; frame-src 'self' blob:; object-src 'none'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'");
+    // the SME billing page opens Razorpay Checkout (only while online payment is configured): its own, still narrow, policy
+    const pay = checkoutHeaders(req.url);
+    if (pay && !reply.hasHeader('Content-Security-Policy')) reply.headers(pay);
+    else if (!reply.hasHeader('Content-Security-Policy')) reply.header('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self' blob:; style-src-attr 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob:; frame-src 'self' blob:; object-src 'none'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'");
     if (config.https) reply.header('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
   });
   // Rate limits on every API request (per session, per address, tighter on sign-in).
@@ -135,6 +140,7 @@ export async function buildApp(opts: { logger?: boolean; rateLimit?: Limits | nu
   await app.register(supplierPublicRoutes);
   await app.register(cbamPublicRoutes);
   await app.register(smePublicRoutes);
+  await app.register(smeBillingWebhook);
   await app.register(auditApiRoutes);
   await app.register(scimRoutes);
   await app.register(async (secured) => {
@@ -172,6 +178,7 @@ export async function buildApp(opts: { logger?: boolean; rateLimit?: Limits | nu
     await secured.register((await import('./modules/smeCalendar.routes.js')).smeCalendarRoutes);
     await secured.register(smeNetRoutes);
     await secured.register(smeAdminRoutes);
+    await secured.register(smeBillingRoutes);
     await secured.register(qrRoutes);
     await secured.register(contractorRoutes);
     await secured.register(assuranceRoutes);

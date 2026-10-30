@@ -20,7 +20,7 @@ export const DEFAULT_REMINDERS: ReminderSettings = { enabled: false, recipients:
 /** Dates more than this many days late are not chased by e-mail (they stay on the calendar). */
 export const OVERDUE_WINDOW = 30;
 
-export interface CalItem { id: string; title: string; date: string; days: number; status: string; who?: string; go?: string | null; notes?: string }
+export interface CalItem { id: string; title: string; date: string; days: number; status: string; who?: string; go?: string | null; notes?: string; own?: boolean }
 export interface Chosen { item: CalItem; kind: string }
 export const sentKey = (id: string, due: string, kind: string) => `${id}|${due}|${kind}`;
 
@@ -86,7 +86,7 @@ export async function remindSme(c: Tx, tenant: string, now = new Date(), opts: {
   if (!picks.length) return { items: 0, people: 0 };
   const company = (await c.query(`SELECT name FROM tenant WHERE id = $1`, [tenant])).rows[0]?.name ?? 'Your company';
   const late = picks.filter((p) => p.kind === 'overdue'), soon = picks.filter((p) => p.kind !== 'overdue');
-  const line = (p: Chosen) => `• ${p.item.title}: ${fmt(p.item.date)}, ${whenText(p.item)}${p.item.who ? ` (${p.item.who})` : ''}${p.item.notes ? `\n  ${p.item.notes.replace(/\s+/g, ' ').slice(0, 200)}` : ''}`;
+  const line = (p: Chosen) => `• ${p.item.title}: ${fmt(p.item.date)}, ${whenText(p.item)}${p.item.who && !p.item.own ? ` (${p.item.who})` : ''}${p.item.notes ? `\n  ${p.item.notes.replace(/\s+/g, ' ').slice(0, 200)}` : ''}`;
   const subject = `EKOTRACE SME: ${late.length ? `${late.length} date${late.length > 1 ? 's' : ''} passed` : ''}${late.length && soon.length ? ', ' : ''}${soon.length ? `${soon.length} due soon` : ''} · ${company}`;
   const body = [
     `Hello {name},`, '',
