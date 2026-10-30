@@ -120,6 +120,7 @@ const PAGE_LINE: Record<string, (r: any, d: any) => string | null> = {
   emissions: (r) => (r.emissions.total > 0 ? `${f1(r.emissions.total)} tCO₂e (Scope 1 + 2)` : 'Add your yearly bills'),
   esg: (r) => `${Math.round(r.esg.overall)}% · ${r.esg.level ? `Level ${r.esg.level}` : 'not yet rated'}`,
   srmm: (r) => `${f1(r.srmm.pct * 100)}% · ${r.srmm.open} to score`,
+  plan: () => 'Actions, savings and a target',
   footprint: (_r, d) => { const n = (d.data.footprint?.products ?? []).length; return n ? `${n} product${n === 1 ? '' : 's'}` : 'Per product'; },
   certs: (_r, d) => { const n = (d.data.certs ?? []).filter((c: any) => c.level && c.level !== 'none').length; return `${n} held`; },
   bills: (r) => (r.money.bills > 0 ? `${lakh(r.money.bills)} a year to save` : 'Check one month’s bill'),
@@ -138,6 +139,7 @@ const PAGE_LINE: Record<string, (r: any, d: any) => string | null> = {
   questionnaire: () => 'Answer buyer questions',
   whatsapp: () => 'Message for your team',
   share: () => 'Consent and CA validation',
+  report: () => 'One-page PDF for buyers',
   loan: () => 'Bank-ready pack',
 };
 

@@ -7,7 +7,7 @@ import type { Tx } from '../../db/pool.js';
 import * as E from './engine.js';
 import { cfg as loadCfg } from './settings.js';
 
-export const MODULES = ['profile', 'emissions', 'esg', 'certs', 'footprint', 'bills', 'solar', 'credits', 'calendar', 'epr', 'dpdp', 'people', 'csr', 'cbam', 'eudr', 'srmm', 'loan', 'share', 'questionnaire'] as const;
+export const MODULES = ['profile', 'emissions', 'esg', 'certs', 'footprint', 'bills', 'solar', 'credits', 'calendar', 'epr', 'dpdp', 'people', 'csr', 'cbam', 'eudr', 'srmm', 'loan', 'share', 'questionnaire', 'plan', 'schemes', 'report'] as const;
 export type Module = (typeof MODULES)[number];
 
 export const STATES = ['Andhra Pradesh', 'Arunachal Pradesh', 'Assam', 'Bihar', 'Chhattisgarh', 'Delhi', 'Goa', 'Gujarat', 'Haryana', 'Himachal Pradesh', 'Jammu and Kashmir', 'Jharkhand', 'Karnataka', 'Kerala', 'Madhya Pradesh', 'Maharashtra', 'Manipur', 'Meghalaya', 'Mizoram', 'Nagaland', 'Odisha', 'Puducherry', 'Punjab', 'Rajasthan', 'Sikkim', 'Tamil Nadu', 'Telangana', 'Tripura', 'Uttar Pradesh', 'Uttarakhand', 'West Bengal', 'Other'];

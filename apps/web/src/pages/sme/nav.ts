@@ -6,6 +6,7 @@ export const SME_PAGES: Record<string, { title: string; sub: string; icon: strin
   emissions: { title: 'Emissions', sub: 'Scope 1, 2, 3', icon: 'flame' },
   esg: { title: 'ESG', sub: 'Readiness score', icon: 'gauge' },
   srmm: { title: 'SRMM', sub: 'ICAI maturity level', icon: 'target' },
+  plan: { title: 'Reduction plan', sub: 'Actions and target', icon: 'chart' },
   footprint: { title: 'Product footprint', sub: 'Per product', icon: 'scale' },
   certs: { title: 'Certifications', sub: 'ZED, ISO', icon: 'shield' },
   bills: { title: 'Bill analyser', sub: 'Power bill savings', icon: 'bolt' },
@@ -24,18 +25,20 @@ export const SME_PAGES: Record<string, { title: string; sub: string; icon: strin
   questionnaire: { title: 'Questionnaire', sub: 'Auto-answer', icon: 'paste' },
   whatsapp: { title: 'WhatsApp', sub: 'Chat & reminders', icon: 'chat' },
   share: { title: 'Share & validate', sub: 'Consent, CA', icon: 'feed' },
-  loan: { title: 'Green loan', sub: 'Bank pack', icon: 'doc' },
+  report: { title: 'Buyer report', sub: 'PDF for buyers', icon: 'doc' },
+  loan: { title: 'Green loan', sub: 'Bank pack', icon: 'scale' },
+  billing: { title: 'Plan & billing', sub: 'Your subscription', icon: 'gear' },
 };
 export interface SmeGroup { key: string; title: string; sub: string; icon: string; color: string; soft: string; pages: string[] }
 /** Sections of the tool: one menu entry each; their pages are tabs at the top of the page. */
 export const SME_GROUPS: SmeGroup[] = [
   { key: 'home', title: 'Home', sub: 'Your snapshot', icon: 'home', color: '#0E7C66', soft: '#E3F3EC', pages: ['home'] },
-  { key: 'carbon', title: 'Carbon & ESG', sub: 'Your footprint and scores', icon: 'leaf', color: '#0E7C66', soft: '#E1F2EA', pages: ['profile', 'applies', 'emissions', 'esg', 'srmm', 'footprint', 'certs'] },
+  { key: 'carbon', title: 'Carbon & ESG', sub: 'Your footprint and scores', icon: 'leaf', color: '#0E7C66', soft: '#E1F2EA', pages: ['profile', 'applies', 'emissions', 'plan', 'esg', 'srmm', 'footprint', 'certs'] },
   { key: 'save', title: 'Save money', sub: 'Lower bills, earn more', icon: 'bolt', color: '#A86207', soft: '#FBEFD9', pages: ['bills', 'solar', 'schemes', 'scrap', 'credits'] },
   { key: 'comply', title: 'Compliance', sub: 'Dates and checklists', icon: 'calendar', color: '#1F5F99', soft: '#E2EEF8', pages: ['calendar', 'epr', 'dpdp', 'people', 'csr'] },
   { key: 'export', title: 'Exports', sub: 'EU and UK rules', icon: 'truck', color: '#6B46B0', soft: '#EEE7F8', pages: ['cbam', 'eudr'] },
   { key: 'ai', title: 'Quick tools', sub: 'Scan, answer, remind', icon: 'paste', color: '#4E7A12', soft: '#ECF4DE', pages: ['scan', 'questionnaire', 'whatsapp'] },
-  { key: 'share', title: 'Share', sub: 'Buyers, banks, your CA', icon: 'feed', color: '#B23A64', soft: '#F9E4EC', pages: ['share', 'loan'] },
+  { key: 'share', title: 'Share', sub: 'Buyers, banks, your CA', icon: 'feed', color: '#B23A64', soft: '#F9E4EC', pages: ['share', 'report', 'loan'] },
 ];
 export const groupOf = (page: string) => SME_GROUPS.find((g) => g.pages.includes(page)) ?? SME_GROUPS[0]!;
 

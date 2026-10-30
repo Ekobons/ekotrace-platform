@@ -70,6 +70,7 @@ import { batchRoutes } from './modules/batches.routes.js';
 import { supplierPortalRoutes, supplierPublicRoutes } from './modules/supplierPortal.routes.js';
 import { supplierEngagementRoutes } from './modules/supplierEngagement.routes.js';
 import { smeRoutes } from './modules/sme.routes.js';
+import { smeFilesRoutes } from './modules/smeFiles.routes.js';
 import { smeNetRoutes } from './modules/smeNet.routes.js';
 import { smeAdminRoutes } from './modules/smeAdmin.routes.js';
 import { smePublicRoutes } from './modules/smePublic.routes.js';
@@ -167,6 +168,7 @@ export async function buildApp(opts: { logger?: boolean; rateLimit?: Limits | nu
     await secured.register(supplierPortalRoutes);
     await secured.register(supplierEngagementRoutes);
     await secured.register(smeRoutes);
+    await secured.register(smeFilesRoutes);
     await secured.register(smeNetRoutes);
     await secured.register(smeAdminRoutes);
     await secured.register(qrRoutes);

@@ -6,7 +6,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { call, download } from './api';
 
-export type SmeModule = 'profile' | 'emissions' | 'esg' | 'certs' | 'footprint' | 'bills' | 'solar' | 'credits' | 'calendar' | 'epr' | 'dpdp' | 'people' | 'csr' | 'cbam' | 'eudr' | 'srmm' | 'loan' | 'share' | 'questionnaire';
+export type SmeModule = 'profile' | 'emissions' | 'esg' | 'certs' | 'footprint' | 'bills' | 'solar' | 'credits' | 'calendar' | 'epr' | 'dpdp' | 'people' | 'csr' | 'cbam' | 'eudr' | 'srmm' | 'loan' | 'share' | 'questionnaire' | 'plan' | 'schemes' | 'report';
 export interface SmeCompany { id: string; name: string; sector: 'mfg' | 'svc'; industry: string; state: string; udyamNo: string | null; isExample: boolean }
 /** The engine's output (apps/api/src/lib/sme/engine.ts `all`). Loosely typed: read fields by name. */
 export type SmeResults = Record<string, any>;

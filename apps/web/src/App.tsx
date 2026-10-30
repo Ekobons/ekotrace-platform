@@ -158,6 +158,7 @@ const SME_NAV: { group?: string; items: NavItem[] }[] = [
     : { label: g.title, icon: g.icon, tabs: g.pages.map((k) => ({ to: `/sme/${k}`, label: SME_PAGES[k]!.title })) })) },
   { group: 'Setup', items: [
     { to: '/people', label: 'People & access', icon: 'users', roles: ['super_admin', 'admin', 'manager'] },
+    { to: '/sme/billing', label: 'Plan & billing', icon: 'gear', roles: ['super_admin', 'admin'] },
     { to: '/audit', label: 'Security & audit log', icon: 'lock', roles: ['super_admin', 'admin', 'verifier'] },
   ] },
   { group: 'Help', items: [{ to: '/help', label: 'User manual', icon: 'book' }] },

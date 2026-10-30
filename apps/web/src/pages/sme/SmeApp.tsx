@@ -8,6 +8,9 @@ import { useLocation } from 'react-router-dom';
 import type { CSSProperties, ReactNode } from 'react';
 import { SmeHome } from './Home';
 import { SmeEmissions } from './Emissions';
+import { SmePlan } from './Plan';
+import { SmeReport } from './Report';
+import { SmeBilling } from './Billing';
 import { SmeProfile } from './Profile';
 import { SmeApplies } from './Applies';
 import { SmeEsg } from './Esg';
@@ -43,6 +46,9 @@ export function SmeApp() {
         <Routes>
         <Route path="home" element={<SmeHome />} />
         <Route path="emissions" element={<SmeEmissions />} />
+        <Route path="plan" element={<SmePlan />} />
+        <Route path="report" element={<SmeReport />} />
+        <Route path="billing" element={<SmeBilling />} />
         <Route path="profile" element={<SmeProfile />} />
         <Route path="applies" element={<SmeApplies />} />
         <Route path="esg" element={<SmeEsg />} />
