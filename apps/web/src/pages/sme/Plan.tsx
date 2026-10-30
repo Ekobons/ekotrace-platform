@@ -110,7 +110,7 @@ export function SmePlan() {
                       <small>{r ? (r.ready ? cutText(r, F) : r.why) : 'Calculating…'}{it.owner ? ` · ${it.owner}` : ''}{it.date ? ` · by ${dmy(it.date)}` : ''}</small></span>
                   </button>
                   <div className="pl-figs">
-                    <span><b className="num">{r?.ready ? f1(r.tco2e) : '—'}</b><small>t a year</small></span>
+                    <span><b className="num">{r?.ready ? (r.lib === 'pf' ? '—' : f1(r.tco2e)) : '—'}</b><small>{r?.lib === 'pf' ? 'not counted' : 't a year'}</small></span>
                     <span><b className="num">{r?.ready ? rupees(r.save) : '—'}</b><small>saved a year</small></span>
                     <span><b className="num">{r && r.cost !== null ? rupees(r.cost) : '—'}</b><small>{r && r.cost === null ? 'enter size' : 'cost'}</small></span>
                     <span><b className="num">{r?.ready ? years(r.payback) : '—'}</b><small>payback</small></span>
@@ -254,8 +254,9 @@ function TargetTab({ doc, P, d, A, can, save, esgTarget }: { doc: PlanDoc; P: an
 /** Line chart: actual years, business as usual, with the counted actions, and the straight target line. */
 export function PathChart({ path, target, compact = false }: { path: any[]; target: any; compact?: boolean }) {
   const [hover, setHover] = useState<number | null>(null);
+  const narrow = typeof window !== 'undefined' && window.innerWidth < 700;
   if (!path?.length) return null;
-  const W = 640, H = compact ? 190 : 250, L = 48, R = compact ? 16 : 96, Tp = 14, B = 28;
+  const W = compact || narrow ? 420 : 640, H = compact ? 210 : narrow ? 260 : 250, L = 48, R = compact || narrow ? 16 : 96, Tp = 14, B = 28;
   const vals = path.flatMap((p) => [p.actual, p.bau, p.withPlan, p.target]).filter((v) => v !== null && v !== undefined) as number[];
   const max = Math.max(...vals, 1) * 1.08;
   const step = niceStep(max / 4);
@@ -274,11 +275,11 @@ export function PathChart({ path, target, compact = false }: { path: any[]; targ
       </div>
       <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`Emissions path to ${target?.label ?? ''}`} onMouseLeave={() => setHover(null)}>
         {ticks.map((t) => <g key={t}><line x1={L} x2={W - R} y1={y(t)} y2={y(t)} className="pl-grid" /><text x={L - 8} y={y(t) + 4} className="pl-ax" textAnchor="end">{f0(t)}</text></g>)}
-        {path.map((p, i) => <text key={p.year} x={x(i)} y={H - 8} className="pl-ax" textAnchor="middle">{compact || path.length > 8 ? `’${String(p.year % 100).padStart(2, '0')}` : p.label.replace('FY ', '')}</text>)}
+        {path.map((p, i) => <text key={p.year} x={x(i)} y={H - 8} className="pl-ax" textAnchor="middle">{compact || narrow || path.length > 8 ? `’${String(p.year % 100).padStart(2, '0')}` : p.label.replace('FY ', '')}</text>)}
         {hover !== null && <line x1={x(hover)} x2={x(hover)} y1={Tp} y2={H - B} className="pl-cross" />}
         {series.map(([k, , c]) => <polyline key={k} points={line(k)} className={`pl-line ${c}`} />)}
         {path.map((p, i) => p.actual !== null && p.actual !== undefined ? <circle key={i} cx={x(i)} cy={y(p.actual)} r={5} className="pl-dot" /> : null)}
-        {!compact && series.map(([k, t, c]) => { const e = last(k); return e ? <text key={k} x={x(e[0]) + 8} y={y(e[1]) + 4 + (k === 'bau' ? -6 : k === 'target' ? 8 : 0)} className={`pl-dl ${c}`}>{t}</text> : null; })}
+        {!compact && !narrow && series.map(([k, t, c]) => { const e = last(k); return e ? <text key={k} x={x(e[0]) + 8} y={y(e[1]) + 4 + (k === 'bau' ? -6 : k === 'target' ? 8 : 0)} className={`pl-dl ${c}`}>{t}</text> : null; })}
         {path.map((p, i) => <rect key={p.year} x={x(i) - (W - L - R) / Math.max(2, path.length - 1) / 2} y={Tp} width={(W - L - R) / Math.max(1, path.length - 1)} height={H - Tp - B} fill="transparent" onMouseEnter={() => setHover(i)} onClick={() => setHover(i)} />)}
       </svg>
       <div className="pl-read" aria-live="polite">{h ? <><b>{h.label}</b>{h.actual !== null && <span>Actual {f1(h.actual)} t</span>}{h.bau !== null && <span>No action {f1(h.bau)} t</span>}{h.withPlan !== null && <span>With plan {f1(h.withPlan)} t</span>}{h.target !== null && <span>Target {f1(h.target)} t</span>}</> : <span className="muted">tCO₂e a year. Point at a year to read its figures.</span>}</div>

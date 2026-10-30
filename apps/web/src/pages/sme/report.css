@@ -10,7 +10,7 @@
 .rp-form label > span { font-size: 13px; font-weight: 600; color: var(--fg2); }
 .rp-form .input { width: 100%; }
 
-.rp-doc { position: relative; overflow: hidden; background: #FFFFFF; color: #10201C; border: 1px solid var(--line); border-radius: 16px; padding: 30px 34px; max-width: 900px; width: 100%; margin: 0 auto; display: grid; gap: 16px; box-shadow: 0 6px 24px -12px #10201C33; }
+.rp-doc { position: relative; overflow: hidden; background: #FFFFFF; color: #10201C; border: 1px solid var(--line); border-radius: 16px; padding: 30px 34px; max-width: 900px; width: 100%; margin: 0 auto; display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; box-shadow: 0 6px 24px -12px #10201C33; }
 .rp-wm { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; font: 800 110px/1 var(--f-ui); letter-spacing: .12em; text-transform: uppercase; color: #B4540A; opacity: .09; transform: rotate(-24deg); z-index: 0; }
 .rp-doc > *:not(.rp-wm) { position: relative; z-index: 1; }
 .rp-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px 24px; flex-wrap: wrap; border-bottom: 2px solid #10201C; padding-bottom: 12px; }
@@ -41,7 +41,8 @@
 @media (max-width: 900px) { .rp-setup { grid-template-columns: 1fr; } }
 @media (max-width: 760px) {
   .rp-doc { padding: 18px 16px; border-radius: 12px; }
-  .rp-cols, .rp-plan { grid-template-columns: 1fr; }
+  .rp-cols, .rp-plan { grid-template-columns: minmax(0, 1fr); }
+  .rp-kicker { letter-spacing: .04em; }
   .rp-checks { grid-template-columns: 1fr; }
   .rp-meta { text-align: left; }
   .rp-foot { grid-template-columns: 1fr 1fr; }
@@ -58,8 +59,10 @@
   .rp-plan { grid-template-columns: 1.1fr 1fr; }
   .rp-foot { grid-template-columns: 1.4fr 1fr 1fr; }
   .rp-sec, .rp-tbl tr, .rp-foot { break-inside: avoid; }
-  .page.sme .rp-doc .rp-tbl { font-size: 10pt; }
-  .page.sme .rp-doc .rp-tbl td { padding: 3px 6px 3px 0; }
+  .page.sme .rp-doc .rp-tbl { font-size: 9.5pt; }
+  .page.sme .rp-doc .rp-tbl td, .page.sme .rp-doc .rp-tbl th { padding: 2.5px 6px 2.5px 0; }
+  .rp-sec h3 { font-size: 8.5pt; margin-bottom: 2px; }
+  .rp-chart svg { max-height: 52mm; }
   .page.sme .rp-doc .rp-factors td, .page.sme .rp-doc .rp-factors th { font-size: 8.5pt; }
   .rp-small, .rp-none, .rp-lead { font-size: 9pt; }
   .rp-head h2 { font-size: 17pt; }

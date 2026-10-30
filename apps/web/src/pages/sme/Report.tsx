@@ -102,7 +102,7 @@ export function SmeReport() {
               ['Scope 1 + 2', `${f1(em.total)} tCO₂e`, true],
               ['Scope 3 (categories reported)', em.s3 > 0 ? `${f1(em.s3)} tCO₂e` : 'Not reported'],
               ['Intensity (Scope 1 + 2)', n(p.turnover) > 0 ? `${f2(em.intensity)} t per ₹ crore` : 'Turnover not given'],
-              ['Last year, Scope 1 + 2', em.prior?.total > 0 ? `${f1(em.prior.total)} t · ${em.change > 0 ? '+' : ''}${f1(em.change)}%` : 'No prior-year data'],
+              ['Last year, Scope 1 + 2', em.prior?.total > 0 ? `${f1(em.prior.total)} t, now ${f1(Math.abs(em.change))}% ${em.change > 0 ? "higher" : "lower"}` : 'No prior-year data'],
             ]} />
           </Sec>}
           {on('energy') && <Sec t="Energy">
@@ -169,8 +169,8 @@ export function SmeReport() {
 
         {on('method') && <Sec t="How the figures were made">
           <p className="rp-small">Calculated with EKOTRACE SME using the GHG Protocol: activity data from the company’s bills and records × emission factors (set {em.factorVersion ?? '—'}). Scope 2 uses the CEA grid factor{em.greenKwh > 0 ? '; the market-based figure counts renewable electricity bought as zero' : ''}. {em.s3 > 0 ? 'Scope 3 covers only the categories shown in the company’s data.' : ''}</p>
-          {used.length > 0 && <table className="sme-tbl rp-tbl rp-factors"><thead><tr><th>Source</th><th className="r">Quantity</th><th className="r">Factor (kg CO₂e)</th><th>Factor source</th></tr></thead>
-            <tbody>{used.map((x) => <tr key={x.key}><td>{x.label}{x.quality === 'estimated' ? ' *' : ''}</td><td className="r">{f0(x.quantity)} {x.unit}</td><td className="r">{x.factor} / {x.unit}</td><td>{x.source ?? '—'}</td></tr>)}</tbody></table>}
+          {used.length > 0 && <div className="sme-scroll"><table className="sme-tbl rp-tbl rp-factors"><thead><tr><th>Source</th><th className="r">Quantity</th><th className="r">Factor (kg CO₂e)</th><th>Factor source</th></tr></thead>
+            <tbody>{used.map((x) => <tr key={x.key}><td>{x.label}{x.quality === 'estimated' ? ' *' : ''}</td><td className="r">{f0(x.quantity)} {x.unit}</td><td className="r">{x.factor} / {x.unit}</td><td>{x.source ?? '—'}</td></tr>)}</tbody></table></div>}
           <p className="rp-small">{est.length ? `* Estimated, not from bills: ${est.join(', ')}. ` : 'No figures are marked as estimates. '}{partial.length ? `Fewer than 12 months entered for: ${partial.join(', ')}. ` : ''}{validated ? 'The SRMM score has been validated by a Chartered Accountant; other figures are not audited.' : 'The figures have not been audited.'}</p>
         </Sec>}
 
