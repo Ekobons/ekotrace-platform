@@ -21,6 +21,16 @@ Only the **owner** can switch sharing on or off for each partner. You can switch
 
 When every SRMM section has at least 30% of its points, the owner can **Ask a CA to validate**. Choose whether your validated score may be shown on ICAI's public list. The Ekotrace team assigns a CA firm; you see the status (requested, assigned, in review, validated or returned with a note). If you are not yet eligible, the page shows which sections are short and by how many points.
 
+## Buyer report
+
+A one-page summary (two at most) for your buyers, in the shape of the BRSR value-chain questions that listed companies ask their suppliers.
+
+1. Under **What to include**, tick the sections you want: emissions (Scope 1, 2 and 3, intensity, change from last year), energy and renewable share, water and waste, people and safety (women in the workforce, training, lost-time injuries, LTIFR), policies (code of conduct, anti-bribery, POSH, privacy, grievances, supplier code, minimum wages), certifications, ESG and SRMM (with CA validation if done), your reduction target and main actions, and how the figures were made (emission factors used and which figures are estimates).
+2. Under **Prepared by**, check your name and designation, and add the buyer's name if you like.
+3. Tap **Print or save as PDF**. In the print window choose **Save as PDF** and A4; switch off the browser's headers and footers for a clean page.
+
+The report shows only what you entered: anything missing says "Not recorded". It states plainly that the figures are not audited unless a CA has validated your SRMM score. The example company's report carries a **Sample** watermark.
+
 ## Green loan
 
 A bank-ready pack for a green loan: choose what the loan is for (rooftop solar, power-factor correction, all bill fixes, or another project), the amount, the repayment period and the bank. The page shows what a bank will look at — whether the yearly saving covers the repayment, your ESG and SRMM levels, Udyam registration — and the pack itself: company, emissions, savings, levels, eligible schemes and signature lines.

@@ -78,6 +78,34 @@ The figures at the top show Scope 1, 2 and 3 in tonnes of CO₂e, the change fro
 
 Tip: **Quick tools → Bill scan** reads an electricity or fuel bill PDF and adds it to the yearly total. If a source is entered by month, the amount added this way is shown on the row as "not split by month". The **Bill analyser** can also copy its 12 months of units into grid electricity.
 
+## Reduction plan
+
+Turns your footprint into a plan: which actions to take, what each one cuts in tonnes of CO₂e and saves in rupees, what it costs, and whether together they reach your target.
+
+**Actions.** The **Action library** lists common measures for small Indian factories: LED lighting, variable speed drives, IE3/IE4 motors, compressed-air leaks and pressure, power factor correction, rooftop solar, boiler and furnace efficiency, waste-heat recovery, switching burners to piped gas, running on grid or solar instead of the DG set, and transformer losses. Tap **Add** to put one in your plan, or **Your own action** for anything else.
+
+Open an action to fit it to your site:
+
+| Field | Meaning |
+|---|---|
+| Part of your use it touches | the share of that source the action affects, e.g. lighting is about 8% of a factory's electricity |
+| Saving on that part | how much of that part it saves (for a switch: how much is switched) |
+| How many / Size | number of fittings, kW of motors or kVA, to work out the typical cost |
+| Your quoted cost | your supplier's price; leave empty to use the typical cost |
+| Owner, date, status | who does it, by when, and idea / planned / in progress / done |
+
+Each action shows tonnes cut a year, rupees saved a year, cost and simple payback. Rooftop solar takes its figures from the **Solar** page and power factor correction from the **Bill analyser**. Attach the quote or invoice under **Quote or invoice**.
+
+The library's figures are **typical and deliberately conservative** (from BEE guide books, EESL programmes and cluster studies). Real savings depend on your site: confirm with an energy audit or a supplier quote before you invest.
+
+**Target and path.** Choose a base year (this year, last year, or an earlier year you enter), a target year and the cut. Two quick choices: **30% by 2030**, or the **1.5 °C path** (about 4.2% less each year, as used by the Science Based Targets initiative). The chart shows emissions with no action, with your plan, and the target line, and says whether you reach it or how many tonnes are still to find. Point at a year to read its figures, or open **Show as a table**.
+
+Only actions marked **planned, in progress or done** count; ideas are listed but not counted. An action done in or before this year is already in your figures, so it is not taken off again. If your answers in ESG say you have no target yet, use **Record this target in ESG**.
+
+**Prices used.** Savings use the energy rate from your power bill and typical fuel prices. Enter what you actually pay for diesel, LPG, PNG or coal to make them yours.
+
+Each financial year keeps its own plan. In a new year, **Bring it into FY …** copies last year's plan.
+
 ## ESG
 
 About ten minutes of questions on environment (water, waste, recycling, targets), social (women in the workforce, training, minimum wages, POSH, grievances) and governance (code of conduct, anti-bribery, privacy, supplier code, who is responsible for ESG).
