@@ -546,7 +546,7 @@ export function answer(d: any, cfg: any, q: any): any {
     [/scope\s*3/, () => true, () => (em.s3 > 0 ? `Yes. ${em.s3.toFixed(1)} tCO2e covering Cat 1, 4 and 6` : 'Not yet tracked')],
     [/(total|how much|quantity|volume).*water|water.*(withdraw|consum|use|usage|kl|litre)/, () => n(s.water) > 0, () => `${Math.round(n(s.water))} kL withdrawn`],
     [/(total|how much|quantity).*waste|waste.*(generat|recycl|tonne|quantity|disposed)/, () => n(s.waste) > 0, () => `${n(s.waste).toFixed(1)} t generated, ${Math.round(n(s.recycled))}% recycled or reused`],
-    [/renewable|solar/, () => true, () => `${em.renewablePct.toFixed(1)}% of electricity from rooftop solar`],
+    [/renewable|solar/, () => true, () => `${em.renewablePct.toFixed(1)}% of electricity from renewable sources (rooftop solar and renewable power bought)`],
     [/(share|percent|%|number|proportion).*(women|female)|gender (diversity|ratio)/, () => has(s.women), () => `${Math.round(n(s.women))}% of workforce`],
     [/injur|ltifr|lost.?time|accident/, () => true, () => `${sf.lti} lost-time injuries; LTIFR ${sf.ltifr.toFixed(2)}`],
     [/bribery|corruption/, () => true, () => `Code of conduct: ${s.coc ? 'Yes' : 'No'}. Anti-bribery policy: ${s.abc ? 'Yes' : 'No'}`],

@@ -57,6 +57,11 @@ export async function load(c: Tx, tenant: string, fy: string) {
   for (const r of rows) { d[r.module] = r.data; meta[r.module] = { version: r.version, updatedName: r.updated_name, updatedAt: r.updated_at }; }
   d.profile = Object.assign({}, d.profile ?? {}, { name: company.name, sector: company.sector, industry: company.industry, state: company.state });
   if (!Array.isArray(d.certs) || !d.certs.length) d.certs = DEFAULT_CERTS;
+  // plants carry over from the latest earlier year until this year's Profile is saved with its own list
+  if (!Array.isArray(d.profile.plants) || !d.profile.plants.length) {
+    const pl = (await c.query(`SELECT data->'plants' AS plants FROM sme_doc WHERE tenant_id = $1 AND module = 'profile' AND fy < $2 AND CASE WHEN jsonb_typeof(data->'plants') = 'array' THEN jsonb_array_length(data->'plants') > 0 ELSE false END ORDER BY fy DESC LIMIT 1`, [tenant, fy])).rows[0];
+    if (pl) d.profile.plants = pl.plants;
+  }
   d.srmm = Object.assign({ version: 'auto', scores: {}, multi: {}, remarks: {} }, d.srmm ?? {});
   d.scrap = (await c.query(`SELECT item, qty, unit, price, hazardous, status FROM sme_scrap WHERE tenant_id = $1 AND status IN ('draft', 'listed')`, [tenant])).rows;
   const g = (await c.query(`SELECT count(*)::int AS total, count(*) FILTER (WHERE status = 'resolved')::int AS resolved FROM sme_grievance WHERE tenant_id = $1`, [tenant])).rows[0];
