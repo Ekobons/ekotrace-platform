@@ -9,9 +9,11 @@ import { Link } from 'react-router-dom';
 import './save.css';
 import './rules.css';
 import { useSme } from './store';
-import { Kpi, Kpis, Pill, Sample, SmeHead } from './ui';
+import { Kpi, Kpis, Pill, SmeHead } from './ui';
 import { Evidence } from './Evidence';
-import { dmy, lakh, n } from '../../lib/sme';
+import { dmy, f0, lakh, n } from '../../lib/sme';
+
+const inr = (v: number) => (v < 1e5 ? `₹${f0(v)}` : lakh(v));
 
 type Status = 'not_started' | 'applied' | 'sanctioned' | 'received' | 'rejected';
 type Scheme = { id: string; title: string; detail: string; eligible: boolean; label: string; note: string; link: string | null; docs?: string[]; status?: Status; sanctioned?: number; received?: number };
@@ -118,9 +120,9 @@ export function SmeSchemes() {
       <SmeHead lede="Government and bank support matched to your profile and figures, and a tracker for each application. Terms change, so confirm on the official portal before you apply." />
       <Kpis>
         <Kpi label="Likely for you" value={yes.length} unit={`of ${list.length} schemes`} good={yes.length > 0} />
-        <Kpi label="Applications" value={tracked.length} unit={tracked.length ? `${tracked.filter((x) => statusOf(x.id) === 'applied').length} waiting` : 'none tracked yet'} />
-        <Kpi label="Support sanctioned" value={sanctioned ? lakh(sanctioned) : '—'} unit={d.company.isExample && sanctioned ? <Sample /> : 'from tracked schemes'} />
-        <Kpi label="Support received" value={received ? lakh(received) : '—'} good={received > 0} unit={`MSME class: ${cls || '—'}`} />
+        <Kpi label="Applications" value={tracked.length} unit={tracked.length ? (() => { const w = tracked.filter((x) => statusOf(x.id) === 'applied').length; return w ? `${w} waiting for a decision` : 'none waiting'; })() : 'none tracked yet'} />
+        <Kpi label="Support sanctioned" value={sanctioned ? inr(sanctioned) : '—'} unit="from tracked schemes" />
+        <Kpi label="Support received" value={received ? inr(received) : '—'} good={received > 0} unit={`MSME class: ${cls || '—'}`} />
       </Kpis>
       {gaps.length > 0 && <div className="sme-callout warn">{gaps.join(' ')} <Link to="/sme/profile">Update your profile</Link> to match more schemes.</div>}
       {!list.length && <div className="card empty">No schemes to show yet. Complete your <Link to="/sme/profile">profile</Link> first.</div>}
@@ -132,8 +134,8 @@ export function SmeSchemes() {
             <thead><tr><th>Scheme</th><th>Status</th><th>Applied</th><th>Reference</th><th className="r">Sanctioned</th><th className="r">Received</th></tr></thead>
             <tbody>{tracked.map((x) => { const a = apps[x.id] ?? {}; const s = stName(statusOf(x.id)); return (
               <tr key={x.id}><td>{x.title}</td><td><Pill kind={s[2]}>{s[1]}</Pill></td><td>{a.applied ? dmy(a.applied) : '—'}</td><td>{a.ref || '—'}</td>
-                <td className="r">{n(a.sanctioned) ? lakh(n(a.sanctioned)) : '—'}</td><td className="r">{n(a.received) ? lakh(n(a.received)) : '—'}</td></tr>); })}</tbody>
-            <tfoot><tr className="tot"><td colSpan={4}>Total</td><td className="r">{lakh(sanctioned)}</td><td className="r">{lakh(received)}</td></tr></tfoot>
+                <td className="r">{n(a.sanctioned) ? inr(n(a.sanctioned)) : '—'}</td><td className="r">{n(a.received) ? inr(n(a.received)) : '—'}</td></tr>); })}</tbody>
+            <tfoot><tr className="tot"><td colSpan={4}>Total</td><td className="r">{inr(sanctioned)}</td><td className="r">{inr(received)}</td></tr></tfoot>
           </table></div>
         </div>)}
 

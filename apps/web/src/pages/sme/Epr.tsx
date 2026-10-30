@@ -21,6 +21,14 @@ const CHECKS: Record<Stream, [string, string][]> = {
   battery: [['sales', 'Batteries placed on the market entered, by type and chemistry'], ['certs', 'EPR certificates bought from registered recyclers or refurbishers'], ['filed', 'Annual return filed'], ['ack', 'Acknowledgement downloaded and attached below']],
 };
 const NAME: Record<Stream, string> = { plastic: 'Plastic packaging', ewaste: 'E-waste', battery: 'Batteries' };
+/** Annual return due date for a financial year: the rule date after the year ends, or the extended date. */
+function dueFor(fy: string, r: { day?: number; month?: number; extended?: Record<string, string> } | undefined) {
+  const m = /^FY (\d{4})-/.exec(fy);
+  if (!r || !m) return null;
+  const usual = `${Number(m[1]) + 1}-${String(r.month ?? 6).padStart(2, '0')}-${String(r.day ?? 30).padStart(2, '0')}`;
+  const ext = r.extended?.[fy];
+  return { due: ext || usual, usual, extended: !!ext };
+}
 const uid = () => Math.random().toString(36).slice(2, 9);
 const numIn = (v: string): number | '' => (v === '' ? '' : Number(v));
 
@@ -60,13 +68,14 @@ export function SmeEpr() {
           return <Kpi key={s} label={NAME[s]} value={x.need > 0 ? `${fmt(s, x.gap)} ${unit(s)}` : '—'} unit={<><Pill kind={k!}>{t}</Pill> {x.need > 0 ? 'gap to close' : ''}</>} good={k === 'done'} />;
         })}</Kpis>
         {streams.length > 1 && <div className="seg ru-tabs" role="tablist">{streams.map((s) => <button key={s} type="button" role="tab" aria-selected={cur === s} className={cur === s ? 'on' : ''} onClick={() => setTab(s)}>{NAME[s]}</button>)}</div>}
-        <p className="muted small" style={{ margin: 0 }}>Targets for {e.fy}. {X.note ?? ''}</p>
+        {e.fy !== fy ? <div className="sme-callout warn">The figures below use the targets for {e.fy}, not {fy}.{can ? <> <button type="button" className="ru-link" onClick={() => save({})}>Use the {fy} targets</button></> : ' An editor can switch them.'}</div>
+          : <p className="muted small" style={{ margin: 0 }}>Targets for {fy}. {X.note ?? ''}</p>}
       </>}
 
       {cur === 'plastic' && <Plastic e={e} raw={raw} can={can} save={save} />}
       {cur === 'ewaste' && <Ewaste e={e} raw={raw} can={can} save={save} />}
       {cur === 'battery' && <Battery e={e} raw={raw} can={can} save={save} types={(X.battery?.types ?? []) as [string, string][]} />}
-      {cur && <ReturnCard stream={cur} r={pos(cur).return} fy={fy} portal={X.returns?.[cur]?.portal} checks={(raw.checks ?? {})[cur] ?? {}} can={can}
+      {cur && <ReturnCard stream={cur} r={dueFor(fy, X.returns?.[cur]) ?? pos(cur).return} fy={fy} portal={X.returns?.[cur]?.portal} checks={(raw.checks ?? {})[cur] ?? {}} can={can}
         onCheck={(k, v) => save({ checks: { ...(raw.checks ?? {}), [cur]: { ...((raw.checks ?? {})[cur] ?? {}), [k]: v } } })} />}
     </>);
 }
@@ -92,10 +101,10 @@ function Position({ need, bought, gap, unit, fmt, children }: { need: number; bo
 function Plastic({ e, raw, can, save }: { e: any; raw: any; can: boolean; save: (x: Record<string, any>) => void }) {
   const P = e.plastic, legacy = !P.perCategory && n(raw.bought) > 0;
   return (
-    <div className="sme-grid2">
+    <>
       <div className="card">
         <div className="cmp-h2row"><h2>Plastic packaging</h2></div>
-        <div className="ru-grid">
+        <div className="ru-grid ru-grid3">
           <F label="Your role"><select className="input" disabled={!can} value={raw.role ?? ''} onChange={(ev) => save({ role: ev.target.value })}>{ROLES.map(([v, t]) => <option key={v} value={v}>{t}</option>)}</select></F>
           <F label="EPR target (% of the quantity)"><input className="input num" type="number" min={0} max={100} disabled={!can} value={raw.target ?? ''} placeholder={String(e.target)} onChange={(ev) => save({ target: numIn(ev.target.value) })} /></F>
           <div className="wide"><Reg on={!!raw.registered} can={can} label="Registered on the CPCB EPR portal (plastic packaging)" onChange={(v) => save({ registered: v })} /></div>
@@ -117,7 +126,7 @@ function Plastic({ e, raw, can, save }: { e: any; raw: any; can: boolean; save: 
         {legacy && <p className="note warn small" style={{ marginTop: 10 }}>You entered {f1(raw.bought)} t of certificates in total earlier. Enter them per category: a surplus in one category does not cover another.</p>}
         <p className="muted small" style={{ margin: '10px 0 0' }}>“From recycling” is the least part of the target that must be met with recycling certificates this year; the rest can come from end-of-life processing. Recycled-content and reuse targets also apply to brand owners and producers.</p>
       </div>
-      <div className="cmp-stack">
+      <div className="sme-grid2">
         <Position need={P.need} bought={P.bought} gap={P.gap} unit="t" fmt={f1}>
           {!P.registered ? <div className="sme-callout warn">Register on the CPCB centralised EPR portal before you file the annual return. Selling without registration can attract environmental compensation.</div>
             : P.gap > 0 ? <div className="sme-callout warn">Buy <b>{f1(P.gap)} t</b> of EPR certificates{P.perCategory ? ' in the categories with a gap' : ''} before the annual return.</div>
@@ -125,7 +134,7 @@ function Plastic({ e, raw, can, save }: { e: any; raw: any; can: boolean; save: 
         </Position>
         <div className="card"><h2>Certificates</h2><p className="cmp-sub">Attach the certificate transfer statements from the portal.</p><Evidence module="epr" item="plastic-certs" label="Statements" /></div>
       </div>
-    </div>);
+    </>);
 }
 
 // ------------------------------------------------------------------ e-waste --

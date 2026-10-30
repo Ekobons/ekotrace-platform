@@ -55,6 +55,7 @@ export async function load(c: Tx, tenant: string, fy: string) {
   const rows = (await c.query(`SELECT module, data, version, updated_name, updated_at FROM sme_doc WHERE tenant_id = $1 AND fy = $2`, [tenant, fy])).rows;
   const d: Record<string, any> = {}, meta: Record<string, { version: number; updatedName: string | null; updatedAt: string }> = {};
   for (const r of rows) { d[r.module] = r.data; meta[r.module] = { version: r.version, updatedName: r.updated_name, updatedAt: r.updated_at }; }
+  d.fy = fy; // the year being looked at (EPR targets and other year-based rules)
   d.profile = Object.assign({}, d.profile ?? {}, { name: company.name, sector: company.sector, industry: company.industry, state: company.state });
   if (!Array.isArray(d.certs) || !d.certs.length) d.certs = DEFAULT_CERTS;
   // plants carry over from the latest earlier year until this year's Profile is saved with its own list

@@ -27,7 +27,28 @@ The rules that matter for your company, grouped as:
 | Keep an eye on | for information; may apply later |
 | In order | nothing to do |
 
-Each rule says why it applies and the next step, with a link to the page that helps. Examples: EU and UK CBAM, BRSR value-chain requests from listed customers, plastic EPR, the DPDP Act, POSH, CSR.
+Each rule gives the rule in plain words, **Why it shows** (the answer that brought it in, for example "You have 85 workers") and **Next** (the next step, with a link to the page that helps). The page has three tabs.
+
+**What applies** checks, among others:
+
+| Rule | Shows when |
+|---|---|
+| Labour Codes (in force from 21 Nov 2025): appointment letters, wage slips, registers | you have employees; registering the establishment from 10 workers |
+| PF, ESI and gratuity | ESI from 10 employees, EPF from 20 |
+| Factory licence (OSH Code) | manufacturing with 20 or more workers using power, or 40 without |
+| Consent to Establish and Operate | manufacturing; depends on your red, orange, green or white category and your Consent to Operate expiry date |
+| Hazardous waste authorisation and Form 4 return | you generate hazardous waste |
+| BIS Quality Control Order (ISI mark) | your product is covered, or you are not sure |
+| Udyam registration | always; asks you to register if not marked |
+| Plastic, e-waste and battery EPR | you marked those products; the status follows your EPR page |
+| EU and UK CBAM, EUDR, BRSR value-chain | from your export and customer answers |
+| CSR, DPDP, POSH, SRMM, CCTS, bank ESG checks | from your figures and answers |
+
+**What changed** lists recent rule changes (with the date and a link to the source) that concern a business like yours, based on your sector, state and answers. **Show all updates** shows the others too, greyed.
+
+**Your answers** asks the few questions the rules need that Profile does not: your pollution control category, your Consent to Operate expiry date, whether you generate hazardous waste, whether a BIS Quality Control Order covers your product, and whether your machines run on power. A dot on the tab means something is unanswered. The right-hand card shows the Profile answers the rules also read.
+
+> The list is guidance to help you prioritise. Check with your CA, lawyer or consultant before you act.
 
 > This is guidance to help you prioritise, not legal advice.
 

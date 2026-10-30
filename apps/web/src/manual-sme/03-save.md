@@ -31,7 +31,11 @@ How big a rooftop solar system fits your roof and your use, what it costs, what 
 
 ## Schemes
 
-Government schemes that fit your company, split into **Likely for you** and **Check first** (a condition such as Udyam registration or MSME class is missing). Each shows what it gives, why it fits, how to apply and the official portal.
+Government and bank support that fits your company, split into **Likely for you** and **Check first** (a condition such as Udyam registration, MSME class, sector or "new units only" is not met). The list includes ADEETIE (energy-efficiency loans with interest subvention), ZED certification, the LEAN scheme, CGTMSE collateral-free loans, the Mutual Credit Guarantee Scheme for machinery loans, SIDBI green loans, your state's capital and interest subsidies, rooftop solar and net metering, PMEGP and the CCTS offset pool. Each shows what it gives, why it fits, how to apply and the official portal.
+
+**Tracking an application.** Press **Track an application** under a scheme. Choose the status (Not started, Applied, Sanctioned, Received or Rejected), and add the dates, the reference number and the amounts sanctioned and received. Tick the documents as you get them ready, and attach the application, the sanction letter or the receipt as proof. Tracked schemes appear in **Your applications** at the top, with the totals of support sanctioned and received.
+
+> Scheme terms change. Confirm on the official portal or with your bank or District Industries Centre before you apply.
 
 ## Scrap market
 
