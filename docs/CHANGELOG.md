@@ -2,6 +2,10 @@
 
 Newest first.
 
+## 2026-10-31 · Add data: months added later keep the type you chose
+
+- `components/MonthGrid.tsx`: the type picked on a row (e.g. Petrol for January) becomes the default for months added afterwards (one by one, All open months, or after clearing the months), instead of the first type of the list (Diesel). Remembered per list of types for the session.
+
 ## 2026-10-31 · Organisation: strict hierarchy, chart from Excel; new-company form
 
 - Hierarchy enforced: sub-groups only under the main entity, facilities only inside a sub-group. Web: the main entity offers only **+ Sub-group** (header and tree), a sub-group only **+ Facility in …**; the header **+ Facility** is gone; "Belongs to" lists the main entity for a sub-group and sub-groups for a facility. API: `POST /api/org/nodes` refuses a sub-group under a sub-group; `PATCH` refuses moving a sub-group off the main entity or a facility out of a sub-group. (Facilities created directly under the main entity before stay as they are.)

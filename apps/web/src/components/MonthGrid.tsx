@@ -32,6 +32,9 @@ const cleanNum = (s: string) => { const x = s.replace(/[\s,]/g, ''); return x ==
 
 type Row = { k: number; m: number; v: string; note: string; dt: string; type: string };
 let K = 1;
+/** the type last chosen on a row, per list of types — kept while the person moves between months (even with none picked) */
+const chosen = new Map<string, string>();
+const defaultType = (types?: { id: string }[]) => { const c = chosen.get(types?.map((t) => t.id).join(',') ?? ''); return types?.some((t) => t.id === c) ? c! : types?.[0]?.id ?? ''; };
 const blank = (m: number, type = ''): Row => ({ k: K++, m, v: '', note: '', dt: 'actual', type });
 
 export function MonthGrid({ year, facilityId, label, unitName, build, bases = ['direct'], dup, onSaved, hint, meterUnit, types, factorText }: {
@@ -60,12 +63,15 @@ export function MonthGrid({ year, facilityId, label, unitName, build, bases = ['
   const navigate = useNavigate();
   const picked = useMemo(() => months ?? MONTHS.map((_, i) => i), [months]);
   const firstType = types?.[0]?.id ?? '';
-  const [rows, setRows] = useState<Row[]>(() => picked.map((m) => blank(m, firstType)));
+  const [rows, setRows] = useState<Row[]>(() => picked.map((m) => blank(m, defaultType(types))));
+  const typesKey = types?.map((t) => t.id).join(',') ?? '';
   // Rows follow the months picked above: keep what was typed for months still picked.
   useEffect(() => {
     setRows((old) => {
       const keep = old.filter((r) => picked.includes(r.m));
-      const add = picked.filter((m) => !keep.some((r) => r.m === m)).map((m) => blank(m, firstType));
+      // months added later take the type last chosen (e.g. petrol picked for January, then all months), not the first type
+      const t = defaultType(types);
+      const add = picked.filter((m) => !keep.some((r) => r.m === m)).map((m) => blank(m, t));
       return [...keep, ...add].sort((a, b) => a.m - b.m || a.k - b.k);
     });
   }, [picked.join(',')]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -179,7 +185,7 @@ export function MonthGrid({ year, facilityId, label, unitName, build, bases = ['
           return (
             <tr key={r.k} className={x?.error ? 'bad' : ''}>
               <td style={{ width: 90 }}>{again ? <span className="muted small">+ line</span> : <b>{MONTHS[r.m]}<br />{year}</b>}</td>
-              {types && <td style={{ minWidth: 170 }}><select className="input" value={r.type} onChange={(e) => set(r.k, { type: e.target.value })}>{types.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}</select></td>}
+              {types && <td style={{ minWidth: 170 }}><select className="input" value={r.type} onChange={(e) => { chosen.set(typesKey, e.target.value); set(r.k, { type: e.target.value }); }}>{types.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}</select></td>}
               <td style={{ minWidth: 170 }}><div className="row" style={{ gap: 6, flexWrap: 'nowrap' }}>
                 <input className="input num" style={{ width: 120 }} inputMode="decimal" value={r.v} placeholder="0" aria-label={`${MONTHS[r.m]} quantity`}
                   onPaste={(e) => { if (paste(r.k, e.clipboardData.getData('text'))) e.preventDefault(); }}
