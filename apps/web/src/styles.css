@@ -1715,3 +1715,7 @@ table.t tr.totrow td { background: var(--ok-bg); font-weight: 600; border-bottom
 .dstatx { margin: 4px 0 6px; } .dstatx b { font-size: 24px; } .dstatx small { color: var(--muted); }
 .vcl .dstatx, .vcl > div > .muted { display: block; border: 0; padding: 0; }
 .vcl > div > .muted.small { margin-top: 6px; }
+.partinfo { display: inline-grid; place-items: center; margin-left: 4px; font-size: 12px; line-height: 1; color: var(--muted); text-decoration: none; text-transform: none; letter-spacing: 0; font-weight: 500; vertical-align: 1px; }
+.partinfo:hover, .partinfo:focus-visible { color: var(--primary); }
+.mflash { animation: mflash 2.4s ease-out; border-radius: 6px; }
+@keyframes mflash { 0%, 40% { background: color-mix(in srgb, var(--lime, #C8F06A) 55%, transparent); } 100% { background: transparent; } }

@@ -10,8 +10,9 @@ import { Diagram, Flow, Layers, Video } from '../components/ManualBlocks';
 import { Icon } from '../components/Icon';
 import { BRAND, productSlug } from '../lib/brand';
 
+import { manualSlug } from '../lib/manualSlug';
 const files = import.meta.glob('../manual/*.md', { query: '?raw', import: 'default', eager: true }) as Record<string, string>;
-const slug = (s: string) => s.toLowerCase().replace(/<[^>]+>/g, '').replace(/&[a-z]+;/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+const slug = manualSlug;
 
 interface Chapter { id: string; title: string; src: string; sections: { id: string; title: string }[] }
 // the product's name in the text (the old tool keeps its name: "the previous Ekotrace list")
@@ -60,6 +61,13 @@ export function Manual() {
     setParams({ c: id }, { replace: false });
     window.setTimeout(() => (section ? document.getElementById(section)?.scrollIntoView({ behavior: 'smooth' }) : window.scrollTo({ top: 0 })), 30);
   };
+  // a link into a section (?c=chapter&s=section, e.g. the ⓘ beside a part of an emission): scroll to it and flash it
+  const sec = params.get('s');
+  useEffect(() => {
+    if (!sec) return;
+    const t = window.setTimeout(() => { const el = document.getElementById(sec); if (!el) return; el.scrollIntoView({ behavior: 'smooth', block: 'start' }); el.classList.add('mflash'); window.setTimeout(() => el.classList.remove('mflash'), 2400); }, 80);
+    return () => window.clearTimeout(t);
+  }, [sec, current.id]);
   useEffect(() => { if (printAll) { const t = window.setTimeout(() => { window.print(); setPrintAll(false); }, 300); return () => window.clearTimeout(t); } }, [printAll]);
 
   const needle = q.trim().toLowerCase();

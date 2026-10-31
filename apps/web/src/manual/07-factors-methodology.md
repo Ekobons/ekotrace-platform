@@ -37,6 +37,52 @@ These come with Ekotrace in one file (`data/grid/grid-factors.csv`) and load by 
 - **To check before a client report:** Australia's values were taken from secondary summaries of the NGA 2025 workbook, and India's from the CEA figure as reported; compare them with the official publication.
 - **Market-based** uses the residual mix where one is loaded (China) and otherwise the grid average, which the report discloses.
 
+## Parts of an emission
+
+Every entry is split into the parts below, following the GHG Protocol. Each part has its own column in Entries & results, its own figure in the dashboards and its own line in **How calculated**. The ⓘ next to a part opens its paragraph here.
+
+Example used below: **10,000 kWh** of grid electricity with a generation factor of 0.355, T&D 0.018, WTT 0.062 and WTT of T&D 0.003 kgCO₂e/kWh.
+
+### Scope 1 — direct emissions
+
+Emissions from sources the company owns or controls: fuel burnt in boilers, generators and vehicles, refrigerant leaks (HFCs, PFCs, SF₆), process emissions, waste treated at its own sites. Reported in the scope totals.
+
+### Scope 2 — location-based
+
+Emissions of generating the electricity, heat, steam or cooling the company buys, with the **average factor of the grid** where it is used: kWh × generation factor. Example: 10,000 × 0.355 = **3,550 kg**. The tool uses the factor of the facility's country (or sub-region, e.g. Dubai) for the year of the entry.
+
+### Scope 2 — market-based
+
+The same kWh with the factor of **what the company chose to buy**: the supplier's own factor, a green tariff, or renewable certificates (I-RECs, GOs, RECs) claimed for that electricity. kWh not covered by any of these use the **residual mix** — the grid factor once the certified renewable electricity claimed by others is taken out (where no residual mix is published, the grid average is used, as in many countries). The GHG Protocol asks for **both** Scope 2 figures; targets and reports state which one they use.
+
+### T&D losses (Scope 3.3)
+
+Part of the electricity generated is lost in the transmission and distribution network before it reaches the meter. The emissions of generating that lost electricity are reported by the consumer in **Scope 3, category 3** (fuel- and energy-related activities); the grid company reports them in its own Scope 2. Factor per kWh consumed — the loss share is already in it, do not add it again. Example: 10,000 × 0.018 = **181 kg**.
+
+### Upstream / well-to-tank (Scope 3.3)
+
+Emissions **before** the fuel is burnt: extracting, refining and transporting it — for the fuels the company burns itself (diesel, natural gas…) and for the fuels burnt in power stations to make its electricity. Reported in **Scope 3, category 3**. Example (electricity): 10,000 × 0.062 = **618 kg**.
+
+### WTT of T&D losses
+
+The upstream (well-to-tank) emissions of the fuel behind the electricity lost in the grid — the small remainder of category 3. Where the factor source publishes it (e.g. DESNZ for the UK), the tool adds it to the **Upstream / well-to-tank** figure. Example: 10,000 × 0.003 = **32 kg**. Together, category 3 for the example is 181 + 618 + 32 = **831 kg**, about 23 % on top of Scope 2.
+
+### Scope 3 — other categories
+
+Emissions in the value chain outside category 3: purchased goods and services (3.1), capital goods (3.2), transport (3.4, 3.9), waste sent to others (3.5), business travel (3.6), commuting (3.7), leased assets (3.8, 3.13), sold products (3.11, 3.12), investments (3.15). Each entry carries its category code.
+
+### Biogenic CO₂ (outside the scopes)
+
+CO₂ released by burning or decomposing **biomass**: wood, biofuel blends in diesel or petrol, the biogenic part of waste. It was absorbed by plants recently, so the GHG Protocol reports it **beside** the scopes, not in them. The CH₄ and N₂O from burning it **are** in the scopes.
+
+### Memo: non-Kyoto gases (ozone-depleting refrigerants)
+
+CFCs and HCFCs (e.g. R-22, R-11, R-123) are controlled by the Montreal Protocol, not by the Kyoto Protocol. Their CO₂e is reported as a **memo item**, outside the scope totals. HFC refrigerants (R-407C, R-410A, R-134a, R-32…) are Kyoto gases and are in **Scope 1**. GRI 305-6 asks for ozone-depleting emissions separately, in CFC-11 equivalent.
+
+### Gases and GWP
+
+Each part is worked out gas by gas — CO₂, CH₄, N₂O, HFCs, PFCs, SF₆, NF₃ — and turned into CO₂e with the company's GWP set (AR4, AR5 or AR6, Setup → Methodology). Sources that give only a CO₂e total show it as "CO2e". **How calculated** on an entry lists every gas, factor and step.
+
 ## Which factor is used
 
 ```flow

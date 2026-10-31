@@ -12,6 +12,7 @@
  * every facility has data yet are drawn pale, and the change against last year uses only the
  * complete months.
  */
+import { PartInfo } from '../components/PartInfo';
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useApp } from '../App';
@@ -164,9 +165,9 @@ function Overview({ d, c, go }: { d: Data; c: Ctx; go: (t: Tab) => void }) {
   return <>
     <DStat cells={[
       ['Total emissions', <>{fmt0(c.total)} <small>tCO₂e</small></>, yoyTxt(c, d.cmpYear)],
-      [<><Dot c="var(--s1)" />Scope 1</>, T(c.s[0]!), `${w(c.s[0]!)} · direct`],
-      [<><Dot c="var(--s2)" />Scope 2</>, T(c.s[1]!), `${w(c.s[1]!)} · purchased energy`],
-      [<><Dot c="var(--s3)" />Scope 3</>, T(c.s[2]!), `${w(c.s[2]!)} · value chain`],
+      [<><Dot c="var(--s1)" />Scope 1<PartInfo part="direct" /></>, T(c.s[0]!), `${w(c.s[0]!)} · direct`],
+      [<><Dot c="var(--s2)" />Scope 2<PartInfo part="scope2" /></>, T(c.s[1]!), `${w(c.s[1]!)} · purchased energy`],
+      [<><Dot c="var(--s3)" />Scope 3<PartInfo part="scope3" /></>, T(c.s[2]!), `${w(c.s[2]!)} · value chain`],
       ['Per employee', c.staff ? `${fmt(c.total / c.staff, 2)} t` : '—', c.area ? `${fmt0((c.total * 1000) / c.area)} kg / m²` : c.staff ? '' : 'add employees to the facilities'],
     ]} />
     <div className="dgrid">
@@ -260,11 +261,11 @@ function OutsideScopes({ c }: { c: Ctx }) {
   return (
     <DCard title="Reported separately — outside the scopes" span={3}>
       <div className="vcl">
-        <div><span className="lbl">Ozone-depleting refrigerants (non-Kyoto gases)</span>
+        <div><span className="lbl">Ozone-depleting refrigerants (non-Kyoto gases)<PartInfo part="memo" /></span>
           <div className="dstatx"><b>{fmtT(memo)}</b> <small>tCO₂e</small></div>
           {memo > 0 ? list('memo') : <div className="muted">None in this period.</div>}
           <div className="muted small">CFCs and HCFCs (e.g. R-22) fall under the Montreal Protocol, not Kyoto: the GHG Protocol reports them as a memo item, not in Scope 1. HFC blends (R-407C, R-410A, R-134a…) are in Scope 1.</div></div>
-        <div><span className="lbl">Biogenic CO₂</span>
+        <div><span className="lbl">Biogenic CO₂<PartInfo part="outside_scopes" /></span>
           <div className="dstatx"><b>{fmtT(bio)}</b> <small>tCO₂</small></div>
           {bio > 0 ? list('bio') : <div className="muted">None in this period.</div>}
           <div className="muted small">CO₂ from biomass, biofuel blends and the biogenic part of waste: reported beside the scopes; its CH₄ and N₂O are in the scopes.</div></div>

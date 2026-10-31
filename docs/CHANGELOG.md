@@ -2,6 +2,11 @@
 
 Newest first.
 
+## 2026-10-31 · Parts of an emission explained, ⓘ links into the manual
+
+- Manual → Factors & methodology → **Parts of an emission**: Scope 1, Scope 2 location- and market-based (residual mix), T&D losses, upstream / well-to-tank, WTT of T&D, other Scope 3, biogenic CO₂, memo (ozone-depleting refrigerants), gases and GWP — each with what it is, where it is reported and a worked electricity example.
+- `components/PartInfo.tsx`: ⓘ beside each part (Entries & results cards and column headers, By greenhouse gas, How calculated on every entry, dashboard scope figures, Outside the scopes card) opens that paragraph. Manual: `?c=<chapter>&s=<section>` scrolls to and highlights the section (`lib/manualSlug.ts` shared by both).
+
 ## 2026-10-31 · Dashboards: emissions outside the scopes
 
 - Scopes & categories: card **Reported separately — outside the scopes** with ozone-depleting refrigerants (non-Kyoto gases: CFCs, HCFCs such as R-22; `memo`) and biogenic CO₂ (`bio`), each by source and clickable to its entries; Overview → Scope split notes both when present.

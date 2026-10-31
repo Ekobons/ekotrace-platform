@@ -5,6 +5,7 @@
  */
 import { useState } from 'react';
 import { GasToggle, useGasSplit } from './GasToggle';
+import { PartInfo } from './PartInfo';
 import { BASIS_LABEL, num, tco2e, type Basis, type CvUsed, type FactorUsed } from '../lib/api';
 
 interface Line { basis: Basis; gas: string; kgGas: number | null; kgCo2e: number; method: string; source?: string | null }
@@ -35,7 +36,7 @@ export function Result({ r, quantity, unitName, energy, defaultGas }: {
       <div className="total">
         {order.filter((b) => (energy ? b === 'scope2' || b === 'scope2_market' : b === 'direct' && !s3only) || r.totals[b]).map((b) => (
           <div key={b} className={`stat ${cls[b]}`}>
-            <small>{BASIS_LABEL[b]}</small>
+            <small>{BASIS_LABEL[b]}<PartInfo part={b} label={BASIS_LABEL[b]} /></small>
             <b>{tco2e(r.totals[b])}</b>
             <small>t{b === 'outside_scopes' ? 'CO₂' : 'CO₂e'}{b === 'direct' || b === 'scope2' ? ` · ${r.gwpSet}` : ''}</small>
           </div>

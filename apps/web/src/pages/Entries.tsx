@@ -11,6 +11,7 @@ import { ENERGY_UNITS, Result } from '../components/Result';
 import { Icon } from '../components/Icon';
 import { GasToggle, useGasSplit } from '../components/GasToggle';
 import { Evidence } from '../components/Evidence';
+import { PartInfo } from '../components/PartInfo';
 
 const STATUS: Record<string, [string, string]> = { draft: ['Draft', 'c-n'], submitted: ['Waiting approval', 'c-warn'], approved: ['Approved', 'c-ok'], rejected: ['Sent back', 'c-bad'] };
 
@@ -165,18 +166,18 @@ export function Entries() {
       </div>}
       {rows.length >= LIMIT && <div className="note warn small" style={{ marginBottom: 8 }}>Only the latest {LIMIT.toLocaleString('en-US')} entries of {year} are listed: the totals may be short. Use the filters, or Excel exports, for the full year.</div>}
       <div className="total">
-        <div className="stat s1"><small>Scope 1</small><b>{tco2e(sum('co2e_direct'))}</b><small>tCO₂e</small></div>
-        <div className="stat s2"><small>Scope 2 · location-based</small><b>{tco2e(sum('co2e_scope2'))}</b><small>tCO₂e</small></div>
-        <div className="stat s2m"><small>Scope 2 · market-based</small><b>{tco2e(sum('co2e_scope2_market'))}</b><small>tCO₂e</small></div>
-        <div className="stat s3"><small>Scope 3.3 · upstream + T&D losses</small><b>{tco2e(sum('co2e_wtt') + sum('co2e_td'))}</b><small>tCO₂e</small></div>
-        <div className="stat s3"><small>Scope 3 · other categories (purchases, waste, travel…)</small><b>{tco2e(sum('co2e_scope3'))}</b><small>tCO₂e</small></div>
-        <div className="stat bio"><small>Biogenic CO₂ (outside scopes)</small><b>{tco2e(sum('co2_biogenic'))}</b><small>tCO₂</small></div>
-        <div className="stat memo"><small>Memo: non-Kyoto gases</small><b>{tco2e(sum('co2e_memo'))}</b><small>tCO₂e</small></div>
+        <div className="stat s1"><small>Scope 1<PartInfo part="direct" /></small><b>{tco2e(sum('co2e_direct'))}</b><small>tCO₂e</small></div>
+        <div className="stat s2"><small>Scope 2 · location-based<PartInfo part="scope2" /></small><b>{tco2e(sum('co2e_scope2'))}</b><small>tCO₂e</small></div>
+        <div className="stat s2m"><small>Scope 2 · market-based<PartInfo part="scope2_market" /></small><b>{tco2e(sum('co2e_scope2_market'))}</b><small>tCO₂e</small></div>
+        <div className="stat s3"><small>Scope 3.3 · upstream<PartInfo part="wtt" /> + T&D losses<PartInfo part="td_loss" /></small><b>{tco2e(sum('co2e_wtt') + sum('co2e_td'))}</b><small>tCO₂e</small></div>
+        <div className="stat s3"><small>Scope 3 · other categories (purchases, waste, travel…)<PartInfo part="scope3" /></small><b>{tco2e(sum('co2e_scope3'))}</b><small>tCO₂e</small></div>
+        <div className="stat bio"><small>Biogenic CO₂ (outside scopes)<PartInfo part="outside_scopes" /></small><b>{tco2e(sum('co2_biogenic'))}</b><small>tCO₂</small></div>
+        <div className="stat memo"><small>Memo: non-Kyoto gases<PartInfo part="memo" /></small><b>{tco2e(sum('co2e_memo'))}</b><small>tCO₂e</small></div>
       </div>
 
       <div className="card flush">
         <div className="row" style={{ padding: '14px 16px 10px' }}>
-          <div className="grow"><h2>By greenhouse gas · {year}{filtered ? <span className="muted small"> · whole year, filters not applied</span> : null}</h2><p className="sub">Each gas in kg and in CO₂e. Totals given by a source without a gas split appear as “CO2e”.</p></div>
+          <div className="grow"><h2>By greenhouse gas<PartInfo part="gases" /> · {year}{filtered ? <span className="muted small"> · whole year, filters not applied</span> : null}</h2><p className="sub">Each gas in kg and in CO₂e. Totals given by a source without a gas split appear as “CO2e”.</p></div>
           {gas.length > 0 && <GasToggle open={showGas} onToggle={toggleGas} count={new Set(gas.filter((g) => g.kg_gas != null).map((g) => g.gas)).size} />}
         </div>
         {!gas.length ? <div className="empty">No entries for {year}.</div> : showGas && (
@@ -210,7 +211,7 @@ export function Entries() {
         {rows.length ? (
           <div className="scroll">
             <table className="t">
-              <thead><tr><th>Period</th><th>Facility</th><th>Category</th><th>Item</th><th className="num">Quantity</th><th className="num">Scope 1 tCO₂e</th><th className="num">Scope 2 loc.</th><th className="num">Scope 2 mkt.</th><th className="num">Scope 3.3</th><th className="num">Scope 3 other</th><th>GWP</th><th>Type</th><th>Status</th></tr></thead>
+              <thead><tr><th>Period</th><th>Facility</th><th>Category</th><th>Item</th><th className="num">Quantity</th><th className="num">Scope 1 tCO₂e<PartInfo part="direct" /></th><th className="num">Scope 2 loc.<PartInfo part="scope2" /></th><th className="num">Scope 2 mkt.<PartInfo part="scope2_market" /></th><th className="num">Scope 3.3<PartInfo part="td_loss" label="Scope 3.3 (T&D and upstream)" /></th><th className="num">Scope 3 other<PartInfo part="scope3" /></th><th>GWP</th><th>Type</th><th>Status</th></tr></thead>
               <tbody>{shown.length > 1 && <tr className="totrow">
                   <td colSpan={4}><b>Total · {shown.length} entries</b>{filtered ? <span className="muted small"> · filtered</span> : null}</td>
                   <td className="num" title={qty.mixed ? 'Different units: summed per unit' : undefined}>{qty.text}</td>
