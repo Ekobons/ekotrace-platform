@@ -21,7 +21,8 @@ export function Fit({ minH, children, className }: { minH: number; children: (w:
 }
 
 export const MN = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-export const PAL = ['#1F6F5C', '#2BA38A', '#86CDB4', '#E9B44C', '#C2523C', '#6B4FA8', '#2E6FB0', '#9AA7A2', '#D27A3A', '#4F7F2E'];
+// neighbouring colours kept far apart (dark green, blue, amber, red, teal, purple…) so series are easy to tell apart
+export const PAL = ['#0B4F43', '#3A7FC1', '#E3B25A', '#C2523C', '#2BA38A', '#6B4FA8', '#D27A3A', '#86CDB4', '#9AA7A2', '#4F7F2E'];
 export const SC = ['var(--s1)', 'var(--s2)', 'var(--s3)'];
 export const fmt = (v: number, d = 0) => (Number.isFinite(v) ? v.toLocaleString('en', { minimumFractionDigits: d, maximumFractionDigits: d }) : '—');
 export const fmt0 = (v: number) => fmt(Math.round(v));

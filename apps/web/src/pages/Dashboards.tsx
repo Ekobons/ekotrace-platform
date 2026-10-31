@@ -286,6 +286,11 @@ function Energy({ d, c }: { d: Data; c: Ctx }) {
   const rows = monthRows(c, (rs) => items.map(([n]) => ({ v: sum(rs.filter((r) => r.item === n && r.kind && r.kwh), mwh), c: col.get(n)!, n })));
   const fac = d.facilities.map((f) => ({ n: f.name, v: sum(el.filter((r) => r.f === f.id), mwh) })).filter((x) => x.v).sort((a, b) => b.v - a.v);
   const noKwh = c.cur.filter((r) => r.kind === 'fuel' && r.kwh === null).length;
+  // energy mix: MWh or tCO2e, by source (fuel / supply) or by sub-category (liquid fuels, gaseous fuels, electricity, cooling…)
+  const [mixOf, setMixOf] = useState<{ m: 'mwh' | 't'; g: 'item' | 'sub' }>({ m: 'mwh', g: 'item' });
+  const el2 = mixOf.m === 'mwh' ? el : c.cur.filter((r) => r.kind);
+  const by2 = new Map<string, number>(); for (const r of el2) { const k = (mixOf.g === 'item' ? r.item : r.sub || r.item) || '—'; by2.set(k, (by2.get(k) ?? 0) + (mixOf.m === 'mwh' ? mwh(r) : tot(r))); }
+  const mix2 = [...by2.entries()].filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]).map(([n, v], i) => ({ n, v, c: mixOf.g === 'item' && col.has(n) ? col.get(n)! : PAL[i % PAL.length]! }));
   return <>
     <DStat cells={[['Total energy', <>{fmt0(total)} <small>MWh</small></>, 'fuels at net calorific value'], ['Electricity', `${fmt0(elec)} MWh`, `${pc(elec, total)} of energy`],
       ['Renewable share', `${elec ? fmt((ren / elec) * 100, 1) : '0'}%`, `${fmt0(ren)} MWh with certificates`, ren ? 'var(--ok)' : undefined], ['Energy emissions', T(sum(c.cur.filter((r) => r.kind), tot)), 'from these sources'],
@@ -294,7 +299,11 @@ function Energy({ d, c }: { d: Data; c: Ctx }) {
       <DCard title="Energy by month and source (MWh)" span={2}><Bars rows={rows} unit="MWh" h={175} label="Energy by month" />
         <div className="lgd">{mix.map((p) => <span key={p.n}><i style={{ background: p.c }} />{p.n}</span>)}</div>
         {noKwh > 0 && <div className="muted" style={{ fontSize: 12.5 }}>{noKwh} vehicle entries are recorded by distance: their emissions count, their energy is not converted.</div>}</DCard>
-      <DCard title="Energy mix"><div className="dsplit"><Donut parts={mix} center={fmt0(total)} sub="MWh" size={140} /><Legend parts={mix} unit="MWh" /></div></DCard>
+      <DCard title="Energy mix"><div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
+          <div className="seg sm" role="group" aria-label="Measure">{([['mwh', 'MWh'], ['t', 'tCO₂e']] as const).map(([k, l]) => <button key={k} className={mixOf.m === k ? 'on' : ''} onClick={() => setMixOf({ ...mixOf, m: k })}>{l}</button>)}</div>
+          <div className="seg sm" role="group" aria-label="Group by">{([['item', 'Source'], ['sub', 'Sub-category']] as const).map(([k, l]) => <button key={k} className={mixOf.g === k ? 'on' : ''} onClick={() => setMixOf({ ...mixOf, g: k })}>{l}</button>)}</div></div>
+        <div className="dsplit"><Donut parts={mix2} center={mixOf.m === 'mwh' ? fmt0(total) : fmtT(sum(el2, tot))} sub={mixOf.m === 'mwh' ? 'MWh' : 'tCO₂e'} size={140} /><Legend parts={mix2} unit={mixOf.m === 'mwh' ? 'MWh' : 't'} /></div>
+        {mixOf.m === 't' && <div className="muted" style={{ fontSize: 12.5 }}>Emissions of the energy entries (all scopes, incl. upstream).{noKwh ? ` Includes ${noKwh} vehicle entries recorded by distance.` : ''}</div>}</DCard>
       <DCard title="By facility (MWh)" span={2}><HBars items={fac} unit="MWh" c="var(--s2)" /></DCard>
       <DCard title="Renewable electricity"><div className="dsplit"><Donut parts={[{ n: 'Renewable', v: ren, c: '#E9B44C' }, { n: 'Grid & other', v: Math.max(0, elec - ren), c: 'var(--line2)' }]} center={pc(ren, elec)} sub="renewable" size={130} />
         <div className="muted" style={{ fontSize: 13, flex: 1, minWidth: 150 }}>Add I-RECs or green tariffs under Energy certificates & suppliers to lift the market-based renewable share.</div></div></DCard>

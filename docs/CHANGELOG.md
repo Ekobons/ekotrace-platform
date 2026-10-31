@@ -2,6 +2,11 @@
 
 Newest first.
 
+## 2026-10-31 · Energy mix by emissions and sub-category; contrasting scope colours
+
+- Dashboards → Energy → **Energy mix**: switches **MWh / tCO₂e** and **Source / Sub-category** (liquid fuels, gaseous fuels, cooling, vehicle classes…); tCO₂e covers every energy entry, vehicles recorded by distance included.
+- Scope colours: Scope 2 is now blue (`--s2: #3A7FC1`) beside Scope 1 dark green and Scope 3 amber, everywhere scopes are shown; the organisation chart keeps its teal (`--teal`). Chart palette (`PAL`) reordered so neighbouring series differ clearly (dark green, blue, amber, red, teal, purple…).
+
 ## 2026-10-31 · Entries filters and totals, Approvals year, larger dashboard text
 
 - Entries & results: the filters sit just above the entries list; new **Item** filter (items of the entries left by the category and facility filters; `item` in the address); a **Total** row at the top of the list sums the entries shown — quantity (one figure per unit when units differ, up to three) and Scope 1, Scope 2 location / market, Scope 3.3 and Scope 3 other.

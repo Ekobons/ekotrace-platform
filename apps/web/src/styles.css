@@ -8,7 +8,7 @@
   --primary: #0E7C66; --primary-ink: #FFFFFF; --primary-soft: #E3F3EC; --ink: #0B2A25; --lime: #C6F06B;
   --side: #5B6B66; --side-fg: #F2F6F4; --side-dim: #DCE6E1; --side-on: #1F4A41; --side-chip: #1E3A34;
   --ok: #0A6B57; --ok-bg: #DCEFE7; --warn: #7A4A06; --warn-bg: #FBEBCB; --bad: #A63E2A; --bad-bg: #FBE3DE; --info: #1D5E80; --info-bg: #E3F0F7;
-  --s1: #0B4F43; --s2: #2BA38A; --s3: #E3B25A; --bio: #8A7B3C;
+  --s1: #0B4F43; --s2: #3A7FC1; --s3: #E3B25A; --teal: #2BA38A; --bio: #8A7B3C;
   --f-ui: 'Instrument Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --f-mono: 'JetBrains Mono', ui-monospace, Menlo, monospace;
 }
@@ -301,8 +301,8 @@ pre.code { background: #F4F7F5; border: 1px solid var(--line); border-radius: 10
 .ohtab td { padding: 8px 10px; vertical-align: middle; }
 .ohtab tr.oh { cursor: pointer; }
 .ohtab tr.oh td:first-child { border-left: 4px solid transparent; }
-.ohtab tr.group td { background: color-mix(in srgb, var(--s2) 16%, var(--surface)); }
-.ohtab tr.group td:first-child { border-left-color: var(--s2); }
+.ohtab tr.group td { background: color-mix(in srgb, var(--teal) 16%, var(--surface)); }
+.ohtab tr.group td:first-child { border-left-color: var(--teal); }
 .ohtab tr.subgroup td { background: color-mix(in srgb, #9BBF4A 14%, var(--surface)); }
 .ohtab tr.subgroup td:first-child { border-left-color: #8DB33A; }
 .ohtab tr.facility td:first-child { border-left-color: #8FA9D6; }
@@ -318,7 +318,7 @@ pre.code { background: #F4F7F5; border: 1px solid var(--line); border-radius: 10
 .ohact { text-align: right; white-space: nowrap; }
 .ohopen { display: inline-flex; align-items: center; gap: 2px; font-size: 12.5px; font-weight: 600; color: var(--muted); }
 .ohchip { display: inline-flex; align-items: center; font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; padding: 3px 8px; border-radius: 6px; white-space: nowrap; }
-.ohchip.group { background: color-mix(in srgb, var(--s2) 22%, transparent); color: #17705E; }
+.ohchip.group { background: color-mix(in srgb, var(--teal) 22%, transparent); color: #17705E; }
 .ohchip.subgroup { background: color-mix(in srgb, #9BBF4A 25%, transparent); color: #56701F; }
 .ohchip.facility { background: color-mix(in srgb, #8FA9D6 28%, transparent); color: #3C5A8C; }
 @media (max-width: 900px) { .ohtab .hide-sm { display: none; } }
@@ -349,7 +349,7 @@ pre.code { background: #F4F7F5; border: 1px solid var(--line); border-radius: 10
 .ocb b { font-size: 13px; padding: 0 8px; line-height: 1.25; }
 .och { font-size: 9.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; padding: 4px 0; margin-bottom: 5px; }
 .ocn.group .och { background: var(--ink); color: var(--lime); }
-.ocn.subgroup .och { background: var(--s2); color: #06231C; }
+.ocn.subgroup .och { background: var(--teal); color: #06231C; }
 .ocn.facility .och { background: color-mix(in srgb, #8FA9D6 45%, var(--surface)); color: #23406E; }
 .ocs { font-size: 11px; color: var(--muted); padding: 0 8px; }
 .octog { position: absolute; bottom: -11px; left: 50%; transform: translateX(-50%); min-width: 22px; height: 22px; padding: 0 5px; border-radius: 11px; border: 1px solid #C9D3CE; background: var(--surface); color: var(--muted); font-size: 11px; font-weight: 700; cursor: pointer; z-index: 2; }
@@ -1709,3 +1709,4 @@ table.t tr.totrow td { background: var(--ok-bg); font-weight: 600; border-bottom
 .dashpage .tml { font-size: 14px; gap: 4px; }
 .dashpage .tml .muted { font-size: 12.5px; }
 .dashpage .small, .dashpage small.muted { font-size: 12.5px; }
+.dashpage .dsplit .dt td, .dashpage .dsplit .dt th { padding: 5px 4px; }
