@@ -2,6 +2,10 @@
 
 Newest first.
 
+## 2026-10-31 · UAE grid factors
+
+- `data/grid/grid-factors.csv`: UAE national average 2023–2026 from DEWA's published electricity carbon intensity (certified to ISO 14064-3): 2023 0.3979, 2024 0.4045, 2025 0.3833 kgCO₂e/kWh; 2026 uses 2025 until DEWA publishes it (source `AE-DEWA-CI`). Dubai's 0.4 (from 2023) attributed to the IEA 2022 report it came from (`IEA-2022-AE-DU`) instead of "previous Ekotrace list". 2019 (MOCCAE), Dubai 2018–2020 and Abu Dhabi (EWEC) unchanged. Loaded at start-up; earlier versions kept as history.
+
 ## 2026-10-31 · Weekly updates: GHG Protocol & standards stream
 
 - Migration 073: `platform_update.stream` adds `standards` (GHG Protocol, ISO 14064/14067, SBTi, PCAF methodology changes); API and the Weekly updates screen ("GHG Protocol & standards"); `data/updates/README.md`. The weekly business tracker now researches these every week.

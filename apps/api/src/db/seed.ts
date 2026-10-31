@@ -152,7 +152,7 @@ const GRID_PUBLISHER: Record<string, string> = {
   'TW-MOEA-2025': 'MOEA Energy Administration (Taiwan)', 'BR-MCTI-2023': 'Ministry of Science, Technology and Innovation (Brazil)',
   'PH-DOE-NGEF': 'Department of Energy (Philippines)', 'IGES-GEF': 'Institute for Global Environmental Strategies (IGES)',
   'EKOTRACE-PREV': 'Ekobon (previous Ekotrace list)',
-  'AE-MOCCAE-NDC3': 'Ministry of Climate Change and Environment (UAE)', 'AE-DEWA-CCR2021': 'Dubai Electricity and Water Authority',
+  'AE-MOCCAE-NDC3': 'Ministry of Climate Change and Environment (UAE)', 'AE-DEWA-CCR2021': 'Dubai Electricity and Water Authority', 'AE-DEWA-CI': 'Dubai Electricity and Water Authority', 'IEA-2022-AE-DU': 'International Energy Agency',
   'AE-EWEC-2023': 'Emirates Water and Electricity Company', 'OM-PWP-2025': 'Nama Power and Water Procurement (Oman)',
   'SA-CT-2022': 'Climate Transparency', 'UNFCCC-IFI-2019': 'UNFCCC / International Financial Institutions',
 };
