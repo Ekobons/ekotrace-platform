@@ -17,6 +17,7 @@ import { factorRoutes } from './modules/factors.routes.js';
 import { activityRoutes } from './modules/activity.routes.js';
 import { authRoutes } from './modules/auth.routes.js';
 import { orgRoutes } from './modules/org.routes.js';
+import { orgImportRoutes } from './modules/orgImport.routes.js';
 import { peopleRoutes } from './modules/people.routes.js';
 import { platformRoutes } from './modules/platform.routes.js';
 import { updatesRoutes } from './modules/updates.routes.js';
@@ -168,6 +169,7 @@ export async function buildApp(opts: { logger?: boolean; rateLimit?: Limits | nu
     await secured.register(messageRoutes);
     await secured.register(securityRoutes);
     await secured.register(orgRoutes);
+    await secured.register(orgImportRoutes);
     await secured.register(peopleRoutes);
     await secured.register(platformRoutes);
     await secured.register(updatesRoutes);

@@ -1676,3 +1676,15 @@ g.drill:hover rect { filter: brightness(1.08); }
 td.drill { cursor: pointer; }
 td.drill:hover { outline: 2px solid var(--primary); outline-offset: -2px; }
 .drillbar { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 8px 14px; background: var(--soft); border-bottom: 1px solid var(--line); font-size: 12.5px; }
+
+/* two-column form fields in dialogs (one column on phones) */
+.fgrid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 14px; }
+.fgrid2 > .field { min-width: 0; margin: 0; }
+.fgrid2 .input { width: 100%; min-width: 0; }
+.modal.mid { width: min(640px, 94vw); }
+.modal .in > h3 { margin: 6px 0 0; }
+@media (max-width: 560px) { .fgrid2 { grid-template-columns: 1fr; } }
+.prodlist { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 16px; }
+.prodlist > label.row { display: grid; grid-template-columns: 18px minmax(0, 1fr); align-items: start; gap: 8px; font-size: 13.5px; line-height: 1.35; flex-wrap: nowrap; }
+.prodlist > label.row input { margin: 2px 0 0; }
+@media (max-width: 560px) { .prodlist { grid-template-columns: 1fr; } }

@@ -9,7 +9,7 @@ import { CompanyDetails } from '../components/CompanyDetails';
 import { Fragment, useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useApp } from '../App';
-import { api, type Facility, type FacilityCategory, type GridRegion, type OrgNode, type Person } from '../lib/api';
+import { api, download, type Facility, type OrgImportPreview, type FacilityCategory, type GridRegion, type OrgNode, type Person } from '../lib/api';
 import { Icon } from '../components/Icon';
 import { Fleet } from '../components/Fleet';
 import { WasteSites } from '../components/WasteSites';
@@ -24,7 +24,7 @@ const VIEW_KEY = 'eko.orgView';
 const readView = (): 'list' | 'chart' => { try { return localStorage.getItem(VIEW_KEY) === 'chart' ? 'chart' : 'list'; } catch { return 'list'; } };
 
 export function Organisation() {
-  const { toast, tenant } = useApp();
+  const { toast, tenant, role } = useApp();
   const [params, setParams] = useSearchParams();
   const [tab, setTab] = useState<'tree' | 'facs' | 'subs' | 'groups' | 'company'>((new URLSearchParams(window.location.search).get('tab') === 'company' ? 'company' : 'tree'));
   const groupsOn = tenant?.planLimits?.groups !== false;
@@ -38,6 +38,7 @@ export function Organisation() {
   const [zoom, setZoom] = useState(1);
   const [sel, setSel] = useState<{ node: OrgNode; tab?: string } | null>(null);
   const [adding, setAdding] = useState<{ parent: OrgNode; kind: 'subgroup' | 'facility' } | null>(null);
+  const [importing, setImporting] = useState(false);
   const dlg = useRef<HTMLDialogElement>(null);
   const setView = (v: 'list' | 'chart') => { setViewState(v); try { localStorage.setItem(VIEW_KEY, v); } catch { /* storage unavailable */ } };
 
@@ -98,8 +99,8 @@ export function Organisation() {
         {!fac && open && kids.map((k) => row(k, depth + 1))}
         {!fac && open && n.canEdit && !filtering && (
           <tr className="ohadd"><td colSpan={6}><div style={{ paddingLeft: depth * 22 + 30 }}>
-            <button className="btn sm ghost" onClick={() => setAdding({ parent: n, kind: 'facility' })}><Icon name="plus" size={14} />Facility in {n.name}</button>
-            <button className="btn sm ghost" onClick={() => setAdding({ parent: n, kind: 'subgroup' })}><Icon name="plus" size={14} />Sub-group</button>
+            {n.kind === 'subgroup' && <button className="btn sm ghost" onClick={() => setAdding({ parent: n, kind: 'facility' })}><Icon name="plus" size={14} />Facility in {n.name}</button>}
+            {n.kind === 'group' && <button className="btn sm ghost" onClick={() => setAdding({ parent: n, kind: 'subgroup' })}><Icon name="plus" size={14} />Sub-group</button>}
           </div></td></tr>
         )}
       </Fragment>
@@ -135,9 +136,10 @@ export function Organisation() {
   return (
     <div className="page">
       <div className="head">
-        <div><div className="eyebrow">Setup</div><h1>Organisation & groups</h1><p className="sub">Main entity → sub-groups → facilities. Click a facility to open it: profile, meters, energy, fleet and landfill sites. Data is entered per facility; totals roll up the tree.</p></div>
+        <div><div className="eyebrow">Setup</div><h1>Organisation & groups</h1><p className="sub">Main entity → sub-groups → facilities: sub-groups are added under the main entity, facilities inside a sub-group. Click a facility to open it: profile, meters, energy, fleet and landfill sites. Data is entered per facility; totals roll up the tree.</p></div>
         <div className="row"><span className="chip">{counts.sub} sub-groups</span><span className="chip">{counts.fac} facilities{tenant?.planLimits?.facilities != null ? ` of ${tenant.planLimits.facilities}` : ''}</span>
-          {root?.canEdit && <><button className="btn" onClick={() => setAdding({ parent: root, kind: 'facility' })}><Icon name="plus" size={14} />Facility</button><button className="btn" onClick={() => setAdding({ parent: root, kind: 'subgroup' })}><Icon name="plus" size={14} />Sub-group</button></>}</div>
+          {root?.canEdit && <button className="btn" onClick={() => setAdding({ parent: root, kind: 'subgroup' })}><Icon name="plus" size={14} />Sub-group</button>}
+          {root?.canEdit && ['super_admin', 'platform_admin'].includes(role) && <button className="btn" onClick={() => setImporting(true)}><Icon name="upload" size={14} />Upload from Excel</button>}</div>
       </div>
       <div className="tabs">
         {([['tree', 'Tree'], ['facs', 'Facilities'], ['subs', 'Sub-groups'], ...(groupsOn ? [['groups', 'Dashboard groups']] : []), ['company', 'Company details & logo']] as [typeof tab, string][]).map(([k, l]) => <button key={k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>{l}</button>)}
@@ -181,6 +183,7 @@ export function Organisation() {
         {sel && <Profile key={sel.node.id} node={sel.node} initialTab={sel.tab} nodes={nodes} managers={managers} onClose={() => dlg.current?.close()}
           onSaved={async (m) => { toast(m); await load(); dlg.current?.close(); }} />}
       </dialog>
+      {importing && <OrgImport onClose={() => setImporting(false)} onDone={async (m) => { toast(m); setImporting(false); await load(); }} />}
       {adding && <AddNode parent={adding.parent} kind={adding.kind} managers={managers} onClose={() => setAdding(null)} onSaved={async (m) => { toast(m); setAdding(null); await load(); }} />}
     </div>
   );
@@ -246,7 +249,8 @@ function Profile({ node, initialTab, nodes, managers, onClose, onSaved }: { node
   const [f, setF] = useState(fieldsFrom(node));
   const [parent, setParent] = useState(node.parent_id ?? '');
   const [err, setErr] = useState<string | null>(null);
-  const parents = nodes.filter((n) => n.kind !== 'facility' && n.id !== node.id && n.active && n.canEdit);
+  // a sub-group belongs to the main entity; a facility belongs to a sub-group
+  const parents = nodes.filter((n) => (node.kind === 'subgroup' ? n.kind === 'group' : n.kind === 'subgroup' || n.id === node.parent_id) && n.id !== node.id && n.active && n.canEdit);
   const { role } = useApp();
   const canManageFleet = ['platform_admin', 'super_admin', 'admin', 'manager'].includes(role);
   const run = async (fn: () => Promise<unknown>, m: string) => { setErr(null); try { const r = await fn() as { message?: string }; onSaved(r?.message ?? m); } catch (e) { setErr((e as Error).message); } };
@@ -376,5 +380,51 @@ function FacilityCategories({ facilityId, active }: { facilityId: string; active
         <button className="btn p" disabled={!changed.length || missingReason || busy} onClick={() => void save()}>Save {changed.length || ''} change{changed.length === 1 ? '' : 's'}</button>
       </div>}
     </div>
+  );
+}
+
+/** Build or extend the chart from a spreadsheet: download the current chart, edit it, upload, check the preview, load. */
+function OrgImport({ onClose, onDone }: { onClose: () => void; onDone: (m: string) => void }) {
+  const ref = useRef<HTMLDialogElement>(null);
+  useEffect(() => { ref.current?.showModal(); }, []);
+  const [file, setFile] = useState<File | null>(null);
+  const [update, setUpdate] = useState(false);
+  const [pv, setPv] = useState<OrgImportPreview | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const preview = async (f: File, u: boolean) => { setErr(null); setPv(null); try { setPv(await api.orgImportPreview(f, u)); } catch (e) { setErr((e as Error).message); } };
+  const CHIP: Record<string, string> = { 'new sub-group': 'ok', 'new facility': 'ok', update: 'info', 'no change': '', refused: 'bad' };
+  return (
+    <dialog ref={ref} className="modal wide" onClose={onClose}>
+      <div className="in">
+        <div><div className="eyebrow">Organisation</div><h2 style={{ margin: 0 }}>Upload the organisation chart from Excel</h2>
+          <div className="sub">One row per facility with its sub-group (a row with only a sub-group adds the sub-group). Sub-groups go under the main entity, facilities inside their sub-group. Nothing is deleted; names already in the chart are not created twice.</div></div>
+        <div className="row" style={{ gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+          <button className="btn" onClick={() => void download('/api/org/import/template', 'organisation-chart.xlsx').catch((e) => setErr((e as Error).message))}><Icon name="download" size={14} />Download the template (with your current chart)</button>
+          <label className="btn p" style={{ cursor: 'pointer' }}><Icon name="upload" size={14} />{file ? 'Choose another file' : 'Choose the filled file'}
+            <input type="file" accept=".xlsx,.csv" hidden onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) { setFile(f); void preview(f, update); } }} /></label>
+          <label className="row small" style={{ gap: 6 }}><input type="checkbox" checked={update} onChange={(e) => { setUpdate(e.target.checked); if (file) void preview(file, e.target.checked); }} />Update existing facilities (type, location, size, sub-group)</label>
+        </div>
+        {file && <div className="muted small">{file.name}</div>}
+        {err && <div className="note bad">{err}</div>}
+        {pv && <>
+          <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
+            <span className="chip ok">{pv.newSubgroups} new sub-group{pv.newSubgroups === 1 ? '' : 's'}</span><span className="chip ok">{pv.newFacilities} new facilit{pv.newFacilities === 1 ? 'y' : 'ies'}</span>
+            {pv.updates > 0 && <span className="chip info">{pv.updates} updated</span>}{pv.refused > 0 && <span className="chip bad">{pv.refused} row{pv.refused === 1 ? '' : 's'} to correct</span>}
+          </div>
+          <div className="scroll" style={{ maxHeight: 380 }}><table className="t"><thead><tr><th>Row</th><th>Sub-group</th><th>Facility</th><th>What happens</th><th>Notes</th></tr></thead>
+            <tbody>{pv.rows.map((r) => <tr key={r.row}><td className="num">{r.row}</td><td>{r.subgroup || '—'}</td><td>{r.facility || '—'}</td><td><span className={`chip ${CHIP[r.action] ?? ''}`}>{r.action}</span></td>
+              <td className="small">{r.problems.map((p) => <div key={p} className="bad">{p}</div>)}{r.notes.map((n) => <div key={n} className="muted">{n}</div>)}</td></tr>)}</tbody></table></div>
+        </>}
+        <div className="row" style={{ justifyContent: 'flex-end' }}>
+          <button className="btn" onClick={() => ref.current?.close()}>Cancel</button>
+          <button className="btn p" disabled={!pv || busy || pv.refused > 0 || pv.newSubgroups + pv.newFacilities + pv.updates === 0} onClick={async () => {
+            setBusy(true); setErr(null);
+            try { const r = await api.orgImport(file!, update); onDone(`Loaded: ${r.subgroups} sub-group${r.subgroups === 1 ? '' : 's'}, ${r.facilities} facilit${r.facilities === 1 ? 'y' : 'ies'}${r.updated ? `, ${r.updated} updated` : ''}`); }
+            catch (e) { setErr((e as Error).message); } finally { setBusy(false); }
+          }}>Load into the chart</button>
+        </div>
+      </div>
+    </dialog>
   );
 }

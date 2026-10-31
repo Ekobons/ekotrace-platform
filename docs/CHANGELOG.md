@@ -2,6 +2,14 @@
 
 Newest first.
 
+## 2026-10-31 · Organisation: strict hierarchy, chart from Excel; new-company form
+
+- Hierarchy enforced: sub-groups only under the main entity, facilities only inside a sub-group. Web: the main entity offers only **+ Sub-group** (header and tree), a sub-group only **+ Facility in …**; the header **+ Facility** is gone; "Belongs to" lists the main entity for a sub-group and sub-groups for a facility. API: `POST /api/org/nodes` refuses a sub-group under a sub-group; `PATCH` refuses moving a sub-group off the main entity or a facility out of a sub-group. (Facilities created directly under the main entity before stay as they are.)
+- `modules/orgImport.routes.ts`: `GET /api/org/import/template` (Excel: instructions + the current chart, type drop-down), `POST /api/org/import/preview` and `POST /api/org/import?update=1` (Excel or CSV, columns by heading; new sub-groups / facilities, updates of existing facilities only with `update=1`, refused rows block the load; types = standard list + the company's own; countries by name or code; manager by e-mail; plan facility limit; audit `org.import`). Super admin only.
+- Web: **Upload from Excel** on Organisation & groups (template, preview with what happens per row, load).
+- Platform console: New company form laid out as a two-column grid (country, plan, access until, GWP) and products as an aligned list; one column on phones. Edit company: plan and access-until in the same grid.
+- Manual: Getting started → The organisation. Test: hierarchy rules, upload with refused rows, load, update, template.
+
 ## 2026-10-28 · Phone menu, dashboard drill-down to entries, OCR for scanned bills
 
 - **Phone menu:** below 1000 px a top bar with a ☰ button slides in the full menu (any package's menu), closing on navigation, outside tap, ✕ or Escape; the icon-only menu is a desktop choice. Closes RFP 8.1 (responsive menu).

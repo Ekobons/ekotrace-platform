@@ -3559,6 +3559,34 @@ test("CBAM official values: the Commission's default-values and benchmark workbo
   assert.equal(logs.length, 0, 'already loaded');
 });
 
+test('organisation chart: sub-groups only under the main entity, facilities only in a sub-group; built from a spreadsheet (preview, refused rows, update existing, template)', async () => {
+  const co = await api('POST', '/api/platform/companies', { name: 'Chart Builder LLC', country: 'AE', gwpSet: 'AR6', products: ['ekotrace'], superAdmin: { name: 'Cara', email: 'super@chart.test' } });
+  const T = co.body.company.id as string;
+  const root = (await api('GET', '/api/org', undefined, T)).body.nodes.find((n: { kind: string }) => n.kind === 'group').id as string;
+  const sub = (await api('POST', '/api/org/nodes', { parentId: root, kind: 'subgroup', name: 'Utilities' }, T)).body.id as string;
+  assert.equal((await api('POST', '/api/org/nodes', { parentId: sub, kind: 'subgroup', name: 'Nested' }, T)).status, 400, 'no sub-group inside a sub-group');
+  const fac = (await api('POST', '/api/org/nodes', { parentId: sub, kind: 'facility', name: 'Pump station' }, T)).body.id as string;
+  assert.equal((await api('PATCH', `/api/org/nodes/${fac}`, { parentId: root }, T)).status, 400, 'a facility moves only into a sub-group');
+  const up = (path: string, csv: string) => app.inject({ method: 'POST', url: path, payload: Buffer.from(csv, 'utf8'), headers: { cookie: adminCookie, 'x-tenant-id': T, 'content-type': 'application/octet-stream', 'x-filename': 'chart.csv' } });
+  const bad = 'Sub-group;Facility;Facility type;City;Country;Floor area (m²);Employees\nWaste;Landfill A;Landfill;Sharjah;UAE;;12\n;Orphan site;Office;Dubai;AE;;\nWaste;Landfill A;Plant;Sharjah;AE;;\nCorporate;HQ;Castle;Sharjah;Narnia;;\n';
+  const p1 = (await up('/api/org/import/preview', bad)).json();
+  assert.equal(p1.refused, 3, JSON.stringify(p1.rows.map((r: { problems: string[] }) => r.problems)));
+  assert.equal((await up('/api/org/import', bad)).statusCode, 400, 'refused rows block the load');
+  const good = 'Sub-group;Facility;Facility type;City / location;Country;Floor area (m²);Employees;Ownership %\nWaste;Landfill A;Landfill;Sharjah;United Arab Emirates;;12;\nWaste;MRF;plant;Sharjah;AE;12000;85;\nCorporate;HQ;Office;Sharjah;AE;6500;320;100\nUtilities;Pump station;Plant;Ajman;AE;;;\nNew division;;;;;;;\n';
+  const p2 = (await up('/api/org/import/preview', good)).json();
+  assert.equal(p2.refused, 0); assert.equal(p2.newFacilities, 3); assert.equal(p2.newSubgroups, 3, 'Waste, Corporate, New division');
+  assert.ok(p2.rows.find((r: { facility: string }) => r.facility === 'Pump station').notes[0].includes('differs'));
+  const r = await up('/api/org/import?update=1', good); assert.equal(r.statusCode, 200, r.body);
+  assert.deepEqual(r.json(), { subgroups: 3, facilities: 3, updated: 1 });
+  const nodes = (await api('GET', '/api/org', undefined, T)).body.nodes as { id: string; kind: string; name: string; parent_id: string; facility_type: string; location: string; employees: number }[];
+  const by = (n: string) => nodes.find((x) => x.name === n)!;
+  assert.equal(by('Landfill A').parent_id, by('Waste').id); assert.equal(by('Waste').parent_id, root); assert.equal(by('MRF').facility_type, 'Plant');
+  assert.equal(by('Pump station').location, 'Ajman', 'existing facility updated');
+  assert.equal(((await up('/api/org/import/preview', good)).json()).newFacilities, 0, 'loading again creates nothing');
+  const tpl = await app.inject({ method: 'GET', url: '/api/org/import/template', headers: { cookie: adminCookie, 'x-tenant-id': T } });
+  assert.equal(tpl.statusCode, 200); assert.ok(tpl.rawPayload.length > 1000);
+});
+
 test('ESG: frameworks decide the materiality needed, double materiality scoring (actual, potential, human rights), decisions need a reason, second-person approval, industry questions with answers checked, export; companies kept apart', async () => {
   const T = tenantA, Y = 2023;
   let d = (await api('GET', `/api/esg?year=${Y}`, undefined, T)).body;

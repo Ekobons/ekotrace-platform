@@ -53,7 +53,13 @@ The page has four tabs:
 | Dashboard groups | any mix of facilities to view together (for example “European sites” or the SBTi boundary); **Open dashboard** shows it in Dashboards, where it is also in the “part of the group” list. Groups never change the structure. A person sees a group only if they can see every facility in it; the creator or a Super admin deletes it. Professional and Enterprise plans. |
 | Company details & logo | the reporting entity printed on every report — legal name, registration no., LEI, region, sector and its code (NACE / ISIC / NAICS), regulator or registry ID, contact, website, net revenue (for intensity per revenue) and financial year end — and the **company logo** (PNG or JPEG) for the report cover |
 
-**+ Facility** and **+ Sub-group** at the top add under the main entity (Super admin); inside the tree, the buttons under each sub-group add there. The number of facilities is limited by the company's plan.
+**Sub-groups sit under the main entity and facilities inside a sub-group** — nothing else is offered. **+ Sub-group** at the top (and under the main entity in the tree) adds a sub-group; **+ Facility in …** under each sub-group adds a facility there. Moving a facility (Belongs to) offers only sub-groups; a sub-group stays under the main entity. The number of facilities is limited by the company's plan.
+
+**Upload from Excel** (Super admin) builds or extends the chart from a spreadsheet:
+1. **Download the template** — it already lists your current chart, one row per facility: Sub-group, Facility, Facility type, City / location, Country, Floor area (m²), Employees, Ownership %, Manager e-mail. A row with only a sub-group adds the sub-group.
+2. Add or change rows and **choose the file** (Excel or CSV; columns are found by their heading).
+3. The **preview** shows, row by row, what is created and what must be corrected: a facility without a sub-group, an unknown facility type or country, a facility listed twice, a sub-group name that is a facility. Rows to correct block the load.
+4. **Load into the chart.** Names already in the chart are matched (any case) and never created twice; existing facilities change only when **Update existing facilities** is ticked. Nothing is deleted by an upload.
 
 In the Tree tab:
 

@@ -541,6 +541,10 @@ export interface CbamInstallation {
   lat: number | null; lon: number | null; operator_name: string | null; operator_reg: string | null; operator_address: string | null; operator_country: string | null; contact_name: string | null; contact_email: string | null; contact_phone: string | null; notes: string;
   processes: { id: string; category: string; route: string; name: string }[]; reports: { id: string; year: number; status: string; verifier_name: string | null; verification_date: string | null }[];
 }
+export interface OrgImportPreview {
+  rows: { row: number; subgroup: string; facility: string; action: 'new sub-group' | 'new facility' | 'update' | 'no change' | 'refused'; problems: string[]; notes: string[] }[];
+  newSubgroups: number; newFacilities: number; updates: number; refused: number;
+}
 export interface CbamRef { id: string; kind: 'default' | 'benchmark' | 'price' | 'highest'; cn: string | null; country: string | null; route: string | null; year: number; quarter: number | null; value: number; source: string; indicative: boolean; own: boolean }
 export interface CbamData {
   year: number; installations: CbamInstallation[]; facilities: { id: string; name: string; country: string }[];
@@ -659,6 +663,8 @@ export const api = {
   saveFacilityCategories: (id: string, categories: { code: string; applicable: boolean; reason?: string }[]) => call<{ ok: boolean; changed: number }>('PUT', `/api/facilities/${id}/categories`, { categories }),
   org: () => call<{ nodes: OrgNode[] }>('GET', '/api/org'),
   createNode: (b: Record<string, unknown>) => call<OrgNode>('POST', '/api/org/nodes', b),
+  orgImportPreview: (f: File, update: boolean) => call<OrgImportPreview>('POST', `/api/org/import/preview?update=${update ? 1 : 0}`, undefined, f, { 'x-filename': encodeURIComponent(f.name) }),
+  orgImport: (f: File, update: boolean) => call<{ subgroups: number; facilities: number; updated: number }>('POST', `/api/org/import?update=${update ? 1 : 0}`, undefined, f, { 'x-filename': encodeURIComponent(f.name) }),
   updateNode: (id: string, b: Record<string, unknown>) => call<OrgNode>('PATCH', `/api/org/nodes/${id}`, b),
   removeNode: (id: string) => call<{ removed: boolean; archived: boolean; message?: string }>('DELETE', `/api/org/nodes/${id}`),
   users: () => call<{ users: Person[] }>('GET', '/api/users'),

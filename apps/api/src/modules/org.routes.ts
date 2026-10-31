@@ -82,6 +82,7 @@ export async function orgRoutes(app: FastifyInstance) {
       const parent = (await c.query('SELECT id, kind, country FROM org_node WHERE id = $1', [b.parentId])).rows[0];
       if (!parent) throw notFound('Parent');
       if (parent.kind === 'facility') throw new AppError('A facility cannot contain other nodes');
+      if (b.kind === 'subgroup' && parent.kind !== 'group') throw new AppError('Sub-groups are added under the main entity');
       if (!canEdit(await editable(c, req), parent.id)) throw forbidden('You can only add inside your own part of the organisation');
       if (b.kind === 'facility') await checkFacilityLimit(c, tenant);
       const r = (await c.query(
@@ -109,6 +110,8 @@ export async function orgRoutes(app: FastifyInstance) {
         if (before.kind === 'group') throw new AppError('The main entity cannot be moved');
         const p = (await c.query('SELECT kind FROM org_node WHERE id = $1', [b.parentId])).rows[0];
         if (!p || p.kind === 'facility') throw new AppError('Move it under the main entity or a sub-group');
+        if (before.kind === 'subgroup' && p.kind !== 'group') throw new AppError('A sub-group belongs to the main entity');
+        if (before.kind === 'facility' && p.kind !== 'subgroup') throw new AppError('Move the facility into a sub-group');
         if ((await subtreeNodes(c, id)).has(b.parentId)) throw new AppError('A node cannot be moved inside itself');
         if (!canEdit(e, b.parentId)) throw forbidden('You can only move it within your own part of the organisation');
       }

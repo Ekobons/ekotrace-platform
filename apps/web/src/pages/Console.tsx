@@ -92,7 +92,7 @@ function ProductBoxes({ value, onChange }: { value: Prod[]; onChange: (v: Prod[]
   const flip = (p: Prod) => onChange(value.includes(p) ? value.filter((x) => x !== p) : [...value, p]);
   return (
     <div className="field"><span>Products</span>
-      <div className="row" style={{ gap: 18, flexWrap: "wrap" }}>
+      <div className="prodlist">
         <label className="row chkline" style={{ gap: 6 }}><input type="checkbox" checked={value.includes('ekotrace')} onChange={() => flip('ekotrace')} />EKOTRACE · own GHG inventory</label>
         <label className="row chkline" style={{ gap: 6 }}><input type="checkbox" checked={value.includes('ekofin')} onChange={() => flip('ekofin')} />{productName('ekofin') === 'EKOFIN' ? 'EKOFIN · financed emissions' : 'Financed emissions'} (banks, investors)</label>
         <label className="row chkline" style={{ gap: 6 }}><input type="checkbox" checked={value.includes('cbam')} onChange={() => flip('cbam')} />CBAM Exporter · CBAM only, simpler menu (included with {productName('ekotrace')})</label>
@@ -122,9 +122,9 @@ function EditCompany({ c, plans, onClose, onSaved }: { c: Company; plans: PlanLi
       <div className="in">
         <h2>{c.name}</h2>
         <label className="field"><span>Company name</span><input className="input" value={f.name} onChange={set('name')} /></label>
-        <div className="row">
-          <label className="field grow"><span>Plan</span><select className="input" value={f.plan} onChange={set('plan')}>{plans.map((x) => <option key={x.code} value={x.code}>{x.name}</option>)}</select></label>
-          <label className="field grow"><span>Access until</span><input className="input" type="date" value={f.accessExpiry} onChange={set('accessExpiry')} /></label>
+        <div className="fgrid2">
+          <label className="field"><span>Plan</span><select className="input" value={f.plan} onChange={set('plan')}>{plans.map((x) => <option key={x.code} value={x.code}>{x.name}</option>)}</select></label>
+          <label className="field"><span>Access until</span><input className="input" type="date" value={f.accessExpiry} onChange={set('accessExpiry')} /></label>
         </div>
         {p && <div className="sub">{p.name}: {planLine(p)}.</div>}
         <ProductBoxes value={prods} onChange={setProds} />
@@ -166,15 +166,15 @@ function NewCompany({ plans, onClose, onDone }: { plans: PlanLimits[]; onClose: 
   const [err, setErr] = useState<string | null>(null);
   const set = (k: keyof typeof f) => (e: { target: { value: string } }) => setF({ ...f, [k]: e.target.value });
   return (
-    <dialog ref={ref} className="modal" onClose={onClose}>
+    <dialog ref={ref} className="modal mid" onClose={onClose}>
       <div className="in">
         <h2>New company</h2>
         <label className="field"><span>Company name</span><input className="input" value={f.name} onChange={set('name')} /></label>
-        <div className="row">
-          <label className="field" style={{ minWidth: 200 }}><span>Country</span><CountrySelect value={f.country} onChange={(c) => setF({ ...f, country: c })} /></label>
-          <label className="field grow"><span>Plan</span><select className="input" value={f.plan} onChange={set('plan')}>{plans.map((p) => <option key={p.code} value={p.code}>{p.name}</option>)}</select></label>
-          <label className="field grow"><span>Access until</span><input className="input" type="date" value={f.accessExpiry} onChange={set('accessExpiry')} /></label>
-          <label className="field"><span>GWP</span><select className="input" value={f.gwpSet} onChange={set('gwpSet')}><option>AR4</option><option>AR5</option><option>AR6</option></select></label>
+        <div className="fgrid2">
+          <label className="field"><span>Country</span><CountrySelect value={f.country} onChange={(c) => setF({ ...f, country: c })} /></label>
+          <label className="field"><span>Plan</span><select className="input" value={f.plan} onChange={set('plan')}>{plans.map((p) => <option key={p.code} value={p.code}>{p.name}</option>)}</select></label>
+          <label className="field"><span>Access until</span><input className="input" type="date" value={f.accessExpiry} onChange={set('accessExpiry')} /></label>
+          <label className="field"><span>GWP values</span><select className="input" value={f.gwpSet} onChange={set('gwpSet')}><option value="AR4">AR4</option><option value="AR5">AR5</option><option value="AR6">AR6</option></select></label>
         </div>
         {plans.find((p) => p.code === f.plan) && <div className="sub">{planLine(plans.find((p) => p.code === f.plan)!)}</div>}
         <ProductBoxes value={prods} onChange={setProds} />
