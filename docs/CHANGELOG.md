@@ -2,6 +2,10 @@
 
 Newest first.
 
+## 2026-10-31 · Dashboards: emissions outside the scopes
+
+- Scopes & categories: card **Reported separately — outside the scopes** with ozone-depleting refrigerants (non-Kyoto gases: CFCs, HCFCs such as R-22; `memo`) and biogenic CO₂ (`bio`), each by source and clickable to its entries; Overview → Scope split notes both when present.
+
 ## 2026-10-31 · Facility and year kept while logged in; fix an entry from Entries & results
 
 - `lib/workContext.ts`: the facility and year chosen in Add data (and the year in Entries & results) are remembered in the browser per company until the next log-in or log-out; links that carry `?facility=` / `?year=` / `?y=` still win.

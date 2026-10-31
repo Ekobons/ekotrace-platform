@@ -186,6 +186,7 @@ function Overview({ d, c, go }: { d: Data; c: Ctx; go: (t: Tab) => void }) {
         </div>
         <div className="sbar">{parts.map((p) => <span key={p.n} style={{ flex: p.v || 0.0001, background: p.c }} title={p.n} />)}</div>
         <div className="sins"><b>Scope {big + 1} is {w(c.s[big]!)} of the total.</b> Main levers: {lever}.</div>
+        {(sum(c.cur, (r) => r.memo) > 0 || sum(c.cur, (r) => r.bio) > 0) && <div className="muted" style={{ fontSize: 12.5 }}>Outside the scopes: {fmtT(sum(c.cur, (r) => r.memo))} tCO₂e ozone-depleting refrigerants · {fmtT(sum(c.cur, (r) => r.bio))} t biogenic CO₂ — see Scopes &amp; categories.</div>}
         <div className="muted" style={{ fontSize: 12.5 }}>{c.cmpOn ? (c.nFull ? `vs ${yy} = the ${c.nFull} complete month${c.nFull === 1 ? '' : 's'} against the same months of ${d.cmpYear}. ` : `vs ${yy} = the same months of ${d.cmpYear}. `) : ''}Scope 2 {d.scope2}-based.</div>
       </DCard>
       <DCard title="Where emissions come from" span={2} sub={`box size = tCO₂e · colour = scope · all ${tm.length} sources listed`}>
@@ -236,6 +237,7 @@ function Scopes({ d, c }: { d: Data; c: Ctx }) {
     <div className="dgrid">
       {[0, 1, 2].map((i) => { const parts = [...sc[i]!.entries()].sort((a, b) => b[1] - a[1]).map(([k, v], j) => ({ n: `${k} ${ghgName(d, c, k)}`, v, c: PAL[(j + i + 1) % PAL.length]!, go: goCode(k) })); return (
         <DCard key={i} title={<><Dot c={SC[i]!} />Scope {i + 1}</>}><div className="dsplit"><Donut parts={parts} center={fmt0(c.s[i]!)} sub="t" size={130} /><Legend parts={parts} unit="t" /></div></DCard>); })}
+      <OutsideScopes c={c} />
       <DCard title="By GHG Protocol category and month (tCO₂e)" span={3}>
         <div className="scrollx"><table className="t dt"><thead><tr><th>Category</th>{MN.map((m) => <th key={m} className="num">{m}</th>)}{whole.size > 0 && <th className="num">Whole year</th>}<th className="num">Total</th><th className="num">Share</th></tr></thead>
           <tbody>{allCodes.map(({ k, ms, t }) => { const mx = Math.max(...ms) || 1, s = k[0]; return (
@@ -246,6 +248,28 @@ function Scopes({ d, c }: { d: Data; c: Ctx }) {
       </DCard>
     </div>
   </>;
+}
+
+/** Gases and CO2 the GHG Protocol reports beside the scopes, never in them: ozone-depleting refrigerants (CFCs, HCFCs
+ *  such as R-22 — Montreal Protocol, not Kyoto) and biogenic CO2 (biomass, biofuels, the biogenic part of waste). */
+function OutsideScopes({ c }: { c: Ctx }) {
+  const drill = useDrill();
+  const memo = sum(c.cur, (r) => r.memo), bio = sum(c.cur, (r) => r.bio);
+  const by = (k: 'memo' | 'bio') => { const m = new Map<string, number>(); for (const r of c.cur) if (r[k] > 0) m.set(r.item, (m.get(r.item) ?? 0) + r[k]); return [...m.entries()].sort((a, b) => b[1] - a[1]); };
+  const list = (k: 'memo' | 'bio') => by(k).map(([n, v]) => <div key={n} className="drill" role="link" tabIndex={0} onClick={() => drill({ items: [n], label: n })} onKeyDown={(e) => { if (e.key === 'Enter') drill({ items: [n], label: n }); }}><span>{n}</span><b>{fmtT(v)} t</b></div>);
+  return (
+    <DCard title="Reported separately — outside the scopes" span={3}>
+      <div className="vcl">
+        <div><span className="lbl">Ozone-depleting refrigerants (non-Kyoto gases)</span>
+          <div className="dstatx"><b>{fmtT(memo)}</b> <small>tCO₂e</small></div>
+          {memo > 0 ? list('memo') : <div className="muted">None in this period.</div>}
+          <div className="muted small">CFCs and HCFCs (e.g. R-22) fall under the Montreal Protocol, not Kyoto: the GHG Protocol reports them as a memo item, not in Scope 1. HFC blends (R-407C, R-410A, R-134a…) are in Scope 1.</div></div>
+        <div><span className="lbl">Biogenic CO₂</span>
+          <div className="dstatx"><b>{fmtT(bio)}</b> <small>tCO₂</small></div>
+          {bio > 0 ? list('bio') : <div className="muted">None in this period.</div>}
+          <div className="muted small">CO₂ from biomass, biofuel blends and the biogenic part of waste: reported beside the scopes; its CH₄ and N₂O are in the scopes.</div></div>
+      </div>
+    </DCard>);
 }
 
 // ---------------------------------------------------------------- facilities --
