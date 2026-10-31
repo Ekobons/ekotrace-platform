@@ -48,7 +48,7 @@ function BarsSvg({ rows, unit, W, H, label }: { rows: BarRow[]; unit: string; W:
   const line = (k: 'line' | 'line2') => rows.map((r, i) => (r[k] == null ? null : `${(L + i * bw + bw / 2).toFixed(1)},${yy(r[k]!).toFixed(1)}`)).filter(Boolean) as string[];
   return (
     <svg viewBox={`0 0 ${W} ${H}`} width={W} height={H} role="img" aria-label={label}>
-      {[0, 0.25, 0.5, 0.75, 1].map((g) => { const v = (mx / 1.1) * g; return <g key={g}><line x1={L} x2={W} y1={yy(v)} y2={yy(v)} stroke="var(--line)" /><text x={L - 6} y={yy(v) + 4} fontSize="12" textAnchor="end" fill="var(--muted)">{tick(v)}</text></g>; })}
+      {[0, 0.25, 0.5, 0.75, 1].map((g) => { const v = (mx / 1.1) * g; return <g key={g}><line x1={L} x2={W} y1={yy(v)} y2={yy(v)} stroke="var(--line)" /><text x={L - 6} y={yy(v) + 4} fontSize="13" textAnchor="end" fill="var(--muted)">{tick(v)}</text></g>; })}
       {rows.map((r, i) => {
         const w = Math.min(bw * 0.64, 72), x = L + i * bw + (bw - w) / 2;
         let acc = 0;
@@ -57,7 +57,7 @@ function BarsSvg({ rows, unit, W, H, label }: { rows: BarRow[]; unit: string; W:
             {r.go && <rect x={L + i * bw} y={T} width={bw} height={H - T - B} fill="transparent" />}
             {r.parts.map((p, k) => { const hh = ((p.v || 0) / mx) * (H - T - B); if (hh <= 0) return null; const y = yy(0) - acc - hh; acc += hh;
               return <rect key={k} x={x} y={y} width={w} height={hh} fill={p.c} opacity={r.dim ? 0.4 : 1}><title>{`${r.lbl}${p.n ? ` · ${p.n}` : ''}: ${fmtT(p.v)} ${unit}`}</title></rect>; })}
-            <text x={x + w / 2} y={H - 6} fontSize="12.5" textAnchor="middle" fill="var(--fg2)">{r.lbl}</text>
+            <text x={x + w / 2} y={H - 6} fontSize="13.5" textAnchor="middle" fill="var(--fg2)">{r.lbl}</text>
           </g>);
       })}
       {(['line', 'line2'] as const).map((k, j) => { const pts = line(k); const col = j ? '#D99A1E' : 'var(--muted)';
@@ -80,7 +80,7 @@ export function Donut({ parts, center, sub, size: size0 = 150 }: { parts: Part[]
         return <path key={i} d={`M${x0} ${y0} A${R} ${R} 0 ${big} 1 ${x1} ${y1} L${x2} ${y2} A${r} ${r} 0 ${big} 0 ${x3} ${y3}Z`} fill={p.c} stroke="var(--surface)" strokeWidth="1.5"><title>{`${p.n}: ${fmtT(p.v)} (${Math.round((p.v / tot) * 100)}%)`}</title></path>;
       })}
       <text x={c} y={c - 1} textAnchor="middle" fontSize={size / 8.5} fontWeight="700" fill="var(--fg)">{center}</text>
-      <text x={c} y={c + size / 11} textAnchor="middle" fontSize={size / 14} fill="var(--muted)">{sub ?? ''}</text>
+      <text x={c} y={c + size / 11} textAnchor="middle" fontSize={Math.max(12, size / 12)} fill="var(--muted)">{sub ?? ''}</text>
     </svg>
   );
 }
@@ -116,9 +116,9 @@ function TreemapSvg({ items, W, H }: { items: Part[]; W: number; H: number }) {
         <g key={i} className={it.go ? 'drill' : undefined} onClick={it.go}>
           <rect x={x + 1} y={y + 1} width={Math.max(0, w - 2)} height={Math.max(0, h - 2)} rx="4" fill={it.c}><title>{`${it.n}: ${fmtT(it.v)} t (${Math.round((it.v / tot0) * 100)}%)`}</title></rect>
           {w > 80 && h > 40 ? <>
-            <text x={x + 8} y={y + 19} fontSize="13" fontWeight="600" fill="#fff">{it.n.length > w / 7.5 ? `${it.n.slice(0, Math.floor(w / 7.5))}…` : it.n}</text>
-            <text x={x + 8} y={y + 35} fontSize="12" fill="#fff" opacity=".9">{fmtT(it.v)} t · {Math.round((it.v / tot0) * 100)}%</text>
-          </> : w > 34 && h > 18 ? <text x={x + w / 2} y={y + h / 2 + 4} fontSize="11.5" fontWeight="600" textAnchor="middle" fill="#fff">{Math.max(1, Math.round((it.v / tot0) * 100))}%</text> : null}
+            <text x={x + 8} y={y + 20} fontSize="14.5" fontWeight="600" fill="#fff">{it.n.length > w / 7.5 ? `${it.n.slice(0, Math.floor(w / 7.5))}…` : it.n}</text>
+            <text x={x + 8} y={y + 38} fontSize="13" fill="#fff" opacity=".9">{fmtT(it.v)} t · {Math.round((it.v / tot0) * 100)}%</text>
+          </> : w > 34 && h > 18 ? <text x={x + w / 2} y={y + h / 2 + 4} fontSize="12.5" fontWeight="600" textAnchor="middle" fill="#fff">{Math.max(1, Math.round((it.v / tot0) * 100))}%</text> : null}
         </g>))}
     </svg>
   );

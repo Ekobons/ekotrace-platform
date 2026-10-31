@@ -67,7 +67,7 @@ Switched on under **Methodology & boundaries → Approval levels**: for entries 
 | **Add data** → category → step 2 *Review* | drafts, waiting and sent back for the facility, category and months chosen — submit, withdraw, approve |
 | **Add data** → step 3 *Approved* | every approved entry of that facility, category and months, whoever entered it and from whatever source |
 | **Entries & approvals → Approvals** | what waits for you, and what waits for someone else (with *Sent by*) |
-| **Entries & approvals → Entries & results** | every entry of a year — filter by status and category; click one to see how it was calculated |
+| **Entries & approvals → Entries & results** | every entry of a year — filters just above the list (month, facility, category, item, status) and a **Total** row that adds up the entries shown: quantity (per unit when units differ) and each emissions column; click an entry to see how it was calculated |
 | **Home** | my drafts, sent back to me, waiting for my approval, data due |
 | **Data progress** | each facility × month: approved, in review, partial, missing |
 | **Dashboards, reports, verifier pack** | approved entries only (dashboards can preview waiting ones) |
@@ -104,7 +104,7 @@ The same entries can be looked at in two places; they answer different questions
 - Step 3 *Approved* adds up Scope 1, 2 and 3 for those months: the facility's approved total for the period, the same figure the dashboards show.
 - The **year** selector changes the year; future months cannot be picked (the current month can).
 
-**Months in Approvals** are a filter, not a period: *All months* by default, or one month to work through them in order. Approvals is a to-do list across the whole company; Add data is the picture of one facility.
+**Years and months in Approvals** are filters, not a period: *All years* and *All months* by default, a year to see only that year's entries, or one month to work through them in order. Approvals is a to-do list across the whole company; Add data is the picture of one facility.
 
 ### Scenarios
 

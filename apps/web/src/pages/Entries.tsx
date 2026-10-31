@@ -22,7 +22,7 @@ export function Entries() {
   type Drill = { cats: string[]; fids: string[]; dm: number[]; whole: boolean; scope: number; items: string[]; wtt: boolean; cons: string; from: string };
   const NO_DRILL: Drill = { cats: [], fids: [], dm: [], whole: true, scope: 0, items: [], wtt: false, cons: '', from: '' };
   const parse = (q: URLSearchParams) => ({
-    year: Number(q.get('y')) || new Date().getFullYear(), status: q.get('status') ?? '', cat: q.get('cat') ?? '', month: q.get('m') ?? '', fac: q.get('fac') ?? '',
+    year: Number(q.get('y')) || new Date().getFullYear(), status: q.get('status') ?? '', cat: q.get('cat') ?? '', month: q.get('m') ?? '', fac: q.get('fac') ?? '', item: q.get('item') ?? '',
     drill: { cats: q.get('cats')?.split('|').filter(Boolean) ?? [], fids: q.get('fids')?.split(',').filter(Boolean) ?? [], dm: (q.get('dm') ?? '').split(',').map(Number).filter((m) => m >= 1 && m <= 12),
       whole: q.get('whole') !== '0', scope: Number(q.get('scope')) || 0, items: q.get('items')?.split('|').filter(Boolean) ?? [], wtt: q.get('wtt') === '1', cons: q.get('cons') ?? '', from: q.get('from') ?? '' } as Drill,
   });
@@ -34,6 +34,7 @@ export function Entries() {
   const [cat, setCat] = useState(init.cat);
   const [month, setMonth] = useState(init.month);
   const [fac, setFac] = useState(init.fac);
+  const [item, setItem] = useState(init.item);
   // from a dashboard: the categories, facilities, months (the dashboard's month rule), scope, items or upstream energy behind the figure clicked
   const [drill, setDrill] = useState<Drill>(init.drill);
   const drilled = !!(drill.cats.length || drill.fids.length || drill.dm.length || drill.scope || drill.items.length || drill.wtt);
@@ -41,7 +42,7 @@ export function Entries() {
   const toQuery = () => {
     const q = new URLSearchParams();
     q.set('y', String(year));
-    if (status) q.set('status', status); if (cat) q.set('cat', cat); if (month) q.set('m', month); if (fac) q.set('fac', fac);
+    if (status) q.set('status', status); if (cat) q.set('cat', cat); if (month) q.set('m', month); if (fac) q.set('fac', fac); if (item) q.set('item', item);
     if (drill.cats.length) q.set('cats', drill.cats.join('|')); if (drill.fids.length) q.set('fids', drill.fids.join(','));
     if (drill.dm.length) { q.set('dm', drill.dm.join(',')); q.set('whole', drill.whole ? '1' : '0'); }
     if (drill.scope) q.set('scope', String(drill.scope)); if (drill.items.length) q.set('items', drill.items.join('|')); if (drill.wtt) q.set('wtt', '1');
@@ -49,14 +50,14 @@ export function Entries() {
     return q;
   };
   // filters → address
-  useEffect(() => { const q = toQuery(); written.current = q.toString(); if (q.toString() !== sp.toString()) setSp(q, { replace: true }); }, [year, status, cat, month, fac, drill]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { const q = toQuery(); written.current = q.toString(); if (q.toString() !== sp.toString()) setSp(q, { replace: true }); }, [year, status, cat, month, fac, item, drill]); // eslint-disable-line react-hooks/exhaustive-deps
   // address → filters, when it changes from outside (the menu, back / forward, a pasted link)
   useEffect(() => {
     if (written.current === null || sp.toString() === written.current) return;
     const x = parse(sp); written.current = sp.toString();
-    setYear(x.year); setStatus(x.status); setCat(x.cat); setMonth(x.month); setFac(x.fac); setDrill(x.drill);
+    setYear(x.year); setStatus(x.status); setCat(x.cat); setMonth(x.month); setFac(x.fac); setItem(x.item); setDrill(x.drill);
   }, [sp]); // eslint-disable-line react-hooks/exhaustive-deps
-  const clearAll = () => { setMonth(''); setFac(''); setCat(''); setStatus(''); setDrill(NO_DRILL); };
+  const clearAll = () => { setMonth(''); setFac(''); setItem(''); setCat(''); setStatus(''); setDrill(NO_DRILL); };
   const back = () => { if (loc.key !== 'default') nav(-1); else nav('/dashboards'); };
   const [gas, setGas] = useState<Awaited<ReturnType<typeof api.byGas>>['rows']>([]);
   const [open, setOpen] = useState<Awaited<ReturnType<typeof api.activity>> | null>(null);
@@ -83,6 +84,8 @@ export function Entries() {
   const cats = [...new Set(rows.map((a) => a.category))].sort();
   const facs = [...new Set(rows.map((a) => a.facility))].sort();
   const months = [...new Set(rows.map((a) => a.period_start.slice(0, 7)))].sort();
+  // items offered: those of the entries left by the category and facility filters
+  const items = [...new Set(rows.filter((a) => (!cat || a.category === cat) && (!fac || a.facility === fac)).map((a) => a.item))].sort();
   const monthName = (m: string) => new Date(`${m}-01T00:00:00Z`).toLocaleDateString('en-GB', { month: 'long', timeZone: 'UTC' });
   // an entry belongs to a month when its period covers it (a whole-year entry shows in every month)
   const inMonth = (a: Activity) => !month || (a.period_start.slice(0, 7) <= month && a.period_end.slice(0, 7) >= month);
@@ -93,9 +96,18 @@ export function Entries() {
   const inScope = (a: Activity) => !drill.scope || (drill.scope === 1 ? Number(a.co2e_direct) > 0 : drill.scope === 2 ? Number(a.co2e_scope2 ?? 0) > 0 || Number(a.co2e_scope2_market ?? 0) > 0 : Number(a.co2e_scope3 ?? 0) > 0 || Number(a.co2e_wtt) > 0 || Number(a.co2e_td ?? 0) > 0);
   const inDrill = (a: Activity) => (!drill.cats.length || drill.cats.includes(a.category_code ?? '')) && (!drill.fids.length || drill.fids.includes(a.facility_id ?? '')) && inRange(a) && inScope(a)
     && (!drill.items.length || drill.items.includes(a.item)) && (!drill.wtt || Number(a.co2e_wtt) > 0 || Number(a.co2e_td ?? 0) > 0);
-  const shown = rows.filter((a) => (!cat || a.category === cat) && (!fac || a.facility === fac) && (status !== 'counted' || a.status !== 'rejected') && inMonth(a) && inDrill(a));
-  const filtered = !!(cat || fac || month || status || drilled);
+  const shown = rows.filter((a) => (!cat || a.category === cat) && (!fac || a.facility === fac) && (!item || a.item === item) && (status !== 'counted' || a.status !== 'rejected') && inMonth(a) && inDrill(a));
+  const filtered = !!(cat || fac || item || month || status || drilled);
   const sum = (k: keyof Activity) => shown.reduce((s, a) => s + Number(a[k] ?? 0), 0);
+  // quantity of the entries shown: one figure when they share a unit, else per unit
+  const qty = (() => {
+    const by = new Map<string, number>();
+    for (const a of shown) if (a.quantity != null) by.set(a.unit, (by.get(a.unit) ?? 0) + Number(a.quantity));
+    const parts = [...by].sort((x, y) => y[1] - x[1]);
+    if (!parts.length) return { text: '—', mixed: false };
+    const t = parts.slice(0, 3).map(([u, v]) => `${num(v)} ${unitLabel(u)}`).join(' · ') + (parts.length > 3 ? ` · +${parts.length - 3} units` : '');
+    return { text: t, mixed: parts.length > 1 };
+  })();
   const yearList = [...new Set([...years.map((y) => y.year), new Date().getFullYear(), year])].sort((a, b) => b - a);
   const other = years.filter((y) => y.year !== year && y.n > 0);
   const show = async (id: string) => { setOpen(await api.activity(id)); dlg.current?.showModal(); };
@@ -123,18 +135,6 @@ export function Entries() {
         {drill.dm.length > 0 && !drill.whole && <div className="muted small" style={{ flexBasis: '100%' }}>As on the dashboard, entries covering more than a month (a quarter, the year) are not counted in single months.</div>}
       </div>}
       {rows.length >= LIMIT && <div className="note warn small" style={{ marginBottom: 8 }}>Only the latest {LIMIT.toLocaleString('en-US')} entries of {year} are listed: the totals may be short. Use the filters, or Excel exports, for the full year.</div>}
-      <div className="row" style={{ gap: 8, flexWrap: 'wrap', alignItems: 'center', margin: '4px 0 12px' }}>
-        <select className="input sm" style={{ width: 'auto' }} aria-label="Month" value={month} onChange={(e) => setMonth(e.target.value)}>
-          <option value="">All months</option>{months.map((m) => <option key={m} value={m}>{monthName(m)} {year}</option>)}</select>
-        <select className="input sm" style={{ width: 'auto', maxWidth: 260 }} aria-label="Facility" value={fac} onChange={(e) => setFac(e.target.value)}>
-          <option value="">All facilities ({facs.length})</option>{facs.map((f) => <option key={f}>{f}</option>)}</select>
-        <select className="input sm" style={{ width: 'auto', maxWidth: 260 }} aria-label="Category" value={cat} onChange={(e) => setCat(e.target.value)}>
-          <option value="">All categories</option>{cats.map((c) => <option key={c}>{c}</option>)}</select>
-        <select className="input sm" style={{ width: 'auto' }} aria-label="Status" value={status} onChange={(e) => setStatus(e.target.value)}>
-          <option value="">All statuses</option><option value="approved">Approved</option><option value="counted">Approved and waiting (not sent back)</option><option value="submitted">Waiting approval</option><option value="draft">Draft</option><option value="rejected">Sent back</option></select>
-        {filtered && <button className="btn sm ghost" onClick={clearAll}>Clear filters</button>}
-        <span className="grow" /><span className="muted small">{filtered ? 'Totals below follow the filters' : 'All entries of the year, every status'}</span>
-      </div>
       <div className="total">
         <div className="stat s1"><small>Scope 1</small><b>{tco2e(sum('co2e_direct'))}</b><small>tCO₂e</small></div>
         <div className="stat s2"><small>Scope 2 · location-based</small><b>{tco2e(sum('co2e_scope2'))}</b><small>tCO₂e</small></div>
@@ -162,13 +162,33 @@ export function Entries() {
 
       <div className="card flush">
         <div style={{ padding: '14px 16px 6px' }}><h2>Entries · {shown.length}{!status && shown.length ? ` · ${shown.filter((a) => a.status === 'approved').length} approved` : ''}</h2>
-          <p className="sub">Every status unless filtered; the totals above follow the filters. Dashboards and reports count approved entries only. Purchase files create one entry per facility, month and spend category — their lines are under Add data → Purchases → Published lines.</p>
+          <p className="sub">Every status unless filtered; the total row and the cards above follow the filters. Dashboards and reports count approved entries only. Purchase files create one entry per facility, month and spend category — their lines are under Add data → Purchases → Published lines.</p>
           {!rows.length && other.length > 0 && <div className="note info small">No entries in {year}. Entries exist in {other.map((y) => <button key={y.year} className="btn xs ghost" onClick={() => setYear(y.year)}>{y.year} ({y.n})</button>)}</div>}</div>
+      <div className="row" style={{ gap: 8, flexWrap: 'wrap', alignItems: 'center', margin: '4px 0 0', padding: '0 16px 12px' }}>
+        <select className="input sm" style={{ width: 'auto' }} aria-label="Month" value={month} onChange={(e) => setMonth(e.target.value)}>
+          <option value="">All months</option>{months.map((m) => <option key={m} value={m}>{monthName(m)} {year}</option>)}</select>
+        <select className="input sm" style={{ width: 'auto', maxWidth: 260 }} aria-label="Facility" value={fac} onChange={(e) => setFac(e.target.value)}>
+          <option value="">All facilities ({facs.length})</option>{facs.map((f) => <option key={f}>{f}</option>)}</select>
+        <select className="input sm" style={{ width: 'auto', maxWidth: 260 }} aria-label="Category" value={cat} onChange={(e) => { setCat(e.target.value); setItem(''); }}>
+          <option value="">All categories</option>{cats.map((c) => <option key={c}>{c}</option>)}</select>
+        <select className="input sm" style={{ width: 'auto', maxWidth: 280 }} aria-label="Item" value={item} onChange={(e) => setItem(e.target.value)}>
+          <option value="">All items ({items.length})</option>{items.map((x) => <option key={x}>{x}</option>)}{item && !items.includes(item) && <option>{item}</option>}</select>
+        <select className="input sm" style={{ width: 'auto' }} aria-label="Status" value={status} onChange={(e) => setStatus(e.target.value)}>
+          <option value="">All statuses</option><option value="approved">Approved</option><option value="counted">Approved and waiting (not sent back)</option><option value="submitted">Waiting approval</option><option value="draft">Draft</option><option value="rejected">Sent back</option></select>
+        {filtered && <button className="btn sm ghost" onClick={clearAll}>Clear filters</button>}
+        <span className="grow" /><span className="muted small">{filtered ? 'The totals (row below and cards above) follow the filters' : 'All entries of the year, every status'}</span>
+      </div>
         {rows.length ? (
           <div className="scroll">
             <table className="t">
               <thead><tr><th>Period</th><th>Facility</th><th>Category</th><th>Item</th><th className="num">Quantity</th><th className="num">Scope 1 tCO₂e</th><th className="num">Scope 2 loc.</th><th className="num">Scope 2 mkt.</th><th className="num">Scope 3.3</th><th className="num">Scope 3 other</th><th>GWP</th><th>Type</th><th>Status</th></tr></thead>
-              <tbody>{shown.map((a) => (
+              <tbody>{shown.length > 1 && <tr className="totrow">
+                  <td colSpan={4}><b>Total · {shown.length} entries</b>{filtered ? <span className="muted small"> · filtered</span> : null}</td>
+                  <td className="num" title={qty.mixed ? 'Different units: summed per unit' : undefined}>{qty.text}</td>
+                  <td className="num">{tco2e(sum('co2e_direct'))}</td><td className="num">{tco2e(sum('co2e_scope2'))}</td><td className="num">{tco2e(sum('co2e_scope2_market'))}</td>
+                  <td className="num">{tco2e(sum('co2e_wtt') + sum('co2e_td'))}</td><td className="num">{tco2e(sum('co2e_scope3'))}</td><td colSpan={3} />
+                </tr>}
+                {shown.map((a) => (
                 <tr key={a.id} className="click" onClick={() => show(a.id)}>
                   <td style={{ whiteSpace: 'nowrap' }}>{new Date(a.period_start + 'T00:00:00Z').toLocaleDateString('en-GB', { month: 'short', year: 'numeric', timeZone: 'UTC' })}</td><td>{a.facility}</td><td>{a.category}{a.purchase_batch_id && <div className="muted small">from a purchase file</div>}</td><td>{a.vehicle ? <><b>{a.vehicle}</b> · </> : null}{a.waste_site ? <><b>{a.waste_site}</b> · </> : null}{a.item}</td>
                   <td className="num">{num(a.quantity)} {unitLabel(a.unit)}</td><td className="num">{tco2e(a.co2e_direct)}</td><td className="num">{tco2e(Number(a.co2e_scope2 ?? 0))}</td><td className="num">{tco2e(Number(a.co2e_scope2_market ?? 0))}</td><td className="num">{tco2e(Number(a.co2e_wtt) + Number(a.co2e_td ?? 0))}</td><td className="num">{a.ghg_category ? <>{tco2e(Number(a.co2e_scope3 ?? 0))} <span className="chip grey">3.{a.ghg_category}</span></> : tco2e(Number(a.co2e_scope3 ?? 0))}</td>

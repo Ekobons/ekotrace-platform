@@ -55,7 +55,7 @@ export function Dashboards() {
   };
   return (
     <DrillCtx.Provider value={drill}>
-    <div className="page" style={{ gap: 12 }}>
+    <div className="page dashpage" style={{ gap: 12 }}>
       <ViewBar v={v} />
       {!d || !c ? <div className="card empty">{err ?? 'Loading…'}</div> : <>
         <div className="dhead">
@@ -186,7 +186,7 @@ function Overview({ d, c, go }: { d: Data; c: Ctx; go: (t: Tab) => void }) {
         </div>
         <div className="sbar">{parts.map((p) => <span key={p.n} style={{ flex: p.v || 0.0001, background: p.c }} title={p.n} />)}</div>
         <div className="sins"><b>Scope {big + 1} is {w(c.s[big]!)} of the total.</b> Main levers: {lever}.</div>
-        <div className="muted" style={{ fontSize: 11 }}>{c.cmpOn ? (c.nFull ? `vs ${yy} = the ${c.nFull} complete month${c.nFull === 1 ? '' : 's'} against the same months of ${d.cmpYear}. ` : `vs ${yy} = the same months of ${d.cmpYear}. `) : ''}Scope 2 {d.scope2}-based.</div>
+        <div className="muted" style={{ fontSize: 12.5 }}>{c.cmpOn ? (c.nFull ? `vs ${yy} = the ${c.nFull} complete month${c.nFull === 1 ? '' : 's'} against the same months of ${d.cmpYear}. ` : `vs ${yy} = the same months of ${d.cmpYear}. `) : ''}Scope 2 {d.scope2}-based.</div>
       </DCard>
       <DCard title="Where emissions come from" span={2} sub={`box size = tCO₂e · colour = scope · all ${tm.length} sources listed`}>
         <div className="tmwrap"><div><Treemap items={tmTop} W={320} H={215} /></div>
@@ -211,7 +211,7 @@ function Overview({ d, c, go }: { d: Data; c: Ctx; go: (t: Tab) => void }) {
       <DCard title="Net zero · emissions vs offsets">
         <div className="dsplit"><Donut parts={nzParts} center={pc(off, c.total)} sub="offset" size={118} />
           <Legend parts={nzParts} unit="t" /></div>
-        <div className="muted" style={{ fontSize: 12 }}>{ret ? `${fmt0(ret)} t of credits retired for ${d.year} (whole company), reported beside gross emissions, never instead.` : `No retired carbon credits recorded for ${d.year}.`}</div>
+        <div className="muted" style={{ fontSize: 13 }}>{ret ? `${fmt0(ret)} t of credits retired for ${d.year} (whole company), reported beside gross emissions, never instead.` : `No retired carbon credits recorded for ${d.year}.`}</div>
         <button className="btn sm ghost" style={{ alignSelf: 'flex-start' }} onClick={() => go('netzero')}>Net zero detail →</button>
       </DCard>
     </div>
@@ -269,7 +269,7 @@ function Facilities({ d, c, pick }: { d: Data; c: Ctx; pick: (id: string) => voi
           <tbody>{rows.map((x) => <tr key={x.f.id}><td className="nowrap"><b>{x.f.name}</b></td>{MN.map((_, i) => { const m = i + 1; if (!c.months.includes(m)) return <td key={i} />;
             const v = cell(x.f.id, m), wt = c.waiting.has(`${x.f.id}|${m}`), has = c.filled.has(`${x.f.id}|${m}`);
             return <td key={i} className={`num hm${v ? ' drill' : ''}`} onClick={v ? () => drill({ fid: x.f.id, m, label: `${x.f.name} · ${MN[m - 1]}` }) : undefined} title={!has ? 'No data yet' : wt ? 'Entries waiting for approval' : 'Approved — click to open the entries'} style={{ background: v ? `color-mix(in srgb, var(--primary) ${Math.round(8 + (v / mx) * 62)}%, transparent)` : 'transparent', ...(wt || !has ? { outline: '1.5px dashed var(--warn)', outlineOffset: -3 } : {}) }}>{v ? fmtT(v) : '—'}</td>; })}</tr>)}</tbody></table></div>
-        <div className="muted" style={{ fontSize: 11.5 }}>Dashed outline = month not fully approved, or no data yet.</div>
+        <div className="muted" style={{ fontSize: 12.5 }}>Dashed outline = month not fully approved, or no data yet.</div>
       </DCard>
     </div>
   </>;
@@ -293,11 +293,11 @@ function Energy({ d, c }: { d: Data; c: Ctx }) {
     <div className="dgrid">
       <DCard title="Energy by month and source (MWh)" span={2}><Bars rows={rows} unit="MWh" h={175} label="Energy by month" />
         <div className="lgd">{mix.map((p) => <span key={p.n}><i style={{ background: p.c }} />{p.n}</span>)}</div>
-        {noKwh > 0 && <div className="muted" style={{ fontSize: 11.5 }}>{noKwh} vehicle entries are recorded by distance: their emissions count, their energy is not converted.</div>}</DCard>
+        {noKwh > 0 && <div className="muted" style={{ fontSize: 12.5 }}>{noKwh} vehicle entries are recorded by distance: their emissions count, their energy is not converted.</div>}</DCard>
       <DCard title="Energy mix"><div className="dsplit"><Donut parts={mix} center={fmt0(total)} sub="MWh" size={140} /><Legend parts={mix} unit="MWh" /></div></DCard>
       <DCard title="By facility (MWh)" span={2}><HBars items={fac} unit="MWh" c="var(--s2)" /></DCard>
       <DCard title="Renewable electricity"><div className="dsplit"><Donut parts={[{ n: 'Renewable', v: ren, c: '#E9B44C' }, { n: 'Grid & other', v: Math.max(0, elec - ren), c: 'var(--line2)' }]} center={pc(ren, elec)} sub="renewable" size={130} />
-        <div className="muted" style={{ fontSize: 12, flex: 1, minWidth: 150 }}>Add I-RECs or green tariffs under Energy certificates & suppliers to lift the market-based renewable share.</div></div></DCard>
+        <div className="muted" style={{ fontSize: 13, flex: 1, minWidth: 150 }}>Add I-RECs or green tariffs under Energy certificates & suppliers to lift the market-based renewable share.</div></div></DCard>
     </div>
   </>;
 }
@@ -334,9 +334,9 @@ function Water({ d, c }: { d: Data; c: Ctx }) {
             <tr><td><b>Total</b></td><td className="num"><b>{ML(W)}</b></td><td className="num"><b>{ML(D)}</b></td></tr>
             <tr><td>Consumption (withdrawal − discharge)</td><td className="num" colSpan={2}><b>{ML(cons)}</b></td></tr>
             <tr><td>Recycled or reused on site</td><td className="num" colSpan={2}>{ML(R)}</td></tr></tbody></table>
-        <div className="muted" style={{ fontSize: 11.5 }}>Water lost by evaporation, in products or to irrigation counts as consumption. Water stress areas are not assessed.</div></DCard>
+        <div className="muted" style={{ fontSize: 12.5 }}>Water lost by evaporation, in products or to irrigation counts as consumption. Water stress areas are not assessed.</div></DCard>
       <DCard title="Emissions by source (tCO₂e)"><HBars unit="t" c="var(--s3)" items={[...emBy.entries()].sort((a, b) => b[1] - a[1]).map(([n, v]) => ({ n, v, d: 2 }))} />
-        <div className="muted" style={{ fontSize: 11.5 }}>Own wells, sea intake and rain: no Scope 3 (their energy is in your electricity and fuel). Mains water uses DESNZ's UK water supply factor unless the utility's own factor was entered.</div></DCard>
+        <div className="muted" style={{ fontSize: 12.5 }}>Own wells, sea intake and rain: no Scope 3 (their energy is in your electricity and fuel). Mains water uses DESNZ's UK water supply factor unless the utility's own factor was entered.</div></DCard>
       <DCard title="By facility (m³)" span={2}><HBars unit="m³" c="#2E6FB0" items={facs.map((x) => ({ n: x.f.name, v: x.w, p: W ? (x.w / W) * 100 : 0 }))} /></DCard>
       <DCard title="Withdrawn per employee (m³ / year)"><HBars unit="m³" c="#7FB8D4" items={facs.filter((x) => x.per !== null).map((x) => ({ n: x.f.name, v: x.per!, d: 1 })).sort((a, b) => b.v - a.v)} /></DCard>
     </div>
@@ -382,7 +382,7 @@ function Waste({ d, c }: { d: Data; c: Ctx }) {
           <tbody>{GRI306.map(([g, n, names], i) => { const h = cell(true, names), nh = cell(false, names); return (
             <tr key={n}><td className="muted small">{i === 0 || GRI306[i - 1]![0] !== g ? g : ''}</td><td>{n}</td><td className="num">{t1(h)}</td><td className="num">{t1(nh)}</td><td className="num"><b>{t1(h + nh)}</b></td></tr>); })}
             <tr><td /><td><b>Waste generated</b></td><td className="num"><b>{t1(haz)}</b></td><td className="num"><b>{t1(total - haz)}</b></td><td className="num"><b>{t1(total)}</b></td></tr></tbody></table>
-        <div className="muted" style={{ fontSize: 11.5 }}>All off-site (sent to other companies). Waste the company treats for others at its own sites is operations, not waste generated: shown separately below.</div></DCard>
+        <div className="muted" style={{ fontSize: 12.5 }}>All off-site (sent to other companies). Waste the company treats for others at its own sites is operations, not waste generated: shown separately below.</div></DCard>
       <DCard title="By contractor (t)"><HBars unit="t" c="var(--s3)" items={[...cons.entries()].sort((a, b) => b[1] - a[1]).map(([n, v]) => ({ n, v, d: 1, p: total ? (v / total) * 100 : 0 }))} /></DCard>
       <DCard title="Diverted from landfill by month (%)" span={2}><Bars rows={rate} unit="%" h={150} label="Diversion rate" /></DCard>
       <DCard title="By facility (t)"><HBars unit="t" c="var(--s3)" items={d.facilities.map((f) => ({ n: f.name, v: sum(own.filter((r) => r.f === f.id), tonnes), d: 1 })).filter((x) => x.v).sort((a, b) => b.v - a.v)} /></DCard>
@@ -465,7 +465,7 @@ function NetZero({ d, c }: { d: Data; c: Ctx }) {
       <DCard title="Credit portfolio" span={2} sub={`retired for ${d.year} by type`} right={<Link className="btn sm ghost" to={`/credits?year=${d.year}`}>Carbon credits →</Link>}>
         {S && ret ? <HBars unit="t" c="#6B4FA8" items={Object.entries(S.byCategory).filter(([, v]) => v > 0).map(([k, v]) => ({ n: cr!.categories[k]!, v, d: 0, c: CC[k] }))} />
           : <div className="muted" style={{ fontSize: 13 }}>No credits retired for {d.year}{cr?.lots.length ? ` (${cr.lots.length} purchase${cr.lots.length === 1 ? '' : 's'} in the register)` : ''}; gross and net are the same. Record purchases and retirements under Carbon credits.</div>}
-        {S && nzOk(S) && <div className="muted" style={{ fontSize: 12 }}>Removals held or contracted for the residual at net zero: {fmt0(S.netZero.removalsHeld)} t of {fmt0(S.netZero.residual)} t a year.</div>}</DCard>
+        {S && nzOk(S) && <div className="muted" style={{ fontSize: 13 }}>Removals held or contracted for the residual at net zero: {fmt0(S.netZero.removalsHeld)} t of {fmt0(S.netZero.residual)} t a year.</div>}</DCard>
       <DCard title="Good practice"><ul style={{ margin: 0, paddingLeft: 18, fontSize: 12.5, lineHeight: 1.6 }}><li>Report gross emissions first; credits separately.</li><li>SBTi targets count reductions only — credits do not.</li><li>Use permanent removals for the residual at net zero.</li></ul></DCard>
     </div>
   </>;

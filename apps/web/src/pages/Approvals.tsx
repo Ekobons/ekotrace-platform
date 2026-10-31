@@ -38,11 +38,11 @@ export function Approvals() {
   };
   const show = async (id: string) => { try { setOpen(await api.activity(id)); dlg.current?.showModal(); } catch (e) { toast((e as Error).message); } };
   // filters: facility, category, month, check, level, search — applied to both lists
-  const [F, setF] = useState({ fac: '', cat: '', month: '', check: '', level: '', q: '' });
+  const [F, setF] = useState({ year: '', fac: '', cat: '', month: '', check: '', level: '', q: '' });
   const all = [...(d?.mine ?? []), ...(d?.others ?? [])];
   const uniq = <T,>(xs: T[]) => [...new Set(xs)];
-  const facs = uniq(all.map((l) => l.facility)).sort(), cats = uniq(all.map((l) => l.category)).sort(), months = uniq(all.map((l) => l.month.slice(0, 7))).sort().reverse();
-  const keep = (l: ApprovalRow) => (!F.fac || l.facility === F.fac) && (!F.cat || l.category === F.cat) && (!F.month || l.month.startsWith(F.month))
+  const facs = uniq(all.map((l) => l.facility)).sort(), cats = uniq(all.map((l) => l.category)).sort(), months = uniq(all.filter((l) => !F.year || l.month.startsWith(F.year)).map((l) => l.month.slice(0, 7))).sort().reverse(), years = uniq(all.map((l) => l.month.slice(0, 4))).sort().reverse();
+  const keep = (l: ApprovalRow) => (!F.year || l.month.startsWith(F.year)) && (!F.fac || l.facility === F.fac) && (!F.cat || l.category === F.cat) && (!F.month || l.month.startsWith(F.month))
     && (!F.check || (F.check === 'warn' ? l.check && !l.check.ok : F.check === 'ok' ? l.check?.ok : !l.check))
     && (!F.level || (F.level === 'L2' ? l.stage === 'L2' : l.stage !== 'L2'))
     && (!F.q || `${l.item} ${l.note ?? ''} ${l.by ?? ''}`.toLowerCase().includes(F.q.toLowerCase()));
@@ -89,12 +89,14 @@ export function Approvals() {
       {!d ? <div className="card empty">Loading…</div> : <>
         <div className="row apfilt">
           <input className="input sm" type="search" placeholder="Search item, note, person" style={{ width: 220 }} value={F.q} onChange={(e) => setF({ ...F, q: e.target.value })} />
+          <select className="input sm" aria-label="Year" style={{ width: 'auto' }} value={F.year} onChange={(e) => setF({ ...F, year: e.target.value, month: F.month && !F.month.startsWith(e.target.value) ? '' : F.month })}>
+            <option value="">All years</option>{years.map((y) => <option key={y} value={y}>{y} ({all.filter((l) => l.month.startsWith(y)).length})</option>)}</select>
           {sel('fac', 'All facilities', facs.map((x) => [x, x]))}
           {sel('cat', 'All categories', cats.map((x) => [x, x]))}
           {sel('month', 'All months', months.map((m) => [m, ml(m)]))}
           {sel('check', 'Any check', [['warn', 'With warnings'], ['ok', 'In usual range'], ['none', 'No history']])}
           {d.settings.l2 && sel('level', 'Any level', [['L1', 'Level 1'], ['L2', 'Level 2']])}
-          {filtered && <button className="btn sm ghost" onClick={() => setF({ fac: '', cat: '', month: '', check: '', level: '', q: '' })}>Clear filters</button>}
+          {filtered && <button className="btn sm ghost" onClick={() => setF({ year: '', fac: '', cat: '', month: '', check: '', level: '', q: '' })}>Clear filters</button>}
           <span className="grow" /><span className="muted small">{mine.length + others.length} of {all.length} shown</span>
         </div>
         <section className="card tacard">

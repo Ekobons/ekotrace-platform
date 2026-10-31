@@ -2,6 +2,13 @@
 
 Newest first.
 
+## 2026-10-31 · Entries filters and totals, Approvals year, larger dashboard text
+
+- Entries & results: the filters sit just above the entries list; new **Item** filter (items of the entries left by the category and facility filters; `item` in the address); a **Total** row at the top of the list sums the entries shown — quantity (one figure per unit when units differ, up to three) and Scope 1, Scope 2 location / market, Scope 3.3 and Scope 3 other.
+- Approvals: **Year** filter (All years by default, with the number of entries per year); the month list follows the year.
+- Dashboards (`.dashpage`): larger KPI values (27 px) and sub-lines, card titles, legends, top-5 list, source list, tables and notes; chart axis and month labels, donut sub-label and treemap labels one size up. Checked on every dashboard tab for overflow.
+- Manual: Approvals & progress.
+
 ## 2026-10-31 · Add data: months added later keep the type you chose
 
 - `components/MonthGrid.tsx`: the type picked on a row (e.g. Petrol for January) becomes the default for months added afterwards (one by one, All open months, or after clearing the months), instead of the first type of the list (Diesel). Remembered per list of types for the session.

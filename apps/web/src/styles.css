@@ -1688,3 +1688,24 @@ td.drill:hover { outline: 2px solid var(--primary); outline-offset: -2px; }
 .prodlist > label.row { display: grid; grid-template-columns: 18px minmax(0, 1fr); align-items: start; gap: 8px; font-size: 13.5px; line-height: 1.35; flex-wrap: nowrap; }
 .prodlist > label.row input { margin: 2px 0 0; }
 @media (max-width: 560px) { .prodlist { grid-template-columns: 1fr; } }
+table.t tr.totrow td { background: var(--ok-bg); font-weight: 600; border-bottom: 2px solid var(--line); }
+
+/* Dashboards: larger values and labels (readability) */
+.dashpage .dstat b { font-size: 27px; }
+.dashpage .dstat b small, .dashpage .dstat small, .dashpage .dstat .muted { font-size: 13.5px; }
+.dashpage .dch h3 { font-size: 16px; }
+.dashpage .dch .muted { font-size: 13px; }
+.dashpage .dleg { font-size: 14px; gap: 7px; }
+.dashpage .dhb > div { font-size: 14px; }
+.dashpage .t5 { font-size: 14px; padding: 7px 0; }
+.dashpage .t5 small, .dashpage .t5 .muted { font-size: 12.5px; }
+.dashpage .t5 .rk { width: 22px; height: 22px; font-size: 12px; }
+.dashpage .vc b { font-size: 17px; }
+.dashpage .vc small { font-size: 12.5px; }
+.dashpage .vcl { font-size: 13.5px; }
+.dashpage .dt td, .dashpage .dt th { font-size: 13px; padding: 5px 6px; }
+.dashpage .lgd { font-size: 13px; }
+.dashpage .sins { font-size: 13.5px; }
+.dashpage .tml { font-size: 14px; gap: 4px; }
+.dashpage .tml .muted { font-size: 12.5px; }
+.dashpage .small, .dashpage small.muted { font-size: 12.5px; }
