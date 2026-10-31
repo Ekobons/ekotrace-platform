@@ -2,6 +2,10 @@
 
 Newest first.
 
+## 2026-10-31 · US electricity upstream (WTT) factors
+
+- `data/grid/grid-factors.csv`: well-to-tank (Scope 3.3) electricity factors for the US average, 50 states, DC and Puerto Rico for data years 2021–2023 (159 rows, source `CARBONDI-US-WTT`, from Ekobon's "Scope 2 – Emission Factors" workbook, US tab). carbondi's factor year 2025 is eGRID2023 data (state generation figures match eGRID2023 to 4 decimals), so its 2025/2024/2023 rows are filed as 2023/2022/2021, beside eGRID's generation and T&D. Generation and T&D stay on US EPA eGRID.
+
 ## 2026-10-31 · UAE grid factors
 
 - `data/grid/grid-factors.csv`: UAE national average 2023–2026 from DEWA's published electricity carbon intensity (certified to ISO 14064-3): 2023 0.3979, 2024 0.4045, 2025 0.3833 kgCO₂e/kWh; 2026 uses 2025 until DEWA publishes it (source `AE-DEWA-CI`). Dubai's 0.4 (from 2023) attributed to the IEA 2022 report it came from (`IEA-2022-AE-DU`) instead of "previous Ekotrace list". 2019 (MOCCAE), Dubai 2018–2020 and Abu Dhabi (EWEC) unchanged. Loaded at start-up; earlier versions kept as history.

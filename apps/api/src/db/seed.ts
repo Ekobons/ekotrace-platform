@@ -145,7 +145,7 @@ const GRID_PUBLISHER: Record<string, string> = {
   'AU-NGA-2025': 'Australian Government DCCEEW', 'IN-CEA-V20': 'Central Electricity Authority (India)',
   'SG-EMA-GEF': 'Energy Market Authority (Singapore)', 'CN-MEE-2023': 'Ministry of Ecology and Environment (China)',
   'JP-MOE-METI-2024': 'Ministry of the Environment / METI (Japan)',
-  'EPA-eGRID2023-ST': 'US Environmental Protection Agency', 'NZ-MFE-2025': 'Ministry for the Environment (New Zealand)',
+  'EPA-eGRID2023-ST': 'US Environmental Protection Agency', 'CARBONDI-US-WTT': 'carbondi.com', 'NZ-MFE-2025': 'Ministry for the Environment (New Zealand)',
   'ZA-DFFE-2023': 'Department of Forestry, Fisheries and the Environment (South Africa)',
   'MY-ST-GEF-2024': 'Energy Commission (Suruhanjaya Tenaga, Malaysia)', 'TR-ETKB-2022': 'Ministry of Energy and Natural Resources (Türkiye)',
   'HK-CLP-2024': 'CLP Power Hong Kong', 'HK-HKE-2025': 'HK Electric', 'KR-GIR-2023': 'Ministry of Climate, Energy and Environment (Korea)',
