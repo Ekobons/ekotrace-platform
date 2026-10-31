@@ -37,7 +37,7 @@ export interface Activity { id: string; facility_id?: string; period_start: stri
 
 // -------------------------------------------------------------- weekly updates (platform admin) --
 export interface UpdateItem {
-  key: string; week: string; stream: 'factors' | 'cbam' | 'cpi' | 'fx' | 'tech' | 'market' | 'regulation'; title: string; detail: string; impact: string; published: string | null;
+  key: string; week: string; stream: 'factors' | 'cbam' | 'cpi' | 'fx' | 'tech' | 'market' | 'regulation' | 'standards'; title: string; detail: string; impact: string; published: string | null;
   sources: { title: string; url: string }[]; whereTo: string; status: 'new' | 'applied' | 'done' | 'dismissed'; decidedName: string | null; decidedAt: string | null; note: string;
   apply: { kind: 'fx'; rows: { currency: string; month: string; perUsd: number; source: string }[] } | { kind: 'cpi'; rows: { region: string; year: number; value: number; source: string }[] } | null;
 }

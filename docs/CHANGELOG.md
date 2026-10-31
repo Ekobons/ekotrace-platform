@@ -2,6 +2,10 @@
 
 Newest first.
 
+## 2026-10-31 · Weekly updates: GHG Protocol & standards stream
+
+- Migration 073: `platform_update.stream` adds `standards` (GHG Protocol, ISO 14064/14067, SBTi, PCAF methodology changes); API and the Weekly updates screen ("GHG Protocol & standards"); `data/updates/README.md`. The weekly business tracker now researches these every week.
+
 ## 2026-10-31 · Parts of an emission explained, ⓘ links into the manual
 
 - Manual → Factors & methodology → **Parts of an emission**: Scope 1, Scope 2 location- and market-based (residual mix), T&D losses, upstream / well-to-tank, WTT of T&D, other Scope 3, biogenic CO₂, memo (ozone-depleting refrigerants), gases and GWP — each with what it is, where it is reported and a worked electricity example.

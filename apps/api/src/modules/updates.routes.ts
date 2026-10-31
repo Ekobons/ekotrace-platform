@@ -42,7 +42,7 @@ export const updateFile = z.object({
   summary: z.string().max(2000).default(''),
   items: z.array(z.object({
     key,
-    stream: z.enum(['factors', 'cbam', 'cpi', 'fx', 'tech', 'market', 'regulation']),
+    stream: z.enum(['factors', 'cbam', 'cpi', 'fx', 'tech', 'market', 'regulation', 'standards']),
     title: z.string().trim().min(2).max(200),
     detail: z.string().max(4000).default(''),
     impact: z.string().max(2000).default(''),

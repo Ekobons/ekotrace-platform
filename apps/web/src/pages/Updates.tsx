@@ -10,7 +10,7 @@ import { useApp } from '../App';
 import { api, type UpdateItem, type UpdatePost, type UpdatesData } from '../lib/api';
 
 const STREAM: Record<UpdateItem['stream'], string> = {
-  factors: 'Emission factors', cbam: 'CBAM', cpi: 'US CPI', fx: 'Exchange rates', regulation: 'Regulation', tech: 'Tech', market: 'Market',
+  factors: 'Emission factors', cbam: 'CBAM', cpi: 'US CPI', fx: 'Exchange rates', regulation: 'Regulation', standards: 'GHG Protocol & standards', tech: 'Tech', market: 'Market',
 };
 const STATUS: Record<UpdateItem['status'], [string, string]> = { new: ['To review', 'warn'], applied: ['Applied', ''], done: ['Done', ''], dismissed: ['Dismissed', 'grey'] };
 const POST: Record<UpdatePost['status'], [string, string]> = { draft: ['Draft', 'warn'], approved: ['Approved', 'info'], rejected: ['Rejected', 'grey'], posted: ['Posted', ''] };

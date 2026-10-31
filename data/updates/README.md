@@ -41,7 +41,7 @@ One file per week, named `<YYYY-MM-DD>.json` (the Monday of the week), written b
 
 Rules
 - `key`: lower-case letters, digits, `.`, `_`, `-` (2–80 characters), unique across all weeks. Reusing a key updates that item's wording but keeps the decision already taken.
-- `stream`: `factors`, `cbam`, `cpi`, `fx`, `tech`, `market` or `regulation`.
+- `stream`: `factors`, `cbam`, `cpi`, `fx`, `tech`, `market`, `regulation` or `standards` (GHG Protocol, ISO 14064/14067, SBTi, PCAF — methodology changes; `impact` says which part of EKOTRACE's calculation or reporting it touches, e.g. Scope 2 market-based, category 3, biogenic CO₂, removals).
 - `apply` only for data the tool takes directly:
   - `{"kind":"fx","rows":[{currency, month "YYYY-MM", perUsd (units of the currency per 1 USD), source}]}` — monthly averages, written as shared rates. Same source as the rates already loaded: Federal Reserve G.5 via FRED. USD-pegged currencies (AED, SAR, QAR, OMR, BHD) are not needed.
   - `{"kind":"cpi","rows":[{region "US", year, value, source}]}` — the CPI-U **annual average** only (the tool converts by year).
