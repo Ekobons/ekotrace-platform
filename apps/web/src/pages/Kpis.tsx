@@ -48,7 +48,7 @@ export const KPI_LIB: Kpi[] = ([
 ] as [string, string, string, string, 'down' | 'up', Kpi['fn']][]).map(([id, name, unit, area, dir, fn]) => ({ id, name, unit, area, dir, fn, ratio: /%|\//.test(unit) }));
 const AREAS = ['Emissions', 'Intensity', 'Energy', 'Water', 'Waste', 'Mobility', 'Value chain'];
 const FREQ: Record<string, [string, number]> = { m: ['Monthly', 1], q: ['Quarterly', 3], h: ['Semi-annual', 6], y: ['Annual', 12] };
-const BENCH: Record<string, [number | null, number | null, string]> = { Office: [150, 250, 'kWh/m²·yr'], Residential: [100, 180, 'kWh/m²·yr'], Clinic: [250, 400, 'kWh/m²·yr'], Laboratory: [300, 600, 'kWh/m²·yr'], Warehouse: [50, 120, 'kWh/m²·yr'], 'Data centre': [null, null, 'PUE'], 'Fleet depot': [null, null, ''] };
+const BENCH: Record<string, [number | null, number | null, string]> = { Office: [150, 250, 'kWh/m²·yr'], Residential: [100, 180, 'kWh/m²·yr'], Clinic: [250, 400, 'kWh/m²·yr'], Laboratory: [300, 600, 'kWh/m²·yr'], Warehouse: [50, 120, 'kWh/m²·yr'], 'Educational campus': [150, 300, 'kWh/m²·yr'], 'Data centre': [null, null, 'PUE'], 'Fleet depot': [null, null, ''] };
 
 export function Kpis() {
   const { toast } = useApp();

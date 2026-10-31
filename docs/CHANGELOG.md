@@ -2,6 +2,10 @@
 
 Newest first.
 
+## 2026-10-31 · Facility type "Educational campus"
+
+- New facility type **Educational campus** (Organisation form, filters, Excel template drop-down and upload); KPI dashboard energy-intensity band 150–300 kWh/m²·yr, like the other types' indicative bands.
+
 ## 2026-10-31 · Energy mix by emissions and sub-category; contrasting scope colours
 
 - Dashboards → Energy → **Energy mix**: switches **MWh / tCO₂e** and **Source / Sub-category** (liquid fuels, gaseous fuels, cooling, vehicle classes…); tCO₂e covers every energy entry, vehicles recorded by distance included.

@@ -17,7 +17,7 @@ import { FacilityEnergy } from '../components/FacilityEnergy';
 import { MeterRegister } from './Meters';
 import { FacilitiesTab, GroupsTab, SubgroupsTab } from './OrgTabs';
 
-const TYPES = ['Office', 'Plant', 'Warehouse', 'Fleet depot', 'Data centre', 'Residential', 'Retail', 'Landfill', 'Laboratory', 'Other'];
+const TYPES = ['Office', 'Plant', 'Warehouse', 'Fleet depot', 'Data centre', 'Residential', 'Retail', 'Landfill', 'Laboratory', 'Educational campus', 'Other'];
 
 const KIND_LABEL: Record<OrgNode['kind'], string> = { group: 'Main entity', subgroup: 'Sub-group', facility: 'Facility' };
 const VIEW_KEY = 'eko.orgView';

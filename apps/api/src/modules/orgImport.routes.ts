@@ -19,7 +19,7 @@ import { sendWorkbook, styleHeader } from '../lib/xlsx.js';
 import { airports } from '../lib/airports.js';
 import { checkFacilityLimit } from '../lib/plans.js';
 
-export const FACILITY_TYPES = ['Office', 'Plant', 'Warehouse', 'Fleet depot', 'Data centre', 'Residential', 'Retail', 'Landfill', 'Laboratory', 'Other'];
+export const FACILITY_TYPES = ['Office', 'Plant', 'Warehouse', 'Fleet depot', 'Data centre', 'Residential', 'Retail', 'Landfill', 'Laboratory', 'Educational campus', 'Other'];
 const HEAD = ['Sub-group', 'Facility', 'Facility type', 'City / location', 'Country', 'Floor area (m²)', 'Employees', 'Ownership %', 'Manager e-mail'];
 type Col = 'sub' | 'fac' | 'type' | 'loc' | 'country' | 'area' | 'emp' | 'own' | 'mgr';
 const SYN: [Col, RegExp][] = [
