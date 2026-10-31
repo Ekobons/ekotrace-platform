@@ -4,8 +4,11 @@ import { api } from '../lib/api';
 import { BRAND } from '../lib/brand';
 import { BrandMark } from '../components/BrandMark';
 import { CbamBrandSide } from './CbamPublic';
+import { forgetWork } from '../lib/workContext';
 
 export function Login({ onDone }: { onDone: () => void }) {
+  // a new log-in starts from the defaults (first facility, this year)
+  useEffect(() => { forgetWork(); }, []);
   // a bin's QR label opened before signing in: a contractor goes to the portal with that bin chosen
   const binCode = /^\/scan\/([A-Za-z0-9]+)/.exec(window.location.pathname)?.[1] ?? '';
   const [mode, setMode] = useState<'password' | 'code' | 'sso'>('password');

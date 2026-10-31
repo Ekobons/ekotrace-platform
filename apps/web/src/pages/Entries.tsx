@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { unitLabel, api, BASIS_LABEL, num, tco2e, type Activity } from '../lib/api';
 import { useApp } from '../App';
+import { rememberWork, workContext } from '../lib/workContext';
 import { ENERGY_UNITS, Result } from '../components/Result';
 import { Icon } from '../components/Icon';
 import { GasToggle, useGasSplit } from '../components/GasToggle';
@@ -14,20 +15,48 @@ import { Evidence } from '../components/Evidence';
 const STATUS: Record<string, [string, string]> = { draft: ['Draft', 'c-n'], submitted: ['Waiting approval', 'c-warn'], approved: ['Approved', 'c-ok'], rejected: ['Sent back', 'c-bad'] };
 
 const LIMIT = 5000;
+
+/** Correct a wrong entry from here: send an approved (or waiting) entry back with a reason, then delete it or fix it in Add data. */
+function EntryFix({ a, onDone }: { a: { id: string; status: string; review_note?: string | null }; onDone: (deleted: boolean) => void }) {
+  const { toast } = useApp();
+  const [why, setWhy] = useState<string | null>(null);
+  const [del, setDel] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const run = async (fn: () => Promise<boolean>) => { setBusy(true); try { if (await fn()) { setWhy(null); setDel(false); } } catch (e) { toast((e as Error).message); } finally { setBusy(false); } };
+  const back = () => run(async () => { const r = await api.reviewAction([a.id], 'return', why!.trim()); if (r.skipped.length) { toast(`Not sent back: ${r.skipped[0]!.reason}`); return false; } toast('Sent back — you can now delete it or correct it'); onDone(false); return true; });
+  const remove = () => run(async () => { await api.deleteActivity(a.id); toast('Entry deleted'); onDone(true); return true; });
+  if (a.status === 'approved' || a.status === 'submitted') return (
+    <div className="note small" style={{ display: 'grid', gap: 8 }}>
+      {why === null ? <div className="row" style={{ gap: 8 }}><span className="grow">{a.status === 'approved' ? 'Wrong facility, month or figure? An approver sends it back first; then it can be deleted or corrected.' : 'Waiting for approval. To remove it, send it back first.'}</span>
+        <button className="btn sm ghost danger" onClick={() => setWhy('')}>Send back…</button></div>
+        : <div className="row" style={{ gap: 8, alignItems: 'flex-end' }}><label className="field grow"><span>Why is it sent back?</span><input className="input" autoFocus value={why} placeholder="e.g. entered for the wrong facility" onChange={(e) => setWhy(e.target.value)} /></label>
+          <button className="btn sm p" disabled={busy || !why.trim()} onClick={() => void back()}>Send back</button><button className="btn sm ghost" onClick={() => setWhy(null)}>Cancel</button></div>}
+    </div>);
+  if (a.status === 'draft' || a.status === 'rejected') return (
+    <div className="note small" style={{ display: 'grid', gap: 8 }}>
+      <div className="row" style={{ gap: 8 }}><span className="grow">{a.status === 'rejected' ? <>Sent back{a.review_note ? `: “${a.review_note}”` : ''}. Delete it, or correct it in Add data and submit again.</> : 'Draft — not counted yet.'}</span>
+        {!del ? <button className="btn sm ghost danger" onClick={() => setDel(true)}>Delete…</button>
+          : <><span>Delete this entry for good?</span><button className="btn sm danger" disabled={busy} onClick={() => void remove()}>Delete</button><button className="btn sm ghost" onClick={() => setDel(false)}>Keep</button></>}</div>
+    </div>);
+  return null;
+}
 export function Entries() {
   // filters live in the address, so a dashboard figure can open exactly the entries behind it
   const [sp, setSp] = useSearchParams();
+  const { tenant: tn } = useApp();
+  const tenantId = tn?.id;
   const nav = useNavigate();
   const loc = useLocation();
   type Drill = { cats: string[]; fids: string[]; dm: number[]; whole: boolean; scope: number; items: string[]; wtt: boolean; cons: string; from: string };
   const NO_DRILL: Drill = { cats: [], fids: [], dm: [], whole: true, scope: 0, items: [], wtt: false, cons: '', from: '' };
   const parse = (q: URLSearchParams) => ({
-    year: Number(q.get('y')) || new Date().getFullYear(), status: q.get('status') ?? '', cat: q.get('cat') ?? '', month: q.get('m') ?? '', fac: q.get('fac') ?? '', item: q.get('item') ?? '',
+    year: Number(q.get('y')) || workContext(tenantId).year || new Date().getFullYear(), status: q.get('status') ?? '', cat: q.get('cat') ?? '', month: q.get('m') ?? '', fac: q.get('fac') ?? '', item: q.get('item') ?? '',
     drill: { cats: q.get('cats')?.split('|').filter(Boolean) ?? [], fids: q.get('fids')?.split(',').filter(Boolean) ?? [], dm: (q.get('dm') ?? '').split(',').map(Number).filter((m) => m >= 1 && m <= 12),
       whole: q.get('whole') !== '0', scope: Number(q.get('scope')) || 0, items: q.get('items')?.split('|').filter(Boolean) ?? [], wtt: q.get('wtt') === '1', cons: q.get('cons') ?? '', from: q.get('from') ?? '' } as Drill,
   });
   const init = parse(sp);
   const [year, setYear] = useState(init.year);
+  useEffect(() => { rememberWork(tenantId, { year }); }, [year, tenantId]);
   const [rows, setRows] = useState<Activity[]>([]);
   const [years, setYears] = useState<{ year: number; n: number; approved: number }[]>([]);
   const [status, setStatus] = useState(init.status);
@@ -207,6 +236,7 @@ export function Entries() {
               <button className="btn ghost" onClick={() => dlg.current?.close()} aria-label="Close"><Icon name="x" /></button></div>
             <div className="row"><div className="sub grow">{num(open.quantity)} {unitLabel(open.unit)}{open.unit === 't' && open.item === 'Landfill methane' ? ' CH₄ generated' : ''} · {open.data_type} · saved {new Date(open.created_at).toLocaleString()}</div>
               {canRecalc && <button className="btn ghost sm" onClick={() => recalc({ ids: [open.id], onlyWithWarnings: false })}>Recalculate</button>}</div>
+            <EntryFix a={open} onDone={async (deleted) => { setReload((x) => x + 1); if (deleted) dlg.current?.close(); else setOpen(await api.activity(open.id)); }} />
             <Result r={{ gwpSet: open.gwp_set, totals: { direct: Number(open.co2e_direct), scope2: Number(open.co2e_scope2 ?? 0), scope2_market: Number(open.co2e_scope2_market ?? 0), td_loss: Number(open.co2e_td ?? 0), scope3: Number(open.co2e_scope3 ?? 0), wtt: Number(open.co2e_wtt), outside_scopes: Number(open.co2_biogenic), memo: Number(open.co2e_memo) },
               lines: open.lines.map((l) => ({ basis: l.basis, gas: l.gas, kgGas: l.kg_gas, kgCo2e: l.kg_co2e, method: l.method, source: l.source })), steps: open.steps, warnings: open.warnings, factors: open.factors, cv: open.inputs?.cv }} quantity={Number(open.quantity)} unitName={open.unit} energy={ENERGY_UNITS.has(open.unit)} />
             <Evidence activityId={open.id} />

@@ -67,6 +67,7 @@ import { FinDashboard } from './pages/fin/FinDashboard';
 import { FinPortfolios } from './pages/fin/FinPortfolios';
 import { FinCounterparties, FinCounterpartyProfile } from './pages/fin/FinCounterparties';
 import { FinFactors } from './pages/fin/FinFactors';
+import { forgetWork } from './lib/workContext';
 
 interface Ctx {
   me: Me;
@@ -238,7 +239,7 @@ function Shell() {
   useEffect(() => { if (role === 'platform_admin') api.companies().then((c) => setCompanies(c.companies)).catch(() => {}); }, [role, tenant?.id]);
 
   const choose = async (id: string) => { setTenant(id || null); await reload(); nav('/'); };
-  const logout = async () => { await api.logout().catch(() => {}); setTenant(null); location.href = '/'; };
+  const logout = async () => { await api.logout().catch(() => {}); forgetWork(); setTenant(null); location.href = '/'; };
   const [folded, setFolded] = useState<Set<string>>(() => { try { return new Set(JSON.parse(localStorage.getItem('eko_nav') ?? '[]') as string[]); } catch { return new Set(); } });
   // the whole menu narrowed to icons (as in the prototype), kept on this browser
   const [miniPref, setMini] = useState(() => { try { return localStorage.getItem('eko_mini') === '1'; } catch { return false; } });

@@ -67,7 +67,7 @@ Switched on under **Methodology & boundaries → Approval levels**: for entries 
 | **Add data** → category → step 2 *Review* | drafts, waiting and sent back for the facility, category and months chosen — submit, withdraw, approve |
 | **Add data** → step 3 *Approved* | every approved entry of that facility, category and months, whoever entered it and from whatever source |
 | **Entries & approvals → Approvals** | what waits for you, and what waits for someone else (with *Sent by*) |
-| **Entries & approvals → Entries & results** | every entry of a year — filters just above the list (month, facility, category, item, status) and a **Total** row that adds up the entries shown: quantity (per unit when units differ) and each emissions column; click an entry to see how it was calculated |
+| **Entries & approvals → Entries & results** | every entry of a year — filters just above the list (month, facility, category, item, status) and a **Total** row that adds up the entries shown: quantity (per unit when units differ) and each emissions column; click an entry to see how it was calculated, and to **send it back** (approvers) and then **delete** it — e.g. an entry made for the wrong facility |
 | **Home** | my drafts, sent back to me, waiting for my approval, data due |
 | **Data progress** | each facility × month: approved, in review, partial, missing |
 | **Dashboards, reports, verifier pack** | approved entries only (dashboards can preview waiting ones) |

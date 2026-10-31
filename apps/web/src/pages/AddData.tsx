@@ -17,6 +17,7 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { CategoryBills, ReadingBatches } from './CategoryBills';
 import { Icon } from '../components/Icon';
 import { useApp } from '../App';
+import { rememberWork, workContext } from '../lib/workContext';
 import { unitLabel, api, ApiError, num, tco2e, type CalcResponse, type Category, type DataStatus, type Facility, type ReviewEntry } from '../lib/api';
 import { Result } from '../components/Result';
 import { VehicleEntry, type VehicleMode } from './VehicleEntry';
@@ -116,11 +117,14 @@ export function AddData() {
   const [cat, setCat] = useState<Category | null>(null);
   const [cats, setCats] = useState<Category[]>([]);
   const [facilities, setFacilities] = useState<Facility[]>([]);
-  const [facilityId, setFacilityId] = useState(() => new URLSearchParams(window.location.search).get('facility') ?? '');
+  // the facility and year last worked on stay chosen until the next log-in (a link with ?facility= / ?year= wins)
+  const [facilityId, setFacilityId] = useState(() => new URLSearchParams(window.location.search).get('facility') ?? workContext(tenant?.id).facility ?? '');
   const now = new Date(), nowY = now.getFullYear(), nowM = now.getMonth();
   // ?year= and ?month= (1–12) open a given month, e.g. from Data progress
   const q0 = new URLSearchParams(window.location.search), qy = Number(q0.get('year')), qm = Number(q0.get('month'));
-  const [year, setYear] = useState(qy >= 2000 && qy <= 2100 ? qy : nowY);
+  const [year, setYear] = useState(qy >= 2000 && qy <= 2100 ? qy : workContext(tenant?.id).year ?? nowY);
+  useEffect(() => { if (facilityId) rememberWork(tenant?.id, { facility: facilityId }); }, [facilityId, tenant?.id]);
+  useEffect(() => { rememberWork(tenant?.id, { year }); }, [year, tenant?.id]);
   /** months picked (0–11); `whole` = one entry for the whole year */
   const [picked, setPicked] = useState<number[]>([qm >= 1 && qm <= 12 ? qm - 1 : Math.max(0, nowM - 1)]);
   const [whole, setWhole] = useState(false);
@@ -143,7 +147,7 @@ export function AddData() {
     });
   }, [catCode, tenant?.id]);
   useEffect(() => {
-    api.facilities().then((f) => { const mine = f.facilities.filter((x) => x.canEnter); setFacilities(mine); setFacilityId((id) => (mine.some((x) => x.id === id) ? id : mine[0]?.id ?? '')); });
+    api.facilities().then((f) => { const mine = f.facilities.filter((x) => x.canEnter); setFacilities(mine); const kept = workContext(tenant?.id).facility; setFacilityId((id) => (mine.some((x) => x.id === id) ? id : mine.find((x) => x.id === kept)?.id ?? mine[0]?.id ?? '')); });
   }, [tenant?.id]);
   useEffect(() => {
     if (!facilityId) { setStatus(null); return; }

@@ -2,6 +2,11 @@
 
 Newest first.
 
+## 2026-10-31 · Facility and year kept while logged in; fix an entry from Entries & results
+
+- `lib/workContext.ts`: the facility and year chosen in Add data (and the year in Entries & results) are remembered in the browser per company until the next log-in or log-out; links that carry `?facility=` / `?year=` / `?y=` still win.
+- Entries & results → entry drawer: **Send back…** (approved or waiting entries, with a reason; approvers only — the server decides) and then **Delete…** (draft or sent-back entries), without going back to Add data.
+
 ## 2026-10-31 · Facility type "Educational campus"
 
 - New facility type **Educational campus** (Organisation form, filters, Excel template drop-down and upload); KPI dashboard energy-intensity band 150–300 kWh/m²·yr, like the other types' indicative bands.
